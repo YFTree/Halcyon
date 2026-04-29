@@ -2,6 +2,8 @@ package com.ella.music.data.repository
 
 import android.content.ContentUris
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.LyricLine
@@ -29,6 +31,7 @@ class MusicRepository(private val context: Context) {
 
     private val lyricsCache = mutableMapOf<Long, List<LyricLine>>()
     private val replayGainCache = mutableMapOf<Long, Float?>()
+    private val coverArtCache = mutableMapOf<Long, ByteArray?>()
 
     suspend fun scanMusic(minDurationMs: Long = 0) {
         _isScanning.value = true
@@ -79,6 +82,18 @@ class MusicRepository(private val context: Context) {
         return gain
     }
 
+    fun getCoverArt(song: Song): ByteArray? {
+        coverArtCache[song.id]?.let { return it }
+        val art = scanner.extractCoverArt(song.path)
+        coverArtCache[song.id] = art
+        return art
+    }
+
+    fun getCoverArtBitmap(song: Song): Bitmap? {
+        val data = getCoverArt(song) ?: return null
+        return BitmapFactory.decodeByteArray(data, 0, data.size)
+    }
+
     fun getAlbumArtUri(albumId: Long): Uri {
         return ContentUris.withAppendedId(
             Uri.parse("content://media/external/audio/albumart"),
@@ -93,5 +108,6 @@ class MusicRepository(private val context: Context) {
     fun clearCache() {
         lyricsCache.clear()
         replayGainCache.clear()
+        coverArtCache.clear()
     }
 }

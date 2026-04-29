@@ -12,6 +12,7 @@ datastore = "1.2.0"
 kotlinx-coroutines = "1.10.2"
 lyricon-provider = "0.1.70"
 backdrop = "1.0.6"
+taglib = "1.0.6"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
@@ -27,6 +28,7 @@ coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" 
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 lyricon-provider = { module = "io.github.proify.lyricon:provider", version.ref = "lyricon-provider" }
 backdrop = { module = "io.github.kyant0:backdrop", version.ref = "backdrop" }
+taglib = { module = "io.github.kyant0:taglib", version.ref = "taglib" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -1,12 +1,12 @@
 package com.ella.music
 
 import android.Manifest
-import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -16,12 +16,19 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
@@ -30,6 +37,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ella.music.data.SettingsManager
+import com.ella.music.ui.components.LiquidGlassBottomBar
+import com.ella.music.ui.components.LiquidGlassBottomBarItem
 import com.ella.music.ui.components.MiniPlayer
 import com.ella.music.ui.navigation.AppNavigation
 import com.ella.music.ui.navigation.Screen
@@ -38,14 +47,18 @@ import com.ella.music.ui.theme.THEME_DARK
 import com.ella.music.ui.theme.THEME_FOLLOW_SYSTEM
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.isRenderEffectSupported
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Album
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -60,7 +73,12 @@ class MainActivity : ComponentActivity() {
     private var mainViewModel: MainViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
 
         setContent {
             val mainVm: MainViewModel = viewModel()
@@ -78,7 +96,7 @@ class MainActivity : ComponentActivity() {
 
             val view = LocalView.current
             LaunchedEffect(isDark) {
-                val window = (view.context as Activity).window
+                val window = (view.context as ComponentActivity).window
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
                 WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDark
             }
@@ -128,6 +146,20 @@ fun EllaApp(
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val showMiniPlayer = currentSong != null && currentRoute != Screen.Player.route
 
+    val backdrop = rememberLayerBackdrop()
+    val isBlurEnabled = remember { isRenderEffectSupported() }
+
+    val settingsManager = remember { SettingsManager(mainViewModel.getApplication()) }
+    val liquidGlass by settingsManager.liquidGlass.collectAsState(initial = true)
+    val useGlass = liquidGlass && isBlurEnabled
+
+    val tabs = listOf(
+        Triple(Screen.Home.route, "首页", MiuixIcons.Regular.Music),
+        Triple(Screen.Album.route, "专辑", MiuixIcons.Regular.Album),
+        Triple(Screen.Folder.route, "文件夹", MiuixIcons.Regular.Folder),
+        Triple(Screen.Settings.route, "设置", MiuixIcons.Regular.Settings),
+    )
+
     Scaffold(
         bottomBar = {
             Column {
@@ -150,61 +182,52 @@ fun EllaApp(
                 }
 
                 AnimatedVisibility(visible = showBottomBar) {
-                    NavigationBar {
-                        NavigationBarItem(
-                            selected = currentRoute == Screen.Home.route,
-                            onClick = {
-                                if (currentRoute != Screen.Home.route) {
-                                    navController.navigate(Screen.Home.route) {
-                                        popUpTo(Screen.Home.route) { inclusive = true }
+                    LiquidGlassBottomBar(
+                        backdrop = backdrop,
+                        isBlurEnabled = useGlass
+                    ) {
+                        tabs.forEach { (route, label, icon) ->
+                            LiquidGlassBottomBarItem(
+                                selected = currentRoute == route,
+                                onClick = {
+                                    if (currentRoute != route) {
+                                        navController.navigate(route) {
+                                            popUpTo(Screen.Home.route) { inclusive = route == Screen.Home.route }
+                                        }
                                     }
+                                },
+                                backdrop = backdrop,
+                                isBlurEnabled = useGlass,
+                                icon = {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = label,
+                                        tint = if (currentRoute == route) MiuixTheme.colorScheme.primary
+                                        else MiuixTheme.colorScheme.onSurface,
+                                        modifier = Modifier
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = label,
+                                        fontSize = 11.sp,
+                                        color = if (currentRoute == route) MiuixTheme.colorScheme.primary
+                                        else MiuixTheme.colorScheme.onSurface
+                                    )
                                 }
-                            },
-                            icon = MiuixIcons.Regular.Music,
-                            label = "首页"
-                        )
-                        NavigationBarItem(
-                            selected = currentRoute == Screen.Album.route,
-                            onClick = {
-                                if (currentRoute != Screen.Album.route) {
-                                    navController.navigate(Screen.Album.route) {
-                                        popUpTo(Screen.Home.route)
-                                    }
-                                }
-                            },
-                            icon = MiuixIcons.Regular.Album,
-                            label = "专辑"
-                        )
-                        NavigationBarItem(
-                            selected = currentRoute == Screen.Folder.route,
-                            onClick = {
-                                if (currentRoute != Screen.Folder.route) {
-                                    navController.navigate(Screen.Folder.route) {
-                                        popUpTo(Screen.Home.route)
-                                    }
-                                }
-                            },
-                            icon = MiuixIcons.Regular.Folder,
-                            label = "文件夹"
-                        )
-                        NavigationBarItem(
-                            selected = currentRoute == Screen.Settings.route,
-                            onClick = {
-                                if (currentRoute != Screen.Settings.route) {
-                                    navController.navigate(Screen.Settings.route) {
-                                        popUpTo(Screen.Home.route)
-                                    }
-                                }
-                            },
-                            icon = MiuixIcons.Regular.Settings,
-                            label = "设置"
-                        )
+                            )
+                        }
                     }
                 }
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .layerBackdrop(backdrop)
+        ) {
             AppNavigation(
                 navController = navController,
                 mainViewModel = mainViewModel,

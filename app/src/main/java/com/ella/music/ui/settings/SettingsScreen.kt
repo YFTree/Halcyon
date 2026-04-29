@@ -64,6 +64,7 @@ fun SettingsScreen(
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = true)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val replayGainEnabled by settingsManager.replayGainEnabled.collectAsState(initial = false)
+    val liquidGlass by settingsManager.liquidGlass.collectAsState(initial = true)
 
     var themeExpanded by remember { mutableStateOf(false) }
     val themeLabels = listOf("跟随系统", "浅色", "深色")
@@ -229,6 +230,30 @@ fun SettingsScreen(
                             checked = replayGainEnabled,
                             onCheckedChange = {
                                 scope.launch { settingsManager.setReplayGainEnabled(it) }
+                            }
+                        )
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "界面",
+                fontSize = 14.sp,
+                color = MiuixTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+            )
+
+            Card(modifier = Modifier.padding(vertical = 4.dp)) {
+                BasicComponent(
+                    title = "液态玻璃导航栏",
+                    summary = "底部导航栏使用液态玻璃效果",
+                    endActions = {
+                        Switch(
+                            checked = liquidGlass,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setLiquidGlass(it) }
                             }
                         )
                     }

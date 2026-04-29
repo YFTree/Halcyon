@@ -1,311 +1,354 @@
 package com.ella.music.ui.about
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.BuildConfig
+import com.ella.music.ui.effect.BgEffectBackground
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.BlendColorEntry
+import top.yukonga.miuix.kmp.blur.BlurBlendMode
+import top.yukonga.miuix.kmp.blur.BlurColors
+import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.isRenderEffectSupported
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.ArrowRight
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Music
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.shapes.SmoothRoundedCornerShape
+import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun AboutScreen(
     onBack: () -> Unit
 ) {
-    val scrollState = rememberScrollState()
-    val scrollValue = scrollState.value.toFloat()
-    val maxScroll = 400f
+    val scrollBehavior = MiuixScrollBehavior()
+    val lazyListState = rememberLazyListState()
+    var logoHeightPx by remember { mutableIntStateOf(0) }
 
-    val logoScale = (1f - (scrollValue / maxScroll) * 0.2f).coerceIn(0.7f, 1f)
-    val logoAlpha = (1f - (scrollValue / maxScroll) * 1.5f).coerceIn(0f, 1f)
-    val titleAlpha = (scrollValue / maxScroll * 2f).coerceIn(0f, 1f)
+    val scrollProgress by remember {
+        derivedStateOf {
+            if (logoHeightPx <= 0) 0f
+            else {
+                val index = lazyListState.firstVisibleItemIndex
+                val offset = lazyListState.firstVisibleItemScrollOffset
+                if (index > 0) 1f else (offset.toFloat() / logoHeightPx).coerceIn(0f, 1f)
+            }
+        }
+    }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "bg")
-    val animTime by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(20000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "animTime"
-    )
-
-    val bgColors = listOf(
-        Color(0xFF93C5FD), Color(0xFFFDA4AF), Color(0xFFC4B5FD),
-        Color(0xFFFDE68A), Color(0xFF86EFAC)
-    )
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(380.dp)
-                .drawBehind {
-                    val w = size.width
-                    val h = size.height
-                    val rad = Math.toRadians(animTime.toDouble()).toFloat()
-                    for (i in bgColors.indices) {
-                        val angle = rad + i * 1.2f
-                        val cx = w * (0.3f + 0.4f * kotlin.math.cos(angle + i * 0.7f))
-                        val cy = h * (0.3f + 0.3f * kotlin.math.sin(angle + i * 0.9f))
-                        drawCircle(
-                            color = bgColors[i].copy(alpha = 0.25f),
-                            radius = w * 0.5f,
-                            center = Offset(cx, cy)
+    Scaffold(
+        topBar = {
+            SmallTopAppBar(
+                title = "关于",
+                scrollBehavior = scrollBehavior,
+                color = colorScheme.surface.copy(alpha = if (scrollProgress == 1f) 1f else 0f),
+                titleColor = colorScheme.onSurface.copy(alpha = scrollProgress),
+                defaultWindowInsetsPadding = false,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Back,
+                            contentDescription = "返回",
+                            tint = colorScheme.onSurface,
                         )
                     }
-                }
+                },
+            )
+        },
+    ) { innerPadding ->
+        AboutContent(
+            padding = PaddingValues(top = innerPadding.calculateTopPadding()),
+            scrollBehavior = scrollBehavior,
+            scrollProgress = scrollProgress,
+            lazyListState = lazyListState,
+            onLogoHeightChanged = { logoHeightPx = it },
         )
+    }
+}
 
+@Composable
+private fun AboutContent(
+    padding: PaddingValues,
+    scrollBehavior: top.yukonga.miuix.kmp.basic.ScrollBehavior,
+    scrollProgress: Float,
+    lazyListState: androidx.compose.foundation.lazy.LazyListState,
+    onLogoHeightChanged: (Int) -> Unit,
+) {
+    val backdrop = rememberLayerBackdrop()
+    val isDark = isSystemInDarkTheme()
+    val blurEnable by remember { mutableStateOf(isRenderEffectSupported()) }
+    val shaderSupported = remember { isRuntimeShaderSupported() }
+    val uriHandler = LocalUriHandler.current
+
+    val density = LocalDensity.current
+    var logoHeightDp by remember { mutableStateOf(300.dp) }
+
+    val titleBlend = remember(isDark) {
+        if (isDark) {
+            listOf(
+                BlendColorEntry(Color(0xe6a1a1a1.toInt()), BlurBlendMode.ColorDodge),
+                BlendColorEntry(Color(0x4de6e6e6), BlurBlendMode.LinearLight),
+                BlendColorEntry(Color(0xff1af500.toInt()), BlurBlendMode.Lab),
+            )
+        } else {
+            listOf(
+                BlendColorEntry(Color(0xcc4a4a4a.toInt()), BlurBlendMode.ColorBurn),
+                BlendColorEntry(Color(0xff4f4f4f.toInt()), BlurBlendMode.LinearLight),
+                BlendColorEntry(Color(0xff1af200.toInt()), BlurBlendMode.Lab),
+            )
+        }
+    }
+
+    val cardBlendColors = remember(isDark) {
+        if (isDark) {
+            listOf(
+                BlendColorEntry(Color(0x4DA9A9A9), BlurBlendMode.Luminosity),
+                BlendColorEntry(Color(0x1A9C9C9C), BlurBlendMode.PlusDarker),
+            )
+        } else {
+            listOf(
+                BlendColorEntry(Color(0x340034F9), BlurBlendMode.Overlay),
+                BlendColorEntry(Color(0xB3FFFFFF.toInt()), BlurBlendMode.HardLight),
+            )
+        }
+    }
+
+    BgEffectBackground(
+        dynamicBackground = shaderSupported,
+        modifier = Modifier.fillMaxSize(),
+        bgModifier = Modifier.layerBackdrop(backdrop),
+        effectBackground = shaderSupported,
+        alpha = { 1f - scrollProgress },
+    ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.statusBars)
+                .fillMaxWidth()
+                .padding(top = padding.calculateTopPadding() + 120.dp)
+                .onSizeChanged { size -> with(density) { logoHeightDp = size.height.toDp() } },
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .size(90.dp)
+                    .clip(CircleShape)
+                    .then(
+                        if (blurEnable) Modifier.textureBlur(
+                            backdrop = backdrop,
+                            shape = SmoothRoundedCornerShape(45.dp),
+                            blurRadius = 150f,
+                            noiseCoefficient = BlurDefaults.NoiseCoefficient,
+                            colors = BlurColors(blendColors = titleBlend),
+                            contentBlendMode = BlendMode.DstIn,
+                            enabled = true,
+                        ) else Modifier
+                    ),
+                contentAlignment = Alignment.Center,
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = "返回",
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Text(
-                    text = "关于",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .weight(1f)
-                        .graphicsLayer { alpha = titleAlpha },
-                    textAlign = TextAlign.Center
+                Icon(
+                    imageVector = MiuixIcons.Regular.Music,
+                    contentDescription = null,
+                    tint = colorScheme.onBackground,
+                    modifier = Modifier.size(48.dp),
                 )
-                Spacer(modifier = Modifier.width(48.dp))
             }
 
-            Column(
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp)
-            ) {
-                Column(
-                    modifier = Modifier
+                    .padding(bottom = 5.dp)
+                    .then(
+                        if (blurEnable) Modifier.textureBlur(
+                            backdrop = backdrop,
+                            shape = SmoothRoundedCornerShape(16.dp),
+                            blurRadius = 150f,
+                            noiseCoefficient = BlurDefaults.NoiseCoefficient,
+                            colors = BlurColors(blendColors = titleBlend),
+                            contentBlendMode = BlendMode.DstIn,
+                            enabled = true,
+                        ) else Modifier
+                    ),
+                text = "Ella Music",
+                color = colorScheme.onBackground,
+                fontWeight = FontWeight.Bold,
+                fontSize = 35.sp,
+            )
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                color = colorScheme.onSurfaceVariantSummary,
+                text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                color = colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f),
+                text = "编译于 ${BuildConfig.BUILD_TIME}",
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier
+                .fillMaxSize()
+                .scrollEndHaptic()
+                .overScrollVertical()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding()),
+            overscrollEffect = null,
+        ) {
+            item(key = "logoSpacer") {
+                Box(
+                    Modifier
                         .fillMaxWidth()
-                        .graphicsLayer {
-                            scaleX = logoScale
-                            scaleY = logoScale
-                            alpha = logoAlpha
-                        }
-                        .padding(top = 24.dp, bottom = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(90.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        MiuixTheme.colorScheme.primary,
-                                        MiuixTheme.colorScheme.primary.copy(alpha = 0.7f)
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Music,
-                            contentDescription = null,
-                            tint = MiuixTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(text = "Ella Music", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "v1.0.0",
-                        fontSize = 14.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "编译于 ${BuildConfig.BUILD_TIME}",
-                        fontSize = 12.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "一款简洁优雅的本地音乐播放器",
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "致谢",
-                    fontSize = 14.sp,
-                    color = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                        .height(logoHeightDp + 218.dp)
+                        .onSizeChanged { size -> onLogoHeightChanged(size.height) },
                 )
+            }
 
-                val uriHandler = LocalUriHandler.current
-
-                Card(modifier = Modifier.padding(vertical = 4.dp)) {
+            item {
+                SmallTitle(text = "致谢")
+                FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors) {
                     BasicComponent(
                         title = "Mimo-V2.5-Pro",
                         summary = "主要开发",
                         onClick = { uriHandler.openUri("https://github.com/Kifranei/Ella") },
-                        endActions = {
-                            Icon(
-                                imageVector = MiuixIcons.Basic.ArrowRight,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                        }
                     )
-                }
-
-                Card(modifier = Modifier.padding(vertical = 4.dp)) {
                     BasicComponent(
                         title = "Miuix",
                         summary = "MIUI/HyperOS 风格 Compose UI 组件库",
                         onClick = { uriHandler.openUri("https://github.com/miuix-kmp/miuix") },
-                        endActions = {
-                            Icon(
-                                imageVector = MiuixIcons.Basic.ArrowRight,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                        }
                     )
-                }
-
-                Card(modifier = Modifier.padding(vertical = 4.dp)) {
                     BasicComponent(
                         title = "ExoPlayer (Media3)",
                         summary = "Google 开源媒体播放库",
                         onClick = { uriHandler.openUri("https://github.com/androidx/media") },
-                        endActions = {
-                            Icon(
-                                imageVector = MiuixIcons.Basic.ArrowRight,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                        }
                     )
-                }
-
-                Card(modifier = Modifier.padding(vertical = 4.dp)) {
                     BasicComponent(
                         title = "Lyricon",
                         summary = "状态栏歌词扩展模块",
                         onClick = { uriHandler.openUri("https://github.com/proify/lyricon") },
-                        endActions = {
-                            Icon(
-                                imageVector = MiuixIcons.Basic.ArrowRight,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                        }
                     )
-                }
-
-                Card(modifier = Modifier.padding(vertical = 4.dp)) {
                     BasicComponent(
-                        title = "JAudioTagger",
+                        title = "TagLib",
                         summary = "音频标签读写库",
-                        onClick = { uriHandler.openUri("https://github.com/ijabergern/jaudiotagger") },
-                        endActions = {
-                            Icon(
-                                imageVector = MiuixIcons.Basic.ArrowRight,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                        }
+                        onClick = { uriHandler.openUri("https://github.com/taglib/taglib") },
                     )
-                }
-
-                Card(modifier = Modifier.padding(vertical = 4.dp)) {
+                    BasicComponent(
+                        title = "FFmpeg",
+                        summary = "音视频编解码框架",
+                        onClick = { uriHandler.openUri("https://ffmpeg.org") },
+                    )
                     BasicComponent(
                         title = "Coil",
                         summary = "Kotlin 图片加载库",
                         onClick = { uriHandler.openUri("https://github.com/coil-kt/coil") },
-                        endActions = {
-                            Icon(
-                                imageVector = MiuixIcons.Basic.ArrowRight,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                        }
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(24.dp))
-
+            item {
                 Text(
                     text = "© 2026 Ella Music. All rights reserved.",
                     fontSize = 12.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
+                    color = colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 32.dp)
+                        .padding(bottom = 16.dp),
                 )
             }
+
+            item {
+                Spacer(Modifier.navigationBarsPadding())
+            }
         }
+    }
+}
+
+@Composable
+private fun FrostedCard(
+    backdrop: top.yukonga.miuix.kmp.blur.LayerBackdrop,
+    blurEnable: Boolean,
+    cardBlendColors: List<BlendColorEntry>,
+    content: @Composable () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(bottom = 12.dp)
+            .then(
+                if (blurEnable) Modifier.textureBlur(
+                    backdrop = backdrop,
+                    shape = SmoothRoundedCornerShape(16.dp),
+                    blurRadius = 60f,
+                    noiseCoefficient = BlurDefaults.NoiseCoefficient,
+                    colors = BlurColors(blendColors = cardBlendColors),
+                    enabled = true,
+                ) else Modifier
+            ),
+        colors = CardDefaults.defaultColors(
+            if (blurEnable) Color.Transparent else colorScheme.surfaceContainer,
+            Color.Transparent,
+        ),
+    ) {
+        content()
     }
 }

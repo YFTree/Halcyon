@@ -68,7 +68,10 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.lyricon.provider)
     implementation(libs.backdrop)
+    implementation(libs.taglib)
+    // implementation(project(":ffmpeg-decoder"))  // TODO: build FFmpeg first
 
     implementation("top.yukonga.miuix.kmp:miuix-ui")
     implementation("top.yukonga.miuix.kmp:miuix-icons")
+    implementation("top.yukonga.miuix.kmp:miuix-blur-android")
 }

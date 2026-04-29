@@ -2,10 +2,10 @@ package com.ella.music.player
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -16,17 +16,17 @@ import com.ella.music.MainActivity
 
 class PlaybackService : MediaSessionService() {
 
+    companion object {
+        private const val TAG = "PlaybackService"
+    }
+
     private var mediaSession: MediaSession? = null
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
 
-        val dataSourceFactory = DefaultDataSource.Factory(this)
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
-
         val player = ExoPlayer.Builder(this)
-            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -47,6 +47,8 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
             .build()
+
+        Log.i(TAG, "PlaybackService created")
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {

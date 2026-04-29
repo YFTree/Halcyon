@@ -16,6 +16,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Ella"
 include(":app")
+include(":ffmpeg-decoder")
 
 includeBuild("C:/Users/Croilan/Documents/CodeX Spaces/miuix") {
     dependencySubstitution {
@@ -23,5 +24,7 @@ includeBuild("C:/Users/Croilan/Documents/CodeX Spaces/miuix") {
         substitute(module("top.yukonga.miuix.kmp:miuix-core")).using(project(":miuix-core"))
         substitute(module("top.yukonga.miuix.kmp:miuix-icons")).using(project(":miuix-icons"))
         substitute(module("top.yukonga.miuix.kmp:miuix-shapes")).using(project(":miuix-shapes"))
+        substitute(module("top.yukonga.miuix.kmp:miuix-blur")).using(project(":miuix-blur"))
+        substitute(module("top.yukonga.miuix.kmp:miuix-blur-android")).using(project(":miuix-blur"))
     }
 }

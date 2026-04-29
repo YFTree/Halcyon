@@ -4,15 +4,15 @@ import android.content.ContentUris
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Log
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
+import com.kyant.taglib.TagLib
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.RandomAccessFile
-import java.nio.charset.Charset
 
 class MusicScanner(private val context: Context) {
 
@@ -68,18 +68,33 @@ class MusicScanner(private val context: Context) {
                 val file = File(path)
                 if (!file.exists()) continue
 
-                val needsRetriever = title.isBlank() || artist.isBlank() || album.isBlank() || duration <= 0
+                val needsTagLib = title.isBlank() || artist.isBlank() || album.isBlank() || duration <= 0
 
-                if (needsRetriever) {
+                if (needsTagLib) {
                     try {
-                        val retriever = MediaMetadataRetriever()
-                        retriever.setDataSource(path)
-                        if (title.isBlank()) title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: ""
-                        if (artist.isBlank()) artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
-                        if (album.isBlank()) album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""
-                        if (duration <= 0) duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-                        retriever.release()
-                    } catch (_: Exception) {}
+                        val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                        val audioProps = TagLib.getAudioProperties(fd.fd)
+                        val metadata = TagLib.getMetadata(fd.fd, false)
+                        val props = metadata?.propertyMap
+
+                        if (title.isBlank()) title = props?.get("TITLE")?.firstOrNull() ?: ""
+                        if (artist.isBlank()) artist = props?.get("ARTIST")?.firstOrNull() ?: ""
+                        if (album.isBlank()) album = props?.get("ALBUM")?.firstOrNull() ?: ""
+                        if (duration <= 0) duration = ((audioProps?.length ?: 0) * 1000L)
+
+                        fd.close()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "TagLib failed for $path", e)
+                        try {
+                            val retriever = MediaMetadataRetriever()
+                            retriever.setDataSource(path)
+                            if (title.isBlank()) title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: ""
+                            if (artist.isBlank()) artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
+                            if (album.isBlank()) album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""
+                            if (duration <= 0) duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+                            retriever.release()
+                        } catch (_: Exception) {}
+                    }
                 }
 
                 if (title.isBlank()) title = fileName.substringBeforeLast('.')
@@ -119,144 +134,50 @@ class MusicScanner(private val context: Context) {
     }
 
     fun extractEmbeddedLyrics(path: String): String? {
-        try {
-            val retriever = MediaMetadataRetriever()
-            retriever.setDataSource(path)
-            val lyrics = try { retriever.extractMetadata(1000) } catch (_: Exception) { null }
-            retriever.release()
-            if (!lyrics.isNullOrBlank()) return lyrics
-        } catch (_: Exception) {}
-
-        return try { parseId3Lyrics(File(path)) } catch (_: Exception) { null }
+        return try {
+            val file = File(path)
+            if (!file.exists()) return null
+            val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            val lyrics = TagLib.getMetadataPropertyValues(fd.fd, "LYRICS")?.firstOrNull()
+            fd.close()
+            lyrics?.ifBlank { null }
+        } catch (e: Exception) {
+            Log.w(TAG, "TagLib lyrics extraction failed for $path", e)
+            null
+        }
     }
 
     fun extractReplayGain(path: String): Float? {
-        return try { parseId3ReplayGain(File(path)) } catch (_: Exception) { null }
+        return try {
+            val file = File(path)
+            if (!file.exists()) return null
+            val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            val gainStr = TagLib.getMetadataPropertyValues(fd.fd, "REPLAYGAIN_TRACK_GAIN")?.firstOrNull()
+            fd.close()
+            if (!gainStr.isNullOrBlank()) {
+                Regex("([+-]?[0-9.]+)").find(gainStr)?.groupValues?.get(1)?.toFloatOrNull()
+            } else null
+        } catch (e: Exception) {
+            Log.w(TAG, "TagLib ReplayGain extraction failed for $path", e)
+            null
+        }
+    }
+
+    fun extractCoverArt(path: String): ByteArray? {
+        return try {
+            val file = File(path)
+            if (!file.exists()) return null
+            val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            val pictures = TagLib.getPictures(fd.fd)
+            fd.close()
+            val frontCover = pictures?.firstOrNull { it.pictureType == "Front Cover" } ?: pictures?.firstOrNull()
+            frontCover?.data
+        } catch (e: Exception) {
+            Log.w(TAG, "TagLib cover art extraction failed for $path", e)
+            null
+        }
     }
 
     fun getAlbumArtUri(albumId: Long): Uri =
         ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
-
-    private fun parseId3Lyrics(file: File): String? {
-        RandomAccessFile(file, "r").use { raf ->
-            val header = ByteArray(10)
-            if (raf.read(header) < 10) return null
-            if (header[0] != 'I'.code.toByte() || header[1] != 'D'.code.toByte() || header[2] != '3'.code.toByte()) return null
-
-            val majorVer = header[3].toInt() and 0xFF
-            val tagSize = synchsafeToInt(header.copyOfRange(6, 10))
-            val endPos = raf.filePointer + tagSize
-
-            while (raf.filePointer < endPos && raf.filePointer < file.length()) {
-                if (majorVer >= 3) {
-                    val frameId = String(raf.readNBytes(4), Charset.forName("ISO-8859-1"))
-                    if (frameId.isBlank() || frameId[0] == '\u0000') break
-                    val frameSize = if (majorVer == 4) synchsafeToInt(raf.readNBytes(4)) else raf.readInt()
-                    raf.skipBytes(2)
-                    if (frameSize <= 0 || raf.filePointer + frameSize > endPos) break
-                    val frameData = raf.readNBytes(frameSize)
-
-                    if (frameId == "USLT") {
-                        return parseUsltFrame(frameData)
-                    }
-                } else {
-                    break
-                }
-            }
-        }
-        return null
-    }
-
-    private fun parseId3ReplayGain(file: File): Float? {
-        RandomAccessFile(file, "r").use { raf ->
-            val header = ByteArray(10)
-            if (raf.read(header) < 10) return null
-            if (header[0] != 'I'.code.toByte() || header[1] != 'D'.code.toByte() || header[2] != '3'.code.toByte()) return null
-
-            val majorVer = header[3].toInt() and 0xFF
-            val tagSize = synchsafeToInt(header.copyOfRange(6, 10))
-            val endPos = raf.filePointer + tagSize
-
-            while (raf.filePointer < endPos && raf.filePointer < file.length()) {
-                if (majorVer >= 3) {
-                    val frameId = String(raf.readNBytes(4), Charset.forName("ISO-8859-1"))
-                    if (frameId.isBlank() || frameId[0] == '\u0000') break
-                    val frameSize = if (majorVer == 4) synchsafeToInt(raf.readNBytes(4)) else raf.readInt()
-                    raf.skipBytes(2)
-                    if (frameSize <= 0 || raf.filePointer + frameSize > endPos) break
-                    val frameData = raf.readNBytes(frameSize)
-
-                    if (frameId == "TXXX") {
-                        val text = parseTxxxFrame(frameData)
-                        if (text?.first?.equals("REPLAYGAIN_TRACK_GAIN", ignoreCase = true) == true) {
-                            return Regex("([+-]?[0-9.]+)").find(text.second ?: "")?.groupValues?.get(1)?.toFloatOrNull()
-                        }
-                    }
-                } else {
-                    break
-                }
-            }
-        }
-        return null
-    }
-
-    private fun parseUsltFrame(data: ByteArray): String? {
-        if (data.size < 4) return null
-        val encoding = data[0].toInt() and 0xFF
-        val charset = when (encoding) {
-            0 -> Charset.forName("ISO-8859-1")
-            1 -> Charset.forName("UTF-16")
-            2 -> Charset.forName("UTF-16BE")
-            3 -> Charset.forName("UTF-8")
-            else -> Charset.forName("UTF-8")
-        }
-        val lang = String(data, 1, 3, Charset.forName("ISO-8859-1"))
-        var offset = 4
-        if (encoding == 1 || encoding == 2) {
-            offset += 2
-            while (offset + 1 < data.size && (data[offset] != 0.toByte() || data[offset + 1] != 0.toByte())) offset += 2
-            offset += 2
-        } else {
-            while (offset < data.size && data[offset] != 0.toByte()) offset++
-            offset++
-        }
-        if (offset >= data.size) return null
-        return String(data, offset, data.size - offset, charset).trim()
-    }
-
-    private fun parseTxxxFrame(data: ByteArray): Pair<String?, String?>? {
-        if (data.size < 2) return null
-        val encoding = data[0].toInt() and 0xFF
-        val charset = when (encoding) {
-            0 -> Charset.forName("ISO-8859-1")
-            1 -> Charset.forName("UTF-16")
-            2 -> Charset.forName("UTF-16BE")
-            3 -> Charset.forName("UTF-8")
-            else -> Charset.forName("UTF-8")
-        }
-        var offset = 1
-        var descEnd = data.size
-        for (i in offset until data.size) {
-            if (data[i] == 0.toByte()) { descEnd = i; break }
-        }
-        val desc = String(data, offset, descEnd - offset, charset)
-        offset = descEnd + 1
-        if (offset >= data.size) return Pair(desc, null)
-        val value = String(data, offset, data.size - offset, charset)
-        return Pair(desc, value)
-    }
-
-    private fun synchsafeToInt(bytes: ByteArray): Int {
-        var result = 0
-        for (b in bytes) {
-            result = (result shl 7) or (b.toInt() and 0x7F)
-        }
-        return result
-    }
-
-    private fun RandomAccessFile.readNBytes(n: Int): ByteArray {
-        val buf = ByteArray(n)
-        readFully(buf)
-        return buf
-    }
 }
