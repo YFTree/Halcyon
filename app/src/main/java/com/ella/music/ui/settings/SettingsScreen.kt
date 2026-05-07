@@ -45,8 +45,8 @@ import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
+import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Info
-import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -70,13 +70,17 @@ fun SettingsScreen(
 
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
+    var themeExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(title = "设置")
+        SmallTopAppBar(
+            title = "设置",
+            color = MiuixTheme.colorScheme.background
+        )
 
         Column(
             modifier = Modifier
@@ -94,16 +98,57 @@ fun SettingsScreen(
             )
 
             Card(modifier = Modifier.padding(vertical = 4.dp)) {
-                OverlayDropdownPreference(
-                    items = themeLabels,
-                    selectedIndex = selectedThemeMode,
+                BasicComponent(
                     title = "主题模式",
-                    showValue = true,
-                    renderInRootScaffold = false,
-                    onSelectedIndexChange = { index ->
-                        scope.launch { settingsManager.setThemeMode(index) }
+                    summary = themeLabels[selectedThemeMode],
+                    onClick = { themeExpanded = !themeExpanded },
+                    endActions = {
+                        Icon(
+                            imageVector = MiuixIcons.Basic.ArrowRight,
+                            contentDescription = null,
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 )
+                AnimatedVisibility(
+                    visible = themeExpanded,
+                    enter = expandVertically(),
+                    exit = shrinkVertically()
+                ) {
+                    Column {
+                        themeLabels.forEachIndexed { index, label ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = selectedThemeMode == index,
+                                        onClick = {
+                                            scope.launch { settingsManager.setThemeMode(index) }
+                                            themeExpanded = false
+                                        }
+                                    )
+                                    .padding(horizontal = 24.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 15.sp,
+                                    color = MiuixTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (selectedThemeMode == index) {
+                                    Icon(
+                                        imageVector = MiuixIcons.Basic.Check,
+                                        contentDescription = null,
+                                        tint = MiuixTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

@@ -66,18 +66,18 @@ fun MiniPlayer(
     val coverModel = embeddedCover ?: if (loadCoverArt == null) albumArtUri else null
     val shape = RoundedCornerShape(if (liquidGlass) 24.dp else 0.dp)
     val glassBackdrop = if (liquidGlass) backdrop else null
-    val isGlass = glassBackdrop != null
+    val useGlassLayout = liquidGlass
     val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
-    val glassSurface = if (isLight) Color(0xFFF8F8FA).copy(alpha = 0.84f) else Color(0xFF111114).copy(alpha = 0.92f)
+    val glassSurface = if (isLight) Color(0xFFF8F8FA).copy(alpha = 0.88f) else Color(0xFF111114).copy(alpha = 0.94f)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = if (isGlass) 16.dp else 0.dp, vertical = if (isGlass) 6.dp else 0.dp)
+            .padding(horizontal = if (useGlassLayout) 16.dp else 0.dp, vertical = if (useGlassLayout) 6.dp else 0.dp)
             .clickable(onClick = onClick)
             .then(
-                if (isGlass) {
+                if (glassBackdrop != null) {
                     Modifier
                         .clip(shape)
                         .drawBackdrop(
@@ -92,6 +92,10 @@ fun MiniPlayer(
                                 drawRect(glassSurface)
                             }
                         )
+                } else if (useGlassLayout) {
+                    Modifier
+                        .clip(shape)
+                        .background(glassSurface, shape)
                 } else {
                     Modifier.background(surfaceContainer)
                 }

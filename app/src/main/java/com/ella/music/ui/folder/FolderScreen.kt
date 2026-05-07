@@ -54,7 +54,10 @@ fun FolderScreen(
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(title = "文件夹")
+        SmallTopAppBar(
+            title = "文件夹",
+            color = MiuixTheme.colorScheme.background
+        )
 
         if (folderMap.isEmpty()) {
             Box(

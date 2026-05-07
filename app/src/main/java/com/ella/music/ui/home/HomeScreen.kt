@@ -69,6 +69,7 @@ fun HomeScreen(
     ) {
         SmallTopAppBar(
             title = "Ella Music",
+            color = MiuixTheme.colorScheme.background,
             actions = {
                 IconButton(onClick = { searchExpanded = !searchExpanded }) {
                     Icon(

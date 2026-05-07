@@ -35,7 +35,10 @@ fun AlbumScreen(
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(title = "专辑")
+        SmallTopAppBar(
+            title = "专辑",
+            color = MiuixTheme.colorScheme.background
+        )
 
         if (albums.isEmpty()) {
             Box(
