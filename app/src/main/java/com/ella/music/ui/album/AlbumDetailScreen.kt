@@ -30,8 +30,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.ella.music.data.model.Album
+import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -138,11 +138,12 @@ private fun AlbumHeader(
                 .background(MiuixTheme.colorScheme.surfaceContainer),
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
+            SafeCoverImage(
                 model = albumArtUri,
                 contentDescription = null,
                 modifier = Modifier.matchParentSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                sizePx = 768
             )
         }
 

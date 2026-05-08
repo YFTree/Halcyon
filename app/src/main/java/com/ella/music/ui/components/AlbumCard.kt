@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.ella.music.data.model.Album
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -49,11 +48,12 @@ fun AlbumCard(
             contentAlignment = Alignment.Center
         ) {
             if (albumArtUri != null) {
-                AsyncImage(
+                SafeCoverImage(
                     model = albumArtUri,
                     contentDescription = album.name,
                     modifier = Modifier.matchParentSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    sizePx = 384
                 )
             } else {
                 Icon(

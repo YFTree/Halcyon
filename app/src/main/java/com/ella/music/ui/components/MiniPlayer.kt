@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.kyant.backdrop.Backdrop
@@ -111,13 +110,14 @@ fun MiniPlayer(
             contentAlignment = Alignment.Center
         ) {
             if (coverModel != null) {
-                AsyncImage(
+                SafeCoverImage(
                     model = coverModel,
                     contentDescription = null,
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    sizePx = 128
                 )
             } else {
                 Icon(

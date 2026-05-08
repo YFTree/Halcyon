@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
+import android.util.LruCache
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
@@ -37,6 +38,9 @@ class MusicRepository(private val context: Context) {
     private val lyricsCache = mutableMapOf<Long, List<LyricLine>>()
     private val replayGainCache = mutableMapOf<Long, Float?>()
     private val coverArtCache = mutableMapOf<Long, ByteArray?>()
+    private val coverBitmapCache = object : LruCache<Long, Bitmap>(16 * 1024) {
+        override fun sizeOf(key: Long, value: Bitmap): Int = value.byteCount / 1024
+    }
     private val libraryCacheFile = File(context.filesDir, "music_library_cache.json")
 
     suspend fun scanMusic(minDurationMs: Long = 0) {
@@ -126,8 +130,25 @@ class MusicRepository(private val context: Context) {
     }
 
     fun getCoverArtBitmap(song: Song): Bitmap? {
+        coverBitmapCache.get(song.id)?.let { return it }
         val data = getCoverArt(song) ?: return null
-        return BitmapFactory.decodeByteArray(data, 0, data.size)
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+
+        val maxSize = 512
+        var sampleSize = 1
+        while ((bounds.outWidth / sampleSize) > maxSize || (bounds.outHeight / sampleSize) > maxSize) {
+            sampleSize *= 2
+        }
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize.coerceAtLeast(1)
+            inPreferredConfig = Bitmap.Config.RGB_565
+        }
+        return BitmapFactory.decodeByteArray(data, 0, data.size, options)
+            ?.also { coverBitmapCache.put(song.id, it) }
     }
 
     fun getAlbumArtUri(albumId: Long): Uri? {

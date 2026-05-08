@@ -25,7 +25,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.ella.music.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -91,11 +90,12 @@ fun SongItem(
             contentAlignment = Alignment.Center
         ) {
             if (coverModel != null) {
-                AsyncImage(
+                SafeCoverImage(
                     model = coverModel,
                     contentDescription = null,
                     modifier = Modifier.size(48.dp),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Crop,
+                    sizePx = 128
                 )
             } else {
                 Icon(

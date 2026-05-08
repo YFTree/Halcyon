@@ -42,10 +42,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.Player
-import coil3.compose.AsyncImage
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.WordLyricView
+import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -314,13 +314,14 @@ private fun AlbumArtView(
         contentAlignment = Alignment.Center
     ) {
         if (coverModel != null) {
-            AsyncImage(
+            SafeCoverImage(
                 model = coverModel,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(20.dp)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                sizePx = 768
             )
         } else {
             Icon(
