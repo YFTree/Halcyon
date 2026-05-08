@@ -80,6 +80,7 @@ class LyriconBridge(private val context: Context) {
     fun setDisplayTranslation(display: Boolean) {
         displayTranslation = display
         provider?.player?.setDisplayTranslation(display)
+        resendLastSong()
     }
 
     fun sendSong(song: Song, lyrics: List<LyricLine>) {
@@ -99,6 +100,13 @@ class LyriconBridge(private val context: Context) {
                         end = word.endMs
                     )
                 }
+                val backgroundWords = line.backgroundWords.map { word ->
+                    LyricWord(
+                        text = word.text,
+                        begin = word.startMs,
+                        end = word.endMs
+                    )
+                }
 
                 val nextLineTime = lyrics
                     .filter { it.timeMs > line.timeMs }
@@ -112,7 +120,8 @@ class LyriconBridge(private val context: Context) {
                     text = line.text,
                     words = words.ifEmpty { null },
                     secondary = line.backgroundText,
-                    translation = line.translation ?: line.backgroundTranslation
+                    secondaryWords = backgroundWords.ifEmpty { null },
+                    translation = line.translationForLyricon()
                 )
             }
 
@@ -145,6 +154,13 @@ class LyriconBridge(private val context: Context) {
                         end = word.endMs
                     )
                 }
+                val backgroundWords = line.backgroundWords.map { word ->
+                    LyricWord(
+                        text = word.text,
+                        begin = word.startMs,
+                        end = word.endMs
+                    )
+                }
 
                 val nextLineTime = lyrics
                     .filter { it.timeMs > line.timeMs }
@@ -158,7 +174,12 @@ class LyriconBridge(private val context: Context) {
                     text = line.text,
                     words = words.ifEmpty { null },
                     secondary = line.backgroundText,
-                    translation = translationMap[line.timeMs] ?: line.backgroundTranslation
+                    secondaryWords = backgroundWords.ifEmpty { null },
+                    translation = if (displayTranslation) {
+                        translationMap[line.timeMs] ?: line.backgroundTranslation
+                    } else {
+                        null
+                    }
                 )
             }
 
@@ -219,5 +240,10 @@ class LyriconBridge(private val context: Context) {
     private fun resendLastSong() {
         val song = lastSong ?: return
         sendSong(song, lastLyrics)
+    }
+
+    private fun LyricLine.translationForLyricon(): String? {
+        if (!displayTranslation) return null
+        return translation ?: backgroundTranslation
     }
 }

@@ -11,6 +11,11 @@ plugins {
 android {
     namespace = "com.ella.music"
     compileSdk = 37
+    val releaseStoreFile = System.getenv("RELEASE_STORE_FILE")?.let { file(it) } ?: file("release.jks")
+    val hasReleaseSigning = releaseStoreFile.exists() &&
+        !System.getenv("RELEASE_STORE_PASSWORD").isNullOrBlank() &&
+        !System.getenv("RELEASE_KEY_ALIAS").isNullOrBlank() &&
+        !System.getenv("RELEASE_KEY_PASSWORD").isNullOrBlank()
 
     defaultConfig {
         applicationId = "com.ella.music"
@@ -25,7 +30,7 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file(System.getenv("RELEASE_STORE_FILE") ?: "release.jks")
+            storeFile = releaseStoreFile
             storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: ""
             keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: ""
             keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: ""
@@ -36,10 +41,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

@@ -250,8 +250,8 @@ fun SettingsScreen(
 
             Card(modifier = Modifier.padding(vertical = 4.dp)) {
                 BasicComponent(
-                    title = "液态玻璃导航栏",
-                    summary = "底部导航栏使用液态玻璃效果",
+                    title = "悬浮导航栏",
+                    summary = "底部导航栏使用高斯模糊悬浮效果",
                     endActions = {
                         Switch(
                             checked = liquidGlass,

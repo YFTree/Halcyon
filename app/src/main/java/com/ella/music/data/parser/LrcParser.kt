@@ -101,7 +101,7 @@ object LrcParser {
     }
 
     private fun parseTtml(content: String): LrcResult? {
-        if (!content.trimStart().startsWith("<tt", ignoreCase = true)) return null
+        if (!Regex("""<tt(?:\s|>)""", RegexOption.IGNORE_CASE).containsMatchIn(content)) return null
         parseTtmlDom(content)?.let { return it }
 
         val lyrics = ttmlParagraphPattern.findAll(content)
@@ -111,7 +111,7 @@ object LrcParser {
                 val begin = beginAttributePattern.find(attributes)?.groupValues?.getOrNull(1)?.parseTtmlTime()
                     ?: return@mapNotNull null
                 val end = endAttributePattern.find(attributes)?.groupValues?.getOrNull(1)?.parseTtmlTime()
-                val agent = Regex("""\b(?:ttm:)?agent="([^"]+)"""", RegexOption.IGNORE_CASE)
+                val agent = Regex("\\b(?:ttm:)?agent=\"([^\"]+)\"", RegexOption.IGNORE_CASE)
                     .find(attributes)
                     ?.groupValues
                     ?.getOrNull(1)
@@ -154,7 +154,9 @@ object LrcParser {
                     translation = translation,
                     agent = agent,
                     backgroundText = background?.text,
-                    backgroundTranslation = background?.translation
+                    backgroundWords = background?.words.orEmpty(),
+                    backgroundTranslation = background?.translation,
+                    isTtml = true
                 )
             }
             .sortedBy { it.timeMs }
@@ -166,21 +168,20 @@ object LrcParser {
     private fun parseTtmlDom(content: String): LrcResult? {
         return try {
             val document = DocumentBuilderFactory.newInstance().apply {
-                isNamespaceAware = false
+                isNamespaceAware = true
                 isIgnoringComments = true
                 isCoalescing = true
             }.newDocumentBuilder().parse(InputSource(StringReader(content)))
 
-            val paragraphs = document.getElementsByTagName("p")
+            val paragraphs = document.getElementsByTagNameNS("*", "p")
             val lyrics = (0 until paragraphs.length).mapNotNull { index ->
                 val paragraph = paragraphs.item(index) as? Element ?: return@mapNotNull null
-                val begin = paragraph.getAttribute("begin").parseTtmlTime() ?: return@mapNotNull null
-                val end = paragraph.getAttribute("end").parseTtmlTime()
+                val begin = paragraph.attr("begin").parseTtmlTime() ?: return@mapNotNull null
+                val end = paragraph.attr("end").parseTtmlTime()
                 val words = mutableListOf<LyricWord>()
                 val translations = mutableListOf<String>()
                 val backgrounds = mutableListOf<TtmlBackground>()
-                val agent = paragraph.getAttribute("ttm:agent")
-                    .ifBlank { paragraph.getAttribute("agent") }
+                val agent = paragraph.attr("agent")
                     .ifBlank { null }
                 val text = collectTtmlText(paragraph, words, translations, backgrounds, end)
                     .replace(Regex("""[ \t\r\n]+"""), " ")
@@ -194,7 +195,9 @@ object LrcParser {
                     translation = translations.firstOrNull { it.isNotBlank() && !it.isMusicSymbolOnly() },
                     agent = agent,
                     backgroundText = backgrounds.firstOrNull { it.text.isNotBlank() && !it.text.isMusicSymbolOnly() }?.text,
-                    backgroundTranslation = backgrounds.firstOrNull { !it.translation.isNullOrBlank() }?.translation
+                    backgroundWords = backgrounds.firstOrNull { it.words.isNotEmpty() }?.words.orEmpty(),
+                    backgroundTranslation = backgrounds.firstOrNull { !it.translation.isNullOrBlank() }?.translation,
+                    isTtml = true
                 )
             }.sortedBy { it.timeMs }
 
@@ -219,15 +222,15 @@ object LrcParser {
                 Node.TEXT_NODE -> builder.append(child.nodeValue)
                 Node.ELEMENT_NODE -> {
                     val element = child as? Element ?: continue
-                    val role = element.getAttribute("ttm:role").ifBlank { element.getAttribute("role") }
+                    val role = element.attr("role")
                     when (role) {
                         "x-translation" -> translations += element.textContent.cleanTtmlText()
-                        "x-bg" -> backgrounds += collectTtmlBackground(element)
+                        "x-bg" -> backgrounds += collectTtmlBackground(element, lineEndMs)
                         else -> {
                             val text = collectTtmlText(element, words, translations, backgrounds, lineEndMs)
-                            val wordBegin = element.getAttribute("begin").parseTtmlTime()
+                            val wordBegin = element.attr("begin").parseTtmlTime()
                             if (wordBegin != null && text.isNotBlank()) {
-                                val wordEnd = element.getAttribute("end").parseTtmlTime()
+                                val wordEnd = element.attr("end").parseTtmlTime()
                                     ?: lineEndMs
                                     ?: (wordBegin + estimateWordDuration(text))
                                 words += LyricWord(text, wordBegin, wordEnd)
@@ -243,11 +246,13 @@ object LrcParser {
 
     private data class TtmlBackground(
         val text: String,
+        val words: List<LyricWord> = emptyList(),
         val translation: String? = null
     )
 
-    private fun collectTtmlBackground(element: Element): TtmlBackground {
+    private fun collectTtmlBackground(element: Element, lineEndMs: Long?): TtmlBackground {
         val translations = mutableListOf<String>()
+        val words = mutableListOf<LyricWord>()
         val textBuilder = StringBuilder()
         val children = element.childNodes
         for (index in 0 until children.length) {
@@ -256,17 +261,37 @@ object LrcParser {
                 Node.TEXT_NODE -> textBuilder.append(child.nodeValue)
                 Node.ELEMENT_NODE -> {
                     val childElement = child as? Element ?: continue
-                    val role = childElement.getAttribute("ttm:role").ifBlank { childElement.getAttribute("role") }
+                    val role = childElement.attr("role")
                     if (role == "x-translation") {
                         translations += childElement.textContent.cleanTtmlText()
                     } else {
-                        textBuilder.append(childElement.textContent)
+                        val childBackground = collectTtmlBackground(childElement, lineEndMs)
+                        textBuilder.append(childBackground.text)
+                        childBackground.translation?.let { translations += it }
+                        words += childBackground.words
+
+                        val wordBegin = childElement.attr("begin").parseTtmlTime()
+                        if (wordBegin != null && childBackground.text.isNotBlank() && childBackground.words.isEmpty()) {
+                            val wordEnd = childElement.attr("end").parseTtmlTime()
+                                ?: lineEndMs
+                                ?: (wordBegin + estimateWordDuration(childBackground.text))
+                            words += LyricWord(childBackground.text, wordBegin, wordEnd)
+                        }
                     }
                 }
             }
         }
+        val text = textBuilder.toString().cleanTtmlText()
+        val ownBegin = element.attr("begin").parseTtmlTime()
+        if (ownBegin != null && words.isEmpty() && text.isNotBlank()) {
+            val ownEnd = element.attr("end").parseTtmlTime()
+                ?: lineEndMs
+                ?: (ownBegin + estimateWordDuration(text))
+            words += LyricWord(text, ownBegin, ownEnd)
+        }
         return TtmlBackground(
-            text = textBuilder.toString().cleanTtmlText(),
+            text = text,
+            words = words.withTextSpacing(text),
             translation = translations.firstOrNull { it.isNotBlank() && !it.isMusicSymbolOnly() }
         )
     }
@@ -282,7 +307,20 @@ object LrcParser {
             .stripXmlText()
             .takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
             .orEmpty()
-        return TtmlBackground(text, translation)
+        val words = ttmlSpanPattern.findAll(this)
+            .mapNotNull { span ->
+                val attributes = span.groupValues[1]
+                if (attributes.contains("ttm:role=", ignoreCase = true)) return@mapNotNull null
+                val begin = beginAttributePattern.find(attributes)?.groupValues?.getOrNull(1)?.parseTtmlTime()
+                    ?: return@mapNotNull null
+                val wordText = span.groupValues[2].stripXmlText()
+                if (wordText.isBlank()) return@mapNotNull null
+                val end = endAttributePattern.find(attributes)?.groupValues?.getOrNull(1)?.parseTtmlTime()
+                    ?: (begin + estimateWordDuration(wordText))
+                LyricWord(wordText, begin, end)
+            }
+            .toList()
+        return TtmlBackground(text, words.withTextSpacing(text), translation)
     }
 
     private fun parseInlineTimedLine(line: String): LyricLine? {
@@ -306,9 +344,10 @@ object LrcParser {
 
         if (wordSegments.isEmpty()) return null
 
-        val hasWordTiming = wordSegments.size > 1 && wordSegments.any { !it.text.hasCjk() }
+        val hasWordTiming = wordSegments.size > 1
         if (!hasWordTiming) {
-            return LyricLine(first.timeMs, first.text.trim())
+            val lineText = wordSegments.joinToString("") { it.text }.trim()
+            return LyricLine(first.timeMs, lineText.ifBlank { first.text.trim() })
         }
 
         val words = wordSegments.mapIndexed { index, segment ->
@@ -467,6 +506,20 @@ object LrcParser {
         return Html.fromHtml(withoutTags, Html.FROM_HTML_MODE_LEGACY)
             .toString()
             .cleanTtmlText()
+    }
+
+    private fun Element.attr(localName: String): String {
+        val direct = getAttribute(localName).ifBlank { getAttribute("ttm:$localName") }
+        if (direct.isNotBlank()) return direct
+
+        val attributes = attributes ?: return ""
+        for (index in 0 until attributes.length) {
+            val item = attributes.item(index)
+            if (item.localName == localName || item.nodeName.substringAfter(':') == localName) {
+                return item.nodeValue.orEmpty()
+            }
+        }
+        return ""
     }
 
     private fun String.cleanTtmlText(): String =

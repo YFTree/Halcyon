@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,6 +30,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,6 +51,8 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlinx.coroutines.Job
+import kotlin.math.floor
 
 @Composable
 fun HomeScreen(
@@ -201,6 +208,13 @@ fun HomeScreen(
                 }
             } else {
                 val listState = rememberLazyListState()
+                var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+                val fastIndexTargets = remember(sortedSongs) {
+                    sortedSongs
+                        .mapIndexed { index, song -> song.indexLetter() to index }
+                        .distinctBy { it.first }
+                        .toMap()
+                }
 
                 Column(modifier = Modifier.fillMaxSize()) {
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -250,9 +264,10 @@ fun HomeScreen(
                                     .fillMaxHeight()
                                     .padding(end = 2.dp),
                                 onLetterClick = { letter ->
-                                    val index = sortedSongs.indexOfFirst { it.indexLetter() == letter }
-                                    if (index >= 0) {
-                                        scope.launch { listState.animateScrollToItem(index) }
+                                    val index = fastIndexTargets[letter]
+                                    if (index != null) {
+                                        fastScrollJob?.cancel()
+                                        fastScrollJob = scope.launch { listState.scrollToItem(index) }
                                     }
                                 }
                             )
@@ -280,8 +295,40 @@ private fun FastIndexBar(
     val letters = remember(songs) {
         songs.map { it.indexLetter() }.distinct()
     }
+    var heightPx by remember { mutableStateOf(1) }
+    var lastSelectedLetter by remember { mutableStateOf<String?>(null) }
+
+    fun selectAt(y: Float) {
+        if (letters.isEmpty()) return
+        val index = floor((y.coerceIn(0f, heightPx.toFloat() - 1f) / heightPx) * letters.size)
+            .toInt()
+            .coerceIn(0, letters.lastIndex)
+        val letter = letters[index]
+        if (letter != lastSelectedLetter) {
+            lastSelectedLetter = letter
+            onLetterClick(letter)
+        }
+    }
+
     Column(
-        modifier = modifier,
+        modifier = modifier
+            .onSizeChanged { heightPx = it.height.coerceAtLeast(1) }
+            .pointerInput(letters, heightPx) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    selectAt(down.position.y)
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+                        if (change.changedToUpIgnoreConsumed()) break
+                        if (change.pressed) {
+                            selectAt(change.position.y)
+                            change.consume()
+                        }
+                    }
+                    lastSelectedLetter = null
+                }
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
     ) {
@@ -292,7 +339,10 @@ private fun FastIndexBar(
                 fontWeight = FontWeight.Bold,
                 color = MiuixTheme.colorScheme.primary,
                 modifier = Modifier
-                    .clickable { onLetterClick(letter) }
+                    .clickable {
+                        lastSelectedLetter = letter
+                        onLetterClick(letter)
+                    }
                     .padding(horizontal = 8.dp, vertical = 1.dp)
             )
         }

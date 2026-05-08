@@ -287,11 +287,11 @@ private fun WordLine(
 }
 
 private fun LyricLine.ttmlTextAlign(): TextAlign {
-    if (agent.isNullOrBlank()) return TextAlign.Center
+    if (!isTtml || agent.isNullOrBlank()) return TextAlign.Center
     return if (agent.equals("v2", ignoreCase = true)) TextAlign.End else TextAlign.Start
 }
 
 private fun LyricLine.ttmlAlignment(): Alignment.Horizontal {
-    if (agent.isNullOrBlank()) return Alignment.CenterHorizontally
+    if (!isTtml || agent.isNullOrBlank()) return Alignment.CenterHorizontally
     return if (agent.equals("v2", ignoreCase = true)) Alignment.End else Alignment.Start
 }

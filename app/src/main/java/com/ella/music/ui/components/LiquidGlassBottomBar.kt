@@ -1,7 +1,5 @@
 package com.ella.music.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -19,7 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,13 +25,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.lerp
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.highlight.Highlight
-import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
-import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -45,25 +39,22 @@ fun LiquidGlassBottomBar(
 ) {
     val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
     val hasBackdrop = isBlurEnabled && backdrop != null
-    val containerColor = if (hasBackdrop) {
-        if (isLight) Color(0xFFF8F8FA).copy(alpha = 0.86f) else Color(0xFF111114).copy(alpha = 0.92f)
-    } else {
-        if (isLight) Color(0xFFF8F8FA).copy(alpha = 0.9f) else Color(0xFF111114).copy(alpha = 0.96f)
-    }
+    val containerColor =
+        if (isLight) Color.White.copy(alpha = 0.78f) else Color(0xFF151518).copy(alpha = 0.82f)
 
     val glassModifier = if (hasBackdrop) {
         Modifier.drawBackdrop(
             backdrop = backdrop,
             shape = { RoundedCornerShape(28.dp) },
             effects = {
-                blur(6f.dp.toPx())
+                blur(18f.dp.toPx())
             },
             highlight = {
-                Highlight.Default.copy(alpha = 0.28f)
+                Highlight.Default.copy(alpha = if (isLight) 0.18f else 0.10f)
             },
             shadow = {
                 Shadow.Default.copy(
-                    color = Color.Black.copy(alpha = if (isLight) 0.08f else 0.2f)
+                    color = Color.Black.copy(alpha = if (isLight) 0.10f else 0.26f)
                 )
             },
             onDrawSurface = { drawRect(containerColor) }
@@ -94,70 +85,37 @@ fun RowScope.LiquidGlassBottomBarItem(
     icon: @Composable () -> Unit,
     label: @Composable () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    val pressProgress = remember { Animatable(0f) }
     var isPressed by remember { mutableStateOf(false) }
     val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
+    val selectedColor = if (isLight) {
+        MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
+    } else {
+        MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
+    }
+    val pressedColor = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.08f)
 
     Column(
         modifier = Modifier
             .weight(1f)
             .height(56.dp)
             .clip(RoundedCornerShape(16.dp))
+            .background(
+                color = when {
+                    isPressed -> pressedColor
+                    selected -> selectedColor
+                    else -> Color.Transparent
+                },
+                shape = RoundedCornerShape(16.dp)
+            )
             .pointerInput(Unit) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
                     isPressed = true
-                    scope.launch {
-                        pressProgress.animateTo(
-                            1f,
-                            animationSpec = spring(stiffness = 400f, dampingRatio = 0.7f)
-                        )
-                    }
                     waitForUpOrCancellation()
                     isPressed = false
-                    scope.launch {
-                        pressProgress.animateTo(
-                            0f,
-                            animationSpec = spring(stiffness = 300f, dampingRatio = 0.6f)
-                        )
-                    }
                     onClick()
                 }
             }
-            .graphicsLayer {
-                val scale = lerp(1f, 1.08f, pressProgress.value)
-                scaleX = scale
-                scaleY = scale
-            }
-            .then(
-                if (isBlurEnabled && backdrop != null) Modifier.drawBackdrop(
-                    backdrop = backdrop,
-                    shape = { RoundedCornerShape(16.dp) },
-                    effects = {
-                        val p = pressProgress.value
-                        if (p > 0.01f) {
-                            blur(2f.dp.toPx() * p)
-                        }
-                    },
-                    highlight = {
-                        Highlight.Default.copy(alpha = pressProgress.value * 0.8f)
-                    },
-                    innerShadow = {
-                        InnerShadow(
-                            radius = 6f.dp * pressProgress.value,
-                            alpha = pressProgress.value * 0.3f
-                        )
-                    },
-                    onDrawSurface = {
-                        val p = pressProgress.value
-                        drawRect(
-                            color = if (isLight) Color.Black.copy(0.06f) else Color.White.copy(0.06f),
-                            alpha = p
-                        )
-                    }
-                ) else Modifier
-            )
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

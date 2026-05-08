@@ -7,7 +7,9 @@ data class LyricLine(
     val translation: String? = null,
     val agent: String? = null,
     val backgroundText: String? = null,
-    val backgroundTranslation: String? = null
+    val backgroundWords: List<LyricWord> = emptyList(),
+    val backgroundTranslation: String? = null,
+    val isTtml: Boolean = false
 )
 
 data class LyricWord(
