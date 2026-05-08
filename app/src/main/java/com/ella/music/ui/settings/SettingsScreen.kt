@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -45,7 +44,6 @@ import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
-import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -66,8 +64,6 @@ fun SettingsScreen(
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = true)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val replayGainEnabled by settingsManager.replayGainEnabled.collectAsState(initial = false)
-    val liquidGlass by settingsManager.liquidGlass.collectAsState(initial = true)
-
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
     var themeExpanded by remember { mutableStateOf(false) }
@@ -97,54 +93,37 @@ fun SettingsScreen(
                 modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
             )
 
-            Card(modifier = Modifier.padding(vertical = 4.dp)) {
-                BasicComponent(
-                    title = "主题模式",
-                    summary = themeLabels[selectedThemeMode],
-                    onClick = { themeExpanded = !themeExpanded },
-                    endActions = {
-                        Icon(
-                            imageVector = MiuixIcons.Basic.ArrowRight,
-                            contentDescription = null,
-                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                )
-                AnimatedVisibility(
-                    visible = themeExpanded,
-                    enter = expandVertically(),
-                    exit = shrinkVertically()
-                ) {
-                    Column {
-                        themeLabels.forEachIndexed { index, label ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .selectable(
-                                        selected = selectedThemeMode == index,
-                                        onClick = {
-                                            scope.launch { settingsManager.setThemeMode(index) }
-                                            themeExpanded = false
-                                        }
-                                    )
-                                    .padding(horizontal = 24.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = label,
-                                    fontSize = 15.sp,
-                                    color = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f)
+            Card(
+                modifier = Modifier.padding(vertical = 4.dp),
+                onClick = { themeExpanded = !themeExpanded }
+            ) {
+                Column {
+                    BasicComponent(
+                        title = "主题模式",
+                        summary = "选择应用明暗外观",
+                        endActions = {
+                            Text(
+                                text = themeLabels[selectedThemeMode],
+                                fontSize = 14.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
+                        }
+                    )
+                    AnimatedVisibility(
+                        visible = themeExpanded,
+                        enter = expandVertically(),
+                        exit = shrinkVertically()
+                    ) {
+                        Column {
+                            themeLabels.forEachIndexed { index, label ->
+                                BasicComponent(
+                                    title = label,
+                                    summary = if (index == selectedThemeMode) "当前使用" else null,
+                                    onClick = {
+                                        themeExpanded = false
+                                        scope.launch { settingsManager.setThemeMode(index) }
+                                    }
                                 )
-                                if (selectedThemeMode == index) {
-                                    Icon(
-                                        imageVector = MiuixIcons.Basic.Check,
-                                        contentDescription = null,
-                                        tint = MiuixTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
                             }
                         }
                     }
@@ -233,30 +212,6 @@ fun SettingsScreen(
                             checked = replayGainEnabled,
                             onCheckedChange = {
                                 scope.launch { settingsManager.setReplayGainEnabled(it) }
-                            }
-                        )
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "界面",
-                fontSize = 14.sp,
-                color = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-            )
-
-            Card(modifier = Modifier.padding(vertical = 4.dp)) {
-                BasicComponent(
-                    title = "悬浮导航栏",
-                    summary = "底部导航栏使用高斯模糊悬浮效果",
-                    endActions = {
-                        Switch(
-                            checked = liquidGlass,
-                            onCheckedChange = {
-                                scope.launch { settingsManager.setLiquidGlass(it) }
                             }
                         )
                     }

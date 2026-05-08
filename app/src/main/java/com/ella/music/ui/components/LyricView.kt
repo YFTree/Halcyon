@@ -1,12 +1,26 @@
 package com.ella.music.ui.components
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -15,14 +29,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.LyricLine
+import com.ella.music.data.model.LyricWord
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlin.math.abs
+import kotlin.math.sin
 
 @Composable
 fun LyricView(
@@ -129,14 +149,15 @@ fun WordLyricView(
     currentIndex: Int,
     currentPositionMs: Long,
     showTranslation: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLineClick: (LyricLine) -> Unit = {}
 ) {
     if (lyrics.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(
                 text = "暂无歌词",
                 fontSize = 16.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                color = Color.White.copy(alpha = 0.72f)
             )
         }
         return
@@ -165,10 +186,13 @@ fun WordLyricView(
 
         itemsIndexed(lyrics) { index, line ->
             val isActive = index == currentIndex || line.isActiveAt(currentPositionMs)
+            val nextLine = lyrics.getOrNull(index + 1)
             val lineTextAlign = line.ttmlTextAlign()
 
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onLineClick(line) },
                 horizontalAlignment = line.ttmlAlignment()
             ) {
                 if (line.words.isNotEmpty() && isActive) {
@@ -179,9 +203,9 @@ fun WordLyricView(
                     )
                 } else {
                     val textColor = when {
-                        isActive -> MiuixTheme.colorScheme.primary
-                        index < currentIndex -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.5f)
-                        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f)
+                        isActive -> Color.White
+                        index < currentIndex -> Color.White.copy(alpha = 0.36f)
+                        else -> Color.White.copy(alpha = 0.56f)
                     }
                     Text(
                         text = line.text.ifBlank { "♪" },
@@ -196,9 +220,9 @@ fun WordLyricView(
                 }
                 if (!line.backgroundText.isNullOrBlank()) {
                     val backgroundColor = when {
-                        isActive -> MiuixTheme.colorScheme.primary.copy(alpha = 0.56f)
-                        index < currentIndex -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.34f)
-                        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.48f)
+                        isActive -> Color.White.copy(alpha = 0.56f)
+                        index < currentIndex -> Color.White.copy(alpha = 0.28f)
+                        else -> Color.White.copy(alpha = 0.42f)
                     }
                     if (isActive && line.backgroundWords.isNotEmpty()) {
                         WordLine(
@@ -206,9 +230,9 @@ fun WordLyricView(
                             currentPositionMs = currentPositionMs,
                             textAlign = lineTextAlign,
                             fontSizeSp = 14,
-                            currentColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.66f),
-                            sungColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.46f),
-                            pendingColor = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.48f),
+                            currentColor = Color.White.copy(alpha = 0.78f),
+                            sungColor = Color.White.copy(alpha = 0.56f),
+                            pendingColor = Color.White.copy(alpha = 0.42f),
                             modifier = Modifier.padding(top = 3.dp)
                         )
                     } else {
@@ -225,9 +249,9 @@ fun WordLyricView(
                 }
                 if (showTranslation && !line.backgroundTranslation.isNullOrBlank()) {
                     val backgroundTranslationColor = when {
-                        isActive -> MiuixTheme.colorScheme.primary.copy(alpha = 0.44f)
-                        index < currentIndex -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.28f)
-                        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.40f)
+                        isActive -> Color.White.copy(alpha = 0.44f)
+                        index < currentIndex -> Color.White.copy(alpha = 0.24f)
+                        else -> Color.White.copy(alpha = 0.36f)
                     }
                     Text(
                         text = line.backgroundTranslation,
@@ -241,9 +265,9 @@ fun WordLyricView(
                 }
                 if (showTranslation && !line.translation.isNullOrBlank()) {
                     val translationColor = when {
-                        isActive -> MiuixTheme.colorScheme.primary.copy(alpha = 0.72f)
-                        index < currentIndex -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.42f)
-                        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.58f)
+                        isActive -> Color.White.copy(alpha = 0.72f)
+                        index < currentIndex -> Color.White.copy(alpha = 0.36f)
+                        else -> Color.White.copy(alpha = 0.50f)
                     }
                     Text(
                         text = line.translation,
@@ -255,6 +279,15 @@ fun WordLyricView(
                             .padding(top = 3.dp)
                     )
                 }
+                if (isActive && line.shouldShowInterlude(nextLine, currentPositionMs)) {
+                    InterludeDots(
+                        remainingMs = (nextLine?.timeMs ?: currentPositionMs) - currentPositionMs,
+                        horizontalAlignment = line.ttmlAlignment(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp)
+                    )
+                }
             }
         }
 
@@ -262,44 +295,128 @@ fun WordLyricView(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WordLine(
-    words: List<com.ella.music.data.model.LyricWord>,
+    words: List<LyricWord>,
     currentPositionMs: Long,
     textAlign: TextAlign,
     modifier: Modifier = Modifier,
     fontSizeSp: Int = 18,
-    currentColor: Color = MiuixTheme.colorScheme.primary,
-    sungColor: Color = MiuixTheme.colorScheme.primary.copy(alpha = 0.8f),
-    pendingColor: Color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f)
+    currentColor: Color = Color.White,
+    sungColor: Color = Color.White.copy(alpha = 0.82f),
+    pendingColor: Color = Color.White.copy(alpha = 0.56f)
 ) {
-    val builder = androidx.compose.ui.text.AnnotatedString.Builder()
-    for (word in words) {
-        val isWordActive = currentPositionMs >= word.startMs
-        val isWordCurrent = currentPositionMs in word.startMs..word.endMs
-
-        val color = when {
-            isWordCurrent -> currentColor
-            isWordActive -> sungColor
-            else -> pendingColor
-        }
-
-        builder.pushStyle(
-            androidx.compose.ui.text.SpanStyle(
-                color = color,
-                fontSize = fontSizeSp.sp,
-                fontWeight = if (isWordCurrent) FontWeight.ExtraBold else FontWeight.Bold
-            )
-        )
-        builder.append(word.text)
-        builder.pop()
+    val arrangement = when (textAlign) {
+        TextAlign.End -> Arrangement.End
+        TextAlign.Start -> Arrangement.Start
+        else -> Arrangement.Center
     }
 
-    Text(
-        text = builder.toAnnotatedString(),
-        textAlign = textAlign,
-        modifier = modifier.fillMaxWidth()
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = arrangement,
+        verticalArrangement = Arrangement.Center
+    ) {
+        words.forEach { word ->
+            val isWordActive = currentPositionMs >= word.startMs
+            val isWordCurrent = currentPositionMs in word.startMs..word.endMs
+
+            val color = when {
+                isWordCurrent -> currentColor
+                isWordActive -> sungColor
+                else -> pendingColor
+            }
+
+            val displayText = word.text
+            val liftFactor = if (word.text.any { it.isCjk() }) 0.055f else 0.065f
+            val waveFactor = if (word.text.any { it.isCjk() }) 2.8f else 3.6f
+            val liftDp = fontSizeSp * liftFactor * word.motionLift(currentPositionMs, waveFactor)
+            val isLongSustain = isWordCurrent && (word.endMs - word.startMs) >= 900L
+            val glowPulse = if (isLongSustain) {
+                0.5f + 0.32f * ((sin(currentPositionMs / 145.0).toFloat() + 1f) / 2f)
+            } else {
+                0f
+            }
+
+            Box {
+                if (isLongSustain && displayText.isNotBlank()) {
+                    Text(
+                        text = displayText,
+                        fontSize = fontSizeSp.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = currentColor.copy(alpha = glowPulse),
+                        modifier = Modifier
+                            .offset(y = (-liftDp).dp)
+                            .graphicsLayer {
+                                scaleX = 1.035f
+                                scaleY = 1.035f
+                            }
+                            .blur(5.dp)
+                    )
+                }
+                Text(
+                    text = displayText,
+                    fontSize = fontSizeSp.sp,
+                    fontWeight = if (isWordCurrent) FontWeight.ExtraBold else FontWeight.Bold,
+                    color = color,
+                    modifier = Modifier
+                        .offset(y = (-liftDp).dp)
+                        .alpha(if (displayText.isBlank()) 0f else 1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InterludeDots(
+    remainingMs: Long,
+    horizontalAlignment: Alignment.Horizontal,
+    modifier: Modifier = Modifier
+) {
+    val transition = rememberInfiniteTransition(label = "interlude_dots")
+    val pulse by transition.animateFloat(
+        initialValue = 0.78f,
+        targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 620, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "interlude_dot_pulse"
     )
+    val dotCount = when {
+        remainingMs < 700L -> 1
+        remainingMs < 1_400L -> 2
+        else -> 3
+    }
+    val arrangement = when (horizontalAlignment) {
+        Alignment.End -> Arrangement.End
+        Alignment.Start -> Arrangement.Start
+        else -> Arrangement.Center
+    }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = arrangement,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(dotCount) { index ->
+            val stagger = 1f - index * 0.1f
+            Canvas(
+                modifier = Modifier
+                    .width(14.dp)
+                    .size(10.dp)
+                    .graphicsLayer {
+                        scaleX = pulse * stagger
+                        scaleY = pulse * stagger
+                    }
+                    .alpha((0.42f + 0.18f * index).coerceIn(0f, 1f))
+            ) {
+                drawCircle(Color.White.copy(alpha = 0.72f))
+            }
+        }
+    }
 }
 
 private fun LyricLine.ttmlTextAlign(): TextAlign {
@@ -315,4 +432,41 @@ private fun LyricLine.ttmlAlignment(): Alignment.Horizontal {
 private fun LyricLine.isActiveAt(positionMs: Long): Boolean {
     val end = endMs ?: return false
     return isTtml && positionMs in timeMs until end
+}
+
+private fun LyricLine.shouldShowInterlude(nextLine: LyricLine?, positionMs: Long): Boolean {
+    val nextStart = nextLine?.timeMs ?: return false
+    val lineEnd = endMs ?: nextStart
+    return positionMs >= lineEnd &&
+        positionMs < nextStart &&
+        nextStart - lineEnd >= 1_800L &&
+        nextStart - positionMs > 180L
+}
+
+private fun LyricWord.motionLift(positionMs: Long, waveFactor: Float): Float {
+    val duration = (endMs - startMs).coerceAtLeast(1L).toFloat()
+    val progress = ((positionMs - startMs).toFloat() / duration).coerceIn(0f, 1f)
+    if (progress <= 0f || progress >= 1f) return 0f
+    val waveWindow = (1f / waveFactor).coerceIn(0.18f, 0.42f)
+    val distance = abs(progress - 0.42f)
+    val normalized = (1f - distance / waveWindow).coerceIn(0f, 1f)
+    return easeOutQuint(normalized)
+}
+
+private fun Char.isCjk(): Boolean {
+    val block = Character.UnicodeBlock.of(this)
+    return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
+        block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A ||
+        block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B ||
+        block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
+        block == Character.UnicodeBlock.HIRAGANA ||
+        block == Character.UnicodeBlock.KATAKANA ||
+        block == Character.UnicodeBlock.HANGUL_SYLLABLES ||
+        block == Character.UnicodeBlock.HANGUL_JAMO ||
+        block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
+}
+
+private fun easeOutQuint(value: Float): Float {
+    val inverse = 1f - value
+    return 1f - inverse * inverse * inverse * inverse * inverse
 }

@@ -174,6 +174,9 @@ private fun AboutContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .graphicsLayer {
+                    alpha = (1f - scrollProgress * 1.35f).coerceIn(0f, 1f)
+                }
                 .padding(top = padding.calculateTopPadding() + 120.dp)
                 .onSizeChanged { size -> with(density) { logoHeightDp = size.height.toDp() } },
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -278,12 +281,22 @@ private fun AboutContent(
                 SmallTitle(text = "致谢")
                 FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors) {
                     BasicComponent(
-                        title = "Codex",
-                        summary = "主要开发",
+                        title = "Codex (GPT-5.5)",
+                        summary = "1.0.2 至今主要开发与代码协作",
                     )
                     BasicComponent(
-                        title = "GPT-5.5",
-                        summary = "代码协作",
+                        title = "BetterLyrics",
+                        summary = "播放页封面模糊背景和歌词视觉效果参考",
+                        onClick = { uriHandler.openUri("https://github.com/jayfunc/BetterLyrics") },
+                    )
+                    BasicComponent(
+                        title = "SPlayer",
+                        summary = "播放页动效和歌词体验参考",
+                        onClick = { uriHandler.openUri("https://github.com/imsyy/SPlayer") },
+                    )
+                    BasicComponent(
+                        title = "Mimo-V2.5-Pro",
+                        summary = "1.0.0 至 1.0.1 早期版本主要开发",
                     )
                 }
             }

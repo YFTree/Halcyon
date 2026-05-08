@@ -28,6 +28,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     val isScanning: StateFlow<Boolean> = repository.isScanning
+    val scanProgress: StateFlow<Int> = repository.scanProgress
 
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()

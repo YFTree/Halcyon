@@ -15,7 +15,7 @@ Chinese documentation: [README.md](README.md)
 - WAV, FLAC, M4A, OGG, OPUS, and other audio tag reading
 - FFmpeg extension decoder for ALAC / M4A compatibility
 - ReplayGain volume normalization
-- Miuix settings, theme switching, and optional floating bottom navigation
+- Miuix settings, theme switching, and default floating bottom navigation
 
 ## Build
 
@@ -50,10 +50,12 @@ The script builds FFmpeg through WSL with the Linux Android NDK.
 
 ## Credits
 
-- **Codex** — Lead development
-- **GPT-5.5** — Code collaboration
+- **Codex (GPT-5.5)** — Lead development and code collaboration since 1.0.2
+- **BetterLyrics** — Visual reference for the blurred cover background and lyric presentation
+- **SPlayer** — Visual reference for now-playing motion and lyric experience
 - Retro Music Player's jaudiotagger-based tag reading approach
 - Miuix, Media3, FFmpeg, Lyricon, Jaudiotagger, Kyant TagLib, Backdrop, Coil, and the other open-source projects used by Ella Music
+- **Mimo-V2.5-Pro** — Lead development for early 1.0.0 to 1.0.1 builds
 
 ## License
 

@@ -24,7 +24,10 @@ class MusicScanner(private val context: Context) {
         private const val TAG = "MusicScanner"
     }
 
-    suspend fun scanAllSongs(minDurationMs: Long = 0): List<Song> = withContext(Dispatchers.IO) {
+    suspend fun scanAllSongs(
+        minDurationMs: Long = 0,
+        onProgress: ((Int) -> Unit)? = null
+    ): List<Song> = withContext(Dispatchers.IO) {
         val songs = mutableListOf<Song>()
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
@@ -133,6 +136,7 @@ class MusicScanner(private val context: Context) {
 
                 if (duration > 0 && duration >= minDurationMs) {
                     songs.add(Song(id, title, artist, album, albumId, duration, path, fileName, size, mime, dateAdded, dateModified))
+                    onProgress?.invoke(songs.size)
                 }
             }
         }

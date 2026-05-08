@@ -87,7 +87,7 @@ class TickerBridge(private val context: Context) {
         }
 
         val notification = builder
-            .setSmallIcon(R.drawable.ic_music_note)
+            .setSmallIcon(R.drawable.ic_ticker_transparent)
             .setContentTitle("Ella Music")
             .setContentText(text)
             .setTicker(text)

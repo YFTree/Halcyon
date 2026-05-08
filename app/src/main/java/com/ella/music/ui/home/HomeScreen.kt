@@ -51,6 +51,8 @@ import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
+import top.yukonga.miuix.kmp.icon.extended.SelectAll
+import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.Job
 import kotlin.math.floor
@@ -65,6 +67,7 @@ fun HomeScreen(
     val songs by mainViewModel.songs.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isScanning by mainViewModel.isScanning.collectAsState()
+    val scanProgress by mainViewModel.scanProgress.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -117,13 +120,23 @@ fun HomeScreen(
                     }
                 } else {
                     IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                        Text(text = "排序", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Sort,
+                            contentDescription = "排序",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                     IconButton(onClick = {
                         selectionMode = true
                         selectedIds = emptySet()
                     }) {
-                        Text(text = "多选", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
+                        Icon(
+                            imageVector = MiuixIcons.Regular.SelectAll,
+                            contentDescription = "多选",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
                 IconButton(onClick = { searchExpanded = !searchExpanded }) {
@@ -197,6 +210,18 @@ fun HomeScreen(
                 }
             },
         ) {
+            AnimatedVisibility(
+                visible = isScanning,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
+                Text(
+                    text = "正在扫描 ${scanProgress} 首歌曲...",
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
             if (songs.isEmpty() && !isScanning) {
                 Box(
                     modifier = Modifier.fillMaxSize(),

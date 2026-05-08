@@ -35,6 +35,9 @@ class MusicRepository(private val context: Context) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    private val _scanProgress = MutableStateFlow(0)
+    val scanProgress: StateFlow<Int> = _scanProgress.asStateFlow()
+
     private val lyricsCache = mutableMapOf<Long, List<LyricLine>>()
     private val replayGainCache = mutableMapOf<Long, Float?>()
     private val coverArtCache = mutableMapOf<Long, ByteArray?>()
@@ -45,8 +48,11 @@ class MusicRepository(private val context: Context) {
 
     suspend fun scanMusic(minDurationMs: Long = 0) {
         _isScanning.value = true
+        _scanProgress.value = 0
         try {
-            _songs.value = scanner.scanAllSongs(minDurationMs)
+            _songs.value = scanner.scanAllSongs(minDurationMs) { count ->
+                _scanProgress.value = count
+            }
             _albums.value = scanner.scanAlbums()
             saveLibraryCache(_songs.value, _albums.value)
         } finally {

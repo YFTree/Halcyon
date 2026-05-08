@@ -40,14 +40,14 @@ fun LiquidGlassBottomBar(
     val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
     val hasBackdrop = isBlurEnabled && backdrop != null
     val containerColor =
-        if (isLight) Color.White.copy(alpha = 0.78f) else Color(0xFF151518).copy(alpha = 0.82f)
+        if (isLight) Color.White.copy(alpha = 0.62f) else Color(0xFF151518).copy(alpha = 0.66f)
 
     val glassModifier = if (hasBackdrop) {
         Modifier.drawBackdrop(
             backdrop = backdrop,
             shape = { RoundedCornerShape(28.dp) },
             effects = {
-                blur(18f.dp.toPx())
+                blur(26f.dp.toPx())
             },
             highlight = {
                 Highlight.Default.copy(alpha = if (isLight) 0.18f else 0.10f)

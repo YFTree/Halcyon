@@ -52,6 +52,7 @@ import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
+import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.floor
 
@@ -97,7 +98,12 @@ fun AlbumScreen(
             color = MiuixTheme.colorScheme.background,
             actions = {
                 IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                    Text(text = "排序", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Sort,
+                        contentDescription = "排序",
+                        tint = MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
                 IconButton(onClick = { searchExpanded = !searchExpanded }) {
                     Icon(

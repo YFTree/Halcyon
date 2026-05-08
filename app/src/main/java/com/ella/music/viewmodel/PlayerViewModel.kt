@@ -212,6 +212,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         _showLyrics.value = !_showLyrics.value
     }
 
+    fun setShowLyrics(show: Boolean) {
+        _showLyrics.value = show
+    }
+
     fun setLyricPageTranslation(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setLyricPageTranslation(enabled)

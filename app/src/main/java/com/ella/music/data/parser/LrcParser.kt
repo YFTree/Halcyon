@@ -150,11 +150,11 @@ object LrcParser {
                 LyricLine(
                     timeMs = begin,
                     text = text,
-                    words = words.withTextSpacing(text),
+                    words = words.toTtmlDisplayWords(text),
                     translation = translation,
                     agent = agent,
                     backgroundText = background?.text,
-                    backgroundWords = background?.words.orEmpty(),
+                    backgroundWords = background?.let { it.words.toTtmlDisplayWords(it.text) }.orEmpty(),
                     backgroundTranslation = background?.translation,
                     isTtml = true,
                     endMs = end
@@ -192,11 +192,11 @@ object LrcParser {
                 LyricLine(
                     timeMs = begin,
                     text = text,
-                    words = words.withTextSpacing(text),
+                    words = words.toTtmlDisplayWords(text),
                     translation = translations.firstOrNull { it.isNotBlank() && !it.isMusicSymbolOnly() },
                     agent = agent,
                     backgroundText = backgrounds.firstOrNull { it.text.isNotBlank() && !it.text.isMusicSymbolOnly() }?.text,
-                    backgroundWords = backgrounds.firstOrNull { it.words.isNotEmpty() }?.words.orEmpty(),
+                    backgroundWords = backgrounds.firstOrNull { it.words.isNotEmpty() }?.let { it.words.toTtmlDisplayWords(it.text) }.orEmpty(),
                     backgroundTranslation = backgrounds.firstOrNull { !it.translation.isNullOrBlank() }?.translation,
                     isTtml = true,
                     endMs = end
@@ -293,7 +293,7 @@ object LrcParser {
         }
         return TtmlBackground(
             text = text,
-            words = words.withTextSpacing(text),
+            words = words.toTtmlDisplayWords(text),
             translation = translations.firstOrNull { it.isNotBlank() && !it.isMusicSymbolOnly() }
         )
     }
@@ -322,7 +322,45 @@ object LrcParser {
                 LyricWord(wordText, begin, end)
             }
             .toList()
-        return TtmlBackground(text, words.withTextSpacing(text), translation)
+        return TtmlBackground(text, words.toTtmlDisplayWords(text), translation)
+    }
+
+    private fun List<LyricWord>.toTtmlDisplayWords(lineText: String): List<LyricWord> {
+        if (isEmpty() || lineText.isBlank()) return this
+        if (lineText.hasCjk()) return withTextSpacing(lineText)
+
+        val tokens = Regex("""\S+\s*""").findAll(lineText).toList()
+        if (tokens.isEmpty()) return withTextSpacing(lineText)
+
+        val result = mutableListOf<LyricWord>()
+        var wordIndex = 0
+        for (token in tokens) {
+            if (wordIndex >= size) break
+
+            val displayText = token.value
+            val target = displayText.trim()
+            if (target.isBlank()) continue
+
+            val startIndex = wordIndex
+            val startMs = this[startIndex].startMs
+            var endMs = this[startIndex].endMs
+            val builder = StringBuilder()
+
+            while (wordIndex < size && builder.length < target.length) {
+                val piece = this[wordIndex].text.trim()
+                builder.append(piece)
+                endMs = this[wordIndex].endMs
+                wordIndex++
+            }
+
+            if (builder.toString() == target) {
+                result += LyricWord(displayText, startMs, endMs)
+            } else {
+                return withTextSpacing(lineText)
+            }
+        }
+
+        return if (result.isNotEmpty()) result else withTextSpacing(lineText)
     }
 
     private fun parseInlineTimedLine(line: String): LyricLine? {

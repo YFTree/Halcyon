@@ -59,11 +59,7 @@ import com.ella.music.viewmodel.PlayerViewModel
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.blur.isRenderEffectSupported
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Album
 import top.yukonga.miuix.kmp.icon.extended.Folder
@@ -195,18 +191,10 @@ fun EllaApp(
 
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
-    val songs by mainViewModel.songs.collectAsState()
     val showMiniPlayer = currentSong != null && currentRoute != Screen.Player.route
 
     val backdrop = rememberLayerBackdrop()
-    val isBlurEnabled = remember { isRenderEffectSupported() }
-
-    val settingsManager = remember { SettingsManager(mainViewModel.getApplication()) }
-    val liquidGlass by settingsManager.liquidGlass.collectAsState(initial = true)
-    val useGlass = liquidGlass && isBlurEnabled
-    val useLightweightGlass = useGlass && currentRoute == Screen.Home.route && songs.size > 200
-    val activeBackdrop = if (useLightweightGlass) null else backdrop
-
+    val useGlass = true
     val tabs = listOf(
         Triple(Screen.Home.route, "首页", MiuixIcons.Regular.Music),
         Triple(Screen.Album.route, "专辑", MiuixIcons.Regular.Album),
@@ -214,89 +202,42 @@ fun EllaApp(
         Triple(Screen.Settings.route, "设置", MiuixIcons.Regular.Settings),
     )
 
-    if (useGlass) {
-        val contentModifier = Modifier
+    val contentModifier = Modifier
+        .fillMaxSize()
+        .background(MiuixTheme.colorScheme.background)
+        .layerBackdrop(backdrop)
+
+    Box(
+        modifier = Modifier
             .fillMaxSize()
             .background(MiuixTheme.colorScheme.background)
-            .then(
-                if (activeBackdrop != null) Modifier.layerBackdrop(activeBackdrop) else Modifier
-            )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MiuixTheme.colorScheme.background)
-        ) {
-            AppNavigation(
-                navController = navController,
-                mainViewModel = mainViewModel,
-                playerViewModel = playerViewModel,
-                modifier = contentModifier
-            )
-            FloatingBottomControls(
-                showMiniPlayer = showMiniPlayer,
-                showBottomBar = showBottomBar,
-                currentSong = currentSong,
-                isPlaying = isPlaying,
-                tabs = tabs,
-                currentRoute = currentRoute,
-                backdrop = activeBackdrop,
-                mainViewModel = mainViewModel,
-                playerViewModel = playerViewModel,
-                onNavigate = { route ->
-                    if (currentRoute != route) {
-                        navController.navigate(route) {
-                            popUpTo(Screen.Home.route) { inclusive = route == Screen.Home.route }
-                        }
+    ) {
+        AppNavigation(
+            navController = navController,
+            mainViewModel = mainViewModel,
+            playerViewModel = playerViewModel,
+            modifier = contentModifier
+        )
+        FloatingBottomControls(
+            showMiniPlayer = showMiniPlayer,
+            showBottomBar = showBottomBar,
+            currentSong = currentSong,
+            isPlaying = isPlaying,
+            tabs = tabs,
+            currentRoute = currentRoute,
+            backdrop = backdrop,
+            mainViewModel = mainViewModel,
+            playerViewModel = playerViewModel,
+            onNavigate = { route ->
+                if (currentRoute != route) {
+                    navController.navigate(route) {
+                        popUpTo(Screen.Home.route) { inclusive = route == Screen.Home.route }
                     }
-                },
-                onNavigatePlayer = { navController.navigate(Screen.Player.route) },
-                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
-            )
-        }
-    } else {
-        Scaffold(
-            bottomBar = {
-                FloatingBottomControls(
-                    showMiniPlayer = showMiniPlayer,
-                    showBottomBar = showBottomBar,
-                    currentSong = currentSong,
-                    isPlaying = isPlaying,
-                    tabs = tabs,
-                    currentRoute = currentRoute,
-                    backdrop = null,
-                    mainViewModel = mainViewModel,
-                    playerViewModel = playerViewModel,
-                    onNavigate = { route ->
-                        if (currentRoute != route) {
-                            navController.navigate(route) {
-                                popUpTo(Screen.Home.route) { inclusive = route == Screen.Home.route }
-                            }
-                        }
-                    },
-                    onNavigatePlayer = { navController.navigate(Screen.Player.route) },
-                    useGlass = false
-                )
-            }
-        ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(
-                        start = paddingValues.calculateStartPadding(LayoutDirection.Ltr),
-                        top = paddingValues.calculateTopPadding(),
-                        end = paddingValues.calculateEndPadding(LayoutDirection.Ltr),
-                        bottom = paddingValues.calculateBottomPadding()
-                    )
-                    .background(MiuixTheme.colorScheme.background)
-            ) {
-                AppNavigation(
-                    navController = navController,
-                    mainViewModel = mainViewModel,
-                    playerViewModel = playerViewModel
-                )
-            }
-        }
+                }
+            },
+            onNavigatePlayer = { navController.navigate(Screen.Player.route) },
+            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+        )
     }
 }
 
@@ -371,17 +312,6 @@ private fun FloatingBottomControls(
                                     else MiuixTheme.colorScheme.onSurface
                                 )
                             }
-                        )
-                    }
-                }
-            } else {
-                NavigationBar {
-                    tabs.forEach { (route, label, icon) ->
-                        NavigationBarItem(
-                            selected = currentRoute == route,
-                            onClick = { onNavigate(route) },
-                            icon = icon,
-                            label = label
                         )
                     }
                 }
