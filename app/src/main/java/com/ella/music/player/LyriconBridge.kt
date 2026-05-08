@@ -108,10 +108,12 @@ class LyriconBridge(private val context: Context) {
                     )
                 }
 
-                val nextLineTime = lyrics
-                    .filter { it.timeMs > line.timeMs }
-                    .minByOrNull { it.timeMs }
-                    ?.timeMs ?: (song.duration)
+                val nextLineTime = line.endMs
+                    ?: lyrics
+                        .filter { it.timeMs > line.timeMs }
+                        .minByOrNull { it.timeMs }
+                        ?.timeMs
+                    ?: song.duration
 
                 RichLyricLine(
                     begin = line.timeMs,
@@ -162,10 +164,12 @@ class LyriconBridge(private val context: Context) {
                     )
                 }
 
-                val nextLineTime = lyrics
-                    .filter { it.timeMs > line.timeMs }
-                    .minByOrNull { it.timeMs }
-                    ?.timeMs ?: (song.duration)
+                val nextLineTime = line.endMs
+                    ?: lyrics
+                        .filter { it.timeMs > line.timeMs }
+                        .minByOrNull { it.timeMs }
+                        ?.timeMs
+                    ?: song.duration
 
                 RichLyricLine(
                     begin = line.timeMs,

@@ -66,6 +66,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val translation = settingsManager.lyriconTranslation.first()
             lyriconBridge.setDisplayTranslation(translation)
             lyriconBridge.setEnabled(enabled)
+            if (enabled) resendExternalLyrics()
         }
     }
 
@@ -73,6 +74,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val enabled = settingsManager.tickerEnabled.first()
             tickerBridge.setEnabled(enabled)
+            if (enabled) resendTickerLyric()
         }
     }
 
@@ -145,8 +147,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (line != null && line != lastTickerLine) {
                     lastTickerLine = line
                     tickerBridge.sendLyric(line)
+                } else if (line != null && lastTickerLine == null && playerManager.isPlaying.value) {
+                    lastTickerLine = line
+                    tickerBridge.sendLyric(line)
                 }
             }
+        }
+    }
+
+    private suspend fun resendExternalLyrics() {
+        val song = currentSong.value ?: return
+        val songLyrics = _lyrics.value.ifEmpty { repository.getLyrics(song) }
+        if (_lyrics.value.isEmpty()) _lyrics.value = songLyrics
+        lyriconBridge.sendSong(song, songLyrics)
+        lyriconBridge.sendPlaybackState(isPlaying.value)
+        lyriconBridge.sendPosition(currentPosition.value)
+        resendTickerLyric()
+    }
+
+    private fun resendTickerLyric() {
+        if (!tickerBridge.isEnabled() || !isPlaying.value) return
+        val index = _currentLyricIndex.value
+        val currentLyrics = _lyrics.value
+        val line = currentLyrics.getOrNull(index)?.text?.takeUnless { it.isMusicSymbolOnly() }
+        if (line != null) {
+            lastTickerLine = line
+            tickerBridge.sendLyric(line)
+        } else {
+            lastTickerLine = null
         }
     }
 

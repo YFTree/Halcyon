@@ -9,7 +9,8 @@ data class LyricLine(
     val backgroundText: String? = null,
     val backgroundWords: List<LyricWord> = emptyList(),
     val backgroundTranslation: String? = null,
-    val isTtml: Boolean = false
+    val isTtml: Boolean = false,
+    val endMs: Long? = null
 )
 
 data class LyricWord(

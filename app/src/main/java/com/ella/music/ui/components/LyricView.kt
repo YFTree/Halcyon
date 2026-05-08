@@ -164,7 +164,7 @@ fun WordLyricView(
         item { Box(modifier = Modifier.height(200.dp)) }
 
         itemsIndexed(lyrics) { index, line ->
-            val isActive = index == currentIndex
+            val isActive = index == currentIndex || line.isActiveAt(currentPositionMs)
             val lineTextAlign = line.ttmlTextAlign()
 
             Column(
@@ -310,4 +310,9 @@ private fun LyricLine.ttmlTextAlign(): TextAlign {
 private fun LyricLine.ttmlAlignment(): Alignment.Horizontal {
     if (!isTtml || agent.isNullOrBlank()) return Alignment.CenterHorizontally
     return if (agent.equals("v2", ignoreCase = true)) Alignment.End else Alignment.Start
+}
+
+private fun LyricLine.isActiveAt(positionMs: Long): Boolean {
+    val end = endMs ?: return false
+    return isTtml && positionMs in timeMs until end
 }

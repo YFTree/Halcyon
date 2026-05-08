@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import android.os.SystemClock
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -247,15 +248,19 @@ private fun AlbumFastIndexBar(
     }
     var heightPx by remember { mutableStateOf(1) }
     var lastSelectedLetter by remember { mutableStateOf<String?>(null) }
+    var lastDispatchTimeMs by remember { mutableStateOf(0L) }
 
     fun selectAt(y: Float) {
         if (letters.isEmpty()) return
+        val now = SystemClock.uptimeMillis()
+        if (now - lastDispatchTimeMs < 80L) return
         val index = floor((y.coerceIn(0f, heightPx.toFloat() - 1f) / heightPx) * letters.size)
             .toInt()
             .coerceIn(0, letters.lastIndex)
         val letter = letters[index]
         if (letter != lastSelectedLetter) {
             lastSelectedLetter = letter
+            lastDispatchTimeMs = now
             onLetterClick(letter)
         }
     }
@@ -291,6 +296,7 @@ private fun AlbumFastIndexBar(
                 modifier = Modifier
                     .clickable {
                         lastSelectedLetter = letter
+                        lastDispatchTimeMs = SystemClock.uptimeMillis()
                         onLetterClick(letter)
                     }
                     .padding(horizontal = 8.dp, vertical = 1.dp)

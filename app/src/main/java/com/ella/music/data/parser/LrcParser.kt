@@ -156,7 +156,8 @@ object LrcParser {
                     backgroundText = background?.text,
                     backgroundWords = background?.words.orEmpty(),
                     backgroundTranslation = background?.translation,
-                    isTtml = true
+                    isTtml = true,
+                    endMs = end
                 )
             }
             .sortedBy { it.timeMs }
@@ -197,7 +198,8 @@ object LrcParser {
                     backgroundText = backgrounds.firstOrNull { it.text.isNotBlank() && !it.text.isMusicSymbolOnly() }?.text,
                     backgroundWords = backgrounds.firstOrNull { it.words.isNotEmpty() }?.words.orEmpty(),
                     backgroundTranslation = backgrounds.firstOrNull { !it.translation.isNullOrBlank() }?.translation,
-                    isTtml = true
+                    isTtml = true,
+                    endMs = end
                 )
             }.sortedBy { it.timeMs }
 
@@ -219,7 +221,7 @@ object LrcParser {
         for (index in 0 until children.length) {
             val child = children.item(index)
             when (child.nodeType) {
-                Node.TEXT_NODE -> builder.append(child.nodeValue)
+                Node.TEXT_NODE -> builder.append(child.nodeValue.orEmpty().withoutFormattingWhitespace())
                 Node.ELEMENT_NODE -> {
                     val element = child as? Element ?: continue
                     val role = element.attr("role")
@@ -258,7 +260,7 @@ object LrcParser {
         for (index in 0 until children.length) {
             val child = children.item(index)
             when (child.nodeType) {
-                Node.TEXT_NODE -> textBuilder.append(child.nodeValue)
+                Node.TEXT_NODE -> textBuilder.append(child.nodeValue.orEmpty().withoutFormattingWhitespace())
                 Node.ELEMENT_NODE -> {
                     val childElement = child as? Element ?: continue
                     val role = childElement.attr("role")
@@ -281,7 +283,7 @@ object LrcParser {
                 }
             }
         }
-        val text = textBuilder.toString().cleanTtmlText()
+        val text = textBuilder.toString().normalizeTtmlText()
         val ownBegin = element.attr("begin").parseTtmlTime()
         if (ownBegin != null && words.isEmpty() && text.isNotBlank()) {
             val ownEnd = element.attr("end").parseTtmlTime()
@@ -524,6 +526,14 @@ object LrcParser {
 
     private fun String.cleanTtmlText(): String =
         replace(Regex("""[ \t\r\n]+"""), " ").trim()
+
+    private fun String.normalizeTtmlText(): String =
+        replace(Regex("""[ \t\r\n]+"""), " ")
+
+    private fun String.withoutFormattingWhitespace(): String {
+        if (isBlank() && any { it == '\n' || it == '\r' || it == '\t' }) return ""
+        return this
+    }
 
     private fun String.hasCjk(): Boolean =
         any { char ->

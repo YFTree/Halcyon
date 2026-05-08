@@ -12,17 +12,20 @@ android {
     namespace = "com.ella.music"
     compileSdk = 37
     val releaseStoreFile = System.getenv("RELEASE_STORE_FILE")?.let { file(it) } ?: file("release.jks")
+    val releaseStorePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: "kidn0x1"
+    val releaseKeyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "release"
+    val releaseKeyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "kidn0x1"
     val hasReleaseSigning = releaseStoreFile.exists() &&
-        !System.getenv("RELEASE_STORE_PASSWORD").isNullOrBlank() &&
-        !System.getenv("RELEASE_KEY_ALIAS").isNullOrBlank() &&
-        !System.getenv("RELEASE_KEY_PASSWORD").isNullOrBlank()
+        releaseStorePassword.isNotBlank() &&
+        releaseKeyAlias.isNotBlank() &&
+        releaseKeyPassword.isNotBlank()
 
     defaultConfig {
         applicationId = "com.ella.music"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
 
         val buildTime = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
@@ -31,9 +34,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = releaseStoreFile
-            storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: ""
-            keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: ""
-            keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: ""
+            storePassword = releaseStorePassword
+            keyAlias = releaseKeyAlias
+            keyPassword = releaseKeyPassword
             enableV3Signing = true
             enableV4Signing = true
         }
