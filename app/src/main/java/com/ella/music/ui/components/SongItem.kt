@@ -49,6 +49,7 @@ fun SongItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     onAddToQueue: (() -> Unit)? = null,
+    onDownload: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song.id, loadCoverArt) {
@@ -165,6 +166,23 @@ fun SongItem(
                 Text(
                     text = "+",
                     fontSize = 18.sp,
+                    color = MiuixTheme.colorScheme.primary
+                )
+            }
+        }
+        if (!selectionMode && onDownload != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f))
+                    .clickable(onClick = onDownload),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "↓",
+                    fontSize = 16.sp,
                     color = MiuixTheme.colorScheme.primary
                 )
             }

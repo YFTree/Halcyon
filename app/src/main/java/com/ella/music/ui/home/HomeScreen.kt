@@ -3,6 +3,7 @@ package com.ella.music.ui.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import android.icu.text.Transliterator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,7 @@ import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.Job
 import kotlin.math.floor
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -87,8 +89,11 @@ fun HomeScreen(
     }
     val sortedSongs = remember(filteredSongs, sortMode) {
         when (sortMode) {
-            HomeSortMode.Title -> filteredSongs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
-            HomeSortMode.FileName -> filteredSongs.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileName.ifBlank { it.path.substringAfterLast('/') } })
+            HomeSortMode.Title -> filteredSongs.sortedWith(compareBy<Song> { it.title.musicSortKey() }.thenBy { it.title })
+            HomeSortMode.FileName -> filteredSongs.sortedWith(
+                compareBy<Song> { it.fileName.ifBlank { it.path.substringAfterLast('/') }.musicSortKey() }
+                    .thenBy { it.fileName.ifBlank { it.path.substringAfterLast('/') } }
+            )
             HomeSortMode.DateAdded -> filteredSongs.sortedByDescending { it.dateAdded }
             HomeSortMode.DateModified -> filteredSongs.sortedByDescending { it.dateModified }
         }
@@ -383,6 +388,19 @@ private fun FastIndexBar(
 }
 
 private fun Song.indexLetter(): String {
-    val first = title.trim().firstOrNull()?.uppercaseChar()
+    val first = title.musicSortKey().firstOrNull()?.uppercaseChar()
     return if (first != null && first in 'A'..'Z') first.toString() else "#"
+}
+
+private fun String.musicSortKey(): String {
+    val text = trim()
+    if (text.isBlank()) return ""
+    val latin = runCatching { MusicSortTransliterator.value.transliterate(text) }.getOrDefault(text)
+    return latin.lowercase(Locale.ROOT)
+}
+
+private object MusicSortTransliterator {
+    val value: Transliterator by lazy {
+        Transliterator.getInstance("Any-Latin; Latin-ASCII; NFD; [:Nonspacing Mark:] Remove; NFC")
+    }
 }

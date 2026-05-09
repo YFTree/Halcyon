@@ -1,6 +1,9 @@
 package com.ella.music.ui.online
 
+import android.app.DownloadManager
+import android.content.Context
 import android.net.Uri
+import android.os.Environment
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -306,6 +309,20 @@ fun LxOnlineScreen(
                                     }
                                     isBusy = false
                                 }
+                            },
+                            onDownload = {
+                                scope.launch {
+                                    isBusy = true
+                                    runCatching {
+                                        val playable = service.resolvePlayableSong(item, sourceScript)
+                                        enqueueDownload(context, playable)
+                                        showToast("已开始下载到 Music/Ella")
+                                    }.onFailure {
+                                        message = it.localizedMessage ?: "下载失败"
+                                        showToast(message)
+                                    }
+                                    isBusy = false
+                                }
                             }
                         )
                     }
@@ -313,4 +330,25 @@ fun LxOnlineScreen(
             }
         }
     }
+}
+
+private fun enqueueDownload(context: Context, song: com.ella.music.data.model.Song) {
+    val fileName = song.fileName.ifBlank { "${song.title}-${song.artist}.mp3" }.sanitizeFileName()
+    val request = DownloadManager.Request(Uri.parse(song.path))
+        .setTitle(fileName)
+        .setDescription("${song.title} - ${song.artist}")
+        .setMimeType(song.mimeType.ifBlank { "audio/*" })
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "Ella/$fileName")
+        .setAllowedOverMetered(true)
+        .setAllowedOverRoaming(true)
+    val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+    manager.enqueue(request)
+}
+
+private fun String.sanitizeFileName(): String {
+    return replace(Regex("""[\\/:*?"<>|]"""), "_")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+        .ifBlank { "Ella Music.mp3" }
 }
