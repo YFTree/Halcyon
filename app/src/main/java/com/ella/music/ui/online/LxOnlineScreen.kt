@@ -1,6 +1,8 @@
 package com.ella.music.ui.online
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -38,6 +40,8 @@ import com.ella.music.data.lx.LxOnlineSong
 import com.ella.music.ui.components.SongItem
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
@@ -75,6 +79,31 @@ fun LxOnlineScreen(
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     }
 
+    val localSourceLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            isBusy = true
+            runCatching {
+                val script = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        input.bufferedReader(Charsets.UTF_8).readText()
+                    }.orEmpty()
+                }
+                val (name, normalizedScript) = service.importSourceScript(script)
+                settingsManager.setLxSource(uri.toString(), name, normalizedScript)
+                importUrl = uri.toString()
+                message = "已导入 $name"
+                importExpanded = false
+            }.onFailure {
+                message = it.localizedMessage ?: "本地导入失败"
+                showToast(message)
+            }
+            isBusy = false
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -104,7 +133,7 @@ fun LxOnlineScreen(
                 Column {
                     BasicComponent(
                         title = if (sourceName.isBlank()) "导入落雪源" else sourceName,
-                        summary = if (sourceUrl.isBlank()) "从网络链接导入 Music API 脚本" else sourceUrl,
+                        summary = if (sourceUrl.isBlank()) "从本地 JS 文件或网络链接导入 Music API 脚本" else sourceUrl,
                     )
                     AnimatedVisibility(
                         visible = importExpanded,
@@ -125,6 +154,23 @@ fun LxOnlineScreen(
                                 Button(
                                     enabled = !isBusy,
                                     onClick = {
+                                        localSourceLauncher.launch(
+                                            arrayOf(
+                                                "text/javascript",
+                                                "application/javascript",
+                                                "application/x-javascript",
+                                                "text/*",
+                                                "application/octet-stream"
+                                            )
+                                        )
+                                    }
+                                ) {
+                                    Text(text = "本地 JS")
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    enabled = !isBusy,
+                                    onClick = {
                                         scope.launch {
                                             isBusy = true
                                             runCatching {
@@ -140,7 +186,7 @@ fun LxOnlineScreen(
                                         }
                                     }
                                 ) {
-                                    Text(text = if (isBusy) "导入中" else "导入")
+                                    Text(text = if (isBusy) "导入中" else "URL 导入")
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Button(

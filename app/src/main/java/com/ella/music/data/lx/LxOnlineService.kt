@@ -30,9 +30,14 @@ class LxOnlineService {
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("导入失败: HTTP ${response.code}")
             val script = response.body?.string().orEmpty()
-            if (script.length !in 50..2_000_000) error("源脚本内容异常")
-            extractSourceName(script) to script
+            importSourceScript(script)
         }
+    }
+
+    fun importSourceScript(script: String): Pair<String, String> {
+        if (script.length !in 50..2_000_000) error("源脚本内容异常")
+        if (!script.contains("lx.") && !script.contains("lx_")) error("这不像落雪 Music API 脚本")
+        return extractSourceName(script) to script
     }
 
     suspend fun search(keyword: String, page: Int = 1): List<LxOnlineSong> = withContext(Dispatchers.IO) {
