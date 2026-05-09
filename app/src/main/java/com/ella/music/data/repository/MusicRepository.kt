@@ -10,14 +10,20 @@ import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import android.util.LruCache
+import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.parser.LrcParser
 import com.ella.music.data.scanner.MusicScanner
+import com.ella.music.data.webdav.WebDavClient
+import com.ella.music.data.webdav.WebDavConfig
 import java.io.File
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +34,7 @@ import org.json.JSONObject
 class MusicRepository(private val context: Context) {
 
     private val scanner = MusicScanner(context)
+    private val settingsManager = SettingsManager(context)
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
@@ -49,6 +56,7 @@ class MusicRepository(private val context: Context) {
         override fun sizeOf(key: Long, value: Bitmap): Int = value.byteCount / 1024
     }
     private val libraryCacheFile = File(context.filesDir, "music_library_cache.json")
+    private val remoteAudioCacheDir = File(context.cacheDir, "webdav_audio")
 
     suspend fun scanMusic(minDurationMs: Long = 0) {
         _isScanning.value = true
@@ -83,7 +91,8 @@ class MusicRepository(private val context: Context) {
 
         Log.d("MusicRepo", "Loading lyrics for: ${song.title} path=${song.path}")
 
-        val lrcContent = LrcParser.findLrcFile(song.path)
+        val effectivePath = song.effectiveLocalPathForMetadata()
+        val lrcContent = LrcParser.findLrcFile(effectivePath)
         if (lrcContent != null) {
             val parsed = LrcParser.parse(lrcContent)
             Log.d("MusicRepo", "LRC parsed: ${parsed.lyrics.size} lines for ${song.title}")
@@ -92,7 +101,7 @@ class MusicRepository(private val context: Context) {
         }
 
         Log.d("MusicRepo", "No LRC file found, trying embedded lyrics for ${song.title}")
-        val embedded = scanner.extractEmbeddedLyrics(song.path)
+        val embedded = scanner.extractEmbeddedLyrics(effectivePath)
         if (!embedded.isNullOrBlank()) {
             Log.d("MusicRepo", "Embedded lyrics found (${embedded.length} chars) for ${song.title}")
             val parsed = LrcParser.parse(embedded)
@@ -127,7 +136,7 @@ class MusicRepository(private val context: Context) {
 
     fun getReplayGain(song: Song): Float? {
         replayGainCache[song.id]?.let { return it }
-        val gain = scanner.extractReplayGain(song.path)
+        val gain = scanner.extractReplayGain(song.effectiveLocalPathForMetadata())
         replayGainCache[song.id] = gain
         return gain
     }
@@ -137,7 +146,7 @@ class MusicRepository(private val context: Context) {
         val info = runCatching {
             val extractor = MediaExtractor()
             try {
-                extractor.setDataSource(song.path)
+                extractor.setDataSource(song.effectiveLocalPathForMetadata())
                 var audioFormat: MediaFormat? = null
                 for (index in 0 until extractor.trackCount) {
                     val format = extractor.getTrackFormat(index)
@@ -169,7 +178,7 @@ class MusicRepository(private val context: Context) {
 
     fun getCoverArt(song: Song): ByteArray? {
         coverArtCache[song.id]?.let { return it }
-        val art = scanner.extractCoverArt(song.path)
+        val art = scanner.extractCoverArt(song.effectiveLocalPathForMetadata())
         coverArtCache[song.id] = art
         return art
     }
@@ -242,6 +251,42 @@ class MusicRepository(private val context: Context) {
         audioInfoCache.clear()
         replayGainCache.clear()
         coverArtCache.clear()
+        coverBitmapCache.evictAll()
+    }
+
+    fun clearRemoteMetadataCache() {
+        clearCache()
+        runCatching {
+            if (remoteAudioCacheDir.exists()) {
+                remoteAudioCacheDir.deleteRecursively()
+            }
+        }.onFailure {
+            Log.w("MusicRepo", "Failed to clear remote metadata cache", it)
+        }
+    }
+
+    private fun Song.effectiveLocalPathForMetadata(): String {
+        if (!path.startsWith("http://") && !path.startsWith("https://")) return path
+        val target = File(remoteAudioCacheDir, "${path.sha256()}.${fileName.substringAfterLast('.', "audio")}")
+        if (target.exists() && target.length() > 0L) return target.absolutePath
+        return runCatching {
+            val config = runBlocking(Dispatchers.IO) {
+                WebDavConfig(
+                    url = settingsManager.webDavUrl.first(),
+                    username = settingsManager.webDavUsername.first(),
+                    password = settingsManager.webDavPassword.first()
+                )
+            }
+            WebDavClient.downloadToFile(path, config, target).absolutePath
+        }.getOrElse {
+            Log.w("MusicRepo", "Failed to cache remote metadata file for $path", it)
+            path
+        }
+    }
+
+    private fun String.sha256(): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
     }
 
     private fun MediaFormat.getIntOrZero(key: String): Int {

@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.androidx.documentfile)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
+    implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.lyricon.provider)
     implementation(libs.backdrop)

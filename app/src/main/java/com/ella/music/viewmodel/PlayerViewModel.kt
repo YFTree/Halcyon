@@ -110,6 +110,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (song != null) {
                     lastTickerLine = null
                     val songLyrics = repository.getLyrics(song)
+                    repository.getCoverArt(song)
                     _lyrics.value = songLyrics
                     _currentLyricIndex.value = -1
 

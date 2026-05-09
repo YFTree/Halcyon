@@ -30,11 +30,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.BuildConfig
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.repository.MusicRepository
 import com.ella.music.ui.theme.THEME_DARK
 import com.ella.music.ui.theme.THEME_FOLLOW_SYSTEM
 import com.ella.music.ui.theme.THEME_LIGHT
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
+import android.widget.Toast
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -56,6 +58,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settingsManager = remember { SettingsManager(context) }
+    val cacheRepository = remember { MusicRepository(context) }
 
     val autoScan by settingsManager.autoScan.collectAsState(initial = true)
     val gaplessPlayback by settingsManager.gaplessPlayback.collectAsState(initial = true)
@@ -303,6 +306,29 @@ fun SettingsScreen(
                 BasicComponent(
                     title = "歌曲库分析",
                     summary = "查看音质占比、听歌时长和播放次数排行",
+                    endActions = {
+                        Icon(
+                            imageVector = MiuixIcons.Basic.ArrowRight,
+                            contentDescription = null,
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                )
+            }
+
+            Card(
+                modifier = Modifier.padding(vertical = 4.dp),
+                onClick = {
+                    scope.launch {
+                        cacheRepository.clearRemoteMetadataCache()
+                        Toast.makeText(context, "封面歌词缓存已清除", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            ) {
+                BasicComponent(
+                    title = "清除封面歌词缓存",
+                    summary = "清除 WebDAV 首次播放时缓存的封面和内嵌歌词文件",
                     endActions = {
                         Icon(
                             imageVector = MiuixIcons.Basic.ArrowRight,

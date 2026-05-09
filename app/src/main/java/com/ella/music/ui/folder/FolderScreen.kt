@@ -43,6 +43,7 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.webdav.WebDavClient
 import com.ella.music.data.webdav.WebDavConfig
 import com.ella.music.data.webdav.WebDavItem
+import com.ella.music.data.webdav.WebDavTestResult
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -72,6 +73,7 @@ fun FolderScreen(
     val savedWebDavUrl by mainViewModel.settingsManager.webDavUrl.collectAsState(initial = "")
     val savedWebDavUser by mainViewModel.settingsManager.webDavUsername.collectAsState(initial = "")
     val savedWebDavPassword by mainViewModel.settingsManager.webDavPassword.collectAsState(initial = "")
+    val savedWebDavLastUrl by mainViewModel.settingsManager.webDavLastUrl.collectAsState(initial = "")
     var webDavTreeUri by remember { mutableStateOf<Uri?>(null) }
     var showWebDavDialog by remember { mutableStateOf(false) }
     var webDavUrl by remember { mutableStateOf("") }
@@ -81,18 +83,35 @@ fun FolderScreen(
     var webDavItems by remember { mutableStateOf<List<WebDavItem>>(emptyList()) }
     var webDavLoading by remember { mutableStateOf(false) }
     var webDavError by remember { mutableStateOf<String?>(null) }
+    var webDavTestStatus by remember { mutableStateOf<String?>(null) }
+    var loadedWebDavKey by remember { mutableStateOf("") }
 
-    LaunchedEffect(savedWebDavUrl, savedWebDavUser, savedWebDavPassword) {
+    LaunchedEffect(savedWebDavUrl, savedWebDavUser, savedWebDavPassword, savedWebDavLastUrl) {
         webDavUrl = savedWebDavUrl
         webDavUser = savedWebDavUser
         webDavPassword = savedWebDavPassword
         if (savedWebDavUrl.isNotBlank()) {
-            webDavCurrentUrl = savedWebDavUrl
+            val startUrl = savedWebDavLastUrl.ifBlank { savedWebDavUrl }
+            val key = listOf(savedWebDavUrl, savedWebDavUser, savedWebDavPassword, startUrl).joinToString("|")
+            if (loadedWebDavKey == key && webDavItems.isNotEmpty()) return@LaunchedEffect
+            loadedWebDavKey = key
+            webDavCurrentUrl = startUrl
             val config = WebDavConfig(savedWebDavUrl, savedWebDavUser, savedWebDavPassword)
             webDavLoading = true
             webDavError = null
-            webDavItems = withContext(Dispatchers.IO) { WebDavClient.list(config, savedWebDavUrl) }
+            runCatching {
+                withContext(Dispatchers.IO) { WebDavClient.list(config, startUrl) }
+            }.onSuccess {
+                webDavItems = it
+            }.onFailure {
+                webDavItems = emptyList()
+                webDavError = it.localizedMessage ?: "WebDAV 加载失败"
+            }
             webDavLoading = false
+        } else {
+            webDavCurrentUrl = ""
+            webDavItems = emptyList()
+            webDavError = null
         }
     }
     val webDavPicker = rememberLauncherForActivityResult(
@@ -143,17 +162,19 @@ fun FolderScreen(
                 onUrlChange = { webDavUrl = it },
                 onUsernameChange = { webDavUser = it },
                 onPasswordChange = { webDavPassword = it },
+                testStatus = webDavTestStatus,
                 onDismiss = { showWebDavDialog = false },
                 onTest = {
                     scope.launch {
-                        val ok = withContext(Dispatchers.IO) {
-                            WebDavClient.test(WebDavConfig(webDavUrl, webDavUser, webDavPassword))
-                        }
-                        Toast.makeText(
-                            context,
-                            if (ok) "WebDAV 连接成功" else "WebDAV 连接失败",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        webDavTestStatus = "正在测试 WebDAV 连接..."
+                        val result = runCatching {
+                            withContext(Dispatchers.IO) {
+                                WebDavClient.testDetailed(WebDavConfig(webDavUrl, webDavUser, webDavPassword))
+                            }
+                        }.getOrElse { WebDavTestResult(ok = false, message = it.localizedMessage ?: "WebDAV 连接失败") }
+                        webDavError = if (result.ok) null else result.message
+                        webDavTestStatus = result.message
+                        Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
                     }
                 },
                 onSave = {
@@ -163,6 +184,20 @@ fun FolderScreen(
                     webDavCurrentUrl = webDavUrl
                     showWebDavDialog = false
                     Toast.makeText(context, "WebDAV 配置已保存", Toast.LENGTH_SHORT).show()
+                },
+                onClear = {
+                    scope.launch {
+                        mainViewModel.settingsManager.clearWebDavConfig()
+                    }
+                    webDavUrl = ""
+                    webDavUser = ""
+                    webDavPassword = ""
+                    webDavCurrentUrl = ""
+                    webDavItems = emptyList()
+                    webDavError = null
+                    webDavTestStatus = null
+                    showWebDavDialog = false
+                    Toast.makeText(context, "WebDAV 配置已移除", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -191,7 +226,7 @@ fun FolderScreen(
                 if (savedWebDavUrl.isNotBlank()) {
                     item {
                         WebDavBrowserCard(
-                            currentUrl = webDavCurrentUrl.ifBlank { savedWebDavUrl },
+                            currentUrl = WebDavClient.displayUrl(webDavCurrentUrl.ifBlank { savedWebDavUrl }),
                             loading = webDavLoading,
                             error = webDavError,
                             items = webDavItems,
@@ -200,7 +235,15 @@ fun FolderScreen(
                                     val config = WebDavConfig(webDavUrl, webDavUser, webDavPassword)
                                     webDavLoading = true
                                     webDavError = null
-                                    webDavItems = withContext(Dispatchers.IO) { WebDavClient.list(config, webDavCurrentUrl.ifBlank { webDavUrl }) }
+                                    WebDavClient.clearListCache()
+                                    runCatching {
+                                        withContext(Dispatchers.IO) { WebDavClient.list(config, webDavCurrentUrl.ifBlank { webDavUrl }, forceRefresh = true) }
+                                    }.onSuccess {
+                                        webDavItems = it
+                                    }.onFailure {
+                                        webDavItems = emptyList()
+                                        webDavError = it.localizedMessage ?: "WebDAV 加载失败"
+                                    }
                                     webDavLoading = false
                                 }
                             },
@@ -208,10 +251,18 @@ fun FolderScreen(
                                 if (item.isDirectory) {
                                     scope.launch {
                                         webDavCurrentUrl = item.url
+                                        mainViewModel.settingsManager.setWebDavLastUrl(item.url)
                                         val config = WebDavConfig(webDavUrl, webDavUser, webDavPassword)
                                         webDavLoading = true
                                         webDavError = null
-                                        webDavItems = withContext(Dispatchers.IO) { WebDavClient.list(config, item.url) }
+                                        runCatching {
+                                            withContext(Dispatchers.IO) { WebDavClient.list(config, item.url) }
+                                        }.onSuccess {
+                                            webDavItems = it
+                                        }.onFailure {
+                                            webDavItems = emptyList()
+                                            webDavError = it.localizedMessage ?: "WebDAV 加载失败"
+                                        }
                                         webDavLoading = false
                                     }
                                 } else {
@@ -444,9 +495,11 @@ private fun WebDavSettingsDialog(
     onUrlChange: (String) -> Unit,
     onUsernameChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
+    testStatus: String?,
     onDismiss: () -> Unit,
     onTest: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    onClear: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -458,10 +511,19 @@ private fun WebDavSettingsDialog(
                 WebDavTextField("地址", url, onUrlChange)
                 WebDavTextField("用户名", username, onUsernameChange)
                 WebDavTextField("密码", password, onPasswordChange)
+                if (!testStatus.isNullOrBlank()) {
+                    Text(
+                        text = testStatus,
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.primary
+                    )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
+                    Button(onClick = onClear) { Text("移除") }
+                    Spacer(modifier = Modifier.weight(1f))
                     Button(onClick = onDismiss) { Text("取消") }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(onClick = onTest) { Text("测试") }

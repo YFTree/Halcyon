@@ -1,6 +1,7 @@
 package com.ella.music.ui.components
 
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,7 +42,6 @@ import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlin.math.abs
 import kotlin.math.sin
 
 @Composable
@@ -105,6 +104,17 @@ fun LyricView(
                     .fillMaxWidth()
                     .padding(vertical = if (isActive) 4.dp else 0.dp)
             )
+            if (showTranslation && !line.translation.isNullOrBlank()) {
+                Text(
+                    text = line.translation,
+                    fontSize = if (isActive) 14.sp else 12.sp,
+                    color = textColor.copy(alpha = 0.72f),
+                    textAlign = lineTextAlign,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp)
+                )
+            }
             if (!line.backgroundText.isNullOrBlank()) {
                 Text(
                     text = line.backgroundText,
@@ -121,17 +131,6 @@ fun LyricView(
                     text = line.backgroundTranslation,
                     fontSize = if (isActive) 13.sp else 11.sp,
                     color = textColor.copy(alpha = 0.48f),
-                    textAlign = lineTextAlign,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp)
-                )
-            }
-            if (showTranslation && !line.translation.isNullOrBlank()) {
-                Text(
-                    text = line.translation,
-                    fontSize = if (isActive) 14.sp else 12.sp,
-                    color = textColor.copy(alpha = 0.72f),
                     textAlign = lineTextAlign,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -219,6 +218,22 @@ fun WordLyricView(
                             .padding(vertical = if (isActive) 4.dp else 0.dp)
                     )
                 }
+                if (showTranslation && !line.translation.isNullOrBlank()) {
+                    val translationColor = when {
+                        isActive -> Color.White.copy(alpha = 0.72f)
+                        index < currentIndex -> Color.White.copy(alpha = 0.36f)
+                        else -> Color.White.copy(alpha = 0.50f)
+                    }
+                    Text(
+                        text = line.translation,
+                        fontSize = if (isActive) 14.sp else 12.sp,
+                        color = translationColor,
+                        textAlign = lineTextAlign,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 3.dp)
+                    )
+                }
                 if (!line.backgroundText.isNullOrBlank()) {
                     val backgroundColor = when {
                         isActive -> Color.White.copy(alpha = 0.56f)
@@ -264,22 +279,6 @@ fun WordLyricView(
                             .padding(top = 2.dp)
                     )
                 }
-                if (showTranslation && !line.translation.isNullOrBlank()) {
-                    val translationColor = when {
-                        isActive -> Color.White.copy(alpha = 0.72f)
-                        index < currentIndex -> Color.White.copy(alpha = 0.36f)
-                        else -> Color.White.copy(alpha = 0.50f)
-                    }
-                    Text(
-                        text = line.translation,
-                        fontSize = if (isActive) 14.sp else 12.sp,
-                        color = translationColor,
-                        textAlign = lineTextAlign,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 3.dp)
-                    )
-                }
                 if (isActive && line.shouldShowInterlude(nextLine, currentPositionMs)) {
                     InterludeDots(
                         remainingMs = (nextLine?.timeMs ?: currentPositionMs) - currentPositionMs,
@@ -323,16 +322,23 @@ private fun WordLine(
             val isWordActive = currentPositionMs >= word.startMs
             val isWordCurrent = currentPositionMs in word.startMs..word.endMs
 
-            val color = when {
+            val baseColor = when {
                 isWordCurrent -> currentColor
                 isWordActive -> sungColor
                 else -> pendingColor
             }
+            val fadeAlpha by animateFloatAsState(
+                targetValue = when {
+                    isWordCurrent -> 1f
+                    isWordActive -> 0.86f
+                    else -> 0.52f
+                },
+                animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
+                label = "word_fade"
+            )
+            val color = baseColor.copy(alpha = (baseColor.alpha * fadeAlpha).coerceIn(0f, 1f))
 
-            val displayText = word.text
-            val liftFactor = if (word.text.any { it.isCjk() }) 0.055f else 0.065f
-            val waveFactor = if (word.text.any { it.isCjk() }) 2.8f else 3.6f
-            val liftDp = fontSizeSp * liftFactor * word.motionLift(currentPositionMs, waveFactor)
+            val displayText = word.text.toDisplayToken()
             val isLongSustain = isWordCurrent && (word.endMs - word.startMs) >= 900L
             val glowPulse = if (isLongSustain) {
                 0.5f + 0.32f * ((sin(currentPositionMs / 145.0).toFloat() + 1f) / 2f)
@@ -350,7 +356,6 @@ private fun WordLine(
                         fontWeight = FontWeight.ExtraBold,
                         color = currentColor.copy(alpha = glowPulse * 0.34f),
                         modifier = Modifier
-                            .offset(y = (-liftDp).dp)
                             .graphicsLayer {
                                 scaleX = 1.12f
                                 scaleY = 1.12f
@@ -363,7 +368,6 @@ private fun WordLine(
                         fontWeight = FontWeight.ExtraBold,
                         color = currentColor.copy(alpha = glowPulse * 0.56f),
                         modifier = Modifier
-                            .offset(y = (-liftDp).dp)
                             .graphicsLayer {
                                 scaleX = 1.05f
                                 scaleY = 1.05f
@@ -377,7 +381,6 @@ private fun WordLine(
                     fontWeight = if (isWordCurrent) FontWeight.ExtraBold else FontWeight.Bold,
                     color = color,
                     modifier = Modifier
-                        .offset(y = (-liftDp).dp)
                         .alpha(if (displayText.isBlank()) 0f else 1f)
                 )
             }
@@ -459,16 +462,6 @@ private fun LyricLine.shouldShowInterlude(nextLine: LyricLine?, positionMs: Long
         nextStart - positionMs > 180L
 }
 
-private fun LyricWord.motionLift(positionMs: Long, waveFactor: Float): Float {
-    val duration = (endMs - startMs).coerceAtLeast(1L).toFloat()
-    val progress = ((positionMs - startMs).toFloat() / duration).coerceIn(0f, 1f)
-    if (progress <= 0f || progress >= 1f) return 0f
-    val waveWindow = (1f / waveFactor).coerceIn(0.18f, 0.42f)
-    val distance = abs(progress - 0.42f)
-    val normalized = (1f - distance / waveWindow).coerceIn(0f, 1f)
-    return easeOutQuint(normalized)
-}
-
 private fun Char.isCjk(): Boolean {
     val block = Character.UnicodeBlock.of(this)
     return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
@@ -482,7 +475,8 @@ private fun Char.isCjk(): Boolean {
         block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
 }
 
-private fun easeOutQuint(value: Float): Float {
-    val inverse = 1f - value
-    return 1f - inverse * inverse * inverse * inverse * inverse
+private fun String.toDisplayToken(): String {
+    val cleaned = replace(Regex("""[ \t\r\n]+"""), " ").trim()
+    if (cleaned.isBlank()) return ""
+    return if (cleaned.any { it.isCjk() }) cleaned else "$cleaned "
 }

@@ -8,12 +8,23 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.ella.music.MainActivity
+import com.ella.music.data.SettingsManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import okhttp3.Credentials
 
 class PlaybackService : MediaSessionService() {
 
@@ -22,10 +33,29 @@ class PlaybackService : MediaSessionService() {
     }
 
     private var mediaSession: MediaSession? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
+        val settingsManager = SettingsManager(this)
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(currentWebDavHeaders(settingsManager))
+        serviceScope.launch {
+            combine(
+                settingsManager.webDavUsername,
+                settingsManager.webDavPassword
+            ) { username, password ->
+                if (username.isNotBlank() || password.isNotBlank()) {
+                    mapOf("Authorization" to Credentials.basic(username, password, Charsets.UTF_8))
+                } else {
+                    emptyMap()
+                }
+            }.collect { headers ->
+                httpDataSourceFactory.setDefaultRequestProperties(headers)
+            }
+        }
+        val dataSourceFactory = DefaultDataSource.Factory(this, httpDataSourceFactory)
 
         val renderersFactory = DefaultRenderersFactory(this)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
@@ -40,6 +70,7 @@ class PlaybackService : MediaSessionService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .build()
 
         val intent = Intent(this, MainActivity::class.java)
@@ -72,6 +103,19 @@ class PlaybackService : MediaSessionService() {
             release()
         }
         mediaSession = null
+        serviceScope.cancel()
         super.onDestroy()
+    }
+
+    private fun currentWebDavHeaders(settingsManager: SettingsManager): Map<String, String> {
+        return runBlocking(Dispatchers.IO) {
+            val username = settingsManager.webDavUsername.first()
+            val password = settingsManager.webDavPassword.first()
+            if (username.isNotBlank() || password.isNotBlank()) {
+                mapOf("Authorization" to Credentials.basic(username, password, Charsets.UTF_8))
+            } else {
+                emptyMap()
+            }
+        }
     }
 }

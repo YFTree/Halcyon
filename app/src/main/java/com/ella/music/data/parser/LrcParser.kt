@@ -83,7 +83,7 @@ object LrcParser {
 
                 if (hasWordTiming) {
                     val words = parseEnhancedWords(text, timeMs)
-                    val fullText = words.joinToString("") { it.text }
+                    val fullText = words.joinLyricText()
                     lyrics.add(LyricLine(timeMs, fullText, words))
                 } else {
                     lyrics.add(LyricLine(timeMs, text.trim()))
@@ -255,12 +255,11 @@ object LrcParser {
     private fun collectTtmlBackground(element: Element, lineEndMs: Long?): TtmlBackground {
         val translations = mutableListOf<String>()
         val words = mutableListOf<LyricWord>()
-        val textBuilder = StringBuilder()
         val children = element.childNodes
         for (index in 0 until children.length) {
             val child = children.item(index)
             when (child.nodeType) {
-                Node.TEXT_NODE -> textBuilder.append(child.nodeValue.orEmpty().withoutFormattingWhitespace())
+                Node.TEXT_NODE -> Unit
                 Node.ELEMENT_NODE -> {
                     val childElement = child as? Element ?: continue
                     val role = childElement.attr("role")
@@ -268,7 +267,6 @@ object LrcParser {
                         translations += childElement.textContent.cleanTtmlText()
                     } else {
                         val childBackground = collectTtmlBackground(childElement, lineEndMs)
-                        textBuilder.append(childBackground.text)
                         childBackground.translation?.let { translations += it }
                         words += childBackground.words
 
@@ -283,7 +281,7 @@ object LrcParser {
                 }
             }
         }
-        val text = textBuilder.toString()
+        val text = element.collectVisibleTtmlText()
             .normalizeTtmlText()
             .removeTtmlBackgroundParentheses()
         val ownBegin = element.attr("begin").parseTtmlTime()
@@ -415,7 +413,7 @@ object LrcParser {
                 endMs = next?.timeMs ?: nextRawTime ?: (segment.timeMs + estimateWordDuration(segment.text))
             )
         }
-        val text = words.joinToString("") { it.text }.trim()
+        val text = words.joinLyricText()
         if (text.isMusicSymbolOnly()) return null
 
         val translation = first.text
@@ -481,6 +479,17 @@ object LrcParser {
         }
 
         return words
+    }
+
+    private fun List<LyricWord>.joinLyricText(): String {
+        if (isEmpty()) return ""
+        val raw = joinToString("") { it.text }
+            .replace(Regex("""[ \t\r\n]+"""), " ")
+            .trim()
+        if (raw.isBlank() || raw.hasCjk() || raw.contains(' ')) return raw
+
+        val tokens = map { it.text.trim() }.filter { it.isNotBlank() }
+        return tokens.joinToString(" ")
     }
 
     private fun List<LyricWord>.withTextSpacing(lineText: String): List<LyricWord> {
@@ -584,6 +593,24 @@ object LrcParser {
         replace(Regex("""[()（）]"""), "")
             .replace(Regex("""[ \t\r\n]+"""), " ")
             .trim()
+
+    private fun Element.collectVisibleTtmlText(): String {
+        val builder = StringBuilder()
+        val children = childNodes
+        for (index in 0 until children.length) {
+            val child = children.item(index)
+            when (child.nodeType) {
+                Node.TEXT_NODE -> builder.append(child.nodeValue.orEmpty().withoutFormattingWhitespace())
+                Node.ELEMENT_NODE -> {
+                    val element = child as? Element ?: continue
+                    if (element.attr("role") != "x-translation") {
+                        builder.append(element.collectVisibleTtmlText())
+                    }
+                }
+            }
+        }
+        return builder.toString()
+    }
 
     private fun String.completeOpenParentheticalAdlib(): String {
         val trimmed = trim()

@@ -29,6 +29,7 @@ class SettingsManager(private val context: Context) {
         val KEY_WEBDAV_URL = stringPreferencesKey("webdav_url")
         val KEY_WEBDAV_USERNAME = stringPreferencesKey("webdav_username")
         val KEY_WEBDAV_PASSWORD = stringPreferencesKey("webdav_password")
+        val KEY_WEBDAV_LAST_URL = stringPreferencesKey("webdav_last_url")
     }
 
     val lyriconEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_ENABLED] ?: true }
@@ -44,6 +45,7 @@ class SettingsManager(private val context: Context) {
     val webDavUrl: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_URL] ?: "" }
     val webDavUsername: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_USERNAME] ?: "" }
     val webDavPassword: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_PASSWORD] ?: "" }
+    val webDavLastUrl: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_LAST_URL] ?: "" }
 
     suspend fun setLyriconEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRICON_ENABLED] = enabled }
@@ -90,6 +92,22 @@ class SettingsManager(private val context: Context) {
             it[KEY_WEBDAV_URL] = url.trim()
             it[KEY_WEBDAV_USERNAME] = username
             it[KEY_WEBDAV_PASSWORD] = password
+            it[KEY_WEBDAV_LAST_URL] = url.trim()
+        }
+    }
+
+    suspend fun setWebDavLastUrl(url: String) {
+        context.dataStore.edit {
+            if (url.isBlank()) it.remove(KEY_WEBDAV_LAST_URL) else it[KEY_WEBDAV_LAST_URL] = url.trim()
+        }
+    }
+
+    suspend fun clearWebDavConfig() {
+        context.dataStore.edit {
+            it.remove(KEY_WEBDAV_URL)
+            it.remove(KEY_WEBDAV_USERNAME)
+            it.remove(KEY_WEBDAV_PASSWORD)
+            it.remove(KEY_WEBDAV_LAST_URL)
         }
     }
 }
