@@ -214,6 +214,7 @@ class ExoPlayerManager(private val context: Context) {
                     .setTitle(song.title)
                     .setArtist(song.artist)
                     .setAlbumTitle(song.album)
+                    .setArtworkUri(song.coverUrl.takeIf { it.isNotBlank() }?.toUri())
                     .build()
             )
 
@@ -250,7 +251,8 @@ class ExoPlayerManager(private val context: Context) {
             duration = mediaController?.duration?.coerceAtLeast(0) ?: 0L,
             path = path,
             fileName = fileName,
-            mimeType = localConfiguration?.mimeType.orEmpty()
+            mimeType = localConfiguration?.mimeType.orEmpty(),
+            coverUrl = metadata.artworkUri?.toString().orEmpty()
         )
     }
 }

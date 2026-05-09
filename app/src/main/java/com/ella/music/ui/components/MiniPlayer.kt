@@ -64,9 +64,9 @@ fun MiniPlayer(
     modifier: Modifier = Modifier
 ) {
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song.id, loadCoverArt) {
-        value = withContext(Dispatchers.IO) { loadCoverArt?.invoke(song) }
+        value = if (song.coverUrl.isNotBlank()) null else withContext(Dispatchers.IO) { loadCoverArt?.invoke(song) }
     }
-    val coverModel = embeddedCover ?: if (loadCoverArt == null) albumArtUri else null
+    val coverModel = embeddedCover ?: song.coverUrl.takeIf { it.isNotBlank() } ?: if (loadCoverArt == null) albumArtUri else null
     val shape = RoundedCornerShape(if (liquidGlass) 24.dp else 0.dp)
     val glassBackdrop = if (liquidGlass) backdrop else null
     val useGlassLayout = liquidGlass

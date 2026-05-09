@@ -352,6 +352,7 @@ class MusicRepository(private val context: Context) {
                     .put("mimeType", song.mimeType)
                     .put("dateAdded", song.dateAdded)
                     .put("dateModified", song.dateModified)
+                    .put("coverUrl", song.coverUrl)
             )
         }
         return array
@@ -387,7 +388,8 @@ class MusicRepository(private val context: Context) {
                 fileSize = item.optLong("fileSize"),
                 mimeType = item.optString("mimeType"),
                 dateAdded = item.optLong("dateAdded"),
-                dateModified = item.optLong("dateModified")
+                dateModified = item.optLong("dateModified"),
+                coverUrl = item.optString("coverUrl")
             )
         }
     }

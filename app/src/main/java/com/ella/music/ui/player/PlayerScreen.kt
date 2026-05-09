@@ -132,7 +132,11 @@ fun PlayerScreen(
 
     val song = currentSong
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song?.id) {
-        value = withContext(Dispatchers.IO) { song?.let(playerViewModel::getCoverArtBitmap) }
+        value = if (song?.coverUrl?.isNotBlank() == true) {
+            null
+        } else {
+            withContext(Dispatchers.IO) { song?.let(playerViewModel::getCoverArtBitmap) }
+        }
     }
     val palette by produceState(initialValue = PlayerPalette.Default, embeddedCover) {
         value = withContext(Dispatchers.Default) { PlayerPalette.from(embeddedCover) }
@@ -591,7 +595,7 @@ private fun PlayerBlurBackground(
     val uri = if ((song?.albumId ?: 0L) > 0) {
         Uri.parse("content://media/external/audio/albumart/${song?.albumId}")
     } else null
-    val coverModel = embeddedCover ?: uri
+    val coverModel = embeddedCover ?: song?.coverUrl?.takeIf { it.isNotBlank() } ?: uri
     val rotationTransition = rememberInfiniteTransition(label = "cover_background_rotation")
     val rotation by rotationTransition.animateFloat(
         initialValue = 0f,
@@ -837,7 +841,7 @@ private fun AlbumArtView(
     val uri = if ((song?.albumId ?: 0L) > 0) {
         Uri.parse("content://media/external/audio/albumart/${song?.albumId}")
     } else null
-    val coverModel = embeddedCover ?: uri
+    val coverModel = embeddedCover ?: song?.coverUrl?.takeIf { it.isNotBlank() } ?: uri
 
     Box(
         modifier = modifier

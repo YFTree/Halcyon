@@ -62,6 +62,7 @@ class LxOnlineService {
                 val album = decodeHtml(item.optString("ALBUM")).ifBlank { "在线音乐" }
                 val durationMs = item.optLong("DURATION", 0L) * 1000L
                 val id = "lx_kw_$mid".hashCode().toLong()
+                val coverUrl = buildKuwoCoverUrl(item.optString("web_albumpic_short"))
                 LxOnlineSong(
                     song = Song(
                         id = id,
@@ -72,12 +73,13 @@ class LxOnlineService {
                         duration = durationMs,
                         path = "",
                         fileName = "$title-$artist.mp3",
-                        mimeType = "audio/mpeg"
+                        mimeType = "audio/mpeg",
+                        coverUrl = coverUrl
                     ),
                     source = "kw",
                     songmid = mid,
                     quality = pickQuality(item.optString("N_MINFO")),
-                    coverUrl = buildKuwoCoverUrl(item.optString("web_albumpic_short"))
+                    coverUrl = coverUrl
                 )
             }.filter { it.songmid.isNotBlank() && it.song.title.isNotBlank() }
         }

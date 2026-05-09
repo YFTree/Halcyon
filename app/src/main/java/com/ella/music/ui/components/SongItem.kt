@@ -52,13 +52,13 @@ fun SongItem(
     modifier: Modifier = Modifier
 ) {
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song.id, loadCoverArt) {
-        value = withContext(Dispatchers.IO) { loadCoverArt?.invoke(song) }
+        value = if (song.coverUrl.isNotBlank()) null else withContext(Dispatchers.IO) { loadCoverArt?.invoke(song) }
     }
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song.id, loadAudioInfo) {
         value = withContext(Dispatchers.IO) { loadAudioInfo?.invoke(song) }
     }
     val qualityTag = audioInfo?.let { song.audioQualityTag(it) }
-    val coverModel = embeddedCover ?: if (loadCoverArt == null) albumArtUri else null
+    val coverModel = embeddedCover ?: song.coverUrl.takeIf { it.isNotBlank() } ?: if (loadCoverArt == null) albumArtUri else null
 
     Row(
         modifier = modifier

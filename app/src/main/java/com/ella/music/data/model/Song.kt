@@ -12,7 +12,8 @@ data class Song(
     val fileSize: Long = 0L,
     val mimeType: String = "",
     val dateAdded: Long = 0L,
-    val dateModified: Long = 0L
+    val dateModified: Long = 0L,
+    val coverUrl: String = ""
 ) {
     val durationText: String
         get() {
