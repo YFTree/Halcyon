@@ -7,10 +7,17 @@ Chinese documentation: [README.md](README.md)
 ## Features
 
 - Local music scanning, search, playback, and folder browsing
-- Home and album search, sorting, fast indexing, and multi-select management
-- Album pages, song lists, mini player, and immersive now-playing screen
+- Home, album, and folder search, sorting, fast indexing, and multi-select management
+- CJK titles participate in A-Z sorting through Latinized sort keys, with cached keys to reduce home-screen stalls
+- Album pages, artist pages, song lists, current queue, mini player, and immersive now-playing screen
+- WebDAV library configuration, connection testing, remote directory browsing, and remote audio playback
+- WebDAV paths support Chinese characters, spaces, and encoded characters, with last-path restoration and cached folder results
+- LX Music API source import from URLs or local JS files, with online search, playback, and downloads to `Music/Ella/`
+- Online artwork display and Kuwo lyric fetching for online music
+- Library analytics for format distribution, quality distribution, play-count ranking, and listen-time ranking
 - LRC / enhanced LRC / TTML parsing with word-level lyrics, translations, background vocals, and TTML duet layout
 - External LRC and embedded lyric reading, including common Chinese lyric encoding fallbacks
+- Custom lyric-page fonts from system-font previews or imported TTF / OTF / TTC font files in Settings
 - Lyricon provider support and AOSP ticker lyric notifications
 - WAV, FLAC, M4A, OGG, OPUS, and other audio tag reading
 - FFmpeg extension decoder for ALAC / M4A compatibility
