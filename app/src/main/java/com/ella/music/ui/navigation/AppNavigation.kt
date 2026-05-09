@@ -19,6 +19,7 @@ import com.ella.music.ui.artist.ArtistScreen
 import com.ella.music.ui.folder.FolderDetailScreen
 import com.ella.music.ui.folder.FolderScreen
 import com.ella.music.ui.home.HomeScreen
+import com.ella.music.ui.online.LxOnlineScreen
 import com.ella.music.ui.player.PlayerScreen
 import com.ella.music.ui.settings.SettingsScreen
 import com.ella.music.viewmodel.MainViewModel
@@ -38,6 +39,7 @@ sealed class Screen(val route: String) {
         fun createRoute(folderPath: String) = "folder/${java.net.URLEncoder.encode(folderPath, "UTF-8")}"
     }
     data object Settings : Screen("settings")
+    data object LxOnline : Screen("lx_online")
     data object Analytics : Screen("analytics")
     data object About : Screen("about")
     data object Player : Screen("player")
@@ -150,7 +152,16 @@ fun AppNavigation(
             SettingsScreen(
                 onNavigateToAbout = { navController.navigate(Screen.About.route) },
                 onNavigateToAnalytics = { navController.navigate(Screen.Analytics.route) },
+                onNavigateToLxOnline = { navController.navigate(Screen.LxOnline.route) },
                 playerViewModel = playerViewModel
+            )
+        }
+
+        composable(Screen.LxOnline.route) {
+            LxOnlineScreen(
+                playerViewModel = playerViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToPlayer = { navController.navigate(Screen.Player.route) }
             )
         }
 

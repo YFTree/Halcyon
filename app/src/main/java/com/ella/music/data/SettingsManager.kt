@@ -30,6 +30,9 @@ class SettingsManager(private val context: Context) {
         val KEY_WEBDAV_USERNAME = stringPreferencesKey("webdav_username")
         val KEY_WEBDAV_PASSWORD = stringPreferencesKey("webdav_password")
         val KEY_WEBDAV_LAST_URL = stringPreferencesKey("webdav_last_url")
+        val KEY_LX_SOURCE_URL = stringPreferencesKey("lx_source_url")
+        val KEY_LX_SOURCE_NAME = stringPreferencesKey("lx_source_name")
+        val KEY_LX_SOURCE_SCRIPT = stringPreferencesKey("lx_source_script")
     }
 
     val lyriconEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_ENABLED] ?: true }
@@ -46,6 +49,9 @@ class SettingsManager(private val context: Context) {
     val webDavUsername: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_USERNAME] ?: "" }
     val webDavPassword: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_PASSWORD] ?: "" }
     val webDavLastUrl: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_LAST_URL] ?: "" }
+    val lxSourceUrl: Flow<String> = context.dataStore.data.map { it[KEY_LX_SOURCE_URL] ?: "" }
+    val lxSourceName: Flow<String> = context.dataStore.data.map { it[KEY_LX_SOURCE_NAME] ?: "" }
+    val lxSourceScript: Flow<String> = context.dataStore.data.map { it[KEY_LX_SOURCE_SCRIPT] ?: "" }
 
     suspend fun setLyriconEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRICON_ENABLED] = enabled }
@@ -108,6 +114,22 @@ class SettingsManager(private val context: Context) {
             it.remove(KEY_WEBDAV_USERNAME)
             it.remove(KEY_WEBDAV_PASSWORD)
             it.remove(KEY_WEBDAV_LAST_URL)
+        }
+    }
+
+    suspend fun setLxSource(url: String, name: String, script: String) {
+        context.dataStore.edit {
+            it[KEY_LX_SOURCE_URL] = url.trim()
+            it[KEY_LX_SOURCE_NAME] = name.ifBlank { "落雪源" }
+            it[KEY_LX_SOURCE_SCRIPT] = script
+        }
+    }
+
+    suspend fun clearLxSource() {
+        context.dataStore.edit {
+            it.remove(KEY_LX_SOURCE_URL)
+            it.remove(KEY_LX_SOURCE_NAME)
+            it.remove(KEY_LX_SOURCE_SCRIPT)
         }
     }
 }
