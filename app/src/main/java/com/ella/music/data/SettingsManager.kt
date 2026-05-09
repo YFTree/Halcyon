@@ -33,6 +33,8 @@ class SettingsManager(private val context: Context) {
         val KEY_LX_SOURCE_URL = stringPreferencesKey("lx_source_url")
         val KEY_LX_SOURCE_NAME = stringPreferencesKey("lx_source_name")
         val KEY_LX_SOURCE_SCRIPT = stringPreferencesKey("lx_source_script")
+        val KEY_LYRIC_FONT_NAME = stringPreferencesKey("lyric_font_name")
+        val KEY_LYRIC_FONT_PATH = stringPreferencesKey("lyric_font_path")
     }
 
     val lyriconEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_ENABLED] ?: true }
@@ -52,6 +54,8 @@ class SettingsManager(private val context: Context) {
     val lxSourceUrl: Flow<String> = context.dataStore.data.map { it[KEY_LX_SOURCE_URL] ?: "" }
     val lxSourceName: Flow<String> = context.dataStore.data.map { it[KEY_LX_SOURCE_NAME] ?: "" }
     val lxSourceScript: Flow<String> = context.dataStore.data.map { it[KEY_LX_SOURCE_SCRIPT] ?: "" }
+    val lyricFontName: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_NAME] ?: "" }
+    val lyricFontPath: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_PATH] ?: "" }
 
     suspend fun setLyriconEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRICON_ENABLED] = enabled }
@@ -130,6 +134,20 @@ class SettingsManager(private val context: Context) {
             it.remove(KEY_LX_SOURCE_URL)
             it.remove(KEY_LX_SOURCE_NAME)
             it.remove(KEY_LX_SOURCE_SCRIPT)
+        }
+    }
+
+    suspend fun setLyricFont(name: String, path: String) {
+        context.dataStore.edit {
+            it[KEY_LYRIC_FONT_NAME] = name.ifBlank { "自定义字体" }
+            it[KEY_LYRIC_FONT_PATH] = path
+        }
+    }
+
+    suspend fun clearLyricFont() {
+        context.dataStore.edit {
+            it.remove(KEY_LYRIC_FONT_NAME)
+            it.remove(KEY_LYRIC_FONT_PATH)
         }
     }
 }

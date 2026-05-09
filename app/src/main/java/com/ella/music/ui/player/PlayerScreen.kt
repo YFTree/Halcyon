@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
+import android.graphics.Typeface
 import android.net.Uri
 import android.provider.MediaStore
 import android.widget.Toast
@@ -73,6 +74,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,6 +86,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.media3.common.Player
 import com.ella.music.R
+import com.ella.music.data.SettingsManager
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
@@ -92,6 +95,7 @@ import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import kotlin.math.max
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -112,6 +116,9 @@ fun PlayerScreen(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val settingsManager = remember { SettingsManager(context) }
+    val lyricFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
+    val lyricFontFamily = remember(lyricFontPath) { lyricFontPath.toPlayerLyricFontFamily() }
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val currentPosition by playerViewModel.currentPosition.collectAsState()
@@ -340,6 +347,7 @@ fun PlayerScreen(
                             currentIndex = currentLyricIndex,
                             currentPositionMs = currentPosition,
                             showTranslation = showLyricTranslation,
+                            fontFamily = lyricFontFamily,
                             onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
                             modifier = Modifier.fillMaxSize()
                         )
@@ -369,6 +377,7 @@ fun PlayerScreen(
                             MiniLyricBlock(
                                 line = miniLyricLine,
                                 showTranslation = showLyricTranslation,
+                                fontFamily = lyricFontFamily,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(18.dp))
@@ -722,6 +731,7 @@ private fun PlayerQueueMenu(
 private fun MiniLyricBlock(
     line: com.ella.music.data.model.LyricLine,
     showTranslation: Boolean,
+    fontFamily: FontFamily? = null,
     modifier: Modifier = Modifier
 ) {
     val longest = listOfNotNull(
@@ -756,6 +766,7 @@ private fun MiniLyricBlock(
             Text(
                 text = main,
                 fontSize = mainSize,
+                fontFamily = fontFamily,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White.copy(alpha = 0.88f),
                 textAlign = TextAlign.Center,
@@ -767,6 +778,7 @@ private fun MiniLyricBlock(
             Text(
                 text = translation,
                 fontSize = secondarySize,
+                fontFamily = fontFamily,
                 color = Color.White.copy(alpha = 0.58f),
                 textAlign = TextAlign.Center,
                 maxLines = 2,
@@ -777,6 +789,7 @@ private fun MiniLyricBlock(
             Text(
                 text = background,
                 fontSize = if (mainSize.value <= 12f) 10.sp else 13.sp,
+                fontFamily = fontFamily,
                 fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.68f),
                 textAlign = TextAlign.Center,
@@ -788,6 +801,7 @@ private fun MiniLyricBlock(
             Text(
                 text = backgroundTranslation,
                 fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
+                fontFamily = fontFamily,
                 color = Color.White.copy(alpha = 0.48f),
                 textAlign = TextAlign.Center,
                 maxLines = 2,
@@ -976,6 +990,13 @@ private fun com.ella.music.data.model.LyricLine.hasMiniLyric(): Boolean {
         !translation.isNullOrBlank() ||
         backgroundText?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() } != null ||
         !backgroundTranslation.isNullOrBlank()
+}
+
+private fun String.toPlayerLyricFontFamily(): FontFamily? {
+    if (isBlank()) return null
+    val file = File(this)
+    if (!file.exists() || !file.canRead()) return null
+    return runCatching { FontFamily(Typeface.createFromFile(file)) }.getOrNull()
 }
 
 private fun String.isMusicSymbolOnly(): Boolean {

@@ -54,6 +54,7 @@ fun SettingsScreen(
     onNavigateToAbout: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToLxOnline: () -> Unit,
+    onNavigateToLyricFont: () -> Unit,
     playerViewModel: PlayerViewModel? = null
 ) {
     val context = LocalContext.current
@@ -69,6 +70,7 @@ fun SettingsScreen(
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = true)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val replayGainEnabled by settingsManager.replayGainEnabled.collectAsState(initial = false)
+    val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
     var themeExpanded by remember { mutableStateOf(false) }
@@ -133,6 +135,24 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
+
+            Card(
+                modifier = Modifier.padding(vertical = 4.dp),
+                onClick = onNavigateToLyricFont
+            ) {
+                BasicComponent(
+                    title = "歌词字体",
+                    summary = lyricFontName.ifBlank { "系统默认" },
+                    endActions = {
+                        Icon(
+                            imageVector = MiuixIcons.Basic.ArrowRight,
+                            contentDescription = null,
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))

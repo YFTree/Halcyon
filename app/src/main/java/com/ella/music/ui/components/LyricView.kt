@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,13 +50,15 @@ fun LyricView(
     lyrics: List<LyricLine>,
     currentIndex: Int,
     showTranslation: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fontFamily: FontFamily? = null
 ) {
     if (lyrics.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(
                 text = "暂无歌词",
                 fontSize = 16.sp,
+                fontFamily = fontFamily,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
         }
@@ -97,6 +100,7 @@ fun LyricView(
             Text(
                 text = line.text.ifBlank { "♪" },
                 fontSize = if (isActive) 18.sp else 15.sp,
+                fontFamily = fontFamily,
                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                 color = textColor,
                 textAlign = lineTextAlign,
@@ -108,6 +112,7 @@ fun LyricView(
                 Text(
                     text = line.translation,
                     fontSize = if (isActive) 14.sp else 12.sp,
+                    fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.72f),
                     textAlign = lineTextAlign,
                     modifier = Modifier
@@ -119,6 +124,7 @@ fun LyricView(
                 Text(
                     text = line.backgroundText,
                     fontSize = if (isActive) 14.sp else 12.sp,
+                    fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.56f),
                     textAlign = lineTextAlign,
                     modifier = Modifier
@@ -130,6 +136,7 @@ fun LyricView(
                 Text(
                     text = line.backgroundTranslation,
                     fontSize = if (isActive) 13.sp else 11.sp,
+                    fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.48f),
                     textAlign = lineTextAlign,
                     modifier = Modifier
@@ -150,6 +157,7 @@ fun WordLyricView(
     currentPositionMs: Long,
     showTranslation: Boolean,
     modifier: Modifier = Modifier,
+    fontFamily: FontFamily? = null,
     onLineClick: (LyricLine) -> Unit = {}
 ) {
     if (lyrics.isEmpty()) {
@@ -157,6 +165,7 @@ fun WordLyricView(
             Text(
                 text = "暂无歌词",
                 fontSize = 16.sp,
+                fontFamily = fontFamily,
                 color = Color.White.copy(alpha = 0.72f)
             )
         }
@@ -199,7 +208,8 @@ fun WordLyricView(
                     WordLine(
                         words = line.words,
                         currentPositionMs = currentPositionMs,
-                        textAlign = lineTextAlign
+                        textAlign = lineTextAlign,
+                        fontFamily = fontFamily
                     )
                 } else {
                     val textColor = when {
@@ -210,6 +220,7 @@ fun WordLyricView(
                     Text(
                         text = line.text.ifBlank { "♪" },
                         fontSize = if (isActive) 18.sp else 15.sp,
+                        fontFamily = fontFamily,
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                         color = textColor,
                         textAlign = lineTextAlign,
@@ -227,6 +238,7 @@ fun WordLyricView(
                     Text(
                         text = line.translation,
                         fontSize = if (isActive) 14.sp else 12.sp,
+                        fontFamily = fontFamily,
                         color = translationColor,
                         textAlign = lineTextAlign,
                         modifier = Modifier
@@ -246,6 +258,7 @@ fun WordLyricView(
                             currentPositionMs = currentPositionMs,
                             textAlign = lineTextAlign,
                             fontSizeSp = 14,
+                            fontFamily = fontFamily,
                             currentColor = Color.White.copy(alpha = 0.78f),
                             sungColor = Color.White.copy(alpha = 0.56f),
                             pendingColor = Color.White.copy(alpha = 0.42f),
@@ -255,6 +268,7 @@ fun WordLyricView(
                         Text(
                             text = line.backgroundText,
                             fontSize = if (isActive) 14.sp else 12.sp,
+                            fontFamily = fontFamily,
                             color = backgroundColor,
                             textAlign = lineTextAlign,
                             modifier = Modifier
@@ -272,6 +286,7 @@ fun WordLyricView(
                     Text(
                         text = line.backgroundTranslation,
                         fontSize = if (isActive) 13.sp else 11.sp,
+                        fontFamily = fontFamily,
                         color = backgroundTranslationColor,
                         textAlign = lineTextAlign,
                         modifier = Modifier
@@ -303,6 +318,7 @@ private fun WordLine(
     textAlign: TextAlign,
     modifier: Modifier = Modifier,
     fontSizeSp: Int = 18,
+    fontFamily: FontFamily? = null,
     currentColor: Color = Color.White,
     sungColor: Color = Color.White.copy(alpha = 0.82f),
     pendingColor: Color = Color.White.copy(alpha = 0.56f)
@@ -353,6 +369,7 @@ private fun WordLine(
                     Text(
                         text = displayText,
                         fontSize = fontSizeSp.sp,
+                        fontFamily = fontFamily,
                         fontWeight = FontWeight.ExtraBold,
                         color = currentColor.copy(alpha = glowPulse * 0.34f),
                         modifier = Modifier
@@ -365,6 +382,7 @@ private fun WordLine(
                     Text(
                         text = displayText,
                         fontSize = fontSizeSp.sp,
+                        fontFamily = fontFamily,
                         fontWeight = FontWeight.ExtraBold,
                         color = currentColor.copy(alpha = glowPulse * 0.56f),
                         modifier = Modifier
@@ -378,6 +396,7 @@ private fun WordLine(
                 Text(
                     text = displayText,
                     fontSize = fontSizeSp.sp,
+                    fontFamily = fontFamily,
                     fontWeight = if (isWordCurrent) FontWeight.ExtraBold else FontWeight.Bold,
                     color = color,
                     modifier = Modifier

@@ -21,6 +21,7 @@ import com.ella.music.ui.folder.FolderScreen
 import com.ella.music.ui.home.HomeScreen
 import com.ella.music.ui.online.LxOnlineScreen
 import com.ella.music.ui.player.PlayerScreen
+import com.ella.music.ui.settings.LyricFontScreen
 import com.ella.music.ui.settings.SettingsScreen
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -39,6 +40,7 @@ sealed class Screen(val route: String) {
         fun createRoute(folderPath: String) = "folder/${java.net.URLEncoder.encode(folderPath, "UTF-8")}"
     }
     data object Settings : Screen("settings")
+    data object LyricFont : Screen("lyric_font")
     data object LxOnline : Screen("lx_online")
     data object Analytics : Screen("analytics")
     data object About : Screen("about")
@@ -153,7 +155,14 @@ fun AppNavigation(
                 onNavigateToAbout = { navController.navigate(Screen.About.route) },
                 onNavigateToAnalytics = { navController.navigate(Screen.Analytics.route) },
                 onNavigateToLxOnline = { navController.navigate(Screen.LxOnline.route) },
+                onNavigateToLyricFont = { navController.navigate(Screen.LyricFont.route) },
                 playerViewModel = playerViewModel
+            )
+        }
+
+        composable(Screen.LyricFont.route) {
+            LyricFontScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
