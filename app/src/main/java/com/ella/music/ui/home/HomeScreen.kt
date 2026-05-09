@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -42,7 +43,9 @@ import com.ella.music.data.model.Song
 import com.ella.music.ui.components.SongItem
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
@@ -87,17 +90,22 @@ fun HomeScreen(
                 it.album.contains(searchQuery, ignoreCase = true)
         }
     }
-    val sortedSongs = remember(filteredSongs, sortMode) {
-        when (sortMode) {
-            HomeSortMode.Title -> filteredSongs.sortedWith(compareBy<Song> { it.title.musicSortKey() }.thenBy { it.title })
-            HomeSortMode.FileName -> filteredSongs.sortedWith(
-                compareBy<Song> { it.fileName.ifBlank { it.path.substringAfterLast('/') }.musicSortKey() }
-                    .thenBy { it.fileName.ifBlank { it.path.substringAfterLast('/') } }
-            )
-            HomeSortMode.DateAdded -> filteredSongs.sortedByDescending { it.dateAdded }
-            HomeSortMode.DateModified -> filteredSongs.sortedByDescending { it.dateModified }
+    val sortedResult by produceState(
+        initialValue = HomeSortedSongs(filteredSongs, emptyMap()),
+        filteredSongs,
+        sortMode
+    ) {
+        value = withContext(Dispatchers.Default) {
+            when (sortMode) {
+                HomeSortMode.Title -> filteredSongs.sortedByMusicKey { it.title }
+                HomeSortMode.FileName -> filteredSongs.sortedByMusicKey { it.fileName.ifBlank { it.path.substringAfterLast('/') } }
+                HomeSortMode.DateAdded -> HomeSortedSongs(filteredSongs.sortedByDescending { it.dateAdded }, emptyMap())
+                HomeSortMode.DateModified -> HomeSortedSongs(filteredSongs.sortedByDescending { it.dateModified }, emptyMap())
+            }
         }
     }
+    val sortedSongs = sortedResult.songs
+    val sortKeysBySongId = sortedResult.sortKeysBySongId
 
     Column(
         modifier = Modifier
@@ -240,9 +248,9 @@ fun HomeScreen(
             } else {
                 val listState = rememberLazyListState()
                 var fastScrollJob by remember { mutableStateOf<Job?>(null) }
-                val fastIndexTargets = remember(sortedSongs) {
+                val fastIndexTargets = remember(sortedSongs, sortKeysBySongId) {
                     sortedSongs
-                        .mapIndexed { index, song -> song.indexLetter() to index }
+                        .mapIndexed { index, song -> song.indexLetter(sortKeysBySongId[song.id]) to index }
                         .distinctBy { it.first }
                         .toMap()
                 }
@@ -292,6 +300,7 @@ fun HomeScreen(
                         if (sortMode == HomeSortMode.Title && sortedSongs.size > 30) {
                             FastIndexBar(
                                 songs = sortedSongs,
+                                sortKeysBySongId = sortKeysBySongId,
                                 modifier = Modifier
                                     .align(Alignment.CenterEnd)
                                     .fillMaxHeight()
@@ -322,11 +331,12 @@ private enum class HomeSortMode(val label: String) {
 @Composable
 private fun FastIndexBar(
     songs: List<Song>,
+    sortKeysBySongId: Map<Long, String>,
     onLetterClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val letters = remember(songs) {
-        songs.map { it.indexLetter() }.distinct()
+    val letters = remember(songs, sortKeysBySongId) {
+        songs.map { it.indexLetter(sortKeysBySongId[it.id]) }.distinct()
     }
     var heightPx by remember { mutableStateOf(1) }
     var lastSelectedLetter by remember { mutableStateOf<String?>(null) }
@@ -387,20 +397,70 @@ private fun FastIndexBar(
     }
 }
 
-private fun Song.indexLetter(): String {
-    val first = title.musicSortKey().firstOrNull()?.uppercaseChar()
+private fun Song.indexLetter(sortKey: String? = null): String {
+    val first = (sortKey ?: title.musicSortKey()).firstOrNull()?.uppercaseChar()
     return if (first != null && first in 'A'..'Z') first.toString() else "#"
 }
 
 private fun String.musicSortKey(): String {
     val text = trim()
     if (text.isBlank()) return ""
+    if (text.isAsciiSortable()) return text.lowercase(Locale.ROOT)
+    MusicSortKeyCache[text]?.let { return it }
     val latin = runCatching { MusicSortTransliterator.value.transliterate(text) }.getOrDefault(text)
-    return latin.lowercase(Locale.ROOT)
+    return latin.lowercase(Locale.ROOT).also { MusicSortKeyCache[text] = it }
+}
+
+private inline fun List<Song>.sortedByMusicKey(crossinline selector: (Song) -> String): HomeSortedSongs {
+    val entries = map { song ->
+        val raw = selector(song)
+        SongSortEntry(
+            song = song,
+            sortKey = raw.musicSortKey(),
+            fallback = raw
+        )
+    }.sortedWith(
+        compareBy<SongSortEntry> { it.sortKey }
+            .thenBy { it.fallback }
+    )
+    return HomeSortedSongs(
+        songs = entries.map { it.song },
+        sortKeysBySongId = entries.associate { it.song.id to it.sortKey }
+    )
+}
+
+private data class HomeSortedSongs(
+    val songs: List<Song>,
+    val sortKeysBySongId: Map<Long, String>
+)
+
+private data class SongSortEntry(
+    val song: Song,
+    val sortKey: String,
+    val fallback: String
+)
+
+private fun String.isAsciiSortable(): Boolean {
+    return all { it.code in 0x20..0x7E }
 }
 
 private object MusicSortTransliterator {
     val value: Transliterator by lazy {
         Transliterator.getInstance("Any-Latin; Latin-ASCII; NFD; [:Nonspacing Mark:] Remove; NFC")
+    }
+}
+
+private object MusicSortKeyCache {
+    private const val MaxSize = 4096
+    private val values = object : LinkedHashMap<String, String>(MaxSize, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean {
+            return size > MaxSize
+        }
+    }
+
+    operator fun get(key: String): String? = synchronized(values) { values[key] }
+
+    operator fun set(key: String, value: String) {
+        synchronized(values) { values[key] = value }
     }
 }
