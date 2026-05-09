@@ -2,6 +2,7 @@ package com.ella.music.player
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.Bundle
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -215,6 +216,12 @@ class ExoPlayerManager(private val context: Context) {
                     .setArtist(song.artist)
                     .setAlbumTitle(song.album)
                     .setArtworkUri(song.coverUrl.takeIf { it.isNotBlank() }?.toUri())
+                    .setExtras(
+                        Bundle().apply {
+                            putString(EXTRA_ONLINE_SOURCE, song.onlineSource)
+                            putString(EXTRA_ONLINE_ID, song.onlineId)
+                        }
+                    )
                     .build()
             )
 
@@ -252,7 +259,14 @@ class ExoPlayerManager(private val context: Context) {
             path = path,
             fileName = fileName,
             mimeType = localConfiguration?.mimeType.orEmpty(),
-            coverUrl = metadata.artworkUri?.toString().orEmpty()
+            coverUrl = metadata.artworkUri?.toString().orEmpty(),
+            onlineSource = metadata.extras?.getString(EXTRA_ONLINE_SOURCE).orEmpty(),
+            onlineId = metadata.extras?.getString(EXTRA_ONLINE_ID).orEmpty()
         )
+    }
+
+    private companion object {
+        const val EXTRA_ONLINE_SOURCE = "com.ella.music.extra.ONLINE_SOURCE"
+        const val EXTRA_ONLINE_ID = "com.ella.music.extra.ONLINE_ID"
     }
 }

@@ -28,13 +28,20 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 class MusicRepository(private val context: Context) {
 
     private val scanner = MusicScanner(context)
     private val settingsManager = SettingsManager(context)
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
 
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
@@ -91,6 +98,11 @@ class MusicRepository(private val context: Context) {
 
         Log.d("MusicRepo", "Loading lyrics for: ${song.title} path=${song.path}")
 
+        fetchOnlineLyrics(song)?.let { onlineLyrics ->
+            lyricsCache[song.id] = onlineLyrics
+            return@withContext onlineLyrics
+        }
+
         val effectivePath = song.effectiveLocalPathForMetadata()
         val lrcContent = LrcParser.findLrcFile(effectivePath)
         if (lrcContent != null) {
@@ -132,6 +144,34 @@ class MusicRepository(private val context: Context) {
         Log.d("MusicRepo", "No lyrics found for ${song.title}")
         lyricsCache[song.id] = emptyList()
         emptyList()
+    }
+
+    private fun fetchOnlineLyrics(song: Song): List<LyricLine>? {
+        if (song.onlineSource != "kw" || song.onlineId.isBlank()) return null
+        val request = Request.Builder()
+            .url("https://www.kuwo.cn/newh5/singles/songinfoandlrc?musicId=${song.onlineId}")
+            .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 EllaMusic/1.0")
+            .build()
+        return runCatching {
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val root = JSONObject(response.body?.string().orEmpty())
+                val list = root.optJSONObject("data")?.optJSONArray("lrclist") ?: return@use null
+                val lyrics = List(list.length()) { index ->
+                    val item = list.getJSONObject(index)
+                    val timeMs = ((item.optString("time").toDoubleOrNull() ?: 0.0) * 1000).toLong()
+                    LyricLine(
+                        timeMs = timeMs,
+                        text = item.optString("lineLyric").trim()
+                    )
+                }.filter { it.text.isNotBlank() }
+                    .sortedBy { it.timeMs }
+                lyrics.takeIf { it.isNotEmpty() }
+            }
+        }.getOrElse {
+            Log.w("MusicRepo", "Failed to fetch online lyrics for ${song.title}", it)
+            null
+        }
     }
 
     fun getReplayGain(song: Song): Float? {
@@ -353,6 +393,8 @@ class MusicRepository(private val context: Context) {
                     .put("dateAdded", song.dateAdded)
                     .put("dateModified", song.dateModified)
                     .put("coverUrl", song.coverUrl)
+                    .put("onlineSource", song.onlineSource)
+                    .put("onlineId", song.onlineId)
             )
         }
         return array
@@ -389,7 +431,9 @@ class MusicRepository(private val context: Context) {
                 mimeType = item.optString("mimeType"),
                 dateAdded = item.optLong("dateAdded"),
                 dateModified = item.optLong("dateModified"),
-                coverUrl = item.optString("coverUrl")
+                coverUrl = item.optString("coverUrl"),
+                onlineSource = item.optString("onlineSource"),
+                onlineId = item.optString("onlineId")
             )
         }
     }

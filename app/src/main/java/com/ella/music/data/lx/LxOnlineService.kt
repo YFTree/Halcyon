@@ -74,7 +74,9 @@ class LxOnlineService {
                         path = "",
                         fileName = "$title-$artist.mp3",
                         mimeType = "audio/mpeg",
-                        coverUrl = coverUrl
+                        coverUrl = coverUrl,
+                        onlineSource = "kw",
+                        onlineId = mid
                     ),
                     source = "kw",
                     songmid = mid,
@@ -156,7 +158,10 @@ class LxOnlineService {
         val normalized = path.trim()
         return when {
             normalized.startsWith("http://") || normalized.startsWith("https://") -> normalized
-            normalized.isNotBlank() -> "https://img1.kuwo.cn/star/albumcover/$normalized"
+            normalized.isNotBlank() -> {
+                val highResPath = normalized.replace(Regex("""^\d+/"""), "500/")
+                "https://img1.kuwo.cn/star/albumcover/$highResPath"
+            }
             else -> ""
         }
     }
