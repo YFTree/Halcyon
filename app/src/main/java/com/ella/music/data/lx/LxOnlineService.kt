@@ -36,7 +36,6 @@ class LxOnlineService {
 
     fun importSourceScript(script: String): Pair<String, String> {
         if (script.length !in 50..2_000_000) error("源脚本内容异常")
-        if (!script.contains("lx.") && !script.contains("lx_")) error("这不像落雪 Music API 脚本")
         return extractSourceName(script) to script
     }
 
