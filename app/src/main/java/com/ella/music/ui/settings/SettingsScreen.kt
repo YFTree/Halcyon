@@ -1,5 +1,10 @@
 package com.ella.music.ui.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -70,6 +75,7 @@ fun SettingsScreen(
     val lyriconTranslation by settingsManager.lyriconTranslation.collectAsState(initial = true)
     val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = true)
+    val desktopLyricEnabled by settingsManager.desktopLyricEnabled.collectAsState(initial = false)
     val bluetoothLyricEnabled by settingsManager.bluetoothLyricEnabled.collectAsState(initial = false)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val replayGainEnabled by settingsManager.replayGainEnabled.collectAsState(initial = false)
@@ -262,6 +268,26 @@ fun SettingsScreen(
                     onCheckedChange = { enabled ->
                         scope.launch { settingsManager.setLyriconTranslation(enabled) }
                         playerViewModel?.setLyriconTranslation(enabled)
+                    }
+                )
+
+                SwitchPreference(
+                    title = "启用桌面歌词",
+                    summary = "通过悬浮窗在其他应用上方显示当前歌词",
+                    checked = desktopLyricEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                            Toast.makeText(context, "请先授予悬浮窗权限", Toast.LENGTH_SHORT).show()
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                            )
+                        } else {
+                            scope.launch { settingsManager.setDesktopLyricEnabled(enabled) }
+                            playerViewModel?.setDesktopLyricEnabled(enabled)
+                        }
                     }
                 )
 

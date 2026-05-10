@@ -13,6 +13,7 @@ data class Song(
     val mimeType: String = "",
     val dateAdded: Long = 0L,
     val dateModified: Long = 0L,
+    val trackNumber: Int = 0,
     val coverUrl: String = "",
     val onlineSource: String = "",
     val onlineId: String = ""

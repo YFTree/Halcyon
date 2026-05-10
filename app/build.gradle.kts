@@ -22,10 +22,10 @@ android {
 
     defaultConfig {
         applicationId = "com.ella.music"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.0.6"
+        versionCode = 8
+        versionName = "1.0.7"
 
         val buildTime = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")

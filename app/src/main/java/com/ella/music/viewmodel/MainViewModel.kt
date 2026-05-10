@@ -114,7 +114,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getAlbumArtUri(albumId: Long) = repository.getAlbumArtUri(albumId)
 
-    fun getCoverArtBitmap(song: Song) = repository.getCoverArtBitmap(song)
+    fun getCoverArtBitmap(song: Song) = repository.getCoverArtBitmap(song, 128)
 
     fun getReplayGain(song: Song): Float? {
         return repository.getReplayGain(song)

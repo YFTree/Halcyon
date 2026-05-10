@@ -46,7 +46,8 @@ class MusicScanner(private val context: Context) {
             MediaStore.Audio.Media.SIZE,
             MediaStore.Audio.Media.MIME_TYPE,
             MediaStore.Audio.Media.DATE_ADDED,
-            MediaStore.Audio.Media.DATE_MODIFIED
+            MediaStore.Audio.Media.DATE_MODIFIED,
+            MediaStore.Audio.Media.TRACK
         )
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
@@ -66,6 +67,7 @@ class MusicScanner(private val context: Context) {
             val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
             val dateAddedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
             val dateModifiedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
+            val trackCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
@@ -80,6 +82,7 @@ class MusicScanner(private val context: Context) {
                 val mime = cursor.getString(mimeCol) ?: ""
                 val dateAdded = cursor.getLong(dateAddedCol) * 1000L
                 val dateModified = cursor.getLong(dateModifiedCol) * 1000L
+                val trackNumber = cursor.getInt(trackCol).normalizedTrackNumber()
 
                 if (path.isEmpty()) continue
                 if (!path.isAllowedByFolderFilters(normalizedIncludeFolders, normalizedExcludeFolders)) continue
@@ -140,7 +143,7 @@ class MusicScanner(private val context: Context) {
                 if (isMissingTag(album)) album = "Unknown"
 
                 if (duration > 0 && duration >= minDurationMs) {
-                    songs.add(Song(id, title, artist, album, albumId, duration, path, fileName, size, mime, dateAdded, dateModified))
+                    songs.add(Song(id, title, artist, album, albumId, duration, path, fileName, size, mime, dateAdded, dateModified, trackNumber))
                     onProgress?.invoke(songs.size)
                 }
             }
@@ -418,6 +421,9 @@ class MusicScanner(private val context: Context) {
 
     private fun String.normalizedPropertyKey(): String =
         lowercase().replace(" ", "").replace("_", "")
+
+    private fun Int.normalizedTrackNumber(): Int =
+        if (this > 1000) this % 1000 else this
 
     private fun String.normalizedFolderPath(): String? {
         val normalized = trim().replace('\\', '/').trimEnd('/')

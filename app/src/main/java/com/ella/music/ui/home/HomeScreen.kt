@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,10 +37,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.painterResource
 import android.os.SystemClock
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.SongItem
 import com.ella.music.viewmodel.MainViewModel
@@ -72,6 +75,7 @@ fun HomeScreen(
 ) {
     val songs by mainViewModel.songs.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
+    val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val isScanning by mainViewModel.isScanning.collectAsState()
     val scanProgress by mainViewModel.scanProgress.collectAsState()
 
@@ -133,6 +137,14 @@ fun HomeScreen(
                         Text(text = "取消", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
                     }
                 } else {
+                    IconButton(onClick = { playerViewModel.requestLocateCurrentSong() }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_my_location),
+                            contentDescription = "定位当前歌曲",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     IconButton(onClick = { sortExpanded = !sortExpanded }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Sort,
@@ -251,6 +263,11 @@ fun HomeScreen(
             } else {
                 val listState = rememberLazyListState()
                 var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+                LaunchedEffect(locateCurrentSongRequest) {
+                    if (locateCurrentSongRequest <= 0) return@LaunchedEffect
+                    val index = sortedSongs.indexOfFirst { it.id == currentSong?.id }
+                    if (index >= 0) listState.animateScrollToItem(index)
+                }
                 val fastIndexTargets = remember(sortedSongs, sortKeysBySongId) {
                     sortedSongs
                         .mapIndexed { index, song -> song.indexLetter(sortKeysBySongId[song.id]) to index }

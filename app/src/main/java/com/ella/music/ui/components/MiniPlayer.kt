@@ -2,7 +2,18 @@ package com.ella.music.ui.components
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -18,11 +29,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
@@ -53,6 +70,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun MiniPlayer(
     song: Song,
     isPlaying: Boolean,
+    progress: Float = 0f,
     lyricText: String? = null,
     lyricTranslation: String? = null,
     albumArtUri: Uri? = null,
@@ -75,6 +93,21 @@ fun MiniPlayer(
     val isLight = MiuixTheme.colorScheme.background.luminance() > 0.5f
     val surfaceContainer = MiuixTheme.colorScheme.surfaceContainer
     val glassSurface = if (isLight) Color(0xFFF8F8FA).copy(alpha = 0.48f) else Color(0xFF111114).copy(alpha = 0.58f)
+    val hasTranslation = !lyricTranslation.isNullOrBlank()
+    val primaryText = lyricText ?: song.title
+    val secondaryText = when {
+        lyricText != null && hasTranslation -> lyricTranslation.orEmpty()
+        lyricText != null -> "${song.title} - ${song.artist}"
+        else -> song.artist
+    }
+    var transitionDirection by remember { mutableIntStateOf(1) }
+
+    val textState = MiniPlayerTextState(
+        songId = song.id,
+        primary = primaryText,
+        secondary = secondaryText,
+        showingLyric = lyricText != null
+    )
 
     Row(
         modifier = modifier
@@ -90,7 +123,13 @@ fun MiniPlayer(
                     },
                     onDragEnd = {
                         if (abs(dragAmount) > 96f) {
-                            if (dragAmount < 0f) onSkipNext() else onSkipPrevious()
+                            if (dragAmount < 0f) {
+                                transitionDirection = 1
+                                onSkipNext()
+                            } else {
+                                transitionDirection = -1
+                                onSkipPrevious()
+                            }
                         }
                         dragAmount = 0f
                     },
@@ -127,64 +166,98 @@ fun MiniPlayer(
     ) {
         Box(
             modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(MiuixTheme.colorScheme.surface),
+                .size(50.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (coverModel != null) {
-                SafeCoverImage(
-                    model = coverModel,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                    sizePx = 128
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(MiuixTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center
+            ) {
+                if (coverModel != null) {
+                    SafeCoverImage(
+                        model = coverModel,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                        sizePx = 128
+                    )
+                } else {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Music,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+            CircularProgressRing(
+                progress = progress,
+                color = MiuixTheme.colorScheme.primary,
+                trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                modifier = Modifier.size(50.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        AnimatedContent(
+            targetState = textState,
+            transitionSpec = {
+                val direction = transitionDirection
+                val outOffset = { width: Int -> -direction * width / 3 }
+                val inOffset = { width: Int -> direction * width / 3 }
+                val enter = slideInHorizontally(
+                    animationSpec = tween(450, easing = FastOutSlowInEasing),
+                    initialOffsetX = inOffset
+                ) + fadeIn(
+                    animationSpec = tween(450, easing = FastOutSlowInEasing),
+                    initialAlpha = 0.15f
                 )
-            } else {
-                Icon(
-                    imageVector = MiuixIcons.Regular.Music,
-                    contentDescription = null,
-                    tint = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
+                val exit = slideOutHorizontally(
+                    animationSpec = tween(300, easing = FastOutLinearInEasing),
+                    targetOffsetX = outOffset
+                ) + fadeOut(
+                    animationSpec = tween(300, easing = FastOutLinearInEasing),
+                    targetAlpha = 0f
+                )
+                enter togetherWith exit using SizeTransform(clip = false)
+            },
+            label = "MiniPlayerSongText",
+            modifier = Modifier.weight(1f)
+        ) { state ->
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = state.primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (state.showingLyric) {
+                        MiuixTheme.colorScheme.primary
+                    } else {
+                        MiuixTheme.colorScheme.onSurface
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = state.secondary,
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
 
-        Spacer(modifier = Modifier.width(10.dp))
-
-        val primaryText = lyricText ?: song.title
-        val secondaryText = if (lyricText != null) {
-            lyricTranslation ?: song.artist
-        } else {
-            song.artist
-        }
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = primaryText,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (lyricText != null) {
-                    MiuixTheme.colorScheme.primary
-                } else {
-                    MiuixTheme.colorScheme.onSurface
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = secondaryText,
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
         IconButton(
-            onClick = onSkipPrevious,
+            onClick = {
+                transitionDirection = -1
+                onSkipPrevious()
+            },
             modifier = Modifier.size(36.dp)
         ) {
             Icon(
@@ -208,7 +281,10 @@ fun MiniPlayer(
         }
 
         IconButton(
-            onClick = onSkipNext,
+            onClick = {
+                transitionDirection = 1
+                onSkipNext()
+            },
             modifier = Modifier.size(36.dp)
         ) {
             Icon(
@@ -221,6 +297,45 @@ fun MiniPlayer(
     }
 }
 
+@Composable
+private fun CircularProgressRing(
+    progress: Float,
+    color: Color,
+    trackColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.graphicsLayer { rotationZ = -90f }) {
+        val strokeWidth = 2.dp.toPx()
+        val inset = strokeWidth / 2f
+        val arcSize = size.copy(width = size.width - strokeWidth, height = size.height - strokeWidth)
+        drawArc(
+            color = trackColor,
+            startAngle = 0f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+            size = arcSize,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+        )
+        drawArc(
+            color = color,
+            startAngle = 0f,
+            sweepAngle = 360f * progress.coerceIn(0f, 1f),
+            useCenter = false,
+            topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+            size = arcSize,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+        )
+    }
+}
+
 private fun Color.luminance(): Float {
     return 0.2126f * red + 0.7152f * green + 0.0722f * blue
 }
+
+private data class MiniPlayerTextState(
+    val songId: Long,
+    val primary: String,
+    val secondary: String,
+    val showingLyric: Boolean
+)

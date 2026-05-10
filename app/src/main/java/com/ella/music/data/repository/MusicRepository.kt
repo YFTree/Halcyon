@@ -33,6 +33,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 
 class MusicRepository(private val context: Context) {
 
@@ -58,10 +59,13 @@ class MusicRepository(private val context: Context) {
     private val lyricsCache = mutableMapOf<Long, List<LyricLine>>()
     private val audioInfoCache = mutableMapOf<Long, AudioInfo>()
     private val replayGainCache = mutableMapOf<Long, Float?>()
-    private val coverArtCache = mutableMapOf<Long, ByteArray?>()
+    private val coverArtCache = object : LruCache<Long, ByteArray>(8 * 1024) {
+        override fun sizeOf(key: Long, value: ByteArray): Int = value.size / 1024
+    }
     private val coverBitmapCache = object : LruCache<Long, Bitmap>(16 * 1024) {
         override fun sizeOf(key: Long, value: Bitmap): Int = value.byteCount / 1024
     }
+    private val missingCoverIds = ConcurrentHashMap.newKeySet<Long>()
     private val libraryCacheFile = File(context.filesDir, "music_library_cache.json")
     private val remoteAudioCacheDir = File(context.cacheDir, "webdav_audio")
 
@@ -264,32 +268,47 @@ class MusicRepository(private val context: Context) {
     }
 
     fun getCoverArt(song: Song): ByteArray? {
-        coverArtCache[song.id]?.let { return it }
+        if (missingCoverIds.contains(song.id)) return null
+        coverArtCache.get(song.id)?.let { return it }
         val art = scanner.extractCoverArt(song.effectiveLocalPathForMetadata())
-        coverArtCache[song.id] = art
+        if (art != null) {
+            coverArtCache.put(song.id, art)
+        } else {
+            missingCoverIds += song.id
+        }
         return art
     }
 
-    fun getCoverArtBitmap(song: Song): Bitmap? {
-        coverBitmapCache.get(song.id)?.let { return it }
+    fun getCoverArtBitmap(song: Song, maxSize: Int = 512): Bitmap? {
+        val cacheKey = song.id * 10000 + maxSize.coerceIn(64, 3000)
+        coverBitmapCache.get(cacheKey)?.let { return it }
         val data = getCoverArt(song) ?: return null
-        val bounds = BitmapFactory.Options().apply {
-            inJustDecodeBounds = true
-        }
-        BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+        return runCatching {
+            val bounds = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-        val maxSize = 512
-        var sampleSize = 1
-        while ((bounds.outWidth / sampleSize) > maxSize || (bounds.outHeight / sampleSize) > maxSize) {
-            sampleSize *= 2
-        }
+            val targetSize = maxSize.coerceIn(64, 3000)
+            var sampleSize = 1
+            while ((bounds.outWidth / sampleSize) > targetSize || (bounds.outHeight / sampleSize) > targetSize) {
+                sampleSize *= 2
+            }
 
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = sampleSize.coerceAtLeast(1)
-            inPreferredConfig = Bitmap.Config.RGB_565
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = sampleSize.coerceAtLeast(1)
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            BitmapFactory.decodeByteArray(data, 0, data.size, options)
+                ?.also { coverBitmapCache.put(cacheKey, it) }
+        }.getOrElse { error ->
+            if (error is OutOfMemoryError) {
+                coverBitmapCache.evictAll()
+            }
+            Log.w("MusicRepo", "Failed to decode cover bitmap for ${song.path}", error)
+            null
         }
-        return BitmapFactory.decodeByteArray(data, 0, data.size, options)
-            ?.also { coverBitmapCache.put(song.id, it) }
     }
 
     fun getAlbumArtUri(albumId: Long): Uri? {
@@ -301,7 +320,14 @@ class MusicRepository(private val context: Context) {
     }
 
     fun getSongsForAlbum(albumId: Long): List<Song> {
-        return _songs.value.filter { it.albumId == albumId }
+        return _songs.value
+            .filter { it.albumId == albumId }
+            .sortedWith(
+                compareBy<Song> { it.trackNumber <= 0 }
+                    .thenBy { it.trackNumber }
+                    .thenBy { it.title.lowercase() }
+                    .thenBy { it.id }
+            )
     }
 
     suspend fun deleteSongs(songs: Collection<Song>): Int = withContext(Dispatchers.IO) {
@@ -337,7 +363,8 @@ class MusicRepository(private val context: Context) {
         lyricsCache.clear()
         audioInfoCache.clear()
         replayGainCache.clear()
-        coverArtCache.clear()
+        coverArtCache.evictAll()
+        missingCoverIds.clear()
         coverBitmapCache.evictAll()
     }
 
@@ -439,6 +466,7 @@ class MusicRepository(private val context: Context) {
                     .put("mimeType", song.mimeType)
                     .put("dateAdded", song.dateAdded)
                     .put("dateModified", song.dateModified)
+                    .put("trackNumber", song.trackNumber)
                     .put("coverUrl", song.coverUrl)
                     .put("onlineSource", song.onlineSource)
                     .put("onlineId", song.onlineId)
@@ -478,6 +506,7 @@ class MusicRepository(private val context: Context) {
                 mimeType = item.optString("mimeType"),
                 dateAdded = item.optLong("dateAdded"),
                 dateModified = item.optLong("dateModified"),
+                trackNumber = item.optInt("trackNumber"),
                 coverUrl = item.optString("coverUrl"),
                 onlineSource = item.optString("onlineSource"),
                 onlineId = item.optString("onlineId")

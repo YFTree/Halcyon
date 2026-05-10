@@ -190,6 +190,8 @@ fun EllaApp(
 
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
+    val currentPosition by playerViewModel.currentPosition.collectAsState()
+    val duration by playerViewModel.duration.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
 
@@ -237,6 +239,8 @@ fun EllaApp(
             showBottomBar = showBottomBar,
             currentSong = currentSong,
             isPlaying = isPlaying,
+            currentPosition = currentPosition,
+            duration = duration,
             lyricText = miniPlayerLyricText,
             lyricTranslation = miniPlayerLyricTranslation,
             tabs = tabs,
@@ -263,6 +267,8 @@ private fun FloatingBottomControls(
     showBottomBar: Boolean,
     currentSong: com.ella.music.data.model.Song?,
     isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
     lyricText: String?,
     lyricTranslation: String?,
     tabs: List<Triple<String, String, androidx.compose.ui.graphics.vector.ImageVector>>,
@@ -289,6 +295,7 @@ private fun FloatingBottomControls(
                 MiniPlayer(
                     song = song,
                     isPlaying = isPlaying,
+                    progress = if (duration > 0L) currentPosition.toFloat() / duration.toFloat() else 0f,
                     lyricText = lyricText,
                     lyricTranslation = lyricTranslation,
                     albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),

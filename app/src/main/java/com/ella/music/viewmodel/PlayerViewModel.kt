@@ -9,6 +9,7 @@ import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.repository.MusicRepository
+import com.ella.music.player.DesktopLyricBridge
 import com.ella.music.player.ExoPlayerManager
 import com.ella.music.player.LyriconBridge
 import com.ella.music.player.TickerBridge
@@ -29,6 +30,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val settingsManager = SettingsManager(application)
     val lyriconBridge = LyriconBridge(application)
     val tickerBridge = TickerBridge(application)
+    val desktopLyricBridge = DesktopLyricBridge(application)
     private val playbackStatsStore = PlaybackStatsStore.getInstance(application)
 
     val currentSong: StateFlow<Song?> = playerManager.currentSong
@@ -53,6 +55,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _showLyricTranslation = MutableStateFlow(true)
     val showLyricTranslation: StateFlow<Boolean> = _showLyricTranslation.asStateFlow()
 
+    private val _locateCurrentSongRequest = MutableStateFlow(0)
+    val locateCurrentSongRequest: StateFlow<Int> = _locateCurrentSongRequest.asStateFlow()
+
     private var positionUpdateJob: Job? = null
     private var lastSentPlayingState: Boolean? = null
     private var lastTickerLine: String? = null
@@ -74,6 +79,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         observePlayState()
         initLyricon()
         initTicker()
+        initDesktopLyric()
         initLyricPageTranslation()
         initBluetoothLyric()
     }
@@ -93,6 +99,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val enabled = settingsManager.tickerEnabled.first()
             tickerBridge.setEnabled(enabled)
             if (enabled) resendTickerLyric()
+        }
+    }
+
+    private fun initDesktopLyric() {
+        viewModelScope.launch {
+            val enabled = settingsManager.desktopLyricEnabled.first()
+            desktopLyricBridge.setEnabled(enabled)
+            if (enabled) resendDesktopLyric()
         }
     }
 
@@ -146,6 +160,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (lyriconBridge.isEnabled()) {
                     lyriconBridge.sendPosition(playerManager.currentPosition.value)
                 }
+                updateDesktopLyricFrame()
 
                 delay(50)
             }
@@ -170,6 +185,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _currentLyricIndex.value = -1
                     lyriconBridge.clearSong()
                     tickerBridge.clearLyric()
+                    desktopLyricBridge.clearLyric()
                 }
             }
         }
@@ -183,10 +199,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     lyriconBridge.sendPlaybackState(playing)
                     if (!playing) {
                         tickerBridge.clearLyric()
+                        desktopLyricBridge.clearLyric()
                         playerManager.clearBluetoothLyric()
                         lastBluetoothLyricLine = null
                     } else {
                         resendBluetoothLyric()
+                        resendDesktopLyric()
                     }
                 }
             }
@@ -270,6 +288,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lyriconBridge.sendPlaybackState(isPlaying.value)
         lyriconBridge.sendPosition(currentPosition.value)
         resendTickerLyric()
+        resendDesktopLyric()
     }
 
     private fun resendTickerLyric() {
@@ -283,6 +302,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             lastTickerLine = null
         }
+    }
+
+    private fun resendDesktopLyric() {
+        if (!desktopLyricBridge.isEnabled() || !isPlaying.value) return
+        val index = _currentLyricIndex.value
+        val currentLyrics = _lyrics.value
+        desktopLyricBridge.sendLyric(
+            line = currentLyrics.getOrNull(index),
+            positionMs = currentPosition.value,
+            showTranslation = _showLyricTranslation.value
+        )
+    }
+
+    private fun updateDesktopLyricFrame() {
+        if (!desktopLyricBridge.isEnabled() || !isPlaying.value) return
+        val index = _currentLyricIndex.value
+        val line = _lyrics.value.getOrNull(index) ?: return
+        desktopLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value)
     }
 
     private fun initLyricPageTranslation() {
@@ -315,6 +352,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun addToPlaylist(song: Song) = playerManager.addToPlaylist(song)
     fun addToPlaylist(songs: List<Song>) = playerManager.addToPlaylist(songs)
     fun playQueueIndex(index: Int) = playerManager.playQueueIndex(index)
+
+    fun requestLocateCurrentSong() {
+        _locateCurrentSongRequest.value += 1
+    }
 
     fun cyclePlaybackMode() {
         val shuffle = shuffleEnabled.value
@@ -432,6 +473,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
             }
+        }
+    }
+
+    fun setDesktopLyricEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setDesktopLyricEnabled(enabled)
+            desktopLyricBridge.setEnabled(enabled)
+            if (enabled) resendDesktopLyric()
         }
     }
 
