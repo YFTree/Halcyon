@@ -307,7 +307,7 @@ private fun AboutContent(
                     BasicComponent(
                         title = "Miuix",
                         summary = "MIUI/HyperOS 风格 Compose UI 组件库",
-                        onClick = { uriHandler.openUri("https://github.com/miuix-kmp/miuix") },
+                        onClick = { uriHandler.openUri("https://github.com/compose-miuix-ui/miuix") },
                     )
                     BasicComponent(
                         title = "AndroidX Media3",

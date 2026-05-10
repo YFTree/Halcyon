@@ -133,6 +133,17 @@ fun FolderScreen(
             }
         )
 
+        WebDavEntryCard(
+            onOpenWebDav = onNavigateToWebDav
+        )
+
+        if (blockedFolders.isNotEmpty()) {
+            BlockedFoldersEntryCard(
+                count = blockedFolders.size,
+                onClick = { showBlockedDialog = true }
+            )
+        }
+
         folderToBlock?.let { folderPath ->
             FolderBlockDialog(
                 folderPath = folderPath,
@@ -186,7 +197,11 @@ fun FolderScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "未找到音乐文件",
+                        text = if (blockedFolders.isNotEmpty()) {
+                            "未找到音乐文件，可能已被屏蔽规则排除"
+                        } else {
+                            "未找到音乐文件"
+                        },
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 }
@@ -245,24 +260,57 @@ fun FolderScreen(
                         }
                     }
                 }
-                if (blockedFolders.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "管理已屏蔽的文件夹",
-                            fontSize = 12.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                                .combinedClickable(onClick = { showBlockedDialog = true })
-                        )
-                    }
-                }
             }
         }
     }
 }
 
+@Composable
+private fun WebDavEntryCard(
+    onOpenWebDav: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        onClick = onOpenWebDav
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Regular.Folder,
+                contentDescription = null,
+                tint = MiuixTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "WebDAV 音乐库",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "配置和浏览 WebDAV 远程音乐目录",
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+
+            Icon(
+                imageVector = MiuixIcons.Basic.ArrowRight,
+                contentDescription = null,
+                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
 @Composable
 internal fun WebDavBrowserCard(
     currentUrl: String,
@@ -373,6 +421,54 @@ internal fun WebDavItemRow(
                     contentDescription = "加入播放列表"
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun BlockedFoldersEntryCard(
+    count: Int,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Regular.Folder,
+                contentDescription = null,
+                tint = MiuixTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "已屏蔽文件夹",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "$count 个文件夹已被排除，点击管理或取消屏蔽",
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+
+            Icon(
+                imageVector = MiuixIcons.Basic.ArrowRight,
+                contentDescription = null,
+                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }

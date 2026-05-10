@@ -102,7 +102,6 @@ fun WebDavScreen(
             currentUrl = ""
             items = emptyList()
             error = null
-            showSettings = true
             return@LaunchedEffect
         }
         val startUrl = savedLastUrl.ifBlank { savedUrl }
