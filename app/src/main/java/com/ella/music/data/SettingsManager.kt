@@ -81,7 +81,7 @@ class SettingsManager(private val context: Context) {
     val lyricFontPath: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_PATH] ?: "" }
     val scanIncludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_INCLUDE_FOLDERS] ?: "" }
     val scanExcludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_EXCLUDE_FOLDERS] ?: "" }
-    val decoderMode: Flow<Int> = context.dataStore.data.map { it[KEY_DECODER_MODE] ?: 1 }
+    val decoderMode: Flow<Int> = context.dataStore.data.map { it[KEY_DECODER_MODE] ?: 2 }
 
     val bluetoothLyricEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_ENABLED] ?: false }
@@ -233,7 +233,7 @@ class SettingsManager(private val context: Context) {
     }
 
     suspend fun setDecoderMode(mode: Int) {
-        context.dataStore.edit { it[KEY_DECODER_MODE] = mode.coerceIn(0, 1) }
+        context.dataStore.edit { it[KEY_DECODER_MODE] = mode.coerceIn(0, 2) }
     }
 
     private fun Preferences.lxSources(): List<LxSourceConfig> {

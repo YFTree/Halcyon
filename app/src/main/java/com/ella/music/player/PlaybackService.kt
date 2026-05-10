@@ -62,10 +62,10 @@ class PlaybackService : MediaSessionService() {
         }
         val renderersFactory = DefaultRenderersFactory(this)
             .setExtensionRendererMode(
-                if (decoderMode == 0) {
-                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
-                } else {
-                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                when (decoderMode) {
+                    1 -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                    2 -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                    else -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
                 }
             )
 

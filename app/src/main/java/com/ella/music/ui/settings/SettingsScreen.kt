@@ -77,10 +77,10 @@ fun SettingsScreen(
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val scanIncludeFolders by settingsManager.scanIncludeFolders.collectAsState(initial = "")
     val scanExcludeFolders by settingsManager.scanExcludeFolders.collectAsState(initial = "")
-    val decoderMode by settingsManager.decoderMode.collectAsState(initial = 1)
+    val decoderMode by settingsManager.decoderMode.collectAsState(initial = 2)
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
-    val decoderLabels = listOf("系统解码", "FFmpeg 解码")
+    val decoderLabels = listOf("系统解码", "FFmpeg 解码", "自动")
     val selectedDecoderMode = decoderMode.coerceIn(decoderLabels.indices)
     var themeExpanded by remember { mutableStateOf(false) }
     var scanIncludeExpanded by remember { mutableStateOf(false) }
@@ -350,7 +350,7 @@ fun SettingsScreen(
                 Column {
                     BasicComponent(
                         title = "解码器",
-                        summary = "选择系统解码或 FFmpeg 扩展解码",
+                        summary = "系统模式不会回落 FFmpeg，自动模式才会 fallback",
                         endActions = {
                             Text(
                                 text = decoderLabels[selectedDecoderMode],
@@ -369,8 +369,9 @@ fun SettingsScreen(
                                 BasicComponent(
                                     title = label,
                                     summary = when (index) {
-                                        0 -> "优先使用 Android 系统解码，适合 ALAC / Dolby Atmos M4A"
-                                        else -> "优先使用 FFmpeg 扩展解码，兼容更多本地格式"
+                                        0 -> "只使用 Android 系统解码；不支持的格式会播放失败"
+                                        1 -> "优先使用 FFmpeg 扩展解码，兼容更多本地格式"
+                                        else -> "先使用系统解码，系统不支持时才回落到 FFmpeg"
                                     },
                                     onClick = {
                                         decoderExpanded = false
