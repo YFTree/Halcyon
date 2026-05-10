@@ -65,6 +65,10 @@ import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Pause
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clipToBounds
 
 @Composable
 fun MiniPlayer(
@@ -73,6 +77,7 @@ fun MiniPlayer(
     progress: Float = 0f,
     lyricText: String? = null,
     lyricTranslation: String? = null,
+    lyricProgress: Float = 0f,
     albumArtUri: Uri? = null,
     loadCoverArt: ((Song) -> Bitmap?)? = null,
     backdrop: Backdrop? = null,
@@ -100,14 +105,14 @@ fun MiniPlayer(
         lyricText != null -> "${song.title} - ${song.artist}"
         else -> song.artist
     }
-    var transitionDirection by remember { mutableIntStateOf(1) }
-
     val textState = MiniPlayerTextState(
         songId = song.id,
         primary = primaryText,
         secondary = secondaryText,
-        showingLyric = lyricText != null
+        showingLyric = lyricText != null,
+        scrollSecondary = lyricText != null && hasTranslation
     )
+    var transitionDirection by remember { mutableIntStateOf(1) }
 
     Row(
         modifier = modifier
@@ -231,24 +236,26 @@ fun MiniPlayer(
             modifier = Modifier.weight(1f)
         ) { state ->
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
+                AutoScrollingMiniText(
                     text = state.primary,
-                    fontSize = 14.sp,
+                    fontSize = 14,
                     fontWeight = FontWeight.Medium,
                     color = if (state.showingLyric) {
                         MiuixTheme.colorScheme.primary
                     } else {
                         MiuixTheme.colorScheme.onSurface
                     },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    enabled = state.showingLyric,
+                    progress = lyricProgress
                 )
-                Text(
+
+                AutoScrollingMiniText(
                     text = state.secondary,
-                    fontSize = 12.sp,
+                    fontSize = 12,
+                    fontWeight = FontWeight.Normal,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    enabled = state.scrollSecondary,
+                    progress = lyricProgress
                 )
             }
         }
@@ -329,6 +336,54 @@ private fun CircularProgressRing(
     }
 }
 
+@Composable
+private fun AutoScrollingMiniText(
+    text: String,
+    fontSize: Int,
+    fontWeight: FontWeight,
+    color: Color,
+    enabled: Boolean,
+    progress: Float,
+    modifier: Modifier = Modifier
+) {
+    val scrollState = rememberScrollState()
+    val safeProgress = progress.coerceIn(0f, 1f)
+
+    LaunchedEffect(text, enabled) {
+        scrollState.scrollTo(0)
+    }
+
+    LaunchedEffect(text, enabled, safeProgress, scrollState.maxValue) {
+        if (enabled && scrollState.maxValue > 0) {
+            scrollState.scrollTo((scrollState.maxValue * safeProgress).toInt())
+        } else {
+            scrollState.scrollTo(0)
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clipToBounds()
+    ) {
+        Row(
+            modifier = Modifier.horizontalScroll(
+                state = scrollState,
+                enabled = false
+            )
+        ) {
+            Text(
+                text = text,
+                fontSize = fontSize.sp,
+                fontWeight = fontWeight,
+                color = color,
+                maxLines = 1,
+                overflow = TextOverflow.Visible
+            )
+        }
+    }
+}
+
 private fun Color.luminance(): Float {
     return 0.2126f * red + 0.7152f * green + 0.0722f * blue
 }
@@ -337,5 +392,6 @@ private data class MiniPlayerTextState(
     val songId: Long,
     val primary: String,
     val secondary: String,
-    val showingLyric: Boolean
+    val showingLyric: Boolean,
+    val scrollSecondary: Boolean
 )

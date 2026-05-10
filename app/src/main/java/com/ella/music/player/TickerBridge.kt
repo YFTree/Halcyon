@@ -110,8 +110,8 @@ class TickerBridge(private val context: Context) {
 
         val notification = builder
             .setSmallIcon(R.drawable.ic_flyme_ticker)
-            .setContentTitle("Ella Music")
-            .setContentText(text)
+            .setContentTitle(text)
+            .setContentText("")
             .setTicker(tickerText)
             .setOngoing(true)
             .setOnlyAlertOnce(false)

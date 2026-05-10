@@ -207,6 +207,20 @@ fun EllaApp(
         null
     }
 
+    val nextLyricLine = lyrics.getOrNull(currentLyricIndex + 1)
+
+    val miniPlayerLyricProgress = if (isPlaying && currentLyricLine != null) {
+        val start = currentLyricLine.timeMs
+        val end = currentLyricLine.endMs
+            ?: nextLyricLine?.timeMs
+            ?: (start + 5_000L)
+
+        ((currentPosition - start).toFloat() / (end - start).coerceAtLeast(1L).toFloat())
+            .coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
     val showMiniPlayer = currentSong != null && currentRoute != Screen.Player.route
 
     val backdrop = rememberLayerBackdrop()
@@ -246,6 +260,7 @@ fun EllaApp(
             tabs = tabs,
             currentRoute = currentRoute,
             backdrop = backdrop,
+            lyricProgress = miniPlayerLyricProgress,
             mainViewModel = mainViewModel,
             playerViewModel = playerViewModel,
             onNavigate = { route ->
@@ -271,6 +286,7 @@ private fun FloatingBottomControls(
     duration: Long,
     lyricText: String?,
     lyricTranslation: String?,
+    lyricProgress: Float,
     tabs: List<Triple<String, String, androidx.compose.ui.graphics.vector.ImageVector>>,
     currentRoute: String?,
     backdrop: com.kyant.backdrop.Backdrop?,
@@ -305,7 +321,8 @@ private fun FloatingBottomControls(
                     onClick = onNavigatePlayer,
                     onPlayPause = { playerViewModel.togglePlayPause() },
                     onSkipNext = { playerViewModel.skipToNext() },
-                    onSkipPrevious = { playerViewModel.skipToPrevious() }
+                    onSkipPrevious = { playerViewModel.skipToPrevious() },
+                    lyricProgress = lyricProgress,
                 )
             }
         }
