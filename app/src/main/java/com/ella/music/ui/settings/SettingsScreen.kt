@@ -78,6 +78,7 @@ fun SettingsScreen(
     val desktopLyricEnabled by settingsManager.desktopLyricEnabled.collectAsState(initial = false)
     val superLyricEnabled by settingsManager.superLyricEnabled.collectAsState(initial = false)
     val bluetoothLyricEnabled by settingsManager.bluetoothLyricEnabled.collectAsState(initial = false)
+    val bluetoothLyricTranslation by settingsManager.bluetoothLyricTranslation.collectAsState(initial = false)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val replayGainEnabled by settingsManager.replayGainEnabled.collectAsState(initial = false)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
@@ -319,6 +320,17 @@ fun SettingsScreen(
                     onCheckedChange = { enabled ->
                         scope.launch { settingsManager.setBluetoothLyricEnabled(enabled) }
                         playerViewModel?.setBluetoothLyricEnabled(enabled)
+                    }
+                )
+
+                SwitchPreference(
+                    title = "车载歌词传递翻译",
+                    summary = "开启后用当前歌词翻译替换媒体歌手行。",
+                    enabled = bluetoothLyricEnabled,
+                    checked = bluetoothLyricTranslation,
+                    onCheckedChange = { enabled ->
+                        scope.launch { settingsManager.setBluetoothLyricTranslation(enabled) }
+                        playerViewModel?.setBluetoothLyricTranslation(enabled)
                     }
                 )
                 }

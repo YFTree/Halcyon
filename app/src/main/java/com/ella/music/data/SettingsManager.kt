@@ -53,6 +53,7 @@ class SettingsManager(private val context: Context) {
         val KEY_DECODER_MODE = intPreferencesKey("decoder_mode")
 
         val KEY_BLUETOOTH_LYRIC_ENABLED = booleanPreferencesKey("bluetooth_lyric_enabled")
+        val KEY_BLUETOOTH_LYRIC_TRANSLATION = booleanPreferencesKey("bluetooth_lyric_translation")
     }
 
     val lyriconEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_ENABLED] ?: false }
@@ -89,6 +90,8 @@ class SettingsManager(private val context: Context) {
 
     val bluetoothLyricEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_ENABLED] ?: false }
+    val bluetoothLyricTranslation: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_TRANSLATION] ?: false }
     suspend fun setLyriconEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRICON_ENABLED] = enabled }
     }
@@ -123,6 +126,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setBluetoothLyricEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_BLUETOOTH_LYRIC_ENABLED] = enabled }
+    }
+
+    suspend fun setBluetoothLyricTranslation(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_BLUETOOTH_LYRIC_TRANSLATION] = enabled }
     }
 
     suspend fun setMinDurationSec(seconds: Int) {

@@ -73,7 +73,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var lastStatsTickMs = 0L
 
     private var bluetoothLyricEnabled = false
-    private var lastBluetoothLyricLine: String? = null
+    private var bluetoothLyricTranslationEnabled = false
+    private var lastBluetoothLyricPayload: Pair<String, String?>? = null
     private var sleepTimerJob: Job? = null
     private var stopAfterCurrentSongId: Long? = null
 
@@ -128,7 +129,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.bluetoothLyricEnabled.collect { enabled ->
                 bluetoothLyricEnabled = enabled
-                lastBluetoothLyricLine = null
+                lastBluetoothLyricPayload = null
 
                 if (enabled) {
                     resendBluetoothLyric()
@@ -137,17 +138,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         }
+        viewModelScope.launch {
+            settingsManager.bluetoothLyricTranslation.collect { enabled ->
+                bluetoothLyricTranslationEnabled = enabled
+                lastBluetoothLyricPayload = null
+                if (bluetoothLyricEnabled) resendBluetoothLyric()
+            }
+        }
     }
 
-    private fun sendBluetoothLyric(line: String?) {
+    private fun sendBluetoothLyric(line: LyricLine?) {
         if (!bluetoothLyricEnabled) return
         if (!playerManager.isPlaying.value) return
 
-        val text = line?.takeUnless { it.isMusicSymbolOnly() } ?: return
-        if (text == lastBluetoothLyricLine) return
+        val text = line?.text?.takeUnless { it.isMusicSymbolOnly() } ?: return
+        val translation = line.bluetoothTranslation()
+        val payload = text to translation
+        if (payload == lastBluetoothLyricPayload) return
 
-        lastBluetoothLyricLine = text
-        playerManager.updateBluetoothLyric(text)
+        lastBluetoothLyricPayload = payload
+        playerManager.updateBluetoothLyric(text, translation)
     }
 
     private fun resendBluetoothLyric() {
@@ -155,11 +165,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         val index = _currentLyricIndex.value
         val currentLyrics = _lyrics.value
-        val line = currentLyrics.getOrNull(index)?.text?.takeUnless { it.isMusicSymbolOnly() }
+        val line = currentLyrics.getOrNull(index)
+        val text = line?.text?.takeUnless { it.isMusicSymbolOnly() }
 
-        if (line != null) {
-            lastBluetoothLyricLine = line
-            playerManager.updateBluetoothLyric(line)
+        if (text != null) {
+            val translation = line.bluetoothTranslation()
+            lastBluetoothLyricPayload = text to translation
+            playerManager.updateBluetoothLyric(text, translation)
         }
     }
 
@@ -219,7 +231,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         desktopLyricBridge.clearLyric()
                         superLyricBridge.sendStop()
                         playerManager.clearBluetoothLyric()
-                        lastBluetoothLyricLine = null
+                        lastBluetoothLyricPayload = null
                     } else {
                         resendBluetoothLyric()
                         resendDesktopLyric()
@@ -246,7 +258,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             _currentLyricIndex.value = index
 
             if (index >= 0 && index < currentLyrics.size) {
-                val line = currentLyrics[index].text.takeUnless { it.isMusicSymbolOnly() }
+                val currentLine = currentLyrics[index]
+                val line = currentLine.text.takeUnless { it.isMusicSymbolOnly() }
                 if (line != null && line != lastTickerLine) {
                     lastTickerLine = line
                     tickerBridge.sendLyric(line)
@@ -254,7 +267,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     lastTickerLine = line
                     tickerBridge.sendLyric(line)
                 }
-                sendBluetoothLyric(line)
+                sendBluetoothLyric(currentLine)
             }
         }
     }
@@ -537,7 +550,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.setBluetoothLyricEnabled(enabled)
             bluetoothLyricEnabled = enabled
-            lastBluetoothLyricLine = null
+            lastBluetoothLyricPayload = null
 
             if (enabled) {
                 resendBluetoothLyric()
@@ -545,6 +558,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 playerManager.clearBluetoothLyric()
             }
         }
+    }
+
+    fun setBluetoothLyricTranslation(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setBluetoothLyricTranslation(enabled)
+            bluetoothLyricTranslationEnabled = enabled
+            lastBluetoothLyricPayload = null
+            if (bluetoothLyricEnabled) resendBluetoothLyric()
+        }
+    }
+
+    private fun LyricLine?.bluetoothTranslation(): String? {
+        if (!bluetoothLyricTranslationEnabled) return null
+        return this?.translation
+            ?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
+            ?: this?.backgroundTranslation?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
     }
 
     private fun String.isMusicSymbolOnly(): Boolean {

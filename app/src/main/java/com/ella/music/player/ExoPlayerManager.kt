@@ -220,7 +220,7 @@ class ExoPlayerManager(private val context: Context) {
         _duration.value = mediaController?.duration?.coerceAtLeast(0) ?: 0L
     }
 
-    fun updateBluetoothLyric(text: String?) {
+    fun updateBluetoothLyric(text: String?, secondaryText: String? = null) {
         val controller = mediaController ?: return
         val song = _currentSong.value ?: return
         val index = controller.currentMediaItemIndex
@@ -232,7 +232,7 @@ class ExoPlayerManager(private val context: Context) {
 
         val displayTitle = lyricText ?: song.title
         val displayArtist = if (lyricText != null) {
-            "${song.title} · ${song.artist}"
+            secondaryText?.takeIf { it.isNotBlank() } ?: "${song.title} · ${song.artist}"
         } else {
             song.artist
         }
