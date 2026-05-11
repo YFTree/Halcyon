@@ -263,8 +263,10 @@ fun HomeScreen(
             } else {
                 val listState = rememberLazyListState()
                 var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+                var handledLocateRequest by remember { mutableStateOf(locateCurrentSongRequest) }
                 LaunchedEffect(locateCurrentSongRequest) {
-                    if (locateCurrentSongRequest <= 0) return@LaunchedEffect
+                    if (locateCurrentSongRequest <= 0 || locateCurrentSongRequest == handledLocateRequest) return@LaunchedEffect
+                    handledLocateRequest = locateCurrentSongRequest
                     val index = sortedSongs.indexOfFirst { it.id == currentSong?.id }
                     if (index >= 0) listState.animateScrollToItem(index)
                 }

@@ -223,8 +223,10 @@ fun FolderScreen(
         } else {
             val folders = remember(folderMap) { folderMap.entries.toList() }
             val listState = rememberLazyListState()
+            var handledLocateRequest by remember { mutableStateOf(locateCurrentSongRequest) }
             LaunchedEffect(locateCurrentSongRequest) {
-                if (locateCurrentSongRequest <= 0) return@LaunchedEffect
+                if (locateCurrentSongRequest <= 0 || locateCurrentSongRequest == handledLocateRequest) return@LaunchedEffect
+                handledLocateRequest = locateCurrentSongRequest
                 val index = folders.indexOfFirst { (_, folderSongs) ->
                     folderSongs.any { it.id == currentSong?.id }
                 }
