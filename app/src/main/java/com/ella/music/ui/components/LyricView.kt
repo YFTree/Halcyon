@@ -97,6 +97,18 @@ fun LyricView(
                 else -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f)
             }
 
+            if (!line.pronunciation.isNullOrBlank()) {
+                Text(
+                    text = line.pronunciation,
+                    fontSize = if (isActive) 13.sp else 11.sp,
+                    fontFamily = fontFamily,
+                    color = textColor.copy(alpha = 0.58f),
+                    textAlign = lineTextAlign,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 2.dp)
+                )
+            }
             Text(
                 text = line.text.ifBlank { "♪" },
                 fontSize = if (isActive) 18.sp else 15.sp,
@@ -204,6 +216,37 @@ fun WordLyricView(
                     .clickable { onLineClick(line) },
                 horizontalAlignment = line.ttmlAlignment()
             ) {
+                if (!line.pronunciation.isNullOrBlank()) {
+                    val pronunciationColor = when {
+                        isActive -> Color.White.copy(alpha = 0.62f)
+                        index < currentIndex -> Color.White.copy(alpha = 0.28f)
+                        else -> Color.White.copy(alpha = 0.40f)
+                    }
+                    if (isActive && line.pronunciationWords.isNotEmpty()) {
+                        WordLine(
+                            words = line.pronunciationWords,
+                            currentPositionMs = currentPositionMs,
+                            textAlign = lineTextAlign,
+                            fontSizeSp = 12,
+                            fontFamily = fontFamily,
+                            currentColor = Color.White.copy(alpha = 0.76f),
+                            sungColor = Color.White.copy(alpha = 0.54f),
+                            pendingColor = Color.White.copy(alpha = 0.38f),
+                            modifier = Modifier.padding(bottom = 1.dp)
+                        )
+                    } else {
+                        Text(
+                            text = line.pronunciation,
+                            fontSize = if (isActive) 13.sp else 11.sp,
+                            fontFamily = fontFamily,
+                            color = pronunciationColor,
+                            textAlign = lineTextAlign,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 2.dp)
+                        )
+                    }
+                }
                 if (line.words.isNotEmpty() && isActive) {
                     WordLine(
                         words = line.words,

@@ -5,6 +5,8 @@ data class LyricLine(
     val text: String,
     val words: List<LyricWord> = emptyList(),
     val translation: String? = null,
+    val pronunciation: String? = null,
+    val pronunciationWords: List<LyricWord> = emptyList(),
     val agent: String? = null,
     val backgroundText: String? = null,
     val backgroundWords: List<LyricWord> = emptyList(),

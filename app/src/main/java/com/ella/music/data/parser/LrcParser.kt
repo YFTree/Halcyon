@@ -397,7 +397,12 @@ object LrcParser {
         val hasWordTiming = wordSegments.size > 1
         if (!hasWordTiming) {
             val lineText = wordSegments.joinToString("") { it.text }.trim()
-            return LyricLine(first.timeMs, lineText.ifBlank { first.text.trim() })
+            val endMs = matches
+                .lastOrNull()
+                ?.groupValues
+                ?.let(::parseTime)
+                ?.takeIf { it > first.timeMs }
+            return LyricLine(first.timeMs, lineText.ifBlank { first.text.trim() }, endMs = endMs)
         }
 
         val words = wordSegments.mapIndexed { index, segment ->
@@ -421,7 +426,7 @@ object LrcParser {
             ?.trim()
             ?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
 
-        return LyricLine(wordSegments.first().timeMs, text, words, translation)
+        return LyricLine(wordSegments.first().timeMs, text, words, translation = translation)
     }
 
     private data class TimedSegment(
@@ -438,18 +443,27 @@ object LrcParser {
             .map { sameTimeLines ->
                 if (sameTimeLines.size == 1) return@map sameTimeLines.first()
 
-                val primary = sameTimeLines.firstOrNull { it.words.isNotEmpty() && !it.text.hasCjk() }
+                val primary = sameTimeLines.firstOrNull { it.text.hasCjk() && !it.text.isMusicSymbolOnly() }
                     ?: sameTimeLines.firstOrNull { it.words.isNotEmpty() }
-                    ?: sameTimeLines.firstOrNull { !it.text.hasCjk() && !it.text.isMusicSymbolOnly() }
                     ?: sameTimeLines.firstOrNull { !it.text.isMusicSymbolOnly() }
                     ?: sameTimeLines.first()
+                val pronunciation = sameTimeLines
+                    .asSequence()
+                    .filter { it !== primary }
+                    .firstOrNull { it.text.isPronunciationLine() }
                 val translation = sameTimeLines
                     .asSequence()
                     .filter { it !== primary }
+                    .filter { it !== pronunciation }
                     .map { it.text.trim() }
                     .firstOrNull { it.isNotBlank() && !it.isMusicSymbolOnly() && it != primary.text.trim() }
 
-                primary.copy(translation = primary.translation ?: translation)
+                primary.copy(
+                    pronunciation = primary.pronunciation ?: pronunciation?.text?.trim(),
+                    pronunciationWords = primary.pronunciationWords.ifEmpty { pronunciation?.words.orEmpty() },
+                    translation = primary.translation ?: translation,
+                    endMs = primary.endMs ?: sameTimeLines.mapNotNull { it.endMs }.maxOrNull()
+                )
             }
     }
 
@@ -637,6 +651,13 @@ object LrcParser {
                 Character.UnicodeBlock.HANGUL_SYLLABLES
             )
         }
+
+    private fun String.isPronunciationLine(): Boolean {
+        val cleaned = replace(Regex("""[ \t\r\n]+"""), " ").trim()
+        if (cleaned.isBlank() || cleaned.hasCjk() || cleaned.isMusicSymbolOnly()) return false
+        val letters = cleaned.count { it.isLetter() }
+        return letters >= 2 && cleaned.all { it.isLetter() || it.isWhitespace() || it in "-'`." }
+    }
 
     private fun String.isMusicSymbolOnly(): Boolean {
         val content = trim()

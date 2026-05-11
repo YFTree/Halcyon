@@ -100,6 +100,7 @@ class DesktopLyricService : Service() {
         if (rootView == null) addLyricView()
         lyricView?.setLyric(
             text = intent.getStringExtra(EXTRA_TEXT).orEmpty(),
+            pronunciation = intent.getStringExtra(EXTRA_PRONUNCIATION).orEmpty(),
             translation = intent.getStringExtra(EXTRA_TRANSLATION).orEmpty(),
             positionMs = intent.getLongExtra(EXTRA_POSITION, 0L),
             agent = intent.getStringExtra(EXTRA_AGENT).orEmpty(),
@@ -109,6 +110,9 @@ class DesktopLyricService : Service() {
             wordTexts = intent.getStringArrayExtra(EXTRA_WORD_TEXTS)?.toList().orEmpty(),
             wordStarts = intent.getLongArrayExtra(EXTRA_WORD_STARTS) ?: LongArray(0),
             wordEnds = intent.getLongArrayExtra(EXTRA_WORD_ENDS) ?: LongArray(0),
+            pronunciationWordTexts = intent.getStringArrayExtra(EXTRA_PRONUNCIATION_WORD_TEXTS)?.toList().orEmpty(),
+            pronunciationWordStarts = intent.getLongArrayExtra(EXTRA_PRONUNCIATION_WORD_STARTS) ?: LongArray(0),
+            pronunciationWordEnds = intent.getLongArrayExtra(EXTRA_PRONUNCIATION_WORD_ENDS) ?: LongArray(0),
             backgroundWordTexts = intent.getStringArrayExtra(EXTRA_BACKGROUND_WORD_TEXTS)?.toList().orEmpty(),
             backgroundWordStarts = intent.getLongArrayExtra(EXTRA_BACKGROUND_WORD_STARTS) ?: LongArray(0),
             backgroundWordEnds = intent.getLongArrayExtra(EXTRA_BACKGROUND_WORD_ENDS) ?: LongArray(0)
@@ -141,7 +145,7 @@ class DesktopLyricService : Service() {
                 setStroke(dp(1), Color.argb(70, 255, 255, 255))
             }
             elevation = dp(10).toFloat()
-            addView(lyric, LinearLayout.LayoutParams(dp(560), dp(138)))
+            addView(lyric, LinearLayout.LayoutParams(dp(560), dp(156)))
             addView(controls, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
             setOnTouchListener(::onDrag)
         }
@@ -325,8 +329,10 @@ class DesktopLyricService : Service() {
         private val pendingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(145, 255, 255, 255); textSize = 20f * resources.displayMetrics.scaledDensity; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
         private val activePaint = Paint(pendingPaint).apply { color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD }
         private val glowPaint = Paint(activePaint).apply { color = Color.argb(130, 125, 205, 255); setShadowLayer(18f, 0f, 0f, color) }
+        private val pronunciationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(145, 255, 255, 255); textSize = 12f * resources.displayMetrics.scaledDensity; textAlign = Paint.Align.CENTER }
         private val translationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(150, 255, 255, 255); textSize = 13f * resources.displayMetrics.scaledDensity; textAlign = Paint.Align.CENTER }
         private var text = "Ella Music"
+        private var pronunciation = ""
         private var translation = ""
         private var agent = ""
         private var isTtml = false
@@ -335,6 +341,7 @@ class DesktopLyricService : Service() {
         private var fontScale = 1f
         private var positionMs = 0L
         private var words = emptyList<DesktopWord>()
+        private var pronunciationWords = emptyList<DesktopWord>()
         private var backgroundWords = emptyList<DesktopWord>()
 
         fun setFontScale(scale: Float) {
@@ -344,6 +351,7 @@ class DesktopLyricService : Service() {
 
         fun setLyric(
             text: String,
+            pronunciation: String,
             translation: String,
             positionMs: Long,
             agent: String,
@@ -353,11 +361,15 @@ class DesktopLyricService : Service() {
             wordTexts: List<String>,
             wordStarts: LongArray,
             wordEnds: LongArray,
+            pronunciationWordTexts: List<String>,
+            pronunciationWordStarts: LongArray,
+            pronunciationWordEnds: LongArray,
             backgroundWordTexts: List<String>,
             backgroundWordStarts: LongArray,
             backgroundWordEnds: LongArray
         ) {
             this.text = text.ifBlank { if (backgroundText.isBlank()) "♪" else "" }
+            this.pronunciation = pronunciation
             this.translation = translation
             this.agent = agent
             this.isTtml = isTtml
@@ -367,6 +379,11 @@ class DesktopLyricService : Service() {
             words = wordTexts.mapIndexedNotNull { index, word ->
                 val start = wordStarts.getOrNull(index) ?: return@mapIndexedNotNull null
                 val end = wordEnds.getOrNull(index) ?: return@mapIndexedNotNull null
+                DesktopWord(word, start, end)
+            }
+            pronunciationWords = pronunciationWordTexts.mapIndexedNotNull { index, word ->
+                val start = pronunciationWordStarts.getOrNull(index) ?: return@mapIndexedNotNull null
+                val end = pronunciationWordEnds.getOrNull(index) ?: return@mapIndexedNotNull null
                 DesktopWord(word, start, end)
             }
             backgroundWords = backgroundWordTexts.mapIndexedNotNull { index, word ->
@@ -380,9 +397,24 @@ class DesktopLyricService : Service() {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val hasBackground = backgroundText.isNotBlank() || backgroundWords.isNotEmpty()
+            val hasPronunciation = pronunciation.isNotBlank() || pronunciationWords.isNotEmpty()
             val primaryAlign = ttmlAlignForPrimary()
             val backgroundAlign = primaryAlign.opposite()
-            if (hasBackground) {
+            if (hasPronunciation && !hasBackground) {
+                drawSmallLine(
+                    canvas = canvas,
+                    fallbackText = pronunciation,
+                    lineWords = pronunciationWords,
+                    anchorX = width / 2f,
+                    baseline = height * 0.24f,
+                    maxWidth = width * 0.88f,
+                    align = AnchorAlign.Center
+                )
+                drawLine(canvas, text, words, width / 2f, height * 0.54f, width * 0.9f, AnchorAlign.Center, true)
+                if (translation.isNotBlank()) {
+                    drawFittedText(canvas, translation, width / 2f, height * 0.82f, width * 0.88f, AnchorAlign.Center, translationPaint)
+                }
+            } else if (hasBackground) {
                 val primaryBaseline = height * 0.34f
                 val backgroundBaseline = height * 0.62f
                 drawLine(canvas, text, words, primaryAlign.anchorX(width), primaryBaseline, width * 0.82f, primaryAlign, true)
@@ -425,6 +457,27 @@ class DesktopLyricService : Service() {
             pendingPaint.textSize = oldPending
             activePaint.textSize = oldActive
             glowPaint.textSize = oldGlow
+        }
+
+        private fun drawSmallLine(canvas: Canvas, fallbackText: String, lineWords: List<DesktopWord>, anchorX: Float, baseline: Float, maxWidth: Float, align: AnchorAlign) {
+            val oldPendingSize = pendingPaint.textSize
+            val oldActiveSize = activePaint.textSize
+            val oldGlowSize = glowPaint.textSize
+            val oldPronunciationSize = pronunciationPaint.textSize
+            val targetSize = 12f * resources.displayMetrics.scaledDensity * fontScale
+            pendingPaint.textSize = targetSize
+            activePaint.textSize = targetSize
+            glowPaint.textSize = targetSize
+            pronunciationPaint.textSize = targetSize
+            if (lineWords.isEmpty()) {
+                drawFittedText(canvas, fallbackText, anchorX, baseline, maxWidth, align, pronunciationPaint)
+            } else {
+                drawWords(canvas, anchorX, baseline, maxWidth, align, lineWords, false)
+            }
+            pendingPaint.textSize = oldPendingSize
+            activePaint.textSize = oldActiveSize
+            glowPaint.textSize = oldGlowSize
+            pronunciationPaint.textSize = oldPronunciationSize
         }
 
         private fun drawWords(canvas: Canvas, anchorX: Float, baseline: Float, maxWidth: Float, align: AnchorAlign, lineWords: List<DesktopWord>, primary: Boolean) {
@@ -526,6 +579,7 @@ class DesktopLyricService : Service() {
         const val ACTION_FONT_SMALLER = "com.ella.music.action.DESKTOP_LYRIC_FONT_SMALLER"
         const val ACTION_FONT_LARGER = "com.ella.music.action.DESKTOP_LYRIC_FONT_LARGER"
         const val EXTRA_TEXT = "text"
+        const val EXTRA_PRONUNCIATION = "pronunciation"
         const val EXTRA_TRANSLATION = "translation"
         const val EXTRA_POSITION = "position"
         const val EXTRA_AGENT = "agent"
@@ -535,6 +589,9 @@ class DesktopLyricService : Service() {
         const val EXTRA_WORD_TEXTS = "word_texts"
         const val EXTRA_WORD_STARTS = "word_starts"
         const val EXTRA_WORD_ENDS = "word_ends"
+        const val EXTRA_PRONUNCIATION_WORD_TEXTS = "pronunciation_word_texts"
+        const val EXTRA_PRONUNCIATION_WORD_STARTS = "pronunciation_word_starts"
+        const val EXTRA_PRONUNCIATION_WORD_ENDS = "pronunciation_word_ends"
         const val EXTRA_BACKGROUND_WORD_TEXTS = "background_word_texts"
         const val EXTRA_BACKGROUND_WORD_STARTS = "background_word_starts"
         const val EXTRA_BACKGROUND_WORD_ENDS = "background_word_ends"
