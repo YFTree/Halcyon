@@ -71,17 +71,18 @@ fun SettingsScreen(
 
     val autoScan by settingsManager.autoScan.collectAsState(initial = true)
     val gaplessPlayback by settingsManager.gaplessPlayback.collectAsState(initial = true)
-    val lyriconEnabled by settingsManager.lyriconEnabled.collectAsState(initial = true)
+    val lyriconEnabled by settingsManager.lyriconEnabled.collectAsState(initial = false)
     val lyriconTranslation by settingsManager.lyriconTranslation.collectAsState(initial = true)
     val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
-    val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = true)
+    val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = false)
     val desktopLyricEnabled by settingsManager.desktopLyricEnabled.collectAsState(initial = false)
+    val superLyricEnabled by settingsManager.superLyricEnabled.collectAsState(initial = false)
     val bluetoothLyricEnabled by settingsManager.bluetoothLyricEnabled.collectAsState(initial = false)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val replayGainEnabled by settingsManager.replayGainEnabled.collectAsState(initial = false)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val scanIncludeFolders by settingsManager.scanIncludeFolders.collectAsState(initial = "")
-    val decoderMode by settingsManager.decoderMode.collectAsState(initial = 2)
+    val decoderMode by settingsManager.decoderMode.collectAsState(initial = 1)
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
     val decoderLabels = listOf("系统解码", "FFmpeg 解码", "自动")
@@ -288,6 +289,16 @@ fun SettingsScreen(
                             scope.launch { settingsManager.setDesktopLyricEnabled(enabled) }
                             playerViewModel?.setDesktopLyricEnabled(enabled)
                         }
+                    }
+                )
+
+                SwitchPreference(
+                    title = "启用 SuperLyric",
+                    summary = "向 SuperLyric 模块发布逐字歌词和翻译",
+                    checked = superLyricEnabled,
+                    onCheckedChange = { enabled ->
+                        scope.launch { settingsManager.setSuperLyricEnabled(enabled) }
+                        playerViewModel?.setSuperLyricEnabled(enabled)
                     }
                 )
 

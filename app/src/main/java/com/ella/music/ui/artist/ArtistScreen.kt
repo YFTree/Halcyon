@@ -20,12 +20,14 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -94,22 +96,6 @@ fun ArtistScreen(
                 )
             }
 
-            if (artistAlbums.isNotEmpty()) {
-                item {
-                    SectionTitle("专辑")
-                }
-
-                items(
-                    items = artistAlbums,
-                    key = { it.id }
-                ) { album ->
-                    ArtistAlbumRow(
-                        album = album,
-                        onClick = { onAlbumClick(album.id) }
-                    )
-                }
-            }
-
             item {
                 SectionTitle("歌曲")
             }
@@ -129,6 +115,23 @@ fun ArtistScreen(
                 )
             }
 
+            if (artistAlbums.isNotEmpty()) {
+                item {
+                    SectionTitle("专辑")
+                }
+
+                items(
+                    items = artistAlbums,
+                    key = { it.id }
+                ) { album ->
+                    ArtistAlbumRow(
+                        album = album,
+                        albumArtUri = mainViewModel.getAlbumArtUri(album.id),
+                        onClick = { onAlbumClick(album.id) }
+                    )
+                }
+            }
+
             item {
                 Spacer(modifier = Modifier.height(24.dp))
             }
@@ -145,7 +148,7 @@ fun ArtistScreen(
             Icon(
                 imageVector = MiuixIcons.Regular.Back,
                 contentDescription = "返回",
-                tint = Color.White,
+                tint = Color.Black.copy(alpha = 0.72f),
                 modifier = Modifier.size(26.dp)
             )
         }
@@ -163,7 +166,7 @@ private fun ArtistHeader(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(420.dp)
+            .height(440.dp)
     ) {
         if (coverUri != null) {
             SafeCoverImage(
@@ -187,8 +190,8 @@ private fun ArtistHeader(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.06f),
-                            Color.Black.copy(alpha = 0.26f),
+                            Color.White.copy(alpha = 0.08f),
+                            Color.White.copy(alpha = 0.42f),
                             MiuixTheme.colorScheme.background
                         )
                     )
@@ -199,7 +202,7 @@ private fun ArtistHeader(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(horizontal = 24.dp, vertical = 34.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
@@ -207,13 +210,13 @@ private fun ArtistHeader(
                 text = artistName.ifBlank { "未知歌手" },
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color.Black.copy(alpha = 0.88f)
             )
 
             Text(
                 text = "$albumCount 张专辑 · $songCount 首歌曲",
                 fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.78f)
+                color = Color.Black.copy(alpha = 0.58f)
             )
 
             Row(
@@ -226,12 +229,12 @@ private fun ArtistHeader(
                 Icon(
                     imageVector = MiuixIcons.Regular.Play,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = Color.Black.copy(alpha = 0.78f),
                     modifier = Modifier.size(20.dp)
                 )
                 Text(
                     text = "播放全部",
-                    color = Color.White,
+                    color = Color.Black.copy(alpha = 0.82f),
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -253,6 +256,7 @@ private fun SectionTitle(text: String) {
 @Composable
 private fun ArtistAlbumRow(
     album: Album,
+    albumArtUri: Uri?,
     onClick: () -> Unit
 ) {
     Row(
@@ -263,12 +267,30 @@ private fun ArtistAlbumRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(
-            imageVector = MiuixIcons.Regular.MapAlbum,
-            contentDescription = null,
-            tint = MiuixTheme.colorScheme.primary,
-            modifier = Modifier.size(28.dp)
-        )
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MiuixTheme.colorScheme.surfaceContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            if (albumArtUri != null) {
+                SafeCoverImage(
+                    model = albumArtUri,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    sizePx = 256
+                )
+            } else {
+                Icon(
+                    imageVector = MiuixIcons.Regular.MapAlbum,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
 
         Column(modifier = Modifier.weight(1f)) {
             Text(

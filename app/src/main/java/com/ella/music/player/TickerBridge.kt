@@ -23,7 +23,7 @@ class TickerBridge(private val context: Context) {
         private const val SYSTEM_UI_PACKAGE = "com.android.systemui"
     }
 
-    private var enabled = true
+    private var enabled = false
     private var lastText: String? = null
 
     private val notificationManager =

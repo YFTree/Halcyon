@@ -90,6 +90,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.lyricon.provider)
+    implementation("com.github.HChenX:SuperLyricApi:3.4")
     implementation(libs.backdrop)
     implementation(libs.taglib)
     implementation(libs.jaudiotagger)
