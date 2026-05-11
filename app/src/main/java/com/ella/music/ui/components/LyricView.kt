@@ -50,6 +50,7 @@ fun LyricView(
     lyrics: List<LyricLine>,
     currentIndex: Int,
     showTranslation: Boolean,
+    showPronunciation: Boolean = true,
     modifier: Modifier = Modifier,
     fontFamily: FontFamily? = null
 ) {
@@ -97,7 +98,7 @@ fun LyricView(
                 else -> MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f)
             }
 
-            if (!line.pronunciation.isNullOrBlank()) {
+            if (showPronunciation && !line.pronunciation.isNullOrBlank()) {
                 Text(
                     text = line.pronunciation,
                     fontSize = if (isActive) 13.sp else 11.sp,
@@ -168,6 +169,7 @@ fun WordLyricView(
     currentIndex: Int,
     currentPositionMs: Long,
     showTranslation: Boolean,
+    showPronunciation: Boolean = true,
     modifier: Modifier = Modifier,
     fontFamily: FontFamily? = null,
     onLineClick: (LyricLine) -> Unit = {}
@@ -216,7 +218,7 @@ fun WordLyricView(
                     .clickable { onLineClick(line) },
                 horizontalAlignment = line.ttmlAlignment()
             ) {
-                if (!line.pronunciation.isNullOrBlank()) {
+                if (showPronunciation && !line.pronunciation.isNullOrBlank()) {
                     val pronunciationColor = when {
                         isActive -> Color.White.copy(alpha = 0.62f)
                         index < currentIndex -> Color.White.copy(alpha = 0.28f)

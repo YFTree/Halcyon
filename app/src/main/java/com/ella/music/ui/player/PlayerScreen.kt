@@ -134,6 +134,7 @@ fun PlayerScreen(
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
     val showLyrics by playerViewModel.showLyrics.collectAsState()
     val showLyricTranslation by playerViewModel.showLyricTranslation.collectAsState()
+    val showLyricPronunciation by playerViewModel.showLyricPronunciation.collectAsState()
     val currentLyricLine = lyrics.getOrNull(currentLyricIndex)
     val miniLyricLine = currentLyricLine
         ?.takeIf { it.hasMiniLyric() }
@@ -229,21 +230,23 @@ fun PlayerScreen(
             )
             Spacer(modifier = Modifier.weight(1f))
             if (showLyrics) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = if (showLyricTranslation) 0.24f else 0.10f))
-                        .clickable {
-                            playerViewModel.setLyricPageTranslation(!showLyricTranslation)
-                        },
-                    contentAlignment = Alignment.Center
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
+                    LyricToggleButton(
+                        text = "音",
+                        active = showLyricPronunciation,
+                        onClick = {
+                            playerViewModel.setLyricPagePronunciation(!showLyricPronunciation)
+                        }
+                    )
+                    LyricToggleButton(
                         text = "译",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = if (showLyricTranslation) 1f else 0.62f)
+                        active = showLyricTranslation,
+                        onClick = {
+                            playerViewModel.setLyricPageTranslation(!showLyricTranslation)
+                        }
                     )
                 }
             } else {
@@ -380,6 +383,7 @@ fun PlayerScreen(
                             currentIndex = currentLyricIndex,
                             currentPositionMs = currentPosition,
                             showTranslation = showLyricTranslation,
+                            showPronunciation = showLyricPronunciation,
                             fontFamily = lyricFontFamily,
                             onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
                             modifier = Modifier.fillMaxSize()
@@ -410,6 +414,7 @@ fun PlayerScreen(
                             MiniLyricBlock(
                                 line = miniLyricLine,
                                 showTranslation = showLyricTranslation,
+                                showPronunciation = showLyricPronunciation,
                                 fontFamily = lyricFontFamily,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -592,6 +597,29 @@ fun PlayerScreen(
 }
 
 @Composable
+private fun LyricToggleButton(
+    text: String,
+    active: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = if (active) 0.24f else 0.10f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = if (active) 1f else 0.62f)
+        )
+    }
+}
+
+@Composable
 private fun PlaybackModeIcon(
     shuffleEnabled: Boolean,
     repeatMode: Int,
@@ -764,10 +792,12 @@ private fun PlayerQueueMenu(
 private fun MiniLyricBlock(
     line: com.ella.music.data.model.LyricLine,
     showTranslation: Boolean,
+    showPronunciation: Boolean,
     fontFamily: FontFamily? = null,
     modifier: Modifier = Modifier
 ) {
     val longest = listOfNotNull(
+        line.pronunciation,
         line.text,
         line.translation,
         line.backgroundText,
@@ -791,10 +821,22 @@ private fun MiniLyricBlock(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val main = line.text.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
+        val pronunciation = line.pronunciation?.takeIf { showPronunciation && it.isNotBlank() }
         val background = line.backgroundText?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
         val translation = line.translation?.takeIf { showTranslation && it.isNotBlank() }
         val backgroundTranslation = line.backgroundTranslation?.takeIf { showTranslation && it.isNotBlank() }
 
+        if (pronunciation != null) {
+            Text(
+                text = pronunciation,
+                fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
+                fontFamily = fontFamily,
+                color = Color.White.copy(alpha = 0.48f),
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         if (main != null) {
             Text(
                 text = main,
@@ -1038,7 +1080,8 @@ private data class PlayerPalette(
 }
 
 private fun com.ella.music.data.model.LyricLine.hasMiniLyric(): Boolean {
-    return text.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() } != null ||
+    return !pronunciation.isNullOrBlank() ||
+        text.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() } != null ||
         !translation.isNullOrBlank() ||
         backgroundText?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() } != null ||
         !backgroundTranslation.isNullOrBlank()

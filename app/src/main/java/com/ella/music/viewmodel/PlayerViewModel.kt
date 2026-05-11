@@ -57,6 +57,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _showLyricTranslation = MutableStateFlow(true)
     val showLyricTranslation: StateFlow<Boolean> = _showLyricTranslation.asStateFlow()
 
+    private val _showLyricPronunciation = MutableStateFlow(true)
+    val showLyricPronunciation: StateFlow<Boolean> = _showLyricPronunciation.asStateFlow()
+
     private val _locateCurrentSongRequest = MutableStateFlow(0)
     val locateCurrentSongRequest: StateFlow<Int> = _locateCurrentSongRequest.asStateFlow()
 
@@ -466,6 +469,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             settingsManager.setLyricPageTranslation(enabled)
             _showLyricTranslation.value = enabled
         }
+    }
+
+    fun setLyricPagePronunciation(enabled: Boolean) {
+        _showLyricPronunciation.value = enabled
     }
 
     fun setLyriconEnabled(enabled: Boolean) {
