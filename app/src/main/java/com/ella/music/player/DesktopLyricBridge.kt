@@ -12,7 +12,9 @@ class DesktopLyricBridge(private val context: Context) {
 
     fun setEnabled(enabled: Boolean) {
         this.enabled = enabled
-        if (!enabled) {
+        if (enabled) {
+            context.startService(Intent(context, DesktopLyricService::class.java).setAction(DesktopLyricService.ACTION_ENABLE))
+        } else {
             lastLineKey = null
             context.startService(Intent(context, DesktopLyricService::class.java).setAction(DesktopLyricService.ACTION_HIDE))
         }

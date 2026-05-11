@@ -45,6 +45,9 @@ class DesktopLyricService : Service() {
     private var startX = 0
     private var startY = 0
     private var fontScale = 1f
+    private var movedDuringTouch = false
+    private var lastTapTimeMs = 0L
+    private val hideControlsRunnable = Runnable { hideControls() }
 
     override fun onCreate() {
         super.onCreate()
@@ -60,6 +63,10 @@ class DesktopLyricService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
+            ACTION_ENABLE -> {
+                userHidden = false
+                if (rootView == null) stopSelf()
+            }
             ACTION_SHOW, ACTION_UPDATE -> showOrUpdate(intent)
             ACTION_HIDE -> stopSelf()
             ACTION_UNLOCK -> setLocked(false)
@@ -70,6 +77,7 @@ class DesktopLyricService : Service() {
     }
 
     override fun onDestroy() {
+        rootView?.removeCallbacks(hideControlsRunnable)
         rootView?.let { runCatching { windowManager.removeView(it) } }
         controllerFuture?.let { MediaController.releaseFuture(it) }
         notificationManager.cancel(NOTIFICATION_ID)
@@ -85,6 +93,10 @@ class DesktopLyricService : Service() {
 
     private fun showOrUpdate(intent: Intent) {
         if (!canDrawOverlay()) return
+        if (userHidden) {
+            stopSelf()
+            return
+        }
         if (rootView == null) addLyricView()
         lyricView?.setLyric(
             text = intent.getStringExtra(EXTRA_TEXT).orEmpty(),
@@ -115,7 +127,8 @@ class DesktopLyricService : Service() {
             addControl("A-", "缩小歌词") { updateFontScale(-0.08f) }
             addControl("A+", "放大歌词") { updateFontScale(0.08f) }
             addControl("🔒", "锁定") { setLocked(true) }
-            addControl("×", "关闭") { stopSelf() }
+            addControl("×", "关闭") { closeByUser() }
+            visibility = View.GONE
         }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -156,6 +169,7 @@ class DesktopLyricService : Service() {
         controlsView = controls
         layoutParams = params
         windowManager.addView(root, params)
+        clampToScreen(root, params)
     }
 
     private fun LinearLayout.addControl(label: String, description: String, action: () -> Unit) {
@@ -171,7 +185,10 @@ class DesktopLyricService : Service() {
                 setColor(Color.argb(72, 255, 255, 255))
             }
             setPadding(0, 0, 0, dp(1))
-            setOnClickListener { action() }
+            setOnClickListener {
+                action()
+                if (!locked && rootView != null) scheduleControlsAutoHide()
+            }
         }, LinearLayout.LayoutParams(dp(34), dp(34)).apply {
             leftMargin = dp(4)
             rightMargin = dp(4)
@@ -183,9 +200,30 @@ class DesktopLyricService : Service() {
         lyricView?.setFontScale(fontScale)
     }
 
+    private fun closeByUser() {
+        userHidden = true
+        stopSelf()
+    }
+
+    private fun showControlsWithTimeout() {
+        if (locked) return
+        controlsView?.visibility = View.VISIBLE
+        scheduleControlsAutoHide()
+    }
+
+    private fun scheduleControlsAutoHide() {
+        rootView?.removeCallbacks(hideControlsRunnable)
+        rootView?.postDelayed(hideControlsRunnable, CONTROLS_AUTO_HIDE_MS)
+    }
+
+    private fun hideControls() {
+        if (!locked) controlsView?.visibility = View.GONE
+    }
+
     private fun setLocked(lock: Boolean) {
         locked = lock
         controlsView?.visibility = if (lock) View.GONE else View.VISIBLE
+        if (!lock) scheduleControlsAutoHide()
         val params = layoutParams ?: return
         params.flags = if (lock) {
             params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -205,16 +243,44 @@ class DesktopLyricService : Service() {
                 downY = event.rawY
                 startX = params.x
                 startY = params.y
+                movedDuringTouch = false
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                params.x = startX + (event.rawX - downX).toInt()
-                params.y = (startY + (event.rawY - downY).toInt()).coerceAtLeast(0)
+                val dx = event.rawX - downX
+                val dy = event.rawY - downY
+                if (kotlin.math.abs(dx) > dp(4) || kotlin.math.abs(dy) > dp(4)) movedDuringTouch = true
+                params.x = startX + dx.toInt()
+                params.y = startY + dy.toInt()
+                clampToScreen(view, params)
                 windowManager.updateViewLayout(view, params)
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                if (!movedDuringTouch) handleTap()
                 return true
             }
         }
         return true
+    }
+
+    private fun handleTap() {
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - lastTapTimeMs <= DOUBLE_TAP_TIMEOUT_MS) {
+            showControlsWithTimeout()
+            lastTapTimeMs = 0L
+        } else {
+            lastTapTimeMs = now
+        }
+    }
+
+    private fun clampToScreen(view: View, params: WindowManager.LayoutParams) {
+        val metrics = resources.displayMetrics
+        val halfWidth = ((view.width.takeIf { it > 0 } ?: dp(596)) / 2)
+        val maxX = (metrics.widthPixels / 2 - halfWidth).coerceAtLeast(0)
+        val maxY = (metrics.heightPixels - (view.height.takeIf { it > 0 } ?: dp(194))).coerceAtLeast(0)
+        params.x = params.x.coerceIn(-maxX, maxX)
+        params.y = params.y.coerceIn(0, maxY)
     }
 
     private fun postUnlockNotification() {
@@ -454,6 +520,7 @@ class DesktopLyricService : Service() {
     companion object {
         const val ACTION_SHOW = "com.ella.music.action.SHOW_DESKTOP_LYRIC"
         const val ACTION_UPDATE = "com.ella.music.action.UPDATE_DESKTOP_LYRIC"
+        const val ACTION_ENABLE = "com.ella.music.action.ENABLE_DESKTOP_LYRIC"
         const val ACTION_HIDE = "com.ella.music.action.HIDE_DESKTOP_LYRIC"
         const val ACTION_UNLOCK = "com.ella.music.action.UNLOCK_DESKTOP_LYRIC"
         const val ACTION_FONT_SMALLER = "com.ella.music.action.DESKTOP_LYRIC_FONT_SMALLER"
@@ -473,5 +540,8 @@ class DesktopLyricService : Service() {
         const val EXTRA_BACKGROUND_WORD_ENDS = "background_word_ends"
         private const val CHANNEL_ID = "ella_desktop_lyric"
         private const val NOTIFICATION_ID = 0x454c4459
+        private const val CONTROLS_AUTO_HIDE_MS = 4_000L
+        private const val DOUBLE_TAP_TIMEOUT_MS = 360L
+        private var userHidden = false
     }
 }
