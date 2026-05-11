@@ -8,6 +8,12 @@ import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.net.Uri
+import androidx.compose.runtime.DisposableEffect
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player as Media3Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
@@ -110,6 +116,7 @@ import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Pause
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import android.content.ClipData
 
 @Composable
 fun PlayerScreen(
@@ -143,6 +150,7 @@ fun PlayerScreen(
         ?: lyrics.firstOrNull { it.hasMiniLyric() }
     var menuExpanded by remember { mutableStateOf(false) }
     var queueExpanded by remember { mutableStateOf(false) }
+    var dynamicCoverFailedPath by remember { mutableStateOf<String?>(null) }
     var dragDismissOffset by remember { mutableFloatStateOf(0f) }
     val animatedDismissOffset by animateFloatAsState(
         targetValue = dragDismissOffset,
@@ -425,14 +433,33 @@ fun PlayerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        AlbumArtView(
-                            song = song,
-                            embeddedCover = embeddedCover,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .widthIn(max = 520.dp)
-                                .aspectRatio(1f)
-                        )
+                        val dynamicCoverFile = song
+                            ?.dynamicCoverVideoFile()
+                            ?.takeUnless { it.absolutePath == dynamicCoverFailedPath }
+
+                        if (dynamicCoverFile != null) {
+                            DynamicCoverVideo(
+                                file = dynamicCoverFile,
+                                isPlaying = isPlaying,
+                                onPlaybackError = {
+                                    dynamicCoverFailedPath = dynamicCoverFile.absolutePath
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = 520.dp)
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(28.dp))
+                            )
+                        } else {
+                            AlbumArtView(
+                                song = song,
+                                embeddedCover = embeddedCover,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = 520.dp)
+                                    .aspectRatio(1f)
+                            )
+                        }
 
                         if (miniLyricLine != null) {
                             Spacer(modifier = Modifier.height(18.dp))
@@ -1041,6 +1068,61 @@ private fun AlbumArtView(
 }
 
 @Composable
+private fun DynamicCoverVideo(
+    file: File,
+    isPlaying: Boolean,
+    onPlaybackError: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    val exoPlayer = remember(file.absolutePath) {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = Media3Player.REPEAT_MODE_ALL
+            volume = 0f
+            setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
+            prepare()
+        }
+    }
+
+    DisposableEffect(exoPlayer) {
+        val listener = object : Media3Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                onPlaybackError()
+            }
+        }
+
+        exoPlayer.addListener(listener)
+
+        onDispose {
+            exoPlayer.removeListener(listener)
+            exoPlayer.release()
+        }
+    }
+
+    DisposableEffect(isPlaying, exoPlayer) {
+        exoPlayer.playWhenReady = isPlaying
+        onDispose { }
+    }
+
+    AndroidView(
+        modifier = modifier,
+        factory = { viewContext ->
+            PlayerView(viewContext).apply {
+                player = exoPlayer
+                useController = false
+                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+            }
+        },
+        update = { view ->
+            view.player = exoPlayer
+            exoPlayer.playWhenReady = isPlaying
+        }
+    )
+}
+
+@Composable
 private fun GlowSeekBar(
     value: Float,
     onSeek: (Float) -> Unit,
@@ -1243,23 +1325,51 @@ private fun enqueuePlayerDownload(context: Context, song: Song) {
 }
 
 private fun openExternalTagEditor(context: Context, song: Song) {
-    val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
-    val mimeType = song.mimeType.ifBlank { "audio/*" }
-    val editIntent = Intent(Intent.ACTION_EDIT).apply {
-        setDataAndType(uri, mimeType)
-        putExtra(Intent.EXTRA_TITLE, song.title)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+    if (song.path.startsWith("http://") || song.path.startsWith("https://")) {
+        Toast.makeText(context, "在线 / WebDAV 歌曲暂不支持外部编辑标签", Toast.LENGTH_SHORT).show()
+        return
     }
-    val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+
+    if (song.id <= 0L) {
+        Toast.makeText(context, "无法获取歌曲媒体库 Uri", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    val uri = ContentUris.withAppendedId(
+        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+        song.id
+    )
+
+    val mimeType = song.mimeType
+        .takeIf { it.startsWith("audio/") }
+        ?: "audio/*"
+
+    val intent = Intent("com.lonx.lyrico.action.EDIT_TAG").apply {
         setDataAndType(uri, mimeType)
-        putExtra(Intent.EXTRA_TITLE, song.title)
+        putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        clipData = ClipData.newUri(context.contentResolver, "audio", uri)
     }
+
     runCatching {
-        context.startActivity(Intent.createChooser(editIntent, "编辑歌曲标签"))
-    }.recoverCatching {
-        context.startActivity(Intent.createChooser(viewIntent, "打开歌曲"))
+        context.startActivity(intent)
     }.onFailure {
-        Toast.makeText(context, "没有找到可编辑标签的外部应用", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "未找到支持编辑标签的应用，请先安装 Lyrico", Toast.LENGTH_SHORT).show()
     }
+}
+
+private fun Song.dynamicCoverVideoFile(): File? {
+    if (path.startsWith("http://") || path.startsWith("https://")) return null
+
+    val audioFile = File(path)
+    val parent = audioFile.parentFile ?: return null
+    val baseName = audioFile.nameWithoutExtension
+
+    val candidates = listOf(
+        File(parent, "${baseName}_cover.mp4"),
+        File(parent, "${baseName}_cover.MP4")
+    )
+
+    return candidates.firstOrNull { it.exists() && it.isFile && it.length() > 0L }
 }

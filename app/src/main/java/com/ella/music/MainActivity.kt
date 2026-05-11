@@ -75,6 +75,12 @@ class MainActivity : ComponentActivity() {
         if (isGranted) {
             mainViewModel?.scanMusicIfAutoEnabled()
         }
+        requestVideoPermissionIfNeeded()
+    }
+
+    private val requestVideoPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
         requestNotificationPermissionIfNeeded()
     }
 
@@ -144,6 +150,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestVideoPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            requestNotificationPermissionIfNeeded()
+            return
+        }
+
+        if (
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_MEDIA_VIDEO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestVideoPermissionLauncher.launch(Manifest.permission.READ_MEDIA_VIDEO)
+        } else {
+            requestNotificationPermissionIfNeeded()
+        }
+    }
+
     private fun checkAndRequestPermissions() {
         val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_AUDIO
@@ -154,7 +178,7 @@ class MainActivity : ComponentActivity() {
         if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
             requestPermissionLauncher.launch(permission)
         } else {
-            requestNotificationPermissionIfNeeded()
+            requestVideoPermissionIfNeeded()
         }
     }
 

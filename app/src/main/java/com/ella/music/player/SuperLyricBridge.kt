@@ -39,7 +39,12 @@ class SuperLyricBridge {
     fun sendLyric(line: LyricLine?, positionMs: Long, showTranslation: Boolean) {
         if (!enabled || line == null) return
         val song = lastSong
-        val key = "${song?.id}:${line.timeMs}:${positionMs / 80}"
+        val translationKey = if (showTranslation) {
+            line.translation ?: line.backgroundTranslation.orEmpty()
+        } else {
+            ""
+        }
+        val key = "${song?.id}:${line.timeMs}:${line.endMs}:$showTranslation:$translationKey"
         if (key == lastKey) return
         lastKey = key
         runCatching {

@@ -174,9 +174,14 @@ object LrcParser {
                 isCoalescing = true
             }.newDocumentBuilder().parse(InputSource(StringReader(content)))
 
+            val pronunciations = parseTtmlPronunciations(document)
+
             val paragraphs = document.getElementsByTagNameNS("*", "p")
             val lyrics = (0 until paragraphs.length).mapNotNull { index ->
                 val paragraph = paragraphs.item(index) as? Element ?: return@mapNotNull null
+                val lyricKey = paragraph.attr("key")
+                val pronunciation = pronunciations[lyricKey]
+
                 val begin = paragraph.attr("begin").parseTtmlTime() ?: return@mapNotNull null
                 val end = paragraph.attr("end").parseTtmlTime()
                 val words = mutableListOf<LyricWord>()
@@ -194,6 +199,8 @@ object LrcParser {
                     text = text,
                     words = words.toTtmlDisplayWords(text),
                     translation = translations.firstOrNull { it.isNotBlank() && !it.isMusicSymbolOnly() },
+                    pronunciation = pronunciation?.text,
+                    pronunciationWords = pronunciation?.words?.toTtmlDisplayWords(pronunciation.text).orEmpty(),
                     agent = agent,
                     backgroundText = backgrounds.firstOrNull { it.text.isNotBlank() && !it.text.isMusicSymbolOnly() }?.text,
                     backgroundWords = backgrounds.firstOrNull { it.words.isNotEmpty() }?.let { it.words.toTtmlDisplayWords(it.text) }.orEmpty(),
@@ -207,6 +214,47 @@ object LrcParser {
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun parseTtmlPronunciations(document: org.w3c.dom.Document): Map<String, TtmlPronunciation> {
+        val result = mutableMapOf<String, TtmlPronunciation>()
+        val texts = document.getElementsByTagNameNS("*", "text")
+
+        for (index in 0 until texts.length) {
+            val textElement = texts.item(index) as? Element ?: continue
+            val key = textElement.attr("for").ifBlank { continue }
+
+            val words = mutableListOf<LyricWord>()
+            val builder = StringBuilder()
+            val spans = textElement.getElementsByTagNameNS("*", "span")
+
+            for (spanIndex in 0 until spans.length) {
+                val span = spans.item(spanIndex) as? Element ?: continue
+                val begin = span.attr("begin").parseTtmlTime() ?: continue
+                val spanText = span.textContent.cleanTtmlText()
+                if (spanText.isBlank()) continue
+
+                val end = span.attr("end").parseTtmlTime()
+                    ?: (begin + estimateWordDuration(spanText))
+
+                builder.append(spanText)
+                words += LyricWord(
+                    text = spanText,
+                    startMs = begin,
+                    endMs = end
+                )
+            }
+
+            val text = builder.toString().cleanTtmlText()
+            if (text.isNotBlank() && !text.isMusicSymbolOnly()) {
+                result[key] = TtmlPronunciation(
+                    text = text,
+                    words = words
+                )
+            }
+        }
+
+        return result
     }
 
     private fun collectTtmlText(
@@ -250,6 +298,11 @@ object LrcParser {
         val text: String,
         val words: List<LyricWord> = emptyList(),
         val translation: String? = null
+    )
+
+    private data class TtmlPronunciation(
+        val text: String,
+        val words: List<LyricWord> = emptyList()
     )
 
     private fun collectTtmlBackground(element: Element, lineEndMs: Long?): TtmlBackground {

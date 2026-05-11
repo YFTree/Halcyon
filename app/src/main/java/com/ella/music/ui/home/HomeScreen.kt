@@ -53,7 +53,6 @@ import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
-import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.SearchBar
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
@@ -137,6 +136,19 @@ fun HomeScreen(
                         Text(text = "取消", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
                     }
                 } else {
+                    IconButton(
+                        onClick = {
+                            if (!isScanning) {
+                                mainViewModel.scanMusic()
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = if (isScanning) "扫描中" else "刷新",
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.primary
+                        )
+                    }
                     IconButton(onClick = { playerViewModel.requestLocateCurrentSong() }) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_my_location),
@@ -228,123 +240,127 @@ fun HomeScreen(
             ) {}
         }
 
-        PullToRefresh(
-            isRefreshing = false,
-            onRefresh = {
-                if (!isScanning) {
-                    scope.launch {
-                        mainViewModel.scanMusic()
-                    }
-                }
-            },
+        AnimatedVisibility(
+            visible = isScanning && scanProgress > 0,
+            enter = expandVertically(),
+            exit = shrinkVertically()
         ) {
-            AnimatedVisibility(
-                visible = isScanning,
-                enter = expandVertically(),
-                exit = shrinkVertically()
+            Text(
+                text = "正在扫描 ${scanProgress} 首歌曲...",
+                fontSize = 13.sp,
+                color = MiuixTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+
+        if (songs.isEmpty() && !isScanning) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "正在扫描 ${scanProgress} 首歌曲...",
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    text = "未找到歌曲，点击右上角刷新扫描",
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
-            if (songs.isEmpty() && !isScanning) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "未找到歌曲，下拉刷新扫描",
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                }
-            } else {
-                val listState = rememberLazyListState()
-                var fastScrollJob by remember { mutableStateOf<Job?>(null) }
-                var handledLocateRequest by remember { mutableStateOf(locateCurrentSongRequest) }
-                LaunchedEffect(locateCurrentSongRequest) {
-                    if (locateCurrentSongRequest <= 0 || locateCurrentSongRequest == handledLocateRequest) return@LaunchedEffect
-                    handledLocateRequest = locateCurrentSongRequest
-                    val index = sortedSongs.indexOfFirst { it.id == currentSong?.id }
-                    if (index >= 0) listState.animateScrollToItem(index)
-                }
-                val fastIndexTargets = remember(sortedSongs, sortKeysBySongId) {
-                    sortedSongs
-                        .mapIndexed { index, song -> song.indexLetter(sortKeysBySongId[song.id]) to index }
-                        .distinctBy { it.first }
-                        .toMap()
-                }
+        } else {
+            val listState = rememberLazyListState()
+            var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+            var handledLocateRequest by remember { mutableStateOf(locateCurrentSongRequest) }
 
+            LaunchedEffect(locateCurrentSongRequest) {
+                if (locateCurrentSongRequest <= 0 || locateCurrentSongRequest == handledLocateRequest) return@LaunchedEffect
+                handledLocateRequest = locateCurrentSongRequest
+                val index = sortedSongs.indexOfFirst { it.id == currentSong?.id }
+                if (index >= 0) listState.animateScrollToItem(index)
+            }
+
+            val fastIndexTargets = remember(sortedSongs, sortKeysBySongId) {
+                sortedSongs
+                    .mapIndexed { index, song -> song.indexLetter(sortKeysBySongId[song.id]) to index }
+                    .distinctBy { it.first }
+                    .toMap()
+            }
+
+            Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            Text(
-                                text = if (selectionMode) "已选择 ${selectedIds.size} 首" else "${sortedSongs.size} 首歌曲 · ${sortMode.label}",
-                                fontSize = 13.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
+                    Text(
+                        text = if (selectionMode) {
+                            "已选择 ${selectedIds.size} 首"
+                        } else {
+                            "${sortedSongs.size} 首歌曲 · ${sortMode.label}"
+                        },
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
 
-                            LazyColumn(
-                                state = listState,
-                                contentPadding = PaddingValues(bottom = 160.dp)
-                            ) {
-                                items(
-                                    items = sortedSongs,
-                                    key = { it.id }
-                                ) { song ->
-                                    val selected = song.id in selectedIds
-                                    SongItem(
-                                        song = song,
-                                        isCurrent = currentSong?.id == song.id,
-                                        albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
-                                        loadCoverArt = mainViewModel::getCoverArtBitmap,
-                                        loadAudioInfo = mainViewModel::getAudioInfo,
-                                        selectionMode = selectionMode,
-                                        selected = selected,
-                                        onLongClick = {
-                                            selectionMode = true
-                                            selectedIds = selectedIds + song.id
-                                        },
-                                        onClick = {
-                                            if (selectionMode) {
-                                                selectedIds = if (selected) selectedIds - song.id else selectedIds + song.id
-                                            } else {
-                                                playerViewModel.setPlaylist(sortedSongs, sortedSongs.indexOf(song))
-                                                onNavigateToPlayer()
-                                            }
-                                        },
-                                        onAddToQueue = { playerViewModel.addToPlaylist(song) }
-                                    )
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(bottom = 160.dp)
+                    ) {
+                        items(
+                            items = sortedSongs,
+                            key = { it.id }
+                        ) { song ->
+                            val selected = song.id in selectedIds
+
+                            SongItem(
+                                song = song,
+                                isCurrent = currentSong?.id == song.id,
+                                albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                                loadCoverArt = mainViewModel::getCoverArtBitmap,
+                                loadAudioInfo = mainViewModel::getAudioInfo,
+                                selectionMode = selectionMode,
+                                selected = selected,
+                                onLongClick = {
+                                    selectionMode = true
+                                    selectedIds = selectedIds + song.id
+                                },
+                                onClick = {
+                                    if (selectionMode) {
+                                        selectedIds = if (selected) {
+                                            selectedIds - song.id
+                                        } else {
+                                            selectedIds + song.id
+                                        }
+                                    } else {
+                                        playerViewModel.setPlaylist(sortedSongs, sortedSongs.indexOf(song))
+                                        onNavigateToPlayer()
+                                    }
+                                },
+                                onAddToQueue = {
+                                    playerViewModel.addToPlaylist(song)
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (sortMode == HomeSortMode.Title && sortedSongs.size > 30) {
+                    FastIndexBar(
+                        songs = sortedSongs,
+                        sortKeysBySongId = sortKeysBySongId,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .padding(end = 2.dp),
+                        onLetterClick = { letter ->
+                            val index = fastIndexTargets[letter]
+                            if (index != null) {
+                                fastScrollJob?.cancel()
+                                fastScrollJob = scope.launch {
+                                    listState.scrollToItem(index)
                                 }
                             }
                         }
-
-                        if (sortMode == HomeSortMode.Title && sortedSongs.size > 30) {
-                            FastIndexBar(
-                                songs = sortedSongs,
-                                sortKeysBySongId = sortKeysBySongId,
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .fillMaxHeight()
-                                    .padding(end = 2.dp),
-                                onLetterClick = { letter ->
-                                    val index = fastIndexTargets[letter]
-                                    if (index != null) {
-                                        fastScrollJob?.cancel()
-                                        fastScrollJob = scope.launch { listState.scrollToItem(index) }
-                                    }
-                                }
-                            )
-                        }
-                    }
+                    )
                 }
             }
         }
     }
 }
+
 
 private enum class HomeSortMode(val label: String) {
     Title("歌曲名称"),

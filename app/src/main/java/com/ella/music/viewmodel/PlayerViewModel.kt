@@ -182,7 +182,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     lyriconBridge.sendPosition(playerManager.currentPosition.value)
                 }
                 updateDesktopLyricFrame()
-                updateSuperLyricFrame()
 
                 delay(50)
             }
@@ -237,6 +236,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun sendSuperLyricAt(index: Int, lyrics: List<LyricLine>) {
+        if (!superLyricBridge.isEnabled() || !isPlaying.value) return
+
+        val line = lyrics.getOrNull(index) ?: return
+        superLyricBridge.sendLyric(
+            line = line,
+            positionMs = currentPosition.value,
+            showTranslation = _showLyricTranslation.value
+        )
+    }
+
     private fun updateCurrentLyricIndex() {
         val currentLyrics = _lyrics.value
         if (currentLyrics.isEmpty()) return
@@ -263,6 +273,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     tickerBridge.sendLyric(line)
                 }
                 sendBluetoothLyric(index, currentLyrics)
+                sendSuperLyricAt(index, currentLyrics)
             }
         }
     }
@@ -357,13 +368,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         superLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value)
     }
 
-    private fun updateSuperLyricFrame() {
-        if (!superLyricBridge.isEnabled() || !isPlaying.value) return
-        val index = _currentLyricIndex.value
-        val line = _lyrics.value.getOrNull(index) ?: return
-        superLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value)
-    }
-
     private fun initLyricPageTranslation() {
         viewModelScope.launch {
             settingsManager.lyricPageTranslation.collect { enabled ->
@@ -387,6 +391,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun seekTo(positionMs: Long) {
         playerManager.seekTo(positionMs)
         lyriconBridge.seekTo(positionMs)
+
+        val lyrics = _lyrics.value
+        val index = lyrics.indexOfLast { positionMs >= it.timeMs }
+        if (index >= 0) {
+            _currentLyricIndex.value = index
+            if (superLyricBridge.isEnabled() && isPlaying.value) {
+                superLyricBridge.sendLyric(
+                    line = lyrics[index],
+                    positionMs = positionMs,
+                    showTranslation = _showLyricTranslation.value
+                )
+            }
+        }
     }
 
     fun toggleShuffle() = playerManager.toggleShuffle()
