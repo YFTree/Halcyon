@@ -32,7 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -190,10 +194,9 @@ fun WordLyricView(
 
     LaunchedEffect(currentIndex) {
         if (currentIndex >= 0 && currentIndex < lyrics.size) {
-            val targetIndex = (currentIndex + 1).coerceAtMost(lyrics.size)
             listState.animateScrollToItem(
-                index = targetIndex,
-                scrollOffset = -200
+                index = currentIndex,
+                scrollOffset = -140
             )
         }
     }
@@ -202,20 +205,73 @@ fun WordLyricView(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .graphicsLayer {
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .drawWithCache {
+                val fade = Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.10f to Color.Black,
+                    0.78f to Color.Black,
+                    1f to Color.Transparent
+                )
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(fade, blendMode = BlendMode.DstIn)
+                }
+            }
+            .padding(horizontal = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        item { Box(modifier = Modifier.height(200.dp)) }
+        item { Box(modifier = Modifier.height(240.dp)) }
 
         itemsIndexed(lyrics) { index, line ->
             val isActive = index == currentIndex || line.isActiveAt(currentPositionMs)
             val nextLine = lyrics.getOrNull(index + 1)
             val lineTextAlign = line.ttmlTextAlign()
+            val distance = when {
+                currentIndex < 0 -> 2
+                index < currentIndex -> currentIndex - index
+                else -> index - currentIndex
+            }
+            val targetAlpha = when {
+                isActive -> 1f
+                distance == 1 -> 0.58f
+                distance == 2 -> 0.36f
+                else -> 0.22f
+            }
+            val targetScale = when {
+                isActive -> 1f
+                distance == 1 -> 0.94f
+                else -> 0.90f
+            }
+            val lineAlpha by animateFloatAsState(
+                targetValue = targetAlpha,
+                animationSpec = tween(durationMillis = 260, easing = LinearOutSlowInEasing),
+                label = "lyric_line_alpha"
+            )
+            val scale by animateFloatAsState(
+                targetValue = targetScale,
+                animationSpec = tween(durationMillis = 300, easing = LinearOutSlowInEasing),
+                label = "lyric_line_scale"
+            )
+            val blur by animateFloatAsState(
+                targetValue = if (isActive || distance <= 1) 0f else (distance - 1).coerceAtMost(3) * 1.35f,
+                animationSpec = tween(durationMillis = 260, easing = LinearOutSlowInEasing),
+                label = "lyric_line_blur"
+            )
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onLineClick(line) },
+                    .graphicsLayer {
+                        alpha = lineAlpha
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .blur(blur.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                    .clickable { onLineClick(line) }
+                    .padding(vertical = if (isActive) 6.dp else 2.dp),
                 horizontalAlignment = line.ttmlAlignment()
             ) {
                 if (showPronunciation && !line.pronunciation.isNullOrBlank()) {
@@ -239,7 +295,7 @@ fun WordLyricView(
                     } else {
                         Text(
                             text = line.pronunciation,
-                            fontSize = if (isActive) 13.sp else 11.sp,
+                            fontSize = if (isActive) 14.sp else 11.sp,
                             fontFamily = fontFamily,
                             color = pronunciationColor,
                             textAlign = lineTextAlign,
@@ -254,6 +310,7 @@ fun WordLyricView(
                         words = line.words,
                         currentPositionMs = currentPositionMs,
                         textAlign = lineTextAlign,
+                        fontSizeSp = 28,
                         fontFamily = fontFamily
                     )
                 } else {
@@ -264,9 +321,9 @@ fun WordLyricView(
                     }
                     Text(
                         text = line.text.ifBlank { "♪" },
-                        fontSize = if (isActive) 18.sp else 15.sp,
+                        fontSize = if (isActive) 28.sp else 18.sp,
                         fontFamily = fontFamily,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
                         color = textColor,
                         textAlign = lineTextAlign,
                         modifier = Modifier
@@ -282,7 +339,7 @@ fun WordLyricView(
                     }
                     Text(
                         text = line.translation,
-                        fontSize = if (isActive) 14.sp else 12.sp,
+                        fontSize = if (isActive) 15.sp else 12.sp,
                         fontFamily = fontFamily,
                         color = translationColor,
                         textAlign = lineTextAlign,
@@ -302,7 +359,7 @@ fun WordLyricView(
                             words = line.backgroundWords,
                             currentPositionMs = currentPositionMs,
                             textAlign = lineTextAlign,
-                            fontSizeSp = 14,
+                            fontSizeSp = 18,
                             fontFamily = fontFamily,
                             currentColor = Color.White.copy(alpha = 0.78f),
                             sungColor = Color.White.copy(alpha = 0.56f),
@@ -312,7 +369,7 @@ fun WordLyricView(
                     } else {
                         Text(
                             text = line.backgroundText,
-                            fontSize = if (isActive) 14.sp else 12.sp,
+                            fontSize = if (isActive) 18.sp else 12.sp,
                             fontFamily = fontFamily,
                             color = backgroundColor,
                             textAlign = lineTextAlign,
@@ -351,7 +408,7 @@ fun WordLyricView(
             }
         }
 
-        item { Box(modifier = Modifier.height(300.dp)) }
+        item { Box(modifier = Modifier.height(420.dp)) }
     }
 }
 

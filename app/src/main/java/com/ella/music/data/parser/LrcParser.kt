@@ -38,67 +38,7 @@ object LrcParser {
         val offset: Long = 0L
     )
 
-    fun parse(lrcContent: String): LrcResult {
-        parseTtml(lrcContent)?.let { return it }
-
-        val lines = lrcContent.lines()
-        val lyrics = mutableListOf<LyricLine>()
-        var title: String? = null
-        var artist: String? = null
-        var album: String? = null
-        var offset = 0L
-
-        for (line in lines) {
-            val trimmed = line.trim()
-            if (trimmed.isEmpty()) continue
-
-            val metaMatch = metaDataPattern.find(trimmed)
-            if (metaMatch != null) {
-                when (metaMatch.groupValues[1].lowercase()) {
-                    "ti" -> title = metaMatch.groupValues[2].trim()
-                    "ar" -> artist = metaMatch.groupValues[2].trim()
-                    "al" -> album = metaMatch.groupValues[2].trim()
-                    "offset" -> offset = metaMatch.groupValues[2].trim().toLongOrNull() ?: 0L
-                }
-                continue
-            }
-
-            parseInlineTimedLine(trimmed)?.let {
-                lyrics.add(it)
-                continue
-            }
-
-            val lineMatch = retroLinePattern.matchEntire(trimmed) ?: continue
-            val times = lineMatch.groupValues[1]
-            val text = lineMatch.groupValues[2].trim()
-            if (text.isMusicSymbolOnly()) continue
-
-            val timeMatches = timePattern.findAll(times).toList()
-            if (timeMatches.isEmpty()) continue
-
-            val hasWordTiming = wordTimePattern.containsMatchIn(text)
-
-            for (timeMatch in timeMatches) {
-                val timeMs = parseTime(timeMatch.groupValues)
-
-                if (hasWordTiming) {
-                    val words = parseEnhancedWords(text, timeMs)
-                    val fullText = words.joinLyricText()
-                    lyrics.add(LyricLine(timeMs, fullText, words))
-                } else {
-                    lyrics.add(LyricLine(timeMs, text.trim()))
-                }
-            }
-        }
-
-        return LrcResult(
-            lyrics = mergeSameTimestampLines(lyrics),
-            title = title,
-            artist = artist,
-            album = album,
-            offset = offset
-        )
-    }
+    fun parse(lrcContent: String): LrcResult = EllaLyricsParser.parse(lrcContent)
 
     private fun parseTtml(content: String): LrcResult? {
         if (!Regex("""<tt(?:\s|>)""", RegexOption.IGNORE_CASE).containsMatchIn(content)) return null
