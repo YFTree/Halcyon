@@ -112,7 +112,7 @@ fun LyricView(
 
             if (showPronunciation && !line.pronunciation.isNullOrBlank()) {
                 Text(
-                    text = line.pronunciation,
+                    text = line.pronunciation.orEmpty().lineBreakSafeText(),
                     fontSize = if (isActive) 13.sp else 11.sp,
                     fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.58f),
@@ -123,7 +123,7 @@ fun LyricView(
                 )
             }
             Text(
-                text = line.text.ifBlank { "♪" },
+                text = line.text.ifBlank { "♪" }.lineBreakSafeText(),
                 fontSize = if (isActive) 18.sp else 15.sp,
                 fontFamily = fontFamily,
                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
@@ -135,7 +135,7 @@ fun LyricView(
             )
             if (showTranslation && !line.translation.isNullOrBlank()) {
                 Text(
-                    text = line.translation,
+                    text = line.translation.orEmpty().lineBreakSafeText(),
                     fontSize = if (isActive) 14.sp else 12.sp,
                     fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.72f),
@@ -147,7 +147,7 @@ fun LyricView(
             }
             if (!line.backgroundText.isNullOrBlank()) {
                 Text(
-                    text = line.backgroundText,
+                    text = line.backgroundText.orEmpty().lineBreakSafeText(),
                     fontSize = if (isActive) 14.sp else 12.sp,
                     fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.56f),
@@ -159,7 +159,7 @@ fun LyricView(
             }
             if (showTranslation && !line.backgroundTranslation.isNullOrBlank()) {
                 Text(
-                    text = line.backgroundTranslation,
+                    text = line.backgroundTranslation.orEmpty().lineBreakSafeText(),
                     fontSize = if (isActive) 13.sp else 11.sp,
                     fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.48f),
@@ -320,14 +320,14 @@ fun WordLyricView(
                         )
                     } else {
                         Text(
-                            text = line.pronunciation,
+                            text = line.pronunciation.orEmpty().lineBreakSafeText(),
                             fontSize = fittedLyricFontSp(line.pronunciation.orEmpty(), if (isActive) 14 else 11, minSp = 9).sp,
                             fontFamily = fontFamily,
                             color = pronunciationColor,
                             textAlign = lineTextAlign,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis,
+                            maxLines = if (isActive) 3 else 2,
+                            softWrap = true,
+                            overflow = TextOverflow.Clip,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 2.dp)
@@ -349,15 +349,15 @@ fun WordLyricView(
                         else -> Color.White.copy(alpha = 0.56f)
                     }
                     Text(
-                        text = line.text.ifBlank { "♪" },
+                        text = line.text.ifBlank { "♪" }.lineBreakSafeText(),
                         fontSize = fittedLyricFontSp(line.text, if (isActive) 36 else 24, minSp = if (isActive) 9 else 8).sp,
                         fontFamily = fontFamily,
                         fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
                         color = textColor,
                         textAlign = lineTextAlign,
-                        maxLines = if (isActive) 2 else 1,
-                        softWrap = isActive,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLines = if (isActive) 4 else 3,
+                        softWrap = true,
+                        overflow = TextOverflow.Clip,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = if (isActive) 4.dp else 0.dp)
@@ -370,13 +370,13 @@ fun WordLyricView(
                         else -> Color.White.copy(alpha = 0.50f)
                     }
                     Text(
-                        text = line.translation,
+                        text = line.translation.orEmpty().lineBreakSafeText(),
                         fontSize = fittedLyricFontSp(line.translation.orEmpty(), if (isActive) 20 else 14, minSp = 8).sp,
                         fontFamily = fontFamily,
                         color = translationColor,
                         textAlign = lineTextAlign,
-                        maxLines = 1,
-                        softWrap = false,
+                        maxLines = if (isActive) 3 else 2,
+                        softWrap = true,
                         overflow = TextOverflow.Clip,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -403,14 +403,14 @@ fun WordLyricView(
                         )
                     } else {
                         Text(
-                            text = line.backgroundText,
+                            text = line.backgroundText.orEmpty().lineBreakSafeText(),
                             fontSize = fittedLyricFontSp(line.backgroundText.orEmpty(), if (isActive) 24 else 14, minSp = 8).sp,
                             fontFamily = fontFamily,
                             color = backgroundColor,
                             textAlign = backgroundTextAlign,
-                            maxLines = if (isActive) 2 else 1,
-                            softWrap = isActive,
-                            overflow = TextOverflow.Ellipsis,
+                            maxLines = if (isActive) 3 else 2,
+                            softWrap = true,
+                            overflow = TextOverflow.Clip,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 3.dp)
@@ -424,13 +424,13 @@ fun WordLyricView(
                         else -> Color.White.copy(alpha = 0.36f)
                     }
                     Text(
-                        text = line.backgroundTranslation,
+                        text = line.backgroundTranslation.orEmpty().lineBreakSafeText(),
                         fontSize = fittedLyricFontSp(line.backgroundTranslation.orEmpty(), if (isActive) 13 else 11, minSp = 8).sp,
                         fontFamily = fontFamily,
                         color = backgroundTranslationColor,
                         textAlign = backgroundTextAlign,
-                        maxLines = 1,
-                        softWrap = false,
+                        maxLines = if (isActive) 3 else 2,
+                        softWrap = true,
                         overflow = TextOverflow.Clip,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -453,6 +453,7 @@ fun WordLyricView(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WordLine(
     words: List<LyricWord>,
@@ -471,84 +472,112 @@ private fun WordLine(
         else -> Arrangement.Center
     }
 
-    Row(
+    FlowRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = arrangement,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.Center
     ) {
-        words.forEach { word ->
-            val isWordActive = currentPositionMs >= word.startMs
-            val isWordCurrent = currentPositionMs in word.startMs..word.endMs
-
-            val baseColor = when {
-                isWordCurrent -> currentColor
-                isWordActive -> sungColor
-                else -> pendingColor
-            }
-            val fadeAlpha by animateFloatAsState(
-                targetValue = when {
-                    isWordCurrent -> 1f
-                    isWordActive -> 0.86f
-                    else -> 0.52f
-                },
-                animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
-                label = "word_fade"
-            )
-            val color = baseColor.copy(alpha = (baseColor.alpha * fadeAlpha).coerceIn(0f, 1f))
-
-            val displayText = word.text.toDisplayToken()
-            val isLongSustain = isWordCurrent && (word.endMs - word.startMs) >= 900L
-            val glowPulse = if (isLongSustain) {
-                0.5f + 0.32f * ((sin(currentPositionMs / 145.0).toFloat() + 1f) / 2f)
-            } else {
-                0f
-            }
-
-            Box(
-                modifier = Modifier.padding(vertical = 5.dp)
-            ) {
-                if (isLongSustain && displayText.isNotBlank()) {
-                    Text(
-                        text = displayText,
-                        fontSize = fontSizeSp.sp,
-                        fontFamily = fontFamily,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = currentColor.copy(alpha = glowPulse * 0.34f),
-                        modifier = Modifier
-                            .graphicsLayer {
-                                scaleX = 1.12f
-                                scaleY = 1.12f
-                            }
-                            .blur(11.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    )
-                    Text(
-                        text = displayText,
-                        fontSize = fontSizeSp.sp,
-                        fontFamily = fontFamily,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = currentColor.copy(alpha = glowPulse * 0.56f),
-                        modifier = Modifier
-                            .graphicsLayer {
-                                scaleX = 1.05f
-                                scaleY = 1.05f
-                            }
-                            .blur(5.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    )
+        words.toLineBreakTokens().forEach { token ->
+            Box(modifier = Modifier.padding(vertical = 5.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    token.words.forEach { word ->
+                        WordTokenText(
+                            word = word,
+                            currentPositionMs = currentPositionMs,
+                            fontSizeSp = fontSizeSp,
+                            fontFamily = fontFamily,
+                            currentColor = currentColor,
+                            sungColor = sungColor,
+                            pendingColor = pendingColor
+                        )
+                    }
                 }
-                Text(
-                    text = displayText,
-                    fontSize = fontSizeSp.sp,
-                    fontFamily = fontFamily,
-                    fontWeight = if (isWordCurrent) FontWeight.ExtraBold else FontWeight.Bold,
-                    color = color,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Clip,
-                    modifier = Modifier
-                        .alpha(if (displayText.isBlank()) 0f else 1f)
-                )
             }
         }
+    }
+}
+
+@Composable
+private fun WordTokenText(
+    word: LyricWord,
+    currentPositionMs: Long,
+    fontSizeSp: Int,
+    fontFamily: FontFamily?,
+    currentColor: Color,
+    sungColor: Color,
+    pendingColor: Color
+) {
+    val isWordActive = currentPositionMs >= word.startMs
+    val isWordCurrent = currentPositionMs in word.startMs..word.endMs
+    val baseColor = when {
+        isWordCurrent -> currentColor
+        isWordActive -> sungColor
+        else -> pendingColor
+    }
+    val fadeAlpha by animateFloatAsState(
+        targetValue = when {
+            isWordCurrent -> 1f
+            isWordActive -> 0.86f
+            else -> 0.52f
+        },
+        animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
+        label = "word_fade"
+    )
+    val color = baseColor.copy(alpha = (baseColor.alpha * fadeAlpha).coerceIn(0f, 1f))
+    val displayText = word.text.toDisplayToken().lineBreakSafeText()
+    val isLongSustain = isWordCurrent && (word.endMs - word.startMs) >= 900L
+    val glowPulse = if (isLongSustain) {
+        0.5f + 0.32f * ((sin(currentPositionMs / 145.0).toFloat() + 1f) / 2f)
+    } else {
+        0f
+    }
+
+    Box {
+        if (isLongSustain && displayText.isNotBlank()) {
+            Text(
+                text = displayText,
+                fontSize = fontSizeSp.sp,
+                fontFamily = fontFamily,
+                fontWeight = FontWeight.ExtraBold,
+                color = currentColor.copy(alpha = glowPulse * 0.34f),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier
+                    .graphicsLayer {
+                        scaleX = 1.12f
+                        scaleY = 1.12f
+                    }
+                    .blur(11.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            )
+            Text(
+                text = displayText,
+                fontSize = fontSizeSp.sp,
+                fontFamily = fontFamily,
+                fontWeight = FontWeight.ExtraBold,
+                color = currentColor.copy(alpha = glowPulse * 0.56f),
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier
+                    .graphicsLayer {
+                        scaleX = 1.05f
+                        scaleY = 1.05f
+                    }
+                    .blur(5.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+            )
+        }
+        Text(
+            text = displayText,
+            fontSize = fontSizeSp.sp,
+            fontFamily = fontFamily,
+            fontWeight = if (isWordCurrent) FontWeight.ExtraBold else FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            modifier = Modifier.alpha(if (displayText.isBlank()) 0f else 1f)
+        )
     }
 }
 
@@ -605,30 +634,19 @@ private fun InterludeDots(
 }
 
 private fun LyricLine.ttmlTextAlign(): TextAlign {
-    if (!isTtml) return TextAlign.Center
+    if (!isTtml) return TextAlign.Start
     if (agent.isNullOrBlank()) {
-        return if (!backgroundText.isNullOrBlank() || backgroundWords.isNotEmpty()) TextAlign.Start else TextAlign.Center
+        return TextAlign.Start
     }
     return if (agent.equals("v2", ignoreCase = true)) TextAlign.End else TextAlign.Start
 }
 
 private fun LyricLine.ttmlBackgroundTextAlign(): TextAlign {
-    if (!isTtml) return TextAlign.Center
-    return when (ttmlTextAlign()) {
-        TextAlign.End -> TextAlign.Start
-        TextAlign.Start -> TextAlign.End
-        else -> TextAlign.Center
-    }
+    return ttmlTextAlign()
 }
 
 private fun LyricLine.ttmlAlignment(): Alignment.Horizontal {
-    if (!isTtml || agent.isNullOrBlank()) {
-        return if (isTtml && (!backgroundText.isNullOrBlank() || backgroundWords.isNotEmpty())) {
-            Alignment.Start
-        } else {
-            Alignment.CenterHorizontally
-        }
-    }
+    if (!isTtml || agent.isNullOrBlank()) return Alignment.Start
     return if (agent.equals("v2", ignoreCase = true)) Alignment.End else Alignment.Start
 }
 
@@ -657,6 +675,70 @@ private fun fittedLyricFontSp(text: String, baseSp: Int, minSp: Int): Int {
     if (visualLength <= threshold) return baseSp
     val scaled = (baseSp * threshold / visualLength).toInt()
     return scaled.coerceIn(minSp, baseSp)
+}
+
+private data class LyricToken(val words: List<LyricWord>)
+
+private fun List<LyricWord>.toLineBreakTokens(): List<LyricToken> {
+    if (isEmpty()) return emptyList()
+    val tokens = mutableListOf<MutableList<LyricWord>>()
+    var current = mutableListOf<LyricWord>()
+
+    fun flush() {
+        if (current.isNotEmpty()) {
+            tokens += current
+            current = mutableListOf()
+        }
+    }
+
+    forEach { word ->
+        val text = word.text
+        val first = text.firstOrNull()
+        val previousText = current.lastOrNull()?.text
+        val shouldJoinCurrent = when {
+            current.isEmpty() -> false
+            text.isBlank() -> true
+            first != null && first.isForbiddenLineStartPunctuation() -> true
+            previousText?.lastOrNull()?.isAsciiWordPart() == true && text.all { it.isAsciiWordPart() } -> true
+            else -> false
+        }
+
+        if (!shouldJoinCurrent) flush()
+        current += word
+    }
+    flush()
+    return tokens.map { LyricToken(it) }
+}
+
+private fun String.lineBreakSafeText(): String {
+    if (length < 2) return this
+    val builder = StringBuilder(length)
+    forEachIndexed { index, char ->
+        if (index > 0 && char.isForbiddenLineStartPunctuation()) {
+            builder.append('\u2060')
+        }
+        builder.append(char)
+    }
+    return builder.toString()
+}
+
+private fun Char.isForbiddenLineStartPunctuation(): Boolean {
+    return this in setOf(
+        ' ', '\t',
+        ',', '.', '?', '!', ':', ';',
+        '，', '。', '？', '！', '：', '；', '、',
+        ')', ']', '}', '）', '】', '〕', '〉', '》',
+        '…', '～', '~'
+    )
+}
+
+private fun Char.isAsciiWordPart(): Boolean {
+    return this in 'A'..'Z' ||
+        this in 'a'..'z' ||
+        this in '0'..'9' ||
+        this == '\'' ||
+        this == '-' ||
+        this == '_'
 }
 
 private fun String.visualLength(): Float {
