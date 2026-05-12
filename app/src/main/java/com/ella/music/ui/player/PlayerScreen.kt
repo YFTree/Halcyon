@@ -480,13 +480,14 @@ private fun CoverPlayerPage(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .height(132.dp)
+                        .height(220.dp)
                         .background(
                             Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    palette.middle.copy(alpha = 0.76f),
-                                    palette.middle
+                                colorStops = arrayOf(
+                                    0.0f to Color.Transparent,
+                                    0.48f to palette.middle.copy(alpha = 0.42f),
+                                    0.78f to palette.middle.copy(alpha = 0.86f),
+                                    1.0f to palette.middle
                                 )
                             )
                         )
@@ -497,7 +498,15 @@ private fun CoverPlayerPage(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(palette.middle)
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to palette.middle.copy(alpha = 0.86f),
+                                0.16f to palette.middle,
+                                1.0f to palette.middle
+                            )
+                        )
+                    )
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(horizontal = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -724,7 +733,7 @@ private fun LandscapeLyricsOverlay(
     val activity = LocalContext.current.findActivity()
     DisposableEffect(activity) {
         val oldOrientation = activity?.requestedOrientation
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         onDispose {
             if (oldOrientation != null) {
                 activity.requestedOrientation = oldOrientation
@@ -806,6 +815,7 @@ private fun LandscapeLyricsOverlay(
             }
         }
     }
+
 }
 
 @Composable

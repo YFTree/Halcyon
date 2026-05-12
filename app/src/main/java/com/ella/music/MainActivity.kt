@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
             }
 
             EllaTheme(themeMode = themeMode) {
-                EllaApp(mainVm, playerVm)
+                EllaApp(mainVm, playerVm, isDark)
             }
         }
     }
@@ -198,11 +198,27 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun EllaApp(
     mainViewModel: MainViewModel,
-    playerViewModel: PlayerViewModel
+    playerViewModel: PlayerViewModel,
+    isDarkTheme: Boolean
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val view = LocalView.current
+    val isPlayerRoute = currentRoute == Screen.Player.route
+
+    LaunchedEffect(isPlayerRoute, isDarkTheme) {
+        val window = (view.context as ComponentActivity).window
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = if (isPlayerRoute) false else !isDarkTheme
+            isAppearanceLightNavigationBars = if (isPlayerRoute) false else !isDarkTheme
+        }
+    }
 
     val bottomBarScreens = listOf(
         Screen.Home.route,
