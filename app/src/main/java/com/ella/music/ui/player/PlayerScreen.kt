@@ -73,6 +73,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -159,7 +160,7 @@ fun PlayerScreen(
         ?: lyrics.firstOrNull { it.hasMiniLyric() }
     var menuExpanded by remember { mutableStateOf(false) }
     var queueExpanded by remember { mutableStateOf(false) }
-    var landscapeExpanded by remember { mutableStateOf(false) }
+    var landscapeExpanded by rememberSaveable { mutableStateOf(false) }
     var dynamicCoverFailedPath by remember { mutableStateOf<String?>(null) }
     var dragDismissOffset by remember { mutableFloatStateOf(0f) }
     val animatedDismissOffset by animateFloatAsState(
@@ -440,7 +441,7 @@ private fun CoverPlayerPage(
         ?.dynamicCoverVideoFile(context)
         ?.takeUnless { it.absolutePath == dynamicCoverFailedPath }
 
-    Box(modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars)) {
+    Box(modifier = modifier) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -475,6 +476,21 @@ private fun CoverPlayerPage(
                             )
                         )
                 )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(132.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    palette.middle.copy(alpha = 0.76f),
+                                    palette.middle
+                                )
+                            )
+                        )
+                )
             }
 
             Column(
@@ -482,6 +498,7 @@ private fun CoverPlayerPage(
                     .fillMaxWidth()
                     .weight(1f)
                     .background(palette.middle)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(horizontal = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
