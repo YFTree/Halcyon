@@ -2,8 +2,13 @@ package com.ella.music.ui.player
 
 import android.content.ContentUris
 import android.content.Context
+import android.app.Activity
 import android.app.DownloadManager
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.content.Intent
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
@@ -46,6 +51,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
@@ -55,6 +61,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -152,6 +159,7 @@ fun PlayerScreen(
         ?: lyrics.firstOrNull { it.hasMiniLyric() }
     var menuExpanded by remember { mutableStateOf(false) }
     var queueExpanded by remember { mutableStateOf(false) }
+    var landscapeExpanded by remember { mutableStateOf(false) }
     var dynamicCoverFailedPath by remember { mutableStateOf<String?>(null) }
     var dragDismissOffset by remember { mutableFloatStateOf(0f) }
     val animatedDismissOffset by animateFloatAsState(
@@ -329,25 +337,52 @@ fun PlayerScreen(
                             Toast.makeText(context, "已开始下载到 Music/Ella", Toast.LENGTH_SHORT).show()
                         }
                     },
+                    onLandscape = {
+                        menuExpanded = false
+                        landscapeExpanded = true
+                    },
                     onStopAfterCurrent = {
+                        menuExpanded = false
                         playerViewModel.stopAfterCurrentSong()
                         Toast.makeText(context, "当前歌曲播放完后暂停", Toast.LENGTH_SHORT).show()
                     },
                     onTimer = { minutes ->
+                        menuExpanded = false
                         playerViewModel.startSleepTimer(minutes)
                         Toast.makeText(context, "${minutes} 分钟后暂停播放", Toast.LENGTH_SHORT).show()
                     },
                     onCancelTimer = {
+                        menuExpanded = false
                         playerViewModel.cancelSleepTimer()
                         Toast.makeText(context, "已取消定时播放", Toast.LENGTH_SHORT).show()
                     },
-                    onSpeed = { playerViewModel.setPlaybackSpeed(playbackSpeed.nextPlaybackStep()) },
-                    onPitch = { playerViewModel.setPlaybackPitch(playbackPitch.nextPlaybackStep()) },
+                    onSpeed = {
+                        playerViewModel.setPlaybackSpeed(playbackSpeed.nextPlaybackStep())
+                    },
+                    onPitch = {
+                        playerViewModel.setPlaybackPitch(playbackPitch.nextPlaybackStep())
+                    },
                     playbackSpeed = playbackSpeed,
                     playbackPitch = playbackPitch,
                     modifier = Modifier.fillMaxSize()
                 )
             }
+        }
+
+        if (landscapeExpanded) {
+            LandscapeLyricsOverlay(
+                song = song,
+                embeddedCover = embeddedCover,
+                lyrics = lyrics,
+                currentLyricIndex = currentLyricIndex,
+                currentPosition = currentPosition,
+                showTranslation = showLyricTranslation,
+                showPronunciation = showLyricPronunciation,
+                fontFamily = lyricFontFamily,
+                onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
+                onDismiss = { landscapeExpanded = false },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
@@ -392,6 +427,7 @@ private fun CoverPlayerPage(
     onArtist: () -> Unit,
     onEditTags: () -> Unit,
     onDownload: () -> Unit,
+    onLandscape: () -> Unit,
     onStopAfterCurrent: () -> Unit,
     onTimer: (Int) -> Unit,
     onCancelTimer: () -> Unit,
@@ -399,137 +435,153 @@ private fun CoverPlayerPage(
     onPitch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val density = LocalDensity.current
+    val bluetoothDeviceName = rememberBluetoothOutputName()
     val dynamicCoverFile = song
         ?.dynamicCoverVideoFile(context)
         ?.takeUnless { it.absolutePath == dynamicCoverFailedPath }
 
-    Column(
-        modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clickable(onClick = onShowLyrics),
-            contentAlignment = Alignment.Center
+    Box(modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars)) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (dynamicCoverFile != null) {
-                DynamicCoverVideo(
-                    file = dynamicCoverFile,
-                    isPlaying = isPlaying,
-                    onPlaybackError = { onDynamicCoverFailed(dynamicCoverFile.absolutePath) },
-                    modifier = Modifier.fillMaxSize()
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clickable(onClick = onShowLyrics),
+                contentAlignment = Alignment.Center
+            ) {
+                if (dynamicCoverFile != null) {
+                    DynamicCoverVideo(
+                        file = dynamicCoverFile,
+                        isPlaying = isPlaying,
+                        onPlaybackError = { onDynamicCoverFailed(dynamicCoverFile.absolutePath) },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    FullBleedCover(song = song, embeddedCover = embeddedCover, modifier = Modifier.fillMaxSize())
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.18f),
+                                    Color.White.copy(alpha = 0.06f),
+                                    Color.White.copy(alpha = 0.16f)
+                                )
+                            )
+                        )
                 )
-            } else {
-                FullBleedCover(song = song, embeddedCover = embeddedCover, modifier = Modifier.fillMaxSize())
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(palette.middle)
+                    .padding(horizontal = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = song?.title ?: "未在播放",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White.copy(alpha = 0.96f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = song?.artist.orEmpty(),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.54f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    PlayerHeaderAction(kind = PlayerHeaderActionKind.Favorite, onClick = {})
+                    PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
+                }
+
+                if (miniLyricLine != null) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    MiniLyricsPreview(
+                        lyrics = lyrics,
+                        currentIndex = currentLyricIndex,
+                        showTranslation = showTranslation,
+                        showPronunciation = showPronunciation,
+                        fontFamily = fontFamily,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 96.dp, max = 150.dp)
+                            .clickable(onClick = onShowLyrics)
+                            .padding(vertical = 6.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+                PlayerProgressBlock(
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    audioInfo = audioInfo,
+                    bluetoothDeviceName = bluetoothDeviceName,
+                    palette = palette,
+                    onSeek = onSeek
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                PlayerTransportControls(
+                    isPlaying = isPlaying,
+                    shuffleEnabled = shuffleEnabled,
+                    repeatMode = repeatMode,
+                    palette = palette,
+                    queueExpanded = queueExpanded,
+                    playlist = playlist,
+                    currentSongId = song?.id,
+                    onCyclePlaybackMode = onCyclePlaybackMode,
+                    onPrevious = onPrevious,
+                    onPlayPause = onPlayPause,
+                    onNext = onNext,
+                    onToggleQueue = onToggleQueue,
+                    onDismissQueue = onDismissQueue,
+                    onQueueSongClick = onQueueSongClick
+                )
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .background(palette.middle)
-                .padding(horizontal = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+        if (menuExpanded) {
+            Popup(
+                alignment = Alignment.BottomCenter,
+                onDismissRequest = onDismissMenu,
+                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = song?.title ?: "未在播放",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White.copy(alpha = 0.96f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = song?.artist.orEmpty(),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White.copy(alpha = 0.54f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                PlayerHeaderAction(kind = PlayerHeaderActionKind.Favorite, onClick = {})
-                Box(contentAlignment = Alignment.TopEnd) {
-                    PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
-                    if (menuExpanded) {
-                        Popup(
-                            alignment = Alignment.TopEnd,
-                            offset = with(density) { IntOffset(x = (-4).dp.roundToPx(), y = 52.dp.roundToPx()) },
-                            onDismissRequest = onDismissMenu,
-                            properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
-                        ) {
-                            PlayerActionMenu(
-                                modifier = Modifier.width(196.dp),
-                                song = song,
-                                speed = playbackSpeed,
-                                pitch = playbackPitch,
-                                onAlbum = onAlbum,
-                                onArtist = onArtist,
-                                onEditTags = onEditTags,
-                                onDownload = onDownload,
-                                onStopAfterCurrent = onStopAfterCurrent,
-                                onTimer = onTimer,
-                                onCancelTimer = onCancelTimer,
-                                onSpeed = onSpeed,
-                                onPitch = onPitch
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (miniLyricLine != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                MiniLyricsPreview(
-                    lyrics = lyrics,
-                    currentIndex = currentLyricIndex,
-                    showTranslation = showTranslation,
-                    showPronunciation = showPronunciation,
-                    fontFamily = fontFamily,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onShowLyrics)
-                        .padding(vertical = 8.dp)
+                PlayerActionMenu(
+                    modifier = Modifier.fillMaxWidth(),
+                    song = song,
+                    speed = playbackSpeed,
+                    pitch = playbackPitch,
+                    onAlbum = onAlbum,
+                    onArtist = onArtist,
+                    onEditTags = onEditTags,
+                    onDownload = onDownload,
+                    onLandscape = onLandscape,
+                    onStopAfterCurrent = onStopAfterCurrent,
+                    onTimer = onTimer,
+                    onCancelTimer = onCancelTimer,
+                    onSpeed = onSpeed,
+                    onPitch = onPitch
                 )
             }
-
-            Spacer(modifier = Modifier.weight(1f))
-            PlayerProgressBlock(
-                currentPosition = currentPosition,
-                duration = duration,
-                audioInfo = audioInfo,
-                palette = palette,
-                onSeek = onSeek
-            )
-            Spacer(modifier = Modifier.height(18.dp))
-            PlayerTransportControls(
-                isPlaying = isPlaying,
-                shuffleEnabled = shuffleEnabled,
-                repeatMode = repeatMode,
-                palette = palette,
-                queueExpanded = queueExpanded,
-                playlist = playlist,
-                currentSongId = song?.id,
-                onCyclePlaybackMode = onCyclePlaybackMode,
-                onPrevious = onPrevious,
-                onPlayPause = onPlayPause,
-                onNext = onNext,
-                onToggleQueue = onToggleQueue,
-                onDismissQueue = onDismissQueue,
-                onQueueSongClick = onQueueSongClick
-            )
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -639,6 +691,107 @@ private fun LyricsPlayerPage(
 }
 
 @Composable
+private fun LandscapeLyricsOverlay(
+    song: Song?,
+    embeddedCover: Bitmap?,
+    lyrics: List<com.ella.music.data.model.LyricLine>,
+    currentLyricIndex: Int,
+    currentPosition: Long,
+    showTranslation: Boolean,
+    showPronunciation: Boolean,
+    fontFamily: FontFamily?,
+    onLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val activity = LocalContext.current.findActivity()
+    DisposableEffect(activity) {
+        val oldOrientation = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose {
+            if (oldOrientation != null) {
+                activity.requestedOrientation = oldOrientation
+            }
+        }
+    }
+    BackHandler(onBack = onDismiss)
+    Row(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.92f))
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(horizontal = 22.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(0.86f),
+            contentAlignment = Alignment.Center
+        ) {
+            AlbumArtView(
+                song = song,
+                embeddedCover = embeddedCover,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(22.dp))
+            )
+        }
+        Spacer(modifier = Modifier.width(24.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .weight(1.14f)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Text(
+                    text = song?.title ?: "Ella Music",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White.copy(alpha = 0.96f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = song?.artist.orEmpty(),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.48f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                WordLyricView(
+                    lyrics = lyrics,
+                    currentIndex = currentLyricIndex,
+                    currentPositionMs = currentPosition,
+                    showTranslation = showTranslation,
+                    showPronunciation = showPronunciation,
+                    fontFamily = fontFamily,
+                    onLineClick = onLineClick,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.12f))
+                    .clickable(onClick = onDismiss),
+                contentAlignment = Alignment.Center
+            ) {
+                CloseIcon(
+                    color = Color.White.copy(alpha = 0.92f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun FullBleedCover(
     song: Song?,
     embeddedCover: Bitmap?,
@@ -737,13 +890,46 @@ private fun MoreIcon(
 }
 
 @Composable
+private fun CloseIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val stroke = size.minDimension * 0.12f
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.22f, size.height * 0.22f),
+            end = Offset(size.width * 0.78f, size.height * 0.78f),
+            strokeWidth = stroke
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.78f, size.height * 0.22f),
+            end = Offset(size.width * 0.22f, size.height * 0.78f),
+            strokeWidth = stroke
+        )
+    }
+}
+
+@Composable
 private fun PlayerProgressBlock(
     currentPosition: Long,
     duration: Long,
     audioInfo: AudioInfo?,
+    bluetoothDeviceName: String?,
     palette: PlayerPalette,
     onSeek: (Float) -> Unit
 ) {
+    var infoMode by remember(audioInfo, bluetoothDeviceName) { mutableStateOf(0) }
+    val infoLabels = remember(audioInfo, bluetoothDeviceName) {
+        buildList {
+            audioInfo?.let {
+                add(compactAudioQualityLabel(it))
+                formatDetailedAudioInfo(it).takeIf { text -> text.isNotBlank() }?.let(::add)
+            }
+            bluetoothDeviceName?.takeIf { it.isNotBlank() }?.let(::add)
+        }.distinct()
+    }
     Column(modifier = Modifier.fillMaxWidth()) {
         GlowSeekBar(
             value = if (duration > 0) currentPosition.toFloat() / duration.toFloat() else 0f,
@@ -758,20 +944,21 @@ private fun PlayerProgressBlock(
                 color = Color.White.copy(alpha = 0.56f),
                 modifier = Modifier.align(Alignment.CenterStart)
             )
-            audioInfo?.let { info ->
-                val infoText = formatAudioInfo(info)
-                if (infoText.isNotBlank()) {
-                    Text(
-                        text = "∞ $infoText",
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.62f),
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.10f))
-                            .padding(horizontal = 10.dp, vertical = 3.dp)
-                    )
-                }
+            if (infoLabels.isNotEmpty()) {
+                val infoText = infoLabels[infoMode % infoLabels.size]
+                Text(
+                    text = "∞ $infoText",
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.62f),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.10f))
+                        .clickable {
+                            if (infoLabels.size > 1) infoMode = (infoMode + 1) % infoLabels.size
+                        }
+                        .padding(horizontal = 10.dp, vertical = 3.dp)
+                )
             }
             Text(
                 text = "-${formatTime((duration - currentPosition).coerceAtLeast(0L))}",
@@ -1270,6 +1457,7 @@ private fun PlayerActionMenu(
     onArtist: () -> Unit,
     onEditTags: () -> Unit,
     onDownload: () -> Unit,
+    onLandscape: () -> Unit,
     onStopAfterCurrent: () -> Unit,
     onTimer: (Int) -> Unit,
     onCancelTimer: () -> Unit,
@@ -1279,10 +1467,28 @@ private fun PlayerActionMenu(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.Black.copy(alpha = 0.50f))
-            .padding(vertical = 6.dp)
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(Color.Black.copy(alpha = 0.74f))
+            .navigationBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .width(42.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(99.dp))
+                .background(Color.White.copy(alpha = 0.24f))
+                .align(Alignment.CenterHorizontally)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "更多操作",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.White.copy(alpha = 0.94f),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+        )
+        PlayerActionMenuItem("横屏歌词", onLandscape)
         PlayerActionMenuItem("查看专辑页", onAlbum)
         PlayerActionMenuItem("查看歌手页", onArtist)
         PlayerActionMenuItem("外部编辑标签", onEditTags)
@@ -1310,8 +1516,11 @@ private fun PlayerActionMenuItem(
         color = Color.White.copy(alpha = 0.92f),
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = 0.06f))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     )
 }
 
@@ -1551,6 +1760,32 @@ private fun Color.boosted(): Color {
     )
 }
 
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+@Composable
+private fun rememberBluetoothOutputName(): String? {
+    val context = LocalContext.current
+    return remember {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        audioManager
+            ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            ?.firstOrNull { device ->
+                device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                    device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                    device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                    device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+                    device.type == AudioDeviceInfo.TYPE_BLE_BROADCAST
+            }
+            ?.productName
+            ?.toString()
+            ?.takeIf { it.isNotBlank() }
+    }
+}
+
 private fun formatTime(ms: Long): String {
     if (ms <= 0) return "00:00"
     val totalSeconds = ms / 1000
@@ -1574,6 +1809,32 @@ private fun formatAudioInfo(info: AudioInfo): String {
     if (info.bitRate > 0) parts += "${(info.bitRate / 1000).coerceAtLeast(1)} kbps"
     if (info.channels > 0) parts += "${info.channels}ch"
     return parts.distinct().joinToString(" · ")
+}
+
+private fun formatDetailedAudioInfo(info: AudioInfo): String {
+    val parts = mutableListOf<String>()
+    parts += info.format.lowercase().ifBlank { "audio" }
+    if (info.sampleRate > 0) {
+        parts += if (info.sampleRate % 1000 == 0) {
+            "${info.sampleRate / 1000}kHz"
+        } else {
+            "%.1fkHz".format(info.sampleRate / 1000f)
+        }
+    }
+    if (info.bitDepth > 0) parts += "${info.bitDepth}bit"
+    if (info.channels > 0) parts += "${info.channels}ch"
+    return parts.joinToString("/")
+}
+
+private fun compactAudioQualityLabel(info: AudioInfo): String {
+    val format = info.format.uppercase()
+    return when {
+        info.channels >= 6 -> "Dolby"
+        format.contains("M4A") || format.contains("ALAC") -> "M4A"
+        isLosslessAudio(info) -> "Lossless"
+        info.bitRate >= 319_000 -> "HQ"
+        else -> "Audio"
+    }
 }
 
 private fun audioQualityLabel(info: AudioInfo): String? {
@@ -1714,4 +1975,13 @@ private fun String.toSafeDynamicCoverName(): String {
         .replace("""[\\/:*?"<>|]""".toRegex(), "_")
         .replace("\\s+".toRegex(), " ")
         .ifBlank { "Unknown" }
+}
+
+private fun isLosslessAudio(info: AudioInfo): Boolean {
+    val format = info.format.uppercase()
+    return format.contains("FLAC") ||
+        format.contains("ALAC") ||
+        format.contains("WAV") ||
+        format.contains("APE") ||
+        (info.sampleRate >= 44_100 && (info.bitDepth >= 16 || info.bitDepth == 0) && info.bitRate <= 0)
 }

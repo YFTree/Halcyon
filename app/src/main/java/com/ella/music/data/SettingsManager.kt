@@ -33,6 +33,7 @@ class SettingsManager(private val context: Context) {
         val KEY_TICKER_ENABLED = booleanPreferencesKey("ticker_enabled")
         val KEY_DESKTOP_LYRIC_ENABLED = booleanPreferencesKey("desktop_lyric_enabled")
         val KEY_SUPER_LYRIC_ENABLED = booleanPreferencesKey("super_lyric_enabled")
+        val KEY_SUPER_LYRIC_TRANSLATION = booleanPreferencesKey("super_lyric_translation")
         val KEY_MIN_DURATION = intPreferencesKey("min_duration_sec")
         val KEY_REPLAYGAIN_ENABLED = booleanPreferencesKey("replaygain_enabled")
         val KEY_LYRIC_PAGE_TRANSLATION = booleanPreferencesKey("lyric_page_translation")
@@ -64,6 +65,7 @@ class SettingsManager(private val context: Context) {
     val tickerEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_ENABLED] ?: false }
     val desktopLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_ENABLED] ?: false }
     val superLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_SUPER_LYRIC_ENABLED] ?: false }
+    val superLyricTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_SUPER_LYRIC_TRANSLATION] ?: true }
     val minDurationSec: Flow<Int> = context.dataStore.data.map { it[KEY_MIN_DURATION] ?: 15 }
     val replayGainEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_REPLAYGAIN_ENABLED] ?: false }
     val lyricPageTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PAGE_TRANSLATION] ?: true }
@@ -122,6 +124,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setSuperLyricEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_SUPER_LYRIC_ENABLED] = enabled }
+    }
+
+    suspend fun setSuperLyricTranslation(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_SUPER_LYRIC_TRANSLATION] = enabled }
     }
 
     suspend fun setBluetoothLyricEnabled(enabled: Boolean) {

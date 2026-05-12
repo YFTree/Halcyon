@@ -75,6 +75,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private var bluetoothLyricEnabled = false
     private var bluetoothLyricTranslationEnabled = false
+    private var superLyricTranslationEnabled = true
     private var lastBluetoothLyricPayload: Pair<String, String?>? = null
     private var sleepTimerJob: Job? = null
     private var stopAfterCurrentSongId: Long? = null
@@ -123,6 +124,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val enabled = settingsManager.superLyricEnabled.first()
             superLyricBridge.setEnabled(enabled)
             if (enabled) resendSuperLyric()
+        }
+        viewModelScope.launch {
+            settingsManager.superLyricTranslation.collect { enabled ->
+                superLyricTranslationEnabled = enabled
+                if (superLyricBridge.isEnabled()) resendSuperLyric()
+            }
         }
     }
 
@@ -243,7 +250,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         superLyricBridge.sendLyric(
             line = line,
             positionMs = currentPosition.value,
-            showTranslation = _showLyricTranslation.value
+            showTranslation = _showLyricTranslation.value && superLyricTranslationEnabled
         )
     }
 
@@ -365,7 +372,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (!superLyricBridge.isEnabled() || !isPlaying.value) return
         val index = _currentLyricIndex.value
         val line = _lyrics.value.getOrNull(index) ?: return
-        superLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value)
+        superLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value && superLyricTranslationEnabled)
     }
 
     private fun initLyricPageTranslation() {
@@ -400,7 +407,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 superLyricBridge.sendLyric(
                     line = lyrics[index],
                     positionMs = positionMs,
-                    showTranslation = _showLyricTranslation.value
+                    showTranslation = _showLyricTranslation.value && superLyricTranslationEnabled
                 )
             }
         }
@@ -555,6 +562,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 currentSong.value?.let { superLyricBridge.sendSong(it) }
                 resendSuperLyric()
             }
+        }
+    }
+
+    fun setSuperLyricTranslation(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setSuperLyricTranslation(enabled)
+            superLyricTranslationEnabled = enabled
+            if (superLyricBridge.isEnabled()) resendSuperLyric()
         }
     }
 

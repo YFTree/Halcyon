@@ -48,6 +48,13 @@ class DesktopLyricService : Service() {
     private var movedDuringTouch = false
     private var lastTapTimeMs = 0L
     private val hideControlsRunnable = Runnable { hideControls() }
+    private val panelBackground by lazy {
+        GradientDrawable().apply {
+            cornerRadius = dp(18).toFloat()
+            setColor(Color.argb(54, 18, 18, 18))
+            setStroke(dp(1), Color.argb(42, 255, 255, 255))
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -168,7 +175,7 @@ class DesktopLyricService : Service() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
@@ -214,12 +221,18 @@ class DesktopLyricService : Service() {
 
     private fun closeByUser() {
         userHidden = true
+        rootView?.let { runCatching { windowManager.removeView(it) } }
+        rootView = null
+        lyricView = null
+        controlsView = null
+        layoutParams = null
         stopSelf()
     }
 
     private fun showControlsWithTimeout() {
         if (locked) return
         controlsView?.visibility = View.VISIBLE
+        setPanelVisible(true)
         scheduleControlsAutoHide()
     }
 
@@ -229,12 +242,16 @@ class DesktopLyricService : Service() {
     }
 
     private fun hideControls() {
-        if (!locked) controlsView?.visibility = View.GONE
+        if (!locked) {
+            controlsView?.visibility = View.GONE
+            setPanelVisible(false)
+        }
     }
 
     private fun setLocked(lock: Boolean) {
         locked = lock
         controlsView?.visibility = if (lock) View.GONE else View.VISIBLE
+        setPanelVisible(!lock)
         if (!lock) scheduleControlsAutoHide()
         val params = layoutParams ?: return
         params.flags = if (lock) {
@@ -244,6 +261,17 @@ class DesktopLyricService : Service() {
         }
         rootView?.let { windowManager.updateViewLayout(it, params) }
         if (lock) postUnlockNotification() else notificationManager.cancel(NOTIFICATION_ID)
+    }
+
+    private fun setPanelVisible(visible: Boolean) {
+        val root = rootView ?: return
+        root.background = if (visible) panelBackground else null
+        root.setPadding(
+            dp(if (visible) 12 else 8),
+            dp(if (visible) 8 else 4),
+            dp(if (visible) 12 else 8),
+            dp(if (visible) 8 else 4)
+        )
     }
 
     private fun onDrag(view: View, event: MotionEvent): Boolean {

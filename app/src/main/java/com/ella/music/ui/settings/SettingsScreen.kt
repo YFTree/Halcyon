@@ -6,6 +6,7 @@ import android.os.Build
 import android.provider.Settings
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -42,6 +43,7 @@ import kotlinx.coroutines.launch
 import android.widget.Toast
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.Slider
@@ -77,6 +79,7 @@ fun SettingsScreen(
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = false)
     val desktopLyricEnabled by settingsManager.desktopLyricEnabled.collectAsState(initial = false)
     val superLyricEnabled by settingsManager.superLyricEnabled.collectAsState(initial = false)
+    val superLyricTranslation by settingsManager.superLyricTranslation.collectAsState(initial = true)
     val bluetoothLyricEnabled by settingsManager.bluetoothLyricEnabled.collectAsState(initial = false)
     val bluetoothLyricTranslation by settingsManager.bluetoothLyricTranslation.collectAsState(initial = false)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
@@ -124,7 +127,7 @@ fun SettingsScreen(
 
             SmallTitle(text = "外观")
 
-            Card(modifier = Modifier.padding(bottom = 12.dp)) {
+            SettingsCardGroup {
                 Column {
                     WindowSpinnerPreference(
                         title = "主题模式",
@@ -145,7 +148,7 @@ fun SettingsScreen(
 
             SmallTitle(text = "通用")
 
-            Card(modifier = Modifier.padding(bottom = 12.dp)) {
+            SettingsCardGroup {
                 Column {
                 SwitchPreference(
                     title = "自动扫描",
@@ -216,7 +219,7 @@ fun SettingsScreen(
 
             SmallTitle(text = "音频")
 
-            Card(modifier = Modifier.padding(bottom = 12.dp)) {
+            SettingsCardGroup {
                 Column {
                 SwitchPreference(
                     title = "无缝播放",
@@ -250,7 +253,7 @@ fun SettingsScreen(
 
             SmallTitle(text = "歌词")
 
-            Card(modifier = Modifier.padding(bottom = 12.dp)) {
+            SettingsCardGroup {
                 Column {
                 SwitchPreference(
                     title = "启用词幕",
@@ -295,11 +298,22 @@ fun SettingsScreen(
 
                 SwitchPreference(
                     title = "启用 SuperLyric",
-                    summary = "向 SuperLyric 模块发布逐字歌词和翻译",
+                    summary = "向 SuperLyric 模块发布逐字歌词",
                     checked = superLyricEnabled,
                     onCheckedChange = { enabled ->
                         scope.launch { settingsManager.setSuperLyricEnabled(enabled) }
                         playerViewModel?.setSuperLyricEnabled(enabled)
+                    }
+                )
+
+                SwitchPreference(
+                    title = "SuperLyric 传递翻译",
+                    summary = "关闭后只传原文，不再把翻译行交给 SuperLyric",
+                    enabled = superLyricEnabled,
+                    checked = superLyricTranslation,
+                    onCheckedChange = { enabled ->
+                        scope.launch { settingsManager.setSuperLyricTranslation(enabled) }
+                        playerViewModel?.setSuperLyricTranslation(enabled)
                     }
                 )
 
@@ -338,7 +352,7 @@ fun SettingsScreen(
 
             SmallTitle(text = "其他")
 
-            Card(modifier = Modifier.padding(bottom = 12.dp)) {
+            SettingsCardGroup {
                 Column {
                     ArrowPreference(
                         title = "歌曲库分析",
@@ -378,5 +392,21 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(160.dp))
         }
+    }
+}
+
+@Composable
+private fun SettingsCardGroup(content: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 14.dp),
+        cornerRadius = 16.dp,
+        insideMargin = PaddingValues(0.dp),
+        colors = CardDefaults.defaultColors(
+            color = MiuixTheme.colorScheme.surfaceContainer
+        )
+    ) {
+        content()
     }
 }
