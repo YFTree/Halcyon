@@ -14,7 +14,7 @@ fun SafeCoverImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    sizePx: Int = 512
+    sizePx: Int = 1200
 ) {
     val context = LocalContext.current
     val request = if (model is Uri || model is String) {

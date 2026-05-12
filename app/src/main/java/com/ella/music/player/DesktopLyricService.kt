@@ -137,16 +137,24 @@ class DesktopLyricService : Service() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(dp(18), dp(10), dp(18), dp(12))
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(24).toFloat()
-                setColor(Color.argb(165, 12, 12, 16))
-                setStroke(dp(1), Color.argb(70, 255, 255, 255))
-            }
-            elevation = dp(10).toFloat()
-            addView(lyric, LinearLayout.LayoutParams(dp(560), dp(156)))
-            addView(controls, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+
+            // 纯文字悬浮窗：不要黑色背景、不要描边、不要阴影卡片
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setBackgroundColor(Color.TRANSPARENT)
+            elevation = 0f
+
+            // 高度收窄，避免像一整块大卡片
+            addView(lyric, LinearLayout.LayoutParams(dp(620), dp(96)))
+
+            // 控制按钮仍保留，双击歌词时显示
+            addView(
+                controls,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
             setOnTouchListener(::onDrag)
         }
 
@@ -280,9 +288,10 @@ class DesktopLyricService : Service() {
 
     private fun clampToScreen(view: View, params: WindowManager.LayoutParams) {
         val metrics = resources.displayMetrics
-        val halfWidth = ((view.width.takeIf { it > 0 } ?: dp(596)) / 2)
+        val halfWidth = ((view.width.takeIf { it > 0 } ?: dp(636)) / 2)
+
         val maxX = (metrics.widthPixels / 2 - halfWidth).coerceAtLeast(0)
-        val maxY = (metrics.heightPixels - (view.height.takeIf { it > 0 } ?: dp(194))).coerceAtLeast(0)
+        val maxY = (metrics.heightPixels - (view.height.takeIf { it > 0 } ?: dp(112))).coerceAtLeast(0)
         params.x = params.x.coerceIn(-maxX, maxX)
         params.y = params.y.coerceIn(0, maxY)
     }
@@ -326,12 +335,40 @@ class DesktopLyricService : Service() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private class DesktopLyricView(context: Context) : View(context) {
-        private val pendingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(145, 255, 255, 255); textSize = 20f * resources.displayMetrics.scaledDensity; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER }
-        private val activePaint = Paint(pendingPaint).apply { color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD }
-        private val glowPaint = Paint(activePaint).apply { color = Color.argb(130, 125, 205, 255); setShadowLayer(18f, 0f, 0f, color) }
-        private val pronunciationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(145, 255, 255, 255); textSize = 12f * resources.displayMetrics.scaledDensity; textAlign = Paint.Align.CENTER }
-        private val translationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(150, 255, 255, 255); textSize = 13f * resources.displayMetrics.scaledDensity; textAlign = Paint.Align.CENTER }
-        private var text = "Ella Music"
+        private val pendingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(150, 255, 255, 255)
+            textSize = 20f * resources.displayMetrics.scaledDensity
+            typeface = Typeface.DEFAULT_BOLD
+            textAlign = Paint.Align.CENTER
+            setShadowLayer(8f, 0f, 2f, Color.argb(180, 0, 0, 0))
+        }
+
+        private val activePaint = Paint(pendingPaint).apply {
+            color = Color.WHITE
+            typeface = Typeface.DEFAULT_BOLD
+            setShadowLayer(10f, 0f, 2f, Color.argb(210, 0, 0, 0))
+        }
+
+        private val glowPaint = Paint(activePaint).apply {
+            color = Color.argb(150, 125, 205, 255)
+            setShadowLayer(18f, 0f, 0f, color)
+        }
+
+        private val pronunciationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(155, 255, 255, 255)
+            textSize = 12f * resources.displayMetrics.scaledDensity
+            textAlign = Paint.Align.CENTER
+            setShadowLayer(7f, 0f, 2f, Color.argb(180, 0, 0, 0))
+        }
+
+        private val translationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(165, 255, 255, 255)
+            textSize = 13f * resources.displayMetrics.scaledDensity
+            textAlign = Paint.Align.CENTER
+            setShadowLayer(7f, 0f, 2f, Color.argb(180, 0, 0, 0))
+        }
+
+        private var lyricText = "Ella Music"
         private var pronunciation = ""
         private var translation = ""
         private var agent = ""
@@ -368,7 +405,7 @@ class DesktopLyricService : Service() {
             backgroundWordStarts: LongArray,
             backgroundWordEnds: LongArray
         ) {
-            this.text = text.ifBlank { if (backgroundText.isBlank()) "♪" else "" }
+            this.lyricText = text.ifBlank { if (backgroundText.isBlank()) "♪" else "" }
             this.pronunciation = pronunciation
             this.translation = translation
             this.agent = agent
@@ -410,14 +447,14 @@ class DesktopLyricService : Service() {
                     maxWidth = width * 0.88f,
                     align = AnchorAlign.Center
                 )
-                drawLine(canvas, text, words, width / 2f, height * 0.54f, width * 0.9f, AnchorAlign.Center, true)
+                drawLine(canvas, lyricText, words, width / 2f, height * 0.54f, width * 0.9f, AnchorAlign.Center, true)
                 if (translation.isNotBlank()) {
                     drawFittedText(canvas, translation, width / 2f, height * 0.82f, width * 0.88f, AnchorAlign.Center, translationPaint)
                 }
             } else if (hasBackground) {
                 val primaryBaseline = height * 0.34f
                 val backgroundBaseline = height * 0.62f
-                drawLine(canvas, text, words, primaryAlign.anchorX(width), primaryBaseline, width * 0.82f, primaryAlign, true)
+                drawLine(canvas, lyricText, words, primaryAlign.anchorX(width), primaryBaseline, width * 0.82f, primaryAlign, true)
                 drawLine(
                     canvas = canvas,
                     fallbackText = backgroundText.ifBlank { backgroundWords.joinToString("") { it.text } },
@@ -434,7 +471,7 @@ class DesktopLyricService : Service() {
                 }
             } else {
                 val baseline = height / 2f - if (translation.isBlank()) -5f else 10f
-                drawLine(canvas, text, words, primaryAlign.anchorX(width), baseline, width * 0.9f, primaryAlign, true)
+                drawLine(canvas, lyricText, words, primaryAlign.anchorX(width), baseline, width * 0.9f, primaryAlign, true)
                 if (translation.isNotBlank()) {
                     drawFittedText(canvas, translation, width / 2f, baseline + 25f * resources.displayMetrics.scaledDensity, width * 0.88f, AnchorAlign.Center, translationPaint)
                 }

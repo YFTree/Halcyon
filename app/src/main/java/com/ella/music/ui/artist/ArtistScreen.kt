@@ -163,6 +163,11 @@ private fun ArtistHeader(
     albumCount: Int,
     onPlayAll: () -> Unit
 ) {
+    val headerTextColor = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.92f)
+    val headerSubTextColor = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.62f)
+    val headerActionColor = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.86f)
+    val headerScrimColor = MiuixTheme.colorScheme.background
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -190,8 +195,8 @@ private fun ArtistHeader(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = 0.08f),
-                            Color.White.copy(alpha = 0.42f),
+                            headerScrimColor.copy(alpha = 0.04f),
+                            headerScrimColor.copy(alpha = 0.46f),
                             MiuixTheme.colorScheme.background
                         )
                     )
@@ -210,13 +215,13 @@ private fun ArtistHeader(
                 text = artistName.ifBlank { "未知歌手" },
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black.copy(alpha = 0.88f)
+                color = headerTextColor
             )
 
             Text(
                 text = "$albumCount 张专辑 · $songCount 首歌曲",
                 fontSize = 14.sp,
-                color = Color.Black.copy(alpha = 0.58f)
+                color = headerSubTextColor
             )
 
             Row(
@@ -229,12 +234,12 @@ private fun ArtistHeader(
                 Icon(
                     imageVector = MiuixIcons.Regular.Play,
                     contentDescription = null,
-                    tint = Color.Black.copy(alpha = 0.78f),
+                    tint = headerActionColor,
                     modifier = Modifier.size(20.dp)
                 )
                 Text(
                     text = "播放全部",
-                    color = Color.Black.copy(alpha = 0.82f),
+                    color = headerActionColor,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -246,10 +251,10 @@ private fun ArtistHeader(
 private fun SectionTitle(text: String) {
     Text(
         text = text,
-        fontSize = 16.sp,
+        fontSize = 18.sp,
         fontWeight = FontWeight.Bold,
-        color = MiuixTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+        color = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.88f),
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
     )
 }
 

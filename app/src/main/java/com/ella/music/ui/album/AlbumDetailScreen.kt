@@ -124,13 +124,21 @@ private fun AlbumHeader(
             .fillMaxWidth()
             .height(420.dp)
     ) {
-        SafeCoverImage(
-            model = albumArtUri,
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-            sizePx = 3000
-        )
+        if (albumArtUri != null) {
+            SafeCoverImage(
+                model = albumArtUri,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                sizePx = 3000
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+            )
+        }
 
         Box(
             modifier = Modifier

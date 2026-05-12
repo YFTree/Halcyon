@@ -439,7 +439,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun getCoverArtBitmap(song: Song) = repository.getCoverArtBitmap(song)
+    fun getCoverArtBitmap(song: Song) = repository.getCoverArtBitmap(song,1200)
 
     fun getAudioInfo(song: Song) = repository.getAudioInfo(song)
 

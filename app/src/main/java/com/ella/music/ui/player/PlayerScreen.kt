@@ -70,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -159,6 +160,11 @@ fun PlayerScreen(
     )
     val topDragLimitPx = with(density) { 132.dp.toPx() }
     val dismissThresholdPx = with(density) { 112.dp.toPx() }
+    val dragCornerRadius by animateDpAsState(
+        targetValue = if (dragDismissOffset > 1f) 28.dp else 0.dp,
+        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
+        label = "player_drag_corner_radius"
+    )
 
     val song = currentSong
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song?.id) {
@@ -181,8 +187,15 @@ fun PlayerScreen(
             .fillMaxSize()
             .graphicsLayer {
                 translationY = animatedDismissOffset
-                alpha = (1f - animatedDismissOffset / (dismissThresholdPx * 2.8f)).coerceIn(0.72f, 1f)
+                alpha = (1f - animatedDismissOffset / (dismissThresholdPx * 2.8f))
+                    .coerceIn(0.72f, 1f)
             }
+            .clip(
+                RoundedCornerShape(
+                    topStart = dragCornerRadius,
+                    topEnd = dragCornerRadius
+                )
+            )
             .pointerInput(showLyrics) {
                 var closeGesture = false
                 detectDragGestures(
@@ -434,7 +447,7 @@ fun PlayerScreen(
                     ) {
                         Spacer(modifier = Modifier.height(8.dp))
                         val dynamicCoverFile = song
-                            ?.dynamicCoverVideoFile()
+                            ?.dynamicCoverVideoFile(context)
                             ?.takeUnless { it.absolutePath == dynamicCoverFailedPath }
 
                         if (dynamicCoverFile != null) {
@@ -785,7 +798,7 @@ private fun PlayerBlurBackground(
                     }
                     .blur(72.dp),
                 contentScale = ContentScale.Crop,
-                sizePx = 512
+                sizePx = 1200
             )
         }
         Box(
@@ -1359,17 +1372,73 @@ private fun openExternalTagEditor(context: Context, song: Song) {
     }
 }
 
-private fun Song.dynamicCoverVideoFile(): File? {
-    if (path.startsWith("http://") || path.startsWith("https://")) return null
+private fun Song.dynamicCoverVideoFile(context: Context): File? {
+    val songFile = path
+        .takeUnless { it.startsWith("http://") || it.startsWith("https://") }
+        ?.let { File(it) }
 
-    val audioFile = File(path)
-    val parent = audioFile.parentFile ?: return null
-    val baseName = audioFile.nameWithoutExtension
+    val songFolder = songFile?.parentFile
 
-    val candidates = listOf(
-        File(parent, "${baseName}_cover.mp4"),
-        File(parent, "${baseName}_cover.MP4")
+    val albumName = album.ifBlank {
+        songFolder?.name.orEmpty()
+    }.ifBlank {
+        "Unknown"
+    }
+
+    val albumKey = albumName.toSafeDynamicCoverName()
+
+    val artistAlbumKey = listOf(artist, albumName)
+        .filter { it.isNotBlank() }
+        .joinToString(" - ")
+        .toSafeDynamicCoverName()
+
+    val songKey = listOf(artist, title)
+        .filter { it.isNotBlank() }
+        .joinToString(" - ")
+        .toSafeDynamicCoverName()
+
+    val folderCandidates = songFolder
+        ?.takeIf { it.exists() && it.isDirectory }
+        ?.let { folder ->
+            listOf(
+                File(folder, "cover.mp4"),               // 专辑内文件夹统一视频
+                File(folder, "${folder.name}.mp4"),      // 例s: Music/÷(Deluxe)/÷(Deluxe).mp4
+                File(folder, "$albumName.mp4"),          // 按专辑 tag
+                File(folder, "$albumKey.mp4"),           // 清洗后的专辑名
+                File(folder, "$artistAlbumKey.mp4")      // 歌手 - 专辑
+            )
+        }
+        .orEmpty()
+
+    val publicDir = File(
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
+        "Ella/DynamicCovers"
     )
 
+    val appDir = File(
+        context.getExternalFilesDir(Environment.DIRECTORY_MOVIES),
+        "DynamicCovers"
+    )
+
+    val roots = listOf(publicDir, appDir)
+
+    val libraryCandidates = roots.flatMap { root ->
+        listOf(
+            File(root, "Song/$songKey.mp4"),
+            File(root, "Album/$albumKey.mp4"),
+            File(root, "Album/$artistAlbumKey.mp4"),
+            File(root, "cover.mp4")
+        )
+    }
+
+    val candidates = folderCandidates + libraryCandidates
+
     return candidates.firstOrNull { it.exists() && it.isFile && it.length() > 0L }
+}
+
+private fun String.toSafeDynamicCoverName(): String {
+    return trim()
+        .replace("""[\\/:*?"<>|]""".toRegex(), "_")
+        .replace("\\s+".toRegex(), " ")
+        .ifBlank { "Unknown" }
 }
