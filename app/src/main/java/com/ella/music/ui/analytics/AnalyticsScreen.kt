@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.SongPlaybackStats
+import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import com.ella.music.viewmodel.MainViewModel
@@ -436,22 +437,8 @@ private fun formatLabel(song: Song, info: AudioInfo): String {
 }
 
 private fun qualityLabel(song: Song, info: AudioInfo): String {
-    val format = formatLabel(song, info)
-    val sampleRate = info.sampleRate
-    val bitDepth = info.bitDepth
-    val bitRate = info.bitRate
-    val losslessFormat = format in setOf("FLAC", "M4A", "WAV")
-    return when {
-        info.channels >= 6 -> "Dolby"
-        bitDepth >= 24 && sampleRate >= 96_000 -> "Master"
-        format == "FLAC" && bitDepth >= 24 && sampleRate >= 48_000 -> "Hi-Res"
-        format == "M4A" && sampleRate >= 48_000 -> "Hi-Res"
-        losslessFormat && sampleRate >= 44_100 && (bitDepth >= 16 || bitDepth == 0) -> "无损"
-        bitRate >= 319_000 -> "HQ"
-        bitRate > 0 -> "LQ"
-        song.mimeType.contains("audio", ignoreCase = true) -> "未知"
-        else -> "其他"
-    }
+    val label = audioQualitySummary(info).analyticsLabel
+    return if (label == "未知" && !song.mimeType.contains("audio", ignoreCase = true)) "其他" else label
 }
 
 private fun Song.fileExtension(): String {

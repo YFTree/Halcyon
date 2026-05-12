@@ -107,6 +107,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.media3.common.Player
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
@@ -990,8 +991,9 @@ private fun PlayerProgressBlock(
     val infoLabels = remember(audioInfo, bluetoothDeviceName) {
         buildList {
             audioInfo?.let {
-                add(compactAudioQualityLabel(it))
-                formatDetailedAudioInfo(it).takeIf { text -> text.isNotBlank() }?.let(::add)
+                val quality = audioQualitySummary(it)
+                add(quality.playerCompactText())
+                quality.detailLabel.takeIf { text -> text.isNotBlank() }?.let(::add)
             }
             bluetoothDeviceName?.takeIf { it.isNotBlank() }?.let(::add)
         }.distinct()
@@ -1013,7 +1015,7 @@ private fun PlayerProgressBlock(
             if (infoLabels.isNotEmpty()) {
                 val infoText = infoLabels[infoMode % infoLabels.size]
                 Text(
-                    text = "∞ $infoText",
+                    text = infoText,
                     fontSize = 12.sp,
                     color = Color.White.copy(alpha = 0.62f),
                     modifier = Modifier
@@ -2006,55 +2008,11 @@ private fun formatTime(ms: Long): String {
     return "%02d:%02d".format(minutes, seconds)
 }
 
-private fun formatAudioInfo(info: AudioInfo): String {
-    val parts = mutableListOf<String>()
-    audioQualityLabel(info)?.let { parts += it }
-    parts += info.format
-    if (info.bitDepth > 0) parts += "${info.bitDepth}-bit"
-    if (info.sampleRate > 0) {
-        parts += if (info.sampleRate % 1000 == 0) {
-            "${info.sampleRate / 1000} kHz"
-        } else {
-            "%.1f kHz".format(info.sampleRate / 1000f)
-        }
-    }
-    if (info.bitRate > 0) parts += "${(info.bitRate / 1000).coerceAtLeast(1)} kbps"
-    if (info.channels > 0) parts += "${info.channels}ch"
-    return parts.distinct().joinToString(" · ")
-}
-
-private fun formatDetailedAudioInfo(info: AudioInfo): String {
-    val parts = mutableListOf<String>()
-    parts += info.format.lowercase().ifBlank { "audio" }
-    if (info.sampleRate > 0) {
-        parts += if (info.sampleRate % 1000 == 0) {
-            "${info.sampleRate / 1000}kHz"
-        } else {
-            "%.1fkHz".format(info.sampleRate / 1000f)
-        }
-    }
-    if (info.bitDepth > 0) parts += "${info.bitDepth}bit"
-    if (info.channels > 0) parts += "${info.channels}ch"
-    return parts.joinToString("/")
-}
-
-private fun compactAudioQualityLabel(info: AudioInfo): String {
-    val format = info.format.uppercase()
+private fun com.ella.music.data.AudioQualitySummary.playerCompactText(): String {
     return when {
-        info.channels >= 6 -> "Dolby"
-        format.contains("M4A") || format.contains("ALAC") -> "M4A"
-        isLosslessAudio(info) -> "Lossless"
-        info.bitRate >= 319_000 -> "HQ"
-        else -> "Audio"
-    }
-}
-
-private fun audioQualityLabel(info: AudioInfo): String? {
-    val format = info.format.uppercase()
-    return when {
-        info.channels >= 6 -> "Dolby"
-        format.contains("M4A") || format.contains("ALAC") -> "M4A"
-        else -> null
+        compactLabel == "Dolby Atmos" -> "ᴰᴰ Dolby Atmos"
+        showMobius -> "∞ $compactLabel"
+        else -> compactLabel
     }
 }
 
@@ -2187,13 +2145,4 @@ private fun String.toSafeDynamicCoverName(): String {
         .replace("""[\\/:*?"<>|]""".toRegex(), "_")
         .replace("\\s+".toRegex(), " ")
         .ifBlank { "Unknown" }
-}
-
-private fun isLosslessAudio(info: AudioInfo): Boolean {
-    val format = info.format.uppercase()
-    return format.contains("FLAC") ||
-        format.contains("ALAC") ||
-        format.contains("WAV") ||
-        format.contains("APE") ||
-        (info.sampleRate >= 44_100 && (info.bitDepth >= 16 || info.bitDepth == 0) && info.bitRate <= 0)
 }

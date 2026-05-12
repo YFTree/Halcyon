@@ -415,7 +415,8 @@ class MusicRepository(private val context: Context) {
             "mpeg" in source || "mp3" in source || extension == "mp3" -> "MP3"
             "wav" in source || extension == "wav" -> "WAV"
             "aac" in source || extension == "aac" -> "AAC"
-            "mp4" in source || "m4a" in source || extension == "m4a" -> "ALAC/M4A"
+            "alac" in source -> "ALAC/M4A"
+            "mp4" in source || "m4a" in source || extension == "m4a" || extension == "mp4" -> "M4A"
             "ogg" in source || extension == "ogg" -> "OGG"
             "opus" in source || extension == "opus" -> "OPUS"
             extension.isNotBlank() -> extension.uppercase()

@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import kotlinx.coroutines.Dispatchers
@@ -58,7 +59,7 @@ fun SongItem(
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song.id, loadAudioInfo) {
         value = withContext(Dispatchers.IO) { loadAudioInfo?.invoke(song) }
     }
-    val qualityTag = audioInfo?.let { song.audioQualityTag(it) }
+    val qualityTag = audioInfo?.let { audioQualitySummary(it).listTag }
     val coverModel = embeddedCover ?: song.coverUrl.takeIf { it.isNotBlank() } ?: if (loadCoverArt == null) albumArtUri else null
 
     Row(
@@ -216,38 +217,5 @@ private fun audioQualityColor(tag: String): Color {
         "HQ" -> Color(0xFF3D83FF)
         "LQ" -> Color(0xFF34C56E)
         else -> Color(0xFF9E9E9E)
-    }
-}
-
-private fun Song.audioQualityTag(info: AudioInfo): String? {
-    val format = audioFormatLabel(info)
-    val sampleRate = info.sampleRate
-    val bitDepth = info.bitDepth
-    val bitRate = info.bitRate
-    val losslessFormat = format in setOf("FLAC", "M4A", "WAV")
-    return when {
-        info.channels >= 6 -> "Dolby"
-        bitDepth >= 24 && sampleRate >= 96_000 -> "Master"
-        format == "FLAC" && bitDepth >= 24 && sampleRate >= 48_000 -> "HR"
-        format == "M4A" && sampleRate >= 48_000 -> "HR"
-        losslessFormat && sampleRate >= 44_100 && (bitDepth >= 16 || bitDepth == 0) -> "SQ"
-        bitRate >= 319_000 -> "HQ"
-        bitRate > 0 -> "LQ"
-        else -> null
-    }
-}
-
-private fun Song.audioFormatLabel(info: AudioInfo): String {
-    val extension = fileName.ifBlank { path.substringAfterLast('/') }
-        .substringAfterLast('.', missingDelimiterValue = "")
-        .lowercase()
-    return when {
-        extension == "mp3" -> "MP3"
-        extension == "m4a" || extension == "mp4" -> "M4A"
-        extension == "flac" -> "FLAC"
-        extension == "wav" || extension == "wave" -> "WAV"
-        extension == "ogg" -> "OGG"
-        info.format.equals("ALAC/M4A", ignoreCase = true) -> "M4A"
-        else -> info.format.uppercase()
     }
 }
