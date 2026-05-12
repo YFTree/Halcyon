@@ -790,29 +790,29 @@ private fun LandscapeLyricsOverlay(
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(0.58f)
-                    .widthIn(max = 330.dp),
+                    .weight(0.48f)
+                    .widthIn(max = 292.dp),
                 contentAlignment = Alignment.Center
             ) {
                 AlbumArtView(
                     song = song,
                     embeddedCover = embeddedCover,
                     modifier = Modifier
-                        .fillMaxHeight(0.78f)
+                        .fillMaxHeight(0.68f)
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(12.dp))
                 )
             }
-            Spacer(modifier = Modifier.width(28.dp))
+            Spacer(modifier = Modifier.width(24.dp))
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(1.42f)
+                    .weight(1.52f)
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Text(
                         text = song?.title ?: "Ella Music",
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White.copy(alpha = 0.96f),
                         maxLines = 1,
@@ -820,7 +820,7 @@ private fun LandscapeLyricsOverlay(
                     )
                     Text(
                         text = song?.artist.orEmpty(),
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White.copy(alpha = 0.48f),
                         maxLines = 1,
@@ -833,6 +833,7 @@ private fun LandscapeLyricsOverlay(
                         currentPositionMs = currentPosition,
                         showTranslation = showTranslation,
                         showPronunciation = showPronunciation,
+                        fontScale = 0.82f,
                         fontFamily = fontFamily,
                         onLineClick = onLineClick,
                         modifier = Modifier.fillMaxSize()
@@ -891,7 +892,7 @@ private fun SmallCover(song: Song?, embeddedCover: Bitmap?, modifier: Modifier =
     AlbumArtView(
         song = song,
         embeddedCover = embeddedCover,
-        modifier = modifier.clip(RoundedCornerShape(8.dp))
+        modifier = modifier.clip(RoundedCornerShape(6.dp))
     )
 }
 
