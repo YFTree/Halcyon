@@ -223,7 +223,7 @@ fun WordLyricView(
             .padding(horizontal = 22.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
-        item { Box(modifier = Modifier.height(240.dp)) }
+        item { Box(modifier = Modifier.height(180.dp)) }
 
         itemsIndexed(lyrics) { index, line ->
             val isActive = index == currentIndex || line.isActiveAt(currentPositionMs)
@@ -310,7 +310,7 @@ fun WordLyricView(
                         words = line.words,
                         currentPositionMs = currentPositionMs,
                         textAlign = lineTextAlign,
-                        fontSizeSp = 28,
+                        fontSizeSp = 36,
                         fontFamily = fontFamily
                     )
                 } else {
@@ -321,7 +321,7 @@ fun WordLyricView(
                     }
                     Text(
                         text = line.text.ifBlank { "♪" },
-                        fontSize = if (isActive) 28.sp else 18.sp,
+                        fontSize = if (isActive) 36.sp else 24.sp,
                         fontFamily = fontFamily,
                         fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
                         color = textColor,
@@ -339,7 +339,7 @@ fun WordLyricView(
                     }
                     Text(
                         text = line.translation,
-                        fontSize = if (isActive) 15.sp else 12.sp,
+                        fontSize = if (isActive) 20.sp else 14.sp,
                         fontFamily = fontFamily,
                         color = translationColor,
                         textAlign = lineTextAlign,
@@ -359,7 +359,7 @@ fun WordLyricView(
                             words = line.backgroundWords,
                             currentPositionMs = currentPositionMs,
                             textAlign = lineTextAlign,
-                            fontSizeSp = 18,
+                            fontSizeSp = 24,
                             fontFamily = fontFamily,
                             currentColor = Color.White.copy(alpha = 0.78f),
                             sungColor = Color.White.copy(alpha = 0.56f),
@@ -369,7 +369,7 @@ fun WordLyricView(
                     } else {
                         Text(
                             text = line.backgroundText,
-                            fontSize = if (isActive) 18.sp else 12.sp,
+                            fontSize = if (isActive) 24.sp else 14.sp,
                             fontFamily = fontFamily,
                             color = backgroundColor,
                             textAlign = lineTextAlign,

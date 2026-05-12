@@ -13,8 +13,7 @@ import kotlin.math.abs
 internal object EllaLyricsParser {
     private val lrcTimePattern = Regex("""\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?]""")
     private val lrcMetaPattern = Regex("""\[(ti|ar|al|by|offset|re|ve):\s*(.*)]""", RegexOption.IGNORE_CASE)
-    private val inlineWordPattern = Regex("""<([^>]+)>([^<]*)""")
-    private val squareWordPattern = Regex("""\[([^\]]+)]([^\[]*)""")
+    private val timedWordMarkerPattern = Regex("""<([^>]+)>|\[([^\]]+)]""")
     private val backgroundLinePattern = Regex("""^\[bg:\s*(.*)]$""", RegexOption.IGNORE_CASE)
     private val lyricifySyllablePattern = Regex("""(.*?)\((\d+),(\d+)\)""")
     private val lyricifyAttributePattern = Regex("""^\[(\d+)]""")
@@ -117,29 +116,43 @@ internal object EllaLyricsParser {
     }
 
     private fun parseEnhancedWords(content: String, lineStartMs: Long): List<LyricWord> {
-        val pattern = when {
-            inlineWordPattern.containsMatchIn(content) -> inlineWordPattern
-            squareWordPattern.containsMatchIn(content) -> squareWordPattern
-            else -> return emptyList()
+        val markers = timedWordMarkerPattern.findAll(content)
+            .mapNotNull { match ->
+                val time = match.groupValues.getOrNull(1).orEmpty()
+                    .ifBlank { match.groupValues.getOrNull(2).orEmpty() }
+                    .trim()
+                if (!time.isTimestampLike()) return@mapNotNull null
+                TimedMarker(match.range.first, match.range.last + 1, time.parseFlexibleTime().toLong())
+            }
+            .toList()
+        if (markers.isEmpty()) return emptyList()
+
+        val words = mutableListOf<LyricWord>()
+        var activeStart = lineStartMs
+        var textStart = 0
+
+        markers.forEach { marker ->
+            val text = content.substring(textStart, marker.startIndex).cleanTimedLyricText()
+            if (text.isNotBlank()) {
+                words += LyricWord(
+                    text = text,
+                    startMs = activeStart,
+                    endMs = marker.timeMs.coerceAtLeast(activeStart + 120L)
+                )
+            }
+            activeStart = marker.timeMs
+            textStart = marker.endIndex
         }
 
-        val words = pattern.findAll(content)
-            .mapNotNull { match ->
-                val time = match.groupValues[1].trim()
-                if (!time.isTimestampLike()) return@mapNotNull null
-                val text = match.groupValues[2]
-                if (text.isEmpty()) return@mapNotNull null
-                LyricWord(text, time.parseFlexibleTime().toLong(), time.parseFlexibleTime().toLong())
-            }
-            .toMutableList()
+        content.substring(textStart).cleanTimedLyricText().takeIf { it.isNotBlank() }?.let { tail ->
+            words += LyricWord(
+                text = tail,
+                startMs = activeStart,
+                endMs = activeStart + estimateDuration(tail)
+            )
+        }
 
         if (words.isEmpty()) return emptyList()
-
-        for (index in 0 until words.lastIndex) {
-            words[index] = words[index].copy(endMs = words[index + 1].startMs)
-        }
-        val last = words.last()
-        words[words.lastIndex] = last.copy(endMs = (last.startMs + estimateDuration(last.text)).coerceAtLeast(last.startMs + 120L))
 
         val firstStart = words.first().startMs
         val relative = firstStart < lineStartMs && abs(firstStart - lineStartMs) > 2_000L
@@ -149,6 +162,12 @@ internal object EllaLyricsParser {
             words
         }
     }
+
+    private data class TimedMarker(
+        val startIndex: Int,
+        val endIndex: Int,
+        val timeMs: Long
+    )
 
     private fun parseLyricify(content: String): LrcParser.LrcResult? {
         val parsed = content.lines()
@@ -458,6 +477,14 @@ internal object EllaLyricsParser {
             .toString()
             .replace(Regex("""[ \t\r\n]+"""), " ")
             .trim()
+
+    private fun String.cleanTimedLyricText(): String =
+        replace(timedWordMarkerPattern) { match ->
+            val time = match.groupValues.getOrNull(1).orEmpty()
+                .ifBlank { match.groupValues.getOrNull(2).orEmpty() }
+                .trim()
+            if (time.isTimestampLike()) "" else match.value
+        }.cleanLyricText()
 
     private fun String.takeUsefulText(): String? =
         cleanLyricText().takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
