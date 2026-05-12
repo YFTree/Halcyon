@@ -16,6 +16,8 @@ import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.Executor
 
 class ExoPlayerManager(private val context: Context) {
@@ -54,6 +56,7 @@ class ExoPlayerManager(private val context: Context) {
     private val _playlist = MutableStateFlow<List<Song>>(emptyList())
     val playlistFlow: StateFlow<List<Song>> = _playlist.asStateFlow()
     private var playerListener: Player.Listener? = null
+    private var lastQueueSaveMs = 0L
 
     private val directExecutor = Executor { it.run() }
 
@@ -113,6 +116,7 @@ class ExoPlayerManager(private val context: Context) {
         }
         mediaController?.addListener(playerListener!!)
 
+        restoreSavedQueueIfNeeded()
         refreshStateFromController()
     }
 
@@ -129,6 +133,7 @@ class ExoPlayerManager(private val context: Context) {
             play()
         }
         updateCurrentSong()
+        savePlaybackQueue(force = true)
     }
 
     fun addToPlaylist(song: Song) {
@@ -139,6 +144,7 @@ class ExoPlayerManager(private val context: Context) {
         if ((mediaController?.mediaItemCount ?: 0) == 1) {
             mediaController?.prepare()
         }
+        savePlaybackQueue(force = true)
     }
 
     fun addToPlaylist(songs: List<Song>) {
@@ -149,6 +155,7 @@ class ExoPlayerManager(private val context: Context) {
         if ((mediaController?.mediaItemCount ?: 0) == songs.size) {
             mediaController?.prepare()
         }
+        savePlaybackQueue(force = true)
     }
 
     fun playQueueIndex(index: Int) {
@@ -156,6 +163,7 @@ class ExoPlayerManager(private val context: Context) {
         mediaController?.seekToDefaultPosition(index)
         mediaController?.play()
         updateCurrentSong()
+        savePlaybackQueue(force = true)
     }
 
     fun playSong(song: Song) {
@@ -163,6 +171,8 @@ class ExoPlayerManager(private val context: Context) {
         if (index >= 0) {
             mediaController?.seekToDefaultPosition(index)
             mediaController?.play()
+            updateCurrentSong()
+            savePlaybackQueue(force = true)
         } else {
             setPlaylist(listOf(song), 0)
         }
@@ -180,18 +190,22 @@ class ExoPlayerManager(private val context: Context) {
 
     fun skipToNext() {
         mediaController?.seekToNext()
+        savePlaybackQueue(force = true)
     }
 
     fun skipToPrevious() {
         mediaController?.seekToPrevious()
+        savePlaybackQueue(force = true)
     }
 
     fun seekTo(positionMs: Long) {
         mediaController?.seekTo(positionMs)
+        savePlaybackQueue(force = true)
     }
 
     fun toggleShuffle() {
         mediaController?.shuffleModeEnabled = !(mediaController?.shuffleModeEnabled ?: false)
+        savePlaybackQueue(force = true)
     }
 
     fun toggleRepeat() {
@@ -202,6 +216,7 @@ class ExoPlayerManager(private val context: Context) {
             else -> Player.REPEAT_MODE_OFF
         }
         mediaController?.repeatMode = next
+        savePlaybackQueue(force = true)
     }
 
     fun setPlaybackParameters(speed: Float, pitch: Float) {
@@ -210,6 +225,7 @@ class ExoPlayerManager(private val context: Context) {
         mediaController?.playbackParameters = PlaybackParameters(safeSpeed, safePitch)
         _playbackSpeed.value = safeSpeed
         _playbackPitch.value = safePitch
+        savePlaybackQueue()
     }
 
     fun updatePosition() {
@@ -218,6 +234,7 @@ class ExoPlayerManager(private val context: Context) {
         }
         _currentPosition.value = mediaController?.currentPosition?.coerceAtLeast(0) ?: 0L
         _duration.value = mediaController?.duration?.coerceAtLeast(0) ?: 0L
+        if (_currentSong.value != null) savePlaybackQueue()
     }
 
     fun updateBluetoothLyric(text: String?, secondaryText: String? = null) {
@@ -320,7 +337,131 @@ class ExoPlayerManager(private val context: Context) {
         }
         _currentSong.value = restoredSong
         _duration.value = controller.duration.coerceAtLeast(0)
+        savePlaybackQueue(force = true)
     }
+
+    private fun restoreSavedQueueIfNeeded() {
+        val controller = mediaController ?: return
+        if (controller.mediaItemCount > 0 || playlist.isNotEmpty()) return
+
+        val saved = loadSavedQueue() ?: return
+        if (saved.songs.isEmpty()) return
+
+        playlist.clear()
+        playlist.addAll(saved.songs)
+        _playlist.value = playlist.toList()
+
+        val index = saved.index.coerceIn(0, playlist.lastIndex)
+        controller.setMediaItems(playlist.map(::songToMediaItem), index, saved.positionMs.coerceAtLeast(0L))
+        controller.repeatMode = saved.repeatMode
+        controller.shuffleModeEnabled = saved.shuffle
+        controller.playbackParameters = PlaybackParameters(saved.speed.coerceIn(0.5f, 2f), saved.pitch.coerceIn(0.5f, 2f))
+        controller.prepare()
+
+        _currentSong.value = playlist.getOrNull(index)
+        _currentPosition.value = saved.positionMs.coerceAtLeast(0L)
+        _repeatMode.value = saved.repeatMode
+        _shuffleEnabled.value = saved.shuffle
+        _playbackSpeed.value = saved.speed
+        _playbackPitch.value = saved.pitch
+    }
+
+    private fun savePlaybackQueue(force: Boolean = false) {
+        if (playlist.isEmpty()) return
+        val now = System.currentTimeMillis()
+        if (!force && now - lastQueueSaveMs < 2_500L) return
+        lastQueueSaveMs = now
+
+        val controller = mediaController
+        val index = controller?.currentMediaItemIndex?.takeIf { it >= 0 } ?: playlist.indexOfFirst { it.id == _currentSong.value?.id }
+        val payload = JSONObject()
+            .put("index", index.coerceAtLeast(0))
+            .put("positionMs", controller?.currentPosition?.coerceAtLeast(0) ?: _currentPosition.value)
+            .put("repeatMode", controller?.repeatMode ?: _repeatMode.value)
+            .put("shuffle", controller?.shuffleModeEnabled ?: _shuffleEnabled.value)
+            .put("speed", controller?.playbackParameters?.speed ?: _playbackSpeed.value)
+            .put("pitch", controller?.playbackParameters?.pitch ?: _playbackPitch.value)
+            .put("songs", JSONArray().apply {
+                playlist.forEach { song -> put(song.toJson()) }
+            })
+
+        context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_QUEUE, payload.toString())
+            .apply()
+    }
+
+    private fun loadSavedQueue(): SavedQueue? {
+        val raw = context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_QUEUE, null)
+            ?: return null
+
+        return runCatching {
+            val payload = JSONObject(raw)
+            val songsArray = payload.optJSONArray("songs") ?: JSONArray()
+            val songs = (0 until songsArray.length())
+                .mapNotNull { songsArray.optJSONObject(it)?.toSongOrNull() }
+            SavedQueue(
+                songs = songs,
+                index = payload.optInt("index", 0),
+                positionMs = payload.optLong("positionMs", 0L),
+                repeatMode = payload.optInt("repeatMode", Player.REPEAT_MODE_OFF),
+                shuffle = payload.optBoolean("shuffle", false),
+                speed = payload.optDouble("speed", 1.0).toFloat(),
+                pitch = payload.optDouble("pitch", 1.0).toFloat()
+            )
+        }.getOrNull()
+    }
+
+    private fun Song.toJson(): JSONObject = JSONObject()
+        .put("id", id)
+        .put("title", title)
+        .put("artist", artist)
+        .put("album", album)
+        .put("albumId", albumId)
+        .put("duration", duration)
+        .put("path", path)
+        .put("fileName", fileName)
+        .put("fileSize", fileSize)
+        .put("mimeType", mimeType)
+        .put("dateAdded", dateAdded)
+        .put("dateModified", dateModified)
+        .put("trackNumber", trackNumber)
+        .put("coverUrl", coverUrl)
+        .put("onlineSource", onlineSource)
+        .put("onlineId", onlineId)
+
+    private fun JSONObject.toSongOrNull(): Song? {
+        val path = optString("path").takeIf { it.isNotBlank() } ?: return null
+        return Song(
+            id = optLong("id", path.hashCode().toLong()),
+            title = optString("title").ifBlank { optString("fileName").ifBlank { path.substringAfterLast('/') } },
+            artist = optString("artist").ifBlank { "Unknown" },
+            album = optString("album").ifBlank { "Music" },
+            albumId = optLong("albumId", 0L),
+            duration = optLong("duration", 0L),
+            path = path,
+            fileName = optString("fileName").ifBlank { path.substringAfterLast('/') },
+            fileSize = optLong("fileSize", 0L),
+            mimeType = optString("mimeType"),
+            dateAdded = optLong("dateAdded", 0L),
+            dateModified = optLong("dateModified", 0L),
+            trackNumber = optInt("trackNumber", 0),
+            coverUrl = optString("coverUrl"),
+            onlineSource = optString("onlineSource"),
+            onlineId = optString("onlineId")
+        )
+    }
+
+    private data class SavedQueue(
+        val songs: List<Song>,
+        val index: Int,
+        val positionMs: Long,
+        val repeatMode: Int,
+        val shuffle: Boolean,
+        val speed: Float,
+        val pitch: Float
+    )
 
     private fun MediaItem.toSong(): Song {
         val metadata = mediaMetadata
@@ -346,5 +487,7 @@ class ExoPlayerManager(private val context: Context) {
     private companion object {
         const val EXTRA_ONLINE_SOURCE = "com.ella.music.extra.ONLINE_SOURCE"
         const val EXTRA_ONLINE_ID = "com.ella.music.extra.ONLINE_ID"
+        const val PLAYBACK_PREFS = "ella_playback_state"
+        const val KEY_QUEUE = "queue"
     }
 }

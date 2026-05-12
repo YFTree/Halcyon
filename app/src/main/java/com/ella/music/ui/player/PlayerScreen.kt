@@ -1337,6 +1337,7 @@ private fun MiniLyricsPreview(
             val main = line.text.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
             val pronunciation = line.pronunciation?.takeIf { showPronunciation && it.isNotBlank() }
             val translation = line.translation?.takeIf { showTranslation && it.isNotBlank() }
+            val textAlign = line.previewTextAlign()
             val alpha = if (isActive) 0.92f else 0.34f
 
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -1346,8 +1347,10 @@ private fun MiniLyricsPreview(
                         fontSize = 12.sp,
                         fontFamily = fontFamily,
                         color = Color.White.copy(alpha = 0.48f),
+                        textAlign = textAlign,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
                 if (main != null) {
@@ -1357,8 +1360,10 @@ private fun MiniLyricsPreview(
                         fontFamily = fontFamily,
                         fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
                         color = Color.White.copy(alpha = alpha),
+                        textAlign = textAlign,
                         maxLines = if (isActive) 2 else 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
                 if (translation != null) {
@@ -1368,8 +1373,10 @@ private fun MiniLyricsPreview(
                         fontFamily = fontFamily,
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                         color = Color.White.copy(alpha = if (isActive) 0.64f else 0.28f),
+                        textAlign = textAlign,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -1407,7 +1414,7 @@ private fun MiniLyricBlock(
 
     Column(
         modifier = modifier,
-        horizontalAlignment = Alignment.Start
+        horizontalAlignment = line.previewHorizontalAlignment()
     ) {
         val main = line.text.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
         val pronunciation = line.pronunciation?.takeIf { showPronunciation && it.isNotBlank() }
@@ -1421,7 +1428,7 @@ private fun MiniLyricBlock(
                 fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
                 fontFamily = fontFamily,
                 color = Color.White.copy(alpha = 0.48f),
-                textAlign = TextAlign.Start,
+                textAlign = line.previewTextAlign(),
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1433,7 +1440,7 @@ private fun MiniLyricBlock(
                 fontFamily = fontFamily,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White.copy(alpha = 0.88f),
-                textAlign = TextAlign.Start,
+                textAlign = line.previewTextAlign(),
                 maxLines = 3,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1444,7 +1451,7 @@ private fun MiniLyricBlock(
                 fontSize = secondarySize,
                 fontFamily = fontFamily,
                 color = Color.White.copy(alpha = 0.58f),
-                textAlign = TextAlign.Start,
+                textAlign = line.previewTextAlign(),
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1456,7 +1463,7 @@ private fun MiniLyricBlock(
                 fontFamily = fontFamily,
                 fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.68f),
-                textAlign = TextAlign.Start,
+                textAlign = line.previewBackgroundTextAlign(),
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1467,7 +1474,7 @@ private fun MiniLyricBlock(
                 fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
                 fontFamily = fontFamily,
                 color = Color.White.copy(alpha = 0.48f),
-                textAlign = TextAlign.Start,
+                textAlign = line.previewBackgroundTextAlign(),
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -1751,6 +1758,31 @@ private fun com.ella.music.data.model.LyricLine.hasMiniLyric(): Boolean {
         !translation.isNullOrBlank() ||
         backgroundText?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() } != null ||
         !backgroundTranslation.isNullOrBlank()
+}
+
+private fun com.ella.music.data.model.LyricLine.previewTextAlign(): TextAlign {
+    if (!isTtml) return TextAlign.Start
+    if (agent.isNullOrBlank()) {
+        return if (!backgroundText.isNullOrBlank() || backgroundWords.isNotEmpty()) TextAlign.Start else TextAlign.Center
+    }
+    return if (agent.equals("v2", ignoreCase = true)) TextAlign.End else TextAlign.Start
+}
+
+private fun com.ella.music.data.model.LyricLine.previewBackgroundTextAlign(): TextAlign {
+    if (!isTtml) return TextAlign.Start
+    return when (previewTextAlign()) {
+        TextAlign.End -> TextAlign.Start
+        TextAlign.Start -> TextAlign.End
+        else -> TextAlign.Center
+    }
+}
+
+private fun com.ella.music.data.model.LyricLine.previewHorizontalAlignment(): Alignment.Horizontal {
+    return when (previewTextAlign()) {
+        TextAlign.End -> Alignment.End
+        TextAlign.Center -> Alignment.CenterHorizontally
+        else -> Alignment.Start
+    }
 }
 
 private fun String.toPlayerLyricFontFamily(): FontFamily? {

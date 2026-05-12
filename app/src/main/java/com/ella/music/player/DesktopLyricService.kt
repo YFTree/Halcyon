@@ -604,7 +604,10 @@ class DesktopLyricService : Service() {
         }
 
         private fun ttmlAlignForPrimary(): AnchorAlign {
-            if (!isTtml || agent.isBlank()) return AnchorAlign.Center
+            if (!isTtml) return AnchorAlign.Center
+            if (agent.isBlank()) {
+                return if (backgroundText.isNotBlank() || backgroundWords.isNotEmpty()) AnchorAlign.Left else AnchorAlign.Center
+            }
             return if (agent.equals("v2", ignoreCase = true)) AnchorAlign.Right else AnchorAlign.Left
         }
     }

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,6 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,6 +73,8 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val settingsManager = remember { SettingsManager(context) }
     val cacheRepository = remember { MusicRepository(context) }
+    val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
 
     val autoScan by settingsManager.autoScan.collectAsState(initial = true)
     val gaplessPlayback by settingsManager.gaplessPlayback.collectAsState(initial = true)
@@ -110,11 +115,12 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(pageBackground)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         SmallTopAppBar(
             title = "设置",
-            color = MiuixTheme.colorScheme.background
+            color = pageBackground
         )
 
         Column(
@@ -397,6 +403,8 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsCardGroup(content: @Composable () -> Unit) {
+    val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    val cardColor = if (isDark) Color(0xFF1D1D21) else Color(0xFFFFFFFF)
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -404,7 +412,7 @@ private fun SettingsCardGroup(content: @Composable () -> Unit) {
         cornerRadius = 16.dp,
         insideMargin = PaddingValues(0.dp),
         colors = CardDefaults.defaultColors(
-            color = MiuixTheme.colorScheme.surfaceContainer
+            color = cardColor
         )
     ) {
         content()

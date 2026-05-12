@@ -102,6 +102,7 @@ fun LyricView(
             val isActive = index == currentIndex
             val isPast = index < currentIndex
             val lineTextAlign = line.ttmlTextAlign()
+            val backgroundTextAlign = line.ttmlBackgroundTextAlign()
 
             val textColor = when {
                 isActive -> MiuixTheme.colorScheme.primary
@@ -150,7 +151,7 @@ fun LyricView(
                     fontSize = if (isActive) 14.sp else 12.sp,
                     fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.56f),
-                    textAlign = lineTextAlign,
+                    textAlign = backgroundTextAlign,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 2.dp)
@@ -162,7 +163,7 @@ fun LyricView(
                     fontSize = if (isActive) 13.sp else 11.sp,
                     fontFamily = fontFamily,
                     color = textColor.copy(alpha = 0.48f),
-                    textAlign = lineTextAlign,
+                    textAlign = backgroundTextAlign,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 2.dp)
@@ -251,6 +252,7 @@ fun WordLyricView(
             val isActive = index == currentIndex || line.isActiveAt(currentPositionMs)
             val nextLine = lyrics.getOrNull(index + 1)
             val lineTextAlign = line.ttmlTextAlign()
+            val backgroundTextAlign = line.ttmlBackgroundTextAlign()
             val distance = when {
                 currentIndex < 0 -> 2
                 index < currentIndex -> currentIndex - index
@@ -391,7 +393,7 @@ fun WordLyricView(
                         WordLine(
                             words = line.backgroundWords,
                             currentPositionMs = currentPositionMs,
-                            textAlign = lineTextAlign,
+                            textAlign = backgroundTextAlign,
                             fontSizeSp = fittedLyricFontSp(line.backgroundWords.joinToString("") { it.text }, 24, minSp = 8),
                             fontFamily = fontFamily,
                             currentColor = Color.White.copy(alpha = 0.78f),
@@ -405,7 +407,7 @@ fun WordLyricView(
                             fontSize = fittedLyricFontSp(line.backgroundText.orEmpty(), if (isActive) 24 else 14, minSp = 8).sp,
                             fontFamily = fontFamily,
                             color = backgroundColor,
-                            textAlign = lineTextAlign,
+                            textAlign = backgroundTextAlign,
                             maxLines = 1,
                             softWrap = false,
                             overflow = TextOverflow.Clip,
@@ -426,7 +428,7 @@ fun WordLyricView(
                         fontSize = fittedLyricFontSp(line.backgroundTranslation.orEmpty(), if (isActive) 13 else 11, minSp = 8).sp,
                         fontFamily = fontFamily,
                         color = backgroundTranslationColor,
-                        textAlign = lineTextAlign,
+                        textAlign = backgroundTextAlign,
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Clip,
@@ -603,12 +605,30 @@ private fun InterludeDots(
 }
 
 private fun LyricLine.ttmlTextAlign(): TextAlign {
-    if (!isTtml || agent.isNullOrBlank()) return TextAlign.Center
+    if (!isTtml) return TextAlign.Center
+    if (agent.isNullOrBlank()) {
+        return if (!backgroundText.isNullOrBlank() || backgroundWords.isNotEmpty()) TextAlign.Start else TextAlign.Center
+    }
     return if (agent.equals("v2", ignoreCase = true)) TextAlign.End else TextAlign.Start
 }
 
+private fun LyricLine.ttmlBackgroundTextAlign(): TextAlign {
+    if (!isTtml) return TextAlign.Center
+    return when (ttmlTextAlign()) {
+        TextAlign.End -> TextAlign.Start
+        TextAlign.Start -> TextAlign.End
+        else -> TextAlign.Center
+    }
+}
+
 private fun LyricLine.ttmlAlignment(): Alignment.Horizontal {
-    if (!isTtml || agent.isNullOrBlank()) return Alignment.CenterHorizontally
+    if (!isTtml || agent.isNullOrBlank()) {
+        return if (isTtml && (!backgroundText.isNullOrBlank() || backgroundWords.isNotEmpty())) {
+            Alignment.Start
+        } else {
+            Alignment.CenterHorizontally
+        }
+    }
     return if (agent.equals("v2", ignoreCase = true)) Alignment.End else Alignment.Start
 }
 
