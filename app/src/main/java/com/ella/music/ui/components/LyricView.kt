@@ -485,6 +485,14 @@ private fun WordLine(
     val sustainWord = words.firstOrNull {
         currentPositionMs in it.startMs..it.endMs && it.endMs - it.startMs >= 900L
     }
+    val sustainRange = sustainWord?.let { word ->
+        var start = 0f
+        for (item in words) {
+            if (item == word) break
+            start += item.text.visualLength().coerceAtLeast(0.5f)
+        }
+        start to (start + word.text.visualLength().coerceAtLeast(0.5f))
+    }
     val glowPulse = if (sustainWord != null) {
         0.38f + 0.32f * ((sin(currentPositionMs / 145.0).toFloat() + 1f) / 2f)
     } else {
@@ -530,7 +538,7 @@ private fun WordLine(
                     }
                     .blur(9.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                     .drawWithContent {
-                        drawTextLineProgress(textLayout, progress)
+                        drawTextVisualRange(textLayout, sustainRange)
                     }
             )
         }
@@ -547,6 +555,52 @@ private fun WordLine(
                     drawTextLineProgress(textLayout, progress)
                 }
         )
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.ContentDrawScope.drawTextVisualRange(
+    layout: TextLayoutResult?,
+    visualRange: Pair<Float, Float>?
+) {
+    val result = layout
+    val range = visualRange
+    if (result == null || result.lineCount == 0 || range == null) {
+        drawContent()
+        return
+    }
+
+    val rangeStart = range.first.coerceAtLeast(0f)
+    val rangeEnd = range.second.coerceAtLeast(rangeStart)
+    val contentScope = this
+    var lineStartVisual = 0f
+    for (line in 0 until result.lineCount) {
+        val start = result.getLineStart(line)
+        val end = result.getLineEnd(line, visibleEnd = true).coerceAtLeast(start)
+        val lineText = result.layoutInput.text.text.substring(start, end)
+        val lineVisual = lineText.visualLength().coerceAtLeast(1f)
+        val lineEndVisual = lineStartVisual + lineVisual
+
+        val overlapStart = maxOf(rangeStart, lineStartVisual)
+        val overlapEnd = minOf(rangeEnd, lineEndVisual)
+        if (overlapEnd > overlapStart) {
+            val left = result.getLineLeft(line)
+            val right = result.getLineRight(line)
+            val top = result.getLineTop(line)
+            val bottom = result.getLineBottom(line)
+            val lineWidth = (right - left).coerceAtLeast(1f)
+            val localStart = ((overlapStart - lineStartVisual) / lineVisual).coerceIn(0f, 1f)
+            val localEnd = ((overlapEnd - lineStartVisual) / lineVisual).coerceIn(0f, 1f)
+            val feather = (lineWidth * 0.05f).coerceIn(6f, 18f)
+            clipRect(
+                left = (left + lineWidth * localStart - feather).coerceAtLeast(left),
+                top = top,
+                right = (left + lineWidth * localEnd + feather).coerceAtMost(right),
+                bottom = bottom
+            ) {
+                contentScope.drawContent()
+            }
+        }
+        lineStartVisual = lineEndVisual
     }
 }
 

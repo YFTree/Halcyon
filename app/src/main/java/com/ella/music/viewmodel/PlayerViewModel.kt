@@ -76,6 +76,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var bluetoothLyricTranslationEnabled = false
     private var samsungFloatingLyricTranslationEnabled = false
     private var superLyricTranslationEnabled = true
+    private var lyricSourceMode = SettingsManager.LYRIC_SOURCE_AUTO
     private var lastBluetoothLyricPayload: Pair<String, String?>? = null
     private var sleepTimerJob: Job? = null
     private var stopAfterCurrentSongId: Long? = null
@@ -92,6 +93,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         initLyricPageTranslation()
         initBluetoothLyric()
         initShuffleMode()
+        initLyricSourceMode()
     }
 
     private fun initLyricon() {
@@ -172,6 +174,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun initLyricSourceMode() {
+        viewModelScope.launch {
+            settingsManager.lyricSourceMode.collect { mode ->
+                lyricSourceMode = mode
+                currentSong.value?.let { reloadLyrics(it, force = true) }
+            }
+        }
+    }
+
     private fun sendBluetoothLyric(index: Int, lyrics: List<LyricLine>) {
         if (!bluetoothLyricEnabled) return
         if (!playerManager.isPlaying.value) return
@@ -217,7 +228,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             playerManager.currentSong.collect { song ->
                 if (song != null) {
                     lastTickerPayload = null
-                    val songLyrics = repository.getLyrics(song)
+                    val songLyrics = repository.getLyrics(song, lyricSourceMode)
                     repository.getCoverArt(song)
                     _lyrics.value = songLyrics
                     _currentLyricIndex.value = -1
@@ -336,7 +347,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun resendExternalLyrics() {
         val song = currentSong.value ?: return
-        val songLyrics = _lyrics.value.ifEmpty { repository.getLyrics(song) }
+        val songLyrics = _lyrics.value.ifEmpty { repository.getLyrics(song, lyricSourceMode) }
         if (_lyrics.value.isEmpty()) _lyrics.value = songLyrics
         lyriconBridge.sendSong(song, songLyrics)
         lyriconBridge.sendPlaybackState(isPlaying.value)
@@ -474,6 +485,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setPlaybackPitch(pitch: Float) {
         playerManager.setPlaybackParameters(playbackSpeed.value, pitch)
+    }
+
+    fun setLyricSourceMode(mode: Int) {
+        viewModelScope.launch {
+            settingsManager.setLyricSourceMode(mode)
+            lyricSourceMode = mode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
+            currentSong.value?.let { reloadLyrics(it, force = true) }
+        }
+    }
+
+    private suspend fun reloadLyrics(song: Song, force: Boolean = false) {
+        lastTickerPayload = null
+        lastBluetoothLyricPayload = null
+        val songLyrics = if (force) {
+            repository.reloadLyrics(song, lyricSourceMode)
+        } else {
+            repository.getLyrics(song, lyricSourceMode)
+        }
+        _lyrics.value = songLyrics
+        _currentLyricIndex.value = -1
+        if (lyriconBridge.isEnabled()) lyriconBridge.sendSong(song, songLyrics)
+        superLyricBridge.sendSong(song)
+        if (tickerBridge.isEnabled()) resendTickerLyric()
+        if (desktopLyricBridge.isEnabled()) resendDesktopLyric()
+        if (bluetoothLyricEnabled) resendBluetoothLyric()
     }
 
     fun startSleepTimer(minutes: Int) {

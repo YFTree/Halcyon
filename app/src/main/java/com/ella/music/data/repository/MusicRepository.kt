@@ -56,7 +56,7 @@ class MusicRepository(private val context: Context) {
     private val _scanProgress = MutableStateFlow(0)
     val scanProgress: StateFlow<Int> = _scanProgress.asStateFlow()
 
-    private val lyricsCache = mutableMapOf<Long, List<LyricLine>>()
+    private val lyricsCache = mutableMapOf<String, List<LyricLine>>()
     private val audioInfoCache = mutableMapOf<Long, AudioInfo>()
     private val replayGainCache = mutableMapOf<Long, Float?>()
     private val coverArtCache = object : LruCache<Long, ByteArray>(8 * 1024) {
@@ -105,34 +105,59 @@ class MusicRepository(private val context: Context) {
         }
     }
 
-    suspend fun getLyrics(song: Song): List<LyricLine> = withContext(Dispatchers.IO) {
-        lyricsCache[song.id]?.let { return@withContext it }
+    suspend fun getLyrics(
+        song: Song,
+        sourceMode: Int = SettingsManager.LYRIC_SOURCE_AUTO
+    ): List<LyricLine> = withContext(Dispatchers.IO) {
+        val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
+        val cacheKey = "${song.id}:$safeMode"
+        lyricsCache[cacheKey]?.let { return@withContext it }
 
         Log.d("MusicRepo", "Loading lyrics for: ${song.title} path=${song.path}")
 
-        fetchOnlineLyrics(song)?.let { onlineLyrics ->
-            lyricsCache[song.id] = onlineLyrics
-            return@withContext onlineLyrics
+        if (safeMode == SettingsManager.LYRIC_SOURCE_AUTO) {
+            fetchOnlineLyrics(song)?.let { onlineLyrics ->
+                lyricsCache[cacheKey] = onlineLyrics
+                return@withContext onlineLyrics
+            }
         }
 
         val effectivePath = song.effectiveLocalPathForMetadata()
-        val lrcContent = LrcParser.findLrcFile(effectivePath)
-        if (lrcContent != null) {
-            val parsed = LrcParser.parse(lrcContent)
-            Log.d("MusicRepo", "LRC parsed: ${parsed.lyrics.size} lines for ${song.title}")
-            lyricsCache[song.id] = parsed.lyrics
-            return@withContext parsed.lyrics
+        if (safeMode != SettingsManager.LYRIC_SOURCE_EMBEDDED) {
+            loadExternalLyrics(song, effectivePath)?.let { externalLyrics ->
+                lyricsCache[cacheKey] = externalLyrics
+                return@withContext externalLyrics
+            }
         }
 
-        Log.d("MusicRepo", "No LRC file found, trying embedded lyrics for ${song.title}")
+        if (safeMode != SettingsManager.LYRIC_SOURCE_EXTERNAL) {
+            loadEmbeddedLyrics(song, effectivePath)?.let { embeddedLyrics ->
+                lyricsCache[cacheKey] = embeddedLyrics
+                return@withContext embeddedLyrics
+            }
+        }
+
+        Log.d("MusicRepo", "No lyrics found for ${song.title}")
+        lyricsCache[cacheKey] = emptyList()
+        emptyList()
+    }
+
+    private fun loadExternalLyrics(song: Song, effectivePath: String): List<LyricLine>? {
+        val lrcContent = LrcParser.findLrcFile(effectivePath) ?: return null
+        val parsed = LrcParser.parse(lrcContent)
+        Log.d("MusicRepo", "LRC parsed: ${parsed.lyrics.size} lines for ${song.title}")
+        return parsed.lyrics.takeIf { it.isNotEmpty() }
+    }
+
+    private fun loadEmbeddedLyrics(song: Song, effectivePath: String): List<LyricLine>? {
+        Log.d("MusicRepo", "Trying embedded lyrics for ${song.title}")
         val embedded = scanner.extractEmbeddedLyrics(effectivePath)
         if (!embedded.isNullOrBlank()) {
             Log.d("MusicRepo", "Embedded lyrics found (${embedded.length} chars) for ${song.title}")
             val parsed = LrcParser.parse(embedded)
             if (parsed.lyrics.isNotEmpty()) {
                 Log.d("MusicRepo", "Embedded lyrics parsed as LRC: ${parsed.lyrics.size} lines")
-                lyricsCache[song.id] = parsed.lyrics
-                return@withContext parsed.lyrics
+                return parsed.lyrics
             }
 
             Log.d("MusicRepo", "Embedded lyrics not LRC format, using plain text")
@@ -146,16 +171,15 @@ class MusicRepository(private val context: Context) {
                     timeOffset += 3000L
                 }
             }
-            if (result.isNotEmpty()) {
-                Log.d("MusicRepo", "Plain text lyrics: ${result.size} lines")
-                lyricsCache[song.id] = result
-                return@withContext result
-            }
+            return result.takeIf { it.isNotEmpty() }
         }
+        return null
+    }
 
-        Log.d("MusicRepo", "No lyrics found for ${song.title}")
-        lyricsCache[song.id] = emptyList()
-        emptyList()
+    suspend fun reloadLyrics(song: Song, sourceMode: Int): List<LyricLine> = withContext(Dispatchers.IO) {
+        val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
+        lyricsCache.remove("${song.id}:$safeMode")
+        getLyrics(song, safeMode)
     }
 
     private fun fetchOnlineLyrics(song: Song): List<LyricLine>? {

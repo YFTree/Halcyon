@@ -90,6 +90,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -143,6 +144,7 @@ fun PlayerScreen(
     val density = LocalDensity.current
     val settingsManager = remember { SettingsManager(context) }
     val lyricFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
+    val lyricSourceMode by settingsManager.lyricSourceMode.collectAsState(initial = SettingsManager.LYRIC_SOURCE_AUTO)
     val lyricFontFamily = remember(lyricFontPath) { lyricFontPath.toPlayerLyricFontFamily() }
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
@@ -266,6 +268,7 @@ fun PlayerScreen(
                     currentPosition = currentPosition,
                     showTranslation = showLyricTranslation,
                     showPronunciation = showLyricPronunciation,
+                    lyricSourceMode = lyricSourceMode,
                     fontFamily = lyricFontFamily,
                     palette = palette,
                     currentPositionMs = currentPosition,
@@ -277,6 +280,9 @@ fun PlayerScreen(
                     },
                     onToggleTranslation = {
                         playerViewModel.setLyricPageTranslation(!showLyricTranslation)
+                    },
+                    onLyricSourceMode = { mode ->
+                        playerViewModel.setLyricSourceMode(mode)
                     },
                     modifier = Modifier.fillMaxSize()
                 )
@@ -369,10 +375,10 @@ fun PlayerScreen(
                         Toast.makeText(context, "已取消定时播放", Toast.LENGTH_SHORT).show()
                     },
                     onSpeed = {
-                        playerViewModel.setPlaybackSpeed(playbackSpeed.nextPlaybackStep())
+                        playerViewModel.setPlaybackSpeed(it)
                     },
                     onPitch = {
-                        playerViewModel.setPlaybackPitch(playbackPitch.nextPlaybackStep())
+                        playerViewModel.setPlaybackPitch(it)
                     },
                     playbackSpeed = playbackSpeed,
                     playbackPitch = playbackPitch,
@@ -446,8 +452,8 @@ private fun CoverPlayerPage(
     onStopAfterCurrent: () -> Unit,
     onTimer: (Int) -> Unit,
     onCancelTimer: () -> Unit,
-    onSpeed: () -> Unit,
-    onPitch: () -> Unit,
+    onSpeed: (Float) -> Unit,
+    onPitch: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bluetoothDeviceName = rememberBluetoothOutputName()
@@ -596,7 +602,14 @@ private fun CoverPlayerPage(
                     onQueueSongClick = onQueueSongClick,
                     onClearQueue = onClearQueue
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                SimpleAudioVisualizer(
+                    isPlaying = isPlaying,
+                    positionMs = currentPosition,
+                    accent = Color.White.copy(alpha = 0.86f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(42.dp)
+                )
             }
         }
 
@@ -636,6 +649,7 @@ private fun LyricsPlayerPage(
     currentPosition: Long,
     showTranslation: Boolean,
     showPronunciation: Boolean,
+    lyricSourceMode: Int,
     fontFamily: FontFamily?,
     palette: PlayerPalette,
     currentPositionMs: Long,
@@ -644,6 +658,7 @@ private fun LyricsPlayerPage(
     onDismissLyrics: () -> Unit,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
+    onLyricSourceMode: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var lyricMenuExpanded by remember { mutableStateOf(false) }
@@ -730,6 +745,16 @@ private fun LyricsPlayerPage(
             }
         }
 
+        SimpleAudioVisualizer(
+            isPlaying = isPlaying,
+            positionMs = currentPositionMs,
+            accent = Color.White.copy(alpha = 0.86f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(58.dp)
+        )
+
         if (lyricMenuExpanded) {
             Popup(
                 alignment = Alignment.BottomCenter,
@@ -739,6 +764,7 @@ private fun LyricsPlayerPage(
                 LyricActionMenu(
                     showPronunciation = showPronunciation,
                     showTranslation = showTranslation,
+                    lyricSourceMode = lyricSourceMode,
                     onTogglePronunciation = {
                         lyricMenuExpanded = false
                         onTogglePronunciation()
@@ -746,6 +772,10 @@ private fun LyricsPlayerPage(
                     onToggleTranslation = {
                         lyricMenuExpanded = false
                         onToggleTranslation()
+                    },
+                    onLyricSourceMode = { mode ->
+                        lyricMenuExpanded = false
+                        onLyricSourceMode(mode)
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -864,6 +894,15 @@ private fun LandscapeLyricsOverlay(
                 }
             }
         }
+        SimpleAudioVisualizer(
+            isPlaying = isPlaying,
+            positionMs = currentPosition,
+            accent = Color.White.copy(alpha = 0.82f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(54.dp)
+        )
     }
 
 }
@@ -1188,14 +1227,16 @@ private fun LyricToggleButton(
 private fun LyricActionMenu(
     showPronunciation: Boolean,
     showTranslation: Boolean,
+    lyricSourceMode: Int,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
+    onLyricSourceMode: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(Color.Black.copy(alpha = 0.74f))
+            .background(Color.Black.copy(alpha = 0.86f))
             .navigationBarsPadding()
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
@@ -1222,6 +1263,61 @@ private fun LyricActionMenu(
         PlayerActionMenuItem(
             text = if (showTranslation) "隐藏翻译" else "显示翻译",
             onClick = onToggleTranslation
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "歌词来源",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.74f),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            LyricSourceChip(
+                text = "自动",
+                selected = lyricSourceMode == SettingsManager.LYRIC_SOURCE_AUTO,
+                onClick = { onLyricSourceMode(SettingsManager.LYRIC_SOURCE_AUTO) },
+                modifier = Modifier.weight(1f)
+            )
+            LyricSourceChip(
+                text = "外置",
+                selected = lyricSourceMode == SettingsManager.LYRIC_SOURCE_EXTERNAL,
+                onClick = { onLyricSourceMode(SettingsManager.LYRIC_SOURCE_EXTERNAL) },
+                modifier = Modifier.weight(1f)
+            )
+            LyricSourceChip(
+                text = "内嵌",
+                selected = lyricSourceMode == SettingsManager.LYRIC_SOURCE_EMBEDDED,
+                onClick = { onLyricSourceMode(SettingsManager.LYRIC_SOURCE_EMBEDDED) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun LyricSourceChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(15.dp))
+            .background(Color.White.copy(alpha = if (selected) 0.22f else 0.07f))
+            .clickable(onClick = onClick)
+            .padding(vertical = 11.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (selected) "✓ $text" else text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = if (selected) 0.96f else 0.70f)
         )
     }
 }
@@ -1708,10 +1804,11 @@ private fun PlayerActionMenu(
     onStopAfterCurrent: () -> Unit,
     onTimer: (Int) -> Unit,
     onCancelTimer: () -> Unit,
-    onSpeed: () -> Unit,
-    onPitch: () -> Unit,
+    onSpeed: (Float) -> Unit,
+    onPitch: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var page by remember { mutableStateOf(PlayerActionSheetPage.Main) }
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
@@ -1728,27 +1825,265 @@ private fun PlayerActionMenu(
                 .align(Alignment.CenterHorizontally)
         )
         Spacer(modifier = Modifier.height(12.dp))
+        when (page) {
+            PlayerActionSheetPage.Main -> {
+                Text(
+                    text = "更多操作",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White.copy(alpha = 0.94f),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+                PlayerActionMenuItem("横屏歌词", onLandscape)
+                PlayerActionMenuItem("查看专辑页", onAlbum)
+                PlayerActionMenuItem("查看歌手页", onArtist)
+                PlayerActionMenuItem("外部编辑标签", onEditTags)
+                if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
+                    PlayerActionMenuItem("下载 LX 歌曲", onDownload)
+                }
+                PlayerActionMenuItem("播放完当前歌曲后暂停", onStopAfterCurrent)
+                PlayerActionMenuItem("定时关闭", { page = PlayerActionSheetPage.Timer })
+                PlayerActionMenuItem("变速变调", { page = PlayerActionSheetPage.Speed })
+            }
+            PlayerActionSheetPage.Timer -> {
+                TimerSheetContent(
+                    onBack = { page = PlayerActionSheetPage.Main },
+                    onTimer = onTimer,
+                    onCancelTimer = onCancelTimer
+                )
+            }
+            PlayerActionSheetPage.Speed -> {
+                SpeedPitchSheetContent(
+                    speed = speed,
+                    pitch = pitch,
+                    onBack = { page = PlayerActionSheetPage.Main },
+                    onSpeed = onSpeed,
+                    onPitch = onPitch
+                )
+            }
+        }
+    }
+}
+
+private enum class PlayerActionSheetPage {
+    Main,
+    Timer,
+    Speed
+}
+
+@Composable
+private fun TimerSheetContent(
+    onBack: () -> Unit,
+    onTimer: (Int) -> Unit,
+    onCancelTimer: () -> Unit
+) {
+    var customMinutes by remember { mutableFloatStateOf(45f) }
+    HalfSheetTitle(title = "定时关闭", onBack = onBack)
+    Spacer(modifier = Modifier.height(18.dp))
+    listOf(10, 15, 20, 30, 40, 60).chunked(4).forEach { row ->
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            row.forEach { minutes ->
+                HalfSheetPill(
+                    text = "$minutes 分钟",
+                    onClick = { onTimer(minutes) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            repeat(4 - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = "自定义时长",
+        fontSize = 16.sp,
+        fontWeight = FontWeight.ExtraBold,
+        color = Color.White.copy(alpha = 0.90f)
+    )
+    DottedValueSlider(
+        value = customMinutes,
+        valueRange = 5f..120f,
+        steps = 23,
+        onValueChange = { customMinutes = it },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(92.dp)
+    )
+    HalfSheetPill(
+        text = "开始计时:${customMinutes.toInt()} 分钟",
+        selected = true,
+        onClick = { onTimer(customMinutes.toInt().coerceAtLeast(1)) },
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    PlayerActionMenuItem("取消定时播放", onCancelTimer)
+}
+
+@Composable
+private fun SpeedPitchSheetContent(
+    speed: Float,
+    pitch: Float,
+    onBack: () -> Unit,
+    onSpeed: (Float) -> Unit,
+    onPitch: (Float) -> Unit
+) {
+    HalfSheetTitle(title = "变速变调", onBack = onBack)
+    Spacer(modifier = Modifier.height(22.dp))
+    Text(
+        text = "变速播放",
+        fontSize = 16.sp,
+        fontWeight = FontWeight.ExtraBold,
+        color = Color.White.copy(alpha = 0.90f)
+    )
+    DottedValueSlider(
+        value = speed,
+        valueRange = 0.5f..2f,
+        steps = 30,
+        label = speed.formatPlaybackStep(),
+        onValueChange = onSpeed,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp)
+    )
+    Text(
+        text = "变调播放",
+        fontSize = 16.sp,
+        fontWeight = FontWeight.ExtraBold,
+        color = Color.White.copy(alpha = 0.90f)
+    )
+    DottedValueSlider(
+        value = pitch,
+        valueRange = 0.5f..2f,
+        steps = 30,
+        label = pitch.formatPlaybackStep(),
+        onValueChange = onPitch,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp)
+    )
+}
+
+@Composable
+private fun HalfSheetTitle(title: String, onBack: () -> Unit) {
+    Box(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = "更多操作",
-            fontSize = 18.sp,
+            text = "‹",
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.70f),
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .clip(CircleShape)
+                .clickable(onClick = onBack)
+                .padding(horizontal = 12.dp, vertical = 2.dp)
+        )
+        Text(
+            text = title,
+            fontSize = 22.sp,
             fontWeight = FontWeight.ExtraBold,
             color = Color.White.copy(alpha = 0.94f),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+            modifier = Modifier.align(Alignment.Center)
         )
-        PlayerActionMenuItem("横屏歌词", onLandscape)
-        PlayerActionMenuItem("查看专辑页", onAlbum)
-        PlayerActionMenuItem("查看歌手页", onArtist)
-        PlayerActionMenuItem("外部编辑标签", onEditTags)
-        if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
-            PlayerActionMenuItem("下载 LX 歌曲", onDownload)
+    }
+}
+
+@Composable
+private fun HalfSheetPill(
+    text: String,
+    selected: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) Color.White.copy(alpha = 0.82f) else Color.White.copy(alpha = 0.10f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = if (selected) Color.Black.copy(alpha = 0.78f) else Color.White.copy(alpha = 0.84f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun DottedValueSlider(
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null
+) {
+    val safeValue = value.coerceIn(valueRange.start, valueRange.endInclusive)
+    val fraction = ((safeValue - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+
+    fun update(width: Float, x: Float) {
+        val raw = valueRange.start + (x / width.coerceAtLeast(1f)).coerceIn(0f, 1f) *
+            (valueRange.endInclusive - valueRange.start)
+        val stepped = if (steps > 0) {
+            val stepSize = (valueRange.endInclusive - valueRange.start) / steps
+            (kotlin.math.round(raw / stepSize) * stepSize).coerceIn(valueRange.start, valueRange.endInclusive)
+        } else {
+            raw
         }
-        PlayerActionMenuItem("播放完当前歌曲后暂停", onStopAfterCurrent)
-        PlayerActionMenuItem("15 分钟后暂停", { onTimer(15) })
-        PlayerActionMenuItem("30 分钟后暂停", { onTimer(30) })
-        PlayerActionMenuItem("60 分钟后暂停", { onTimer(60) })
-        PlayerActionMenuItem("取消定时播放", onCancelTimer)
-        PlayerActionMenuItem("倍速 ${speed.formatPlaybackStep()}x", onSpeed)
-        PlayerActionMenuItem("变调 ${pitch.formatPlaybackStep()}x", onPitch)
+        onValueChange(stepped)
+    }
+
+    Box(modifier = modifier) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(valueRange, steps) {
+                    detectTapGestures { offset -> update(size.width.toFloat(), offset.x) }
+                }
+                .pointerInput(valueRange, steps) {
+                    detectDragGestures { change, _ -> update(size.width.toFloat(), change.position.x) }
+                }
+        ) {
+            val centerY = size.height * 0.60f
+            val dotCount = 44
+            val gap = size.width / (dotCount - 1).coerceAtLeast(1)
+            for (index in 0 until dotCount) {
+                val dotFraction = index.toFloat() / (dotCount - 1).coerceAtLeast(1)
+                drawCircle(
+                    color = Color.White.copy(alpha = if (dotFraction <= fraction) 0.74f else 0.34f),
+                    radius = if (index % 5 == 0) 4.2f else 3.2f,
+                    center = Offset(x = gap * index, y = centerY)
+                )
+            }
+            val knobX = size.width * fraction
+            drawLine(
+                color = Color.White.copy(alpha = 0.86f),
+                start = Offset(knobX, centerY - 36f),
+                end = Offset(knobX, centerY + 36f),
+                strokeWidth = 6f,
+                cap = StrokeCap.Round
+            )
+            drawCircle(
+                color = Color.White.copy(alpha = 0.92f),
+                radius = 24f,
+                center = Offset(knobX, centerY - 54f)
+            )
+        }
+        label?.let {
+            Text(
+                text = it,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black.copy(alpha = 0.78f),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 5.dp)
+            )
+        }
     }
 }
 
@@ -1769,6 +2104,49 @@ private fun PlayerActionMenuItem(
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp)
     )
+}
+
+@Composable
+private fun SimpleAudioVisualizer(
+    isPlaying: Boolean,
+    positionMs: Long,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    val transition = rememberInfiniteTransition(label = "audio_visualizer")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = if (isPlaying) 920 else 2600, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "audio_visualizer_phase"
+    )
+    val playbackPhase = if (isPlaying) phase else 0.18f
+    Canvas(modifier = modifier.graphicsLayer { alpha = if (isPlaying) 1f else 0.42f }) {
+        val barCount = 58
+        val bottom = size.height - 2.dp.toPx()
+        val gap = size.width / barCount
+        val barWidth = (gap * 0.36f).coerceIn(2.dp.toPx(), 5.dp.toPx())
+        for (index in 0 until barCount) {
+            val x = gap * index + gap / 2f
+            val seed = index * 0.37f + positionMs / 780f + playbackPhase * 6.28f
+            val wave = (
+                kotlin.math.sin(seed) * 0.42f +
+                    kotlin.math.sin(seed * 0.47f + index * 0.19f) * 0.34f +
+                    kotlin.math.sin(seed * 1.71f) * 0.24f
+                ).coerceIn(-1f, 1f)
+            val normalized = if (isPlaying) (0.30f + kotlin.math.abs(wave) * 0.70f) else 0.18f
+            val height = size.height * normalized * if (index < 6 || index > barCount - 7) 0.58f else 1f
+            drawRoundRect(
+                color = accent.copy(alpha = 0.20f + normalized * 0.56f),
+                topLeft = Offset(x - barWidth / 2f, bottom - height),
+                size = Size(barWidth, height),
+                cornerRadius = CornerRadius(barWidth, barWidth)
+            )
+        }
+    }
 }
 
 @Composable
