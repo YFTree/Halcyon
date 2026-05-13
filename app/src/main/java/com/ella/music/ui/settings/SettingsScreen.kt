@@ -17,18 +17,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -48,7 +44,6 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
@@ -94,7 +89,6 @@ fun SettingsScreen(
     val audioFocusDisabled by settingsManager.audioFocusDisabled.collectAsState(initial = false)
     val shuffleMode by settingsManager.shuffleMode.collectAsState(initial = SettingsManager.SHUFFLE_MODE_PSEUDO)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
-    val scanIncludeFolders by settingsManager.scanIncludeFolders.collectAsState(initial = "")
     val decoderMode by settingsManager.decoderMode.collectAsState(initial = 1)
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
@@ -102,8 +96,6 @@ fun SettingsScreen(
     val selectedDecoderMode = decoderMode.coerceIn(decoderLabels.indices)
     val shuffleModeLabels = listOf("伪随机", "真随机")
     val selectedShuffleMode = shuffleMode.coerceIn(shuffleModeLabels.indices)
-    var scanIncludeExpanded by remember { mutableStateOf(false) }
-    var scanIncludeDraft by remember(scanIncludeFolders) { mutableStateOf(scanIncludeFolders) }
     val themeEntries = remember { themeLabels.map { SpinnerEntry(title = it) } }
     val decoderEntries = remember {
         decoderLabels.mapIndexed { index, label ->
@@ -205,38 +197,6 @@ fun SettingsScreen(
                     }
                 }
 
-                    ArrowPreference(
-                        title = "扫描文件夹",
-                        summary = scanIncludeFolders.ifBlank { "在文件夹页右上角添加本地文件夹" },
-                        onClick = { scanIncludeExpanded = !scanIncludeExpanded }
-                    )
-                    if (scanIncludeExpanded) {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                            InputField(
-                                query = scanIncludeDraft,
-                                onQueryChange = { scanIncludeDraft = it },
-                                onSearch = {},
-                                expanded = true,
-                                onExpandedChange = {},
-                                label = "/storage/emulated/0/Music；/sdcard/Download"
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Button(onClick = {
-                                    scope.launch { settingsManager.setScanIncludeFolders(scanIncludeDraft) }
-                                }) {
-                                    Text("保存")
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Button(onClick = {
-                                    scanIncludeDraft = ""
-                                    scope.launch { settingsManager.setScanIncludeFolders("") }
-                                }) {
-                                    Text("清空")
-                                }
-                            }
-                        }
-                    }
                 }
             }
 

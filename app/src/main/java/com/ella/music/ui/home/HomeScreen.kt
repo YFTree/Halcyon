@@ -136,19 +136,6 @@ fun HomeScreen(
                         Text(text = "取消", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
                     }
                 } else {
-                    IconButton(
-                        onClick = {
-                            if (!isScanning) {
-                                mainViewModel.scanMusic()
-                            }
-                        }
-                    ) {
-                        Text(
-                            text = if (isScanning) "扫描中" else "刷新",
-                            fontSize = 13.sp,
-                            color = MiuixTheme.colorScheme.primary
-                        )
-                    }
                     IconButton(onClick = { playerViewModel.requestLocateCurrentSong() }) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_my_location),

@@ -81,8 +81,11 @@ fun FolderScreen(
     val songs by mainViewModel.songs.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
+    val isScanning by mainViewModel.isScanning.collectAsState()
+    val scanProgress by mainViewModel.scanProgress.collectAsState()
     val scanIncludeFolders by mainViewModel.settingsManager.scanIncludeFolders.collectAsState(initial = "")
     val scanExcludeFolders by mainViewModel.settingsManager.scanExcludeFolders.collectAsState(initial = "")
+    val savedFolders = remember(scanIncludeFolders) { scanIncludeFolders.toFolderSettingList() }
     val blockedFolders = remember(scanExcludeFolders) { scanExcludeFolders.toFolderSettingList() }
     var folderToBlock by remember { mutableStateOf<String?>(null) }
     var showBlockedDialog by remember { mutableStateOf(false) }
@@ -104,7 +107,7 @@ fun FolderScreen(
             } else {
                 scope.launch {
                     mainViewModel.settingsManager.setScanIncludeFolders(
-                        (scanIncludeFolders.toFolderSettingList() + folderPath).distinct().joinToString("；")
+                        (savedFolders + folderPath).distinct().joinToString("；")
                     )
                     mainViewModel.scanMusic()
                 }
@@ -138,6 +141,29 @@ fun FolderScreen(
                         modifier = Modifier.size(24.dp)
                     )
                 }
+                IconButton(
+                    onClick = {
+                        if (!isScanning) mainViewModel.scanMusic()
+                    }
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Refresh,
+                        contentDescription = "全量扫描",
+                        tint = MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        if (!isScanning) mainViewModel.incrementalScanMusic()
+                    }
+                ) {
+                    Text(
+                        text = if (isScanning) "扫描中" else "增量",
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.primary
+                    )
+                }
                 IconButton(onClick = { folderPicker.launch(null) }) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Add,
@@ -150,6 +176,30 @@ fun FolderScreen(
         WebDavEntryCard(
             onOpenWebDav = onNavigateToWebDav
         )
+
+        if (isScanning) {
+            ScanStatusCard(scanProgress = scanProgress)
+        }
+
+        if (savedFolders.isNotEmpty()) {
+            SavedScanFoldersCard(
+                folders = savedFolders,
+                onRemove = { folderPath ->
+                    scope.launch {
+                        mainViewModel.settingsManager.setScanIncludeFolders(
+                            savedFolders.filterNot { it == folderPath }.joinToString("；")
+                        )
+                        mainViewModel.incrementalScanMusic()
+                    }
+                },
+                onScan = {
+                    if (!isScanning) mainViewModel.scanMusic()
+                },
+                onIncrementalScan = {
+                    if (!isScanning) mainViewModel.incrementalScanMusic()
+                }
+            )
+        }
 
         if (blockedFolders.isNotEmpty()) {
             BlockedFoldersEntryCard(
@@ -337,6 +387,80 @@ private fun WebDavEntryCard(
         }
     }
 }
+
+@Composable
+private fun ScanStatusCard(scanProgress: Int) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = if (scanProgress > 0) "正在扫描 ${scanProgress} 首歌曲..." else "正在扫描音乐库...",
+            fontSize = 14.sp,
+            color = MiuixTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+        )
+    }
+}
+
+@Composable
+private fun SavedScanFoldersCard(
+    folders: List<String>,
+    onRemove: (String) -> Unit,
+    onScan: () -> Unit,
+    onIncrementalScan: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "本地扫描目录", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "${folders.size} 个目录，右上角加号可继续添加",
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
+                Button(onClick = onIncrementalScan) { Text("增量") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = onScan) { Text("全量") }
+            }
+            folders.forEach { folder ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Folder,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = folder.substringAfterLast('/').ifBlank { folder },
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = folder,
+                            fontSize = 12.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
+                    Button(onClick = { onRemove(folder) }) { Text("移除") }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 internal fun WebDavBrowserCard(
     currentUrl: String,

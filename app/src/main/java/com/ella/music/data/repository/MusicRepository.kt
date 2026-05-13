@@ -91,6 +91,33 @@ class MusicRepository(private val context: Context) {
         }
     }
 
+    suspend fun incrementalScanMusic(
+        minDurationMs: Long = 0,
+        includeFolders: List<String> = emptyList(),
+        excludeFolders: List<String> = emptyList()
+    ) {
+        _isScanning.value = true
+        _scanProgress.value = 0
+        try {
+            val scannedSongs = scanner.scanAllSongs(minDurationMs, includeFolders, excludeFolders) { count ->
+                _scanProgress.value = count
+            }
+            val mergedSongs = (_songs.value + scannedSongs)
+                .associateBy { it.id }
+                .values
+                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+            _songs.value = mergedSongs
+            _albums.value = if (includeFolders.isEmpty() && excludeFolders.isEmpty()) {
+                scanner.scanAlbums()
+            } else {
+                mergedSongs.toAlbums()
+            }
+            saveLibraryCache(_songs.value, _albums.value)
+        } finally {
+            _isScanning.value = false
+        }
+    }
+
     suspend fun loadCachedLibrary() = withContext(Dispatchers.IO) {
         if (!libraryCacheFile.exists()) return@withContext
 
