@@ -50,6 +50,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -73,6 +74,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -90,6 +92,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -98,6 +101,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -107,11 +111,15 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -558,8 +566,7 @@ private fun CoverPlayerPage(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clickable(onClick = onShowLyrics),
+                    .aspectRatio(1f),
                 contentAlignment = Alignment.Center
             ) {
                 if (dynamicCoverFile != null) {
@@ -650,20 +657,17 @@ private fun CoverPlayerPage(
 
                 if (miniLyricLine != null) {
                     Spacer(modifier = Modifier.height(14.dp))
-                    WordLyricView(
+                    MiniLyricsPreview(
                         lyrics = lyrics,
                         currentIndex = currentLyricIndex,
-                        currentPositionMs = currentPosition,
                         showTranslation = showTranslation,
                         showPronunciation = showPronunciation,
-                        fontScale = 0.62f,
+                        currentPositionMs = currentPosition,
                         fontFamily = fontFamily,
-                        topSpacer = 20.dp,
-                        bottomSpacer = 64.dp,
                         onLineClick = onLyricLineClick,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 128.dp, max = 218.dp)
+                            .heightIn(min = 132.dp, max = 212.dp)
                             .padding(vertical = 6.dp)
                     )
                 }
@@ -799,10 +803,9 @@ private fun LandscapeCoverPlayerPage(
             ) {
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight(0.70f)
+                        .fillMaxHeight(0.82f)
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable(onClick = onShowLyrics),
+                        .clip(RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     if (dynamicCoverFile != null) {
@@ -863,6 +866,7 @@ private fun LandscapeCoverPlayerPage(
                     fontFamily = fontFamily,
                     topSpacer = 24.dp,
                     bottomSpacer = 72.dp,
+                    horizontalPadding = 6.dp,
                     onLineClick = onLyricLineClick,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -949,7 +953,7 @@ private fun LyricsPlayerPage(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 28.dp)
+                .padding(horizontal = 12.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -1013,8 +1017,9 @@ private fun LyricsPlayerPage(
                     showPronunciation = showPronunciation,
                     fontScale = 0.78f,
                     fontFamily = fontFamily,
-                    topSpacer = 126.dp,
+                    topSpacer = 116.dp,
                     bottomSpacer = 220.dp,
+                    horizontalPadding = 6.dp,
                     onLineClick = onLineClick,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -1157,6 +1162,7 @@ private fun LandscapeLyricsOverlay(
                         fontFamily = fontFamily,
                         topSpacer = 36.dp,
                         bottomSpacer = 96.dp,
+                        horizontalPadding = 4.dp,
                         onLineClick = onLineClick,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -1836,6 +1842,17 @@ private fun PlayerQueueMenu(
     onClearQueue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val currentIndex = remember(playlist, currentSongId) {
+        playlist.indexOfFirst { it.id == currentSongId }
+    }
+    LaunchedEffect(currentIndex) {
+        if (currentIndex >= 0) {
+            listState.scrollToItem(currentIndex)
+        }
+    }
+
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
@@ -1857,6 +1874,20 @@ private fun PlayerQueueMenu(
             Spacer(modifier = Modifier.weight(1f))
             if (playlist.isNotEmpty()) {
                 Text(
+                    text = "定位",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.76f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .clickable {
+                            if (currentIndex >= 0) {
+                                scope.launch { listState.animateScrollToItem(currentIndex) }
+                            }
+                        }
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+                Text(
                     text = "清空",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -1876,7 +1907,10 @@ private fun PlayerQueueMenu(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
             )
         } else {
-            LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.heightIn(max = 320.dp)
+            ) {
                 itemsIndexed(playlist, key = { _, item -> item.id }) { index, item ->
                     Column(
                         modifier = Modifier
@@ -1912,70 +1946,85 @@ private fun MiniLyricsPreview(
     currentIndex: Int,
     showTranslation: Boolean,
     showPronunciation: Boolean,
+    currentPositionMs: Long,
     fontFamily: FontFamily? = null,
+    onLineClick: (com.ella.music.data.model.LyricLine) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val safeIndex = currentIndex.takeIf { it in lyrics.indices }
         ?: lyrics.indexOfFirst { it.hasMiniLyric() }.takeIf { it >= 0 }
         ?: return
-    val previewLines = (-1..2)
-        .mapNotNull { offset -> lyrics.getOrNull(safeIndex + offset)?.let { (safeIndex + offset) to it } }
-        .filter { (_, line) -> line.hasMiniLyric() }
+    val visibleLines = remember(lyrics) { lyrics.withIndex().filter { it.value.hasMiniLyric() } }
+    val visibleIndex = visibleLines.indexOfFirst { it.index == safeIndex }.coerceAtLeast(0)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = visibleIndex)
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.Start
-    ) {
-        previewLines.forEach { (index, line) ->
-            val isActive = index == safeIndex
-            val main = line.text.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
-            val pronunciation = line.pronunciation?.takeIf { showPronunciation && it.isNotBlank() }
-            val translation = line.translation?.takeIf { showTranslation && it.isNotBlank() }
-            val textAlign = line.previewTextAlign()
-            val alpha = if (isActive) 0.92f else 0.34f
-
-            Column(modifier = Modifier.fillMaxWidth()) {
-                if (pronunciation != null && isActive) {
-                    Text(
-                        text = pronunciation,
-                        fontSize = 12.sp,
-                        fontFamily = fontFamily,
-                        color = Color.White.copy(alpha = 0.48f),
-                        textAlign = textAlign,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                if (main != null) {
-                    Text(
-                        text = main,
-                        fontSize = if (isActive) 18.sp else 15.sp,
-                        fontFamily = fontFamily,
-                        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
-                        color = Color.White.copy(alpha = alpha),
-                        textAlign = textAlign,
-                        maxLines = if (isActive) 2 else 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                if (translation != null) {
-                    Text(
-                        text = translation,
-                        fontSize = if (isActive) 14.sp else 12.sp,
-                        fontFamily = fontFamily,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                        color = Color.White.copy(alpha = if (isActive) 0.64f else 0.28f),
-                        textAlign = textAlign,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
+    LaunchedEffect(visibleIndex) {
+        if (visibleIndex in visibleLines.indices) {
+            listState.animateScrollToItem(visibleIndex, scrollOffset = -34)
         }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                compositingStrategy = CompositingStrategy.Offscreen
+            }
+            .drawWithCache {
+                val fade = Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.16f to Color.Black,
+                    0.82f to Color.Black,
+                    1f to Color.Transparent
+                )
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(fade, blendMode = BlendMode.DstIn)
+                }
+            },
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item { Spacer(modifier = Modifier.height(14.dp)) }
+        itemsIndexed(visibleLines, key = { _, indexed -> indexed.index }) { _, indexed ->
+            val index = indexed.index
+            val line = indexed.value
+            val isActive = index == safeIndex
+            val distance = kotlin.math.abs(index - safeIndex)
+            val alpha by animateFloatAsState(
+                targetValue = when {
+                    isActive -> 1f
+                    distance == 1 -> 0.48f
+                    else -> 0.28f
+                },
+                animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing),
+                label = "mini_lyric_alpha"
+            )
+            val scale by animateFloatAsState(
+                targetValue = if (isActive) 1f else 0.94f,
+                animationSpec = tween(durationMillis = 240, easing = LinearOutSlowInEasing),
+                label = "mini_lyric_scale"
+            )
+
+            MiniLyricBlock(
+                line = line,
+                showTranslation = showTranslation,
+                showPronunciation = showPronunciation,
+                currentPositionMs = currentPositionMs,
+                active = isActive,
+                fontFamily = fontFamily,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        this.alpha = alpha
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .clickable { onLineClick(line) }
+                    .padding(vertical = if (isActive) 5.dp else 2.dp)
+            )
+        }
+        item { Spacer(modifier = Modifier.height(30.dp)) }
     }
 }
 
@@ -1984,6 +2033,8 @@ private fun MiniLyricBlock(
     line: com.ella.music.data.model.LyricLine,
     showTranslation: Boolean,
     showPronunciation: Boolean,
+    currentPositionMs: Long = 0L,
+    active: Boolean = true,
     fontFamily: FontFamily? = null,
     modifier: Modifier = Modifier
 ) {
@@ -2018,50 +2069,90 @@ private fun MiniLyricBlock(
         val backgroundTranslation = line.backgroundTranslation?.takeIf { showTranslation && it.isNotBlank() }
 
         if (pronunciation != null) {
-            Text(
-                text = pronunciation,
-                fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
-                fontFamily = fontFamily,
-                color = Color.White.copy(alpha = 0.48f),
-                textAlign = line.previewTextAlign(),
-                maxLines = 2,
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (active && line.pronunciationWords.isNotEmpty()) {
+                MiniWordText(
+                    text = pronunciation,
+                    words = line.pronunciationWords,
+                    currentPositionMs = currentPositionMs,
+                    fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
+                    fontFamily = fontFamily,
+                    textAlign = line.previewTextAlign(),
+                    pendingAlpha = 0.42f,
+                    sungAlpha = 0.62f,
+                    currentAlpha = 0.82f
+                )
+            } else {
+                Text(
+                    text = pronunciation,
+                    fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
+                    fontFamily = fontFamily,
+                    color = Color.White.copy(alpha = if (active) 0.48f else 0.34f),
+                    textAlign = line.previewTextAlign(),
+                    maxLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
         if (main != null) {
-            Text(
-                text = main,
-                fontSize = mainSize,
-                fontFamily = fontFamily,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White.copy(alpha = 0.88f),
-                textAlign = line.previewTextAlign(),
-                maxLines = 3,
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (active && line.words.isNotEmpty()) {
+                MiniWordText(
+                    text = main,
+                    words = line.words,
+                    currentPositionMs = currentPositionMs,
+                    fontSize = (mainSize.value + 1f).sp,
+                    fontFamily = fontFamily,
+                    textAlign = line.previewTextAlign(),
+                    maxLines = 3
+                )
+            } else {
+                Text(
+                    text = main,
+                    fontSize = if (active) (mainSize.value + 1f).sp else mainSize,
+                    fontFamily = fontFamily,
+                    fontWeight = if (active) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = if (active) 0.90f else 0.70f),
+                    textAlign = line.previewTextAlign(),
+                    maxLines = if (active) 3 else 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
         if (translation != null) {
             Text(
                 text = translation,
                 fontSize = secondarySize,
                 fontFamily = fontFamily,
-                color = Color.White.copy(alpha = 0.58f),
+                color = Color.White.copy(alpha = if (active) 0.58f else 0.38f),
                 textAlign = line.previewTextAlign(),
                 maxLines = 2,
                 modifier = Modifier.fillMaxWidth()
             )
         }
         if (background != null) {
-            Text(
-                text = background,
-                fontSize = if (mainSize.value <= 12f) 10.sp else 13.sp,
-                fontFamily = fontFamily,
-                fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.68f),
-                textAlign = line.previewBackgroundTextAlign(),
-                maxLines = 2,
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (active && line.backgroundWords.isNotEmpty()) {
+                MiniWordText(
+                    text = background,
+                    words = line.backgroundWords,
+                    currentPositionMs = currentPositionMs,
+                    fontSize = if (mainSize.value <= 12f) 10.sp else 13.sp,
+                    fontFamily = fontFamily,
+                    textAlign = line.previewBackgroundTextAlign(),
+                    pendingAlpha = 0.36f,
+                    sungAlpha = 0.58f,
+                    currentAlpha = 0.78f
+                )
+            } else {
+                Text(
+                    text = background,
+                    fontSize = if (mainSize.value <= 12f) 10.sp else 13.sp,
+                    fontFamily = fontFamily,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = if (active) 0.68f else 0.44f),
+                    textAlign = line.previewBackgroundTextAlign(),
+                    maxLines = 2,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
         if (backgroundTranslation != null) {
             Text(
@@ -2075,6 +2166,56 @@ private fun MiniLyricBlock(
             )
         }
     }
+}
+
+@Composable
+private fun MiniWordText(
+    text: String,
+    words: List<com.ella.music.data.model.LyricWord>,
+    currentPositionMs: Long,
+    fontSize: TextUnit,
+    fontFamily: FontFamily?,
+    textAlign: TextAlign,
+    modifier: Modifier = Modifier,
+    maxLines: Int = 2,
+    pendingAlpha: Float = 0.52f,
+    sungAlpha: Float = 0.72f,
+    currentAlpha: Float = 1f
+) {
+    val annotated = remember(words, currentPositionMs, pendingAlpha, sungAlpha, currentAlpha) {
+        buildAnnotatedString {
+            words.forEach { word ->
+                val isCurrent = currentPositionMs in word.startMs until word.endMs
+                val isSung = currentPositionMs >= word.endMs
+                val color = when {
+                    isCurrent -> Color.White.copy(alpha = currentAlpha)
+                    isSung -> Color.White.copy(alpha = sungAlpha)
+                    else -> Color.White.copy(alpha = pendingAlpha)
+                }
+                pushStyle(
+                    SpanStyle(
+                        color = color,
+                        fontWeight = if (isCurrent) FontWeight.ExtraBold else FontWeight.SemiBold
+                    )
+                )
+                append(word.text)
+                pop()
+            }
+            if (length == 0) append(text)
+        }
+    }
+    BasicText(
+        text = annotated,
+        modifier = modifier.fillMaxWidth(),
+        style = TextStyle(
+            fontSize = fontSize,
+            fontFamily = fontFamily,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = textAlign
+        ),
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
@@ -2228,12 +2369,7 @@ private fun SpeedPitchSheetContent(
 ) {
     HalfSheetTitle(title = "变速变调", onBack = onBack)
     Spacer(modifier = Modifier.height(22.dp))
-    Text(
-        text = "变速播放",
-        fontSize = 16.sp,
-        fontWeight = FontWeight.ExtraBold,
-        color = Color.White.copy(alpha = 0.90f)
-    )
+    SpeedPitchHeader(title = "变速播放", value = speed.formatPlaybackStep())
     DottedValueSlider(
         value = speed,
         valueRange = 0.5f..2f,
@@ -2244,12 +2380,7 @@ private fun SpeedPitchSheetContent(
             .fillMaxWidth()
             .height(100.dp)
     )
-    Text(
-        text = "变调播放",
-        fontSize = 16.sp,
-        fontWeight = FontWeight.ExtraBold,
-        color = Color.White.copy(alpha = 0.90f)
-    )
+    SpeedPitchHeader(title = "变调播放", value = pitch.formatPlaybackStep())
     DottedValueSlider(
         value = pitch,
         valueRange = 0.5f..2f,
@@ -2260,6 +2391,32 @@ private fun SpeedPitchSheetContent(
             .fillMaxWidth()
             .height(100.dp)
     )
+}
+
+@Composable
+private fun SpeedPitchHeader(title: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.White.copy(alpha = 0.90f),
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.Black.copy(alpha = 0.78f),
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color.White.copy(alpha = 0.86f))
+                .padding(horizontal = 12.dp, vertical = 5.dp)
+        )
+    }
 }
 
 @Composable
@@ -2426,13 +2583,16 @@ private fun DottedValueSlider(
         label?.let {
             Text(
                 text = it,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold,
                 color = Color.Black.copy(alpha = 0.78f),
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(start = knobOffset)
-                    .padding(top = 5.dp)
+                    .padding(top = 2.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.White.copy(alpha = 0.88f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
             )
         }
     }
@@ -2649,13 +2809,13 @@ private fun GlowSeekBar(
     }
 
     Box(
-        modifier = modifier.height(38.dp)
+        modifier = modifier.height(30.dp)
     ) {
         AndroidView(
             factory = { context ->
                 SuperIslandGlowProgressBar(context).apply {
                     shaderMode = SuperIslandGlowProgressBar.ShaderMode.HIGH_END
-                    trackHeightPx = resources.displayMetrics.density * 6f
+                    trackHeightPx = resources.displayMetrics.density * 4.5f
                     trackHorizontalPaddingPx = 0f
                     headGlowAlpha = 1f
                     trackColor = AndroidColor.argb(48, 255, 255, 255)

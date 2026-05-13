@@ -195,6 +195,7 @@ fun WordLyricView(
     fontFamily: FontFamily? = null,
     topSpacer: androidx.compose.ui.unit.Dp = 180.dp,
     bottomSpacer: androidx.compose.ui.unit.Dp = 420.dp,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 22.dp,
     onLineClick: (LyricLine) -> Unit = {}
 ) {
     if (lyrics.isEmpty()) {
@@ -254,7 +255,7 @@ fun WordLyricView(
                     drawRect(fade, blendMode = BlendMode.DstIn)
                 }
             }
-            .padding(horizontal = 22.dp),
+            .padding(horizontal = horizontalPadding),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item { Box(modifier = Modifier.height(topSpacer)) }
