@@ -29,7 +29,7 @@ android {
 }
 
 dependencies {
-    compileOnly("androidx.media3:media3-decoder:1.6.1")
-    compileOnly("androidx.media3:media3-exoplayer:1.6.1")
+    compileOnly(libs.androidx.media3.decoder)
+    compileOnly(libs.androidx.media3.exoplayer)
     compileOnly("androidx.annotation:annotation:1.9.1")
 }

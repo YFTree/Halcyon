@@ -104,8 +104,8 @@ dependencies {
     implementation("wang.harlon.quickjs:wrapper-android:2.4.0")
     implementation(project(":ffmpeg-decoder"))
 
-    implementation("top.yukonga.miuix.kmp:miuix-ui")
-    implementation("top.yukonga.miuix.kmp:miuix-icons")
-    implementation("top.yukonga.miuix.kmp:miuix-blur-android")
-    implementation("top.yukonga.miuix.kmp:miuix-preference")
+    implementation(libs.miuix.ui)
+    implementation(libs.miuix.icons)
+    implementation(libs.miuix.blur)
+    implementation(libs.miuix.preference)
 }
