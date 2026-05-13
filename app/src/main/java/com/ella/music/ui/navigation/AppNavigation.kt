@@ -21,6 +21,7 @@ import com.ella.music.ui.folder.FolderScreen
 import com.ella.music.ui.folder.WebDavScreen
 import com.ella.music.ui.home.HomeScreen
 import com.ella.music.ui.online.LxOnlineScreen
+import com.ella.music.ui.online.MusicFreeOnlineScreen
 import com.ella.music.ui.player.PlayerScreen
 import com.ella.music.ui.settings.LyricFontScreen
 import com.ella.music.ui.settings.LogScreen
@@ -46,6 +47,7 @@ sealed class Screen(val route: String) {
     data object LyricFont : Screen("lyric_font")
     data object Logs : Screen("logs")
     data object LxOnline : Screen("lx_online")
+    data object MusicFreeOnline : Screen("musicfree_online")
     data object Analytics : Screen("analytics")
     data object About : Screen("about")
     data object Player : Screen("player")
@@ -169,6 +171,7 @@ fun AppNavigation(
                 onNavigateToAbout = { navController.navigate(Screen.About.route) },
                 onNavigateToAnalytics = { navController.navigate(Screen.Analytics.route) },
                 onNavigateToLxOnline = { navController.navigate(Screen.LxOnline.route) },
+                onNavigateToMusicFreeOnline = { navController.navigate(Screen.MusicFreeOnline.route) },
                 onNavigateToLyricFont = { navController.navigate(Screen.LyricFont.route) },
                 onNavigateToLogs = { navController.navigate(Screen.Logs.route) },
                 playerViewModel = playerViewModel
@@ -192,6 +195,12 @@ fun AppNavigation(
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
                 onNavigateToPlayer = { navController.navigate(Screen.Player.route) }
+            )
+        }
+
+        composable(Screen.MusicFreeOnline.route) {
+            MusicFreeOnlineScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

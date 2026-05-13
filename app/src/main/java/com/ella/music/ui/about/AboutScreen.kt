@@ -343,6 +343,21 @@ private fun AboutContent(
                         summary = "Kotlin 图片加载库",
                         onClick = { uriHandler.openUri("https://github.com/coil-kt/coil") },
                     )
+                    BasicComponent(
+                        title = "LX Music Mobile",
+                        summary = "在线音乐源与 API 适配参考",
+                        onClick = { uriHandler.openUri("https://github.com/lyswhut/lx-music-mobile") },
+                    )
+                    BasicComponent(
+                        title = "accompanist-lyrics-core",
+                        summary = "歌词解析与 TTML/LRC 结构参考",
+                        onClick = { uriHandler.openUri("https://github.com/6xingyv/accompanist-lyrics-core") },
+                    )
+                    BasicComponent(
+                        title = "MusicFree",
+                        summary = "在线音乐插件协议与插件生态参考",
+                        onClick = { uriHandler.openUri("https://github.com/maotoumao/MusicFree") },
+                    )
                 }
             }
 

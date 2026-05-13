@@ -23,6 +23,13 @@ data class LxSourceConfig(
     val script: String
 )
 
+data class MusicFreePluginConfig(
+    val id: String,
+    val url: String,
+    val name: String,
+    val script: String
+)
+
 class SettingsManager(private val context: Context) {
 
     companion object {
@@ -53,6 +60,8 @@ class SettingsManager(private val context: Context) {
         val KEY_LX_SOURCE_SCRIPT = stringPreferencesKey("lx_source_script")
         val KEY_LX_SOURCES_JSON = stringPreferencesKey("lx_sources_json")
         val KEY_LX_SELECTED_SOURCE_ID = stringPreferencesKey("lx_selected_source_id")
+        val KEY_MUSICFREE_PLUGINS_JSON = stringPreferencesKey("musicfree_plugins_json")
+        val KEY_MUSICFREE_SELECTED_PLUGIN_ID = stringPreferencesKey("musicfree_selected_plugin_id")
         val KEY_LYRIC_FONT_NAME = stringPreferencesKey("lyric_font_name")
         val KEY_LYRIC_FONT_PATH = stringPreferencesKey("lyric_font_path")
         val KEY_LYRIC_FONT_WEIGHT = intPreferencesKey("lyric_font_weight")
@@ -107,6 +116,15 @@ class SettingsManager(private val context: Context) {
     val lxSourceUrl: Flow<String> = selectedLxSource.map { it?.url.orEmpty() }
     val lxSourceName: Flow<String> = selectedLxSource.map { it?.name.orEmpty() }
     val lxSourceScript: Flow<String> = selectedLxSource.map { it?.script.orEmpty() }
+    val musicFreePlugins: Flow<List<MusicFreePluginConfig>> =
+        context.dataStore.data.map { prefs -> prefs.musicFreePlugins() }
+    val selectedMusicFreePluginId: Flow<String> =
+        context.dataStore.data.map { it[KEY_MUSICFREE_SELECTED_PLUGIN_ID] ?: "" }
+    val selectedMusicFreePlugin: Flow<MusicFreePluginConfig?> = context.dataStore.data.map { prefs ->
+        val plugins = prefs.musicFreePlugins()
+        val selectedId = prefs[KEY_MUSICFREE_SELECTED_PLUGIN_ID].orEmpty()
+        plugins.firstOrNull { it.id == selectedId } ?: plugins.firstOrNull()
+    }
     val lyricFontName: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_NAME] ?: "" }
     val lyricFontPath: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_PATH] ?: "" }
     val lyricFontWeight: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_WEIGHT] ?: 800 }
@@ -279,6 +297,48 @@ class SettingsManager(private val context: Context) {
         }
     }
 
+    suspend fun setMusicFreePlugin(url: String, name: String, script: String) {
+        context.dataStore.edit {
+            val plugin = MusicFreePluginConfig(
+                id = url.toMusicFreePluginId(script),
+                url = url.trim(),
+                name = name.ifBlank { "MusicFree 插件" },
+                script = script
+            )
+            val plugins = it.musicFreePlugins().filterNot { existing -> existing.id == plugin.id } + plugin
+            it[KEY_MUSICFREE_PLUGINS_JSON] = plugins.toMusicFreeJson()
+            it[KEY_MUSICFREE_SELECTED_PLUGIN_ID] = plugin.id
+        }
+    }
+
+    suspend fun selectMusicFreePlugin(id: String) {
+        context.dataStore.edit { prefs ->
+            val plugin = prefs.musicFreePlugins().firstOrNull { it.id == id } ?: return@edit
+            prefs[KEY_MUSICFREE_SELECTED_PLUGIN_ID] = plugin.id
+        }
+    }
+
+    suspend fun removeMusicFreePlugin(id: String) {
+        context.dataStore.edit { prefs ->
+            val plugins = prefs.musicFreePlugins().filterNot { it.id == id }
+            if (plugins.isEmpty()) {
+                prefs.remove(KEY_MUSICFREE_PLUGINS_JSON)
+                prefs.remove(KEY_MUSICFREE_SELECTED_PLUGIN_ID)
+            } else {
+                val selected = plugins.firstOrNull { it.id == prefs[KEY_MUSICFREE_SELECTED_PLUGIN_ID] } ?: plugins.first()
+                prefs[KEY_MUSICFREE_PLUGINS_JSON] = plugins.toMusicFreeJson()
+                prefs[KEY_MUSICFREE_SELECTED_PLUGIN_ID] = selected.id
+            }
+        }
+    }
+
+    suspend fun clearMusicFreePlugins() {
+        context.dataStore.edit {
+            it.remove(KEY_MUSICFREE_PLUGINS_JSON)
+            it.remove(KEY_MUSICFREE_SELECTED_PLUGIN_ID)
+        }
+    }
+
     suspend fun setLyricFont(name: String, path: String) {
         context.dataStore.edit {
             it[KEY_LYRIC_FONT_NAME] = name.ifBlank { "自定义字体" }
@@ -359,6 +419,8 @@ class SettingsManager(private val context: Context) {
             setString(KEY_LX_SOURCE_SCRIPT)
             setString(KEY_LX_SOURCES_JSON)
             setString(KEY_LX_SELECTED_SOURCE_ID)
+            setString(KEY_MUSICFREE_PLUGINS_JSON)
+            setString(KEY_MUSICFREE_SELECTED_PLUGIN_ID)
             setString(KEY_LYRIC_FONT_NAME)
             setString(KEY_LYRIC_FONT_PATH)
             setString(KEY_SCAN_INCLUDE_FOLDERS)
@@ -422,8 +484,44 @@ class SettingsManager(private val context: Context) {
         return array.toString()
     }
 
+    private fun Preferences.musicFreePlugins(): List<MusicFreePluginConfig> {
+        val json = this[KEY_MUSICFREE_PLUGINS_JSON].orEmpty()
+        if (json.isBlank()) return emptyList()
+        return runCatching {
+            val array = JSONArray(json)
+            List(array.length()) { index ->
+                val item = array.getJSONObject(index)
+                MusicFreePluginConfig(
+                    id = item.optString("id"),
+                    url = item.optString("url"),
+                    name = item.optString("name").ifBlank { "MusicFree 插件" },
+                    script = item.optString("script")
+                )
+            }.filter { it.id.isNotBlank() && it.script.isNotBlank() }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun List<MusicFreePluginConfig>.toMusicFreeJson(): String {
+        val array = JSONArray()
+        forEach { plugin ->
+            array.put(
+                JSONObject()
+                    .put("id", plugin.id)
+                    .put("url", plugin.url)
+                    .put("name", plugin.name)
+                    .put("script", plugin.script)
+            )
+        }
+        return array.toString()
+    }
+
     private fun String.toLxSourceId(script: String): String {
         val source = trim().ifBlank { script.take(64) }
         return "lx_${source.hashCode()}"
+    }
+
+    private fun String.toMusicFreePluginId(script: String): String {
+        val source = trim().ifBlank { script.take(64) }
+        return "musicfree_${source.hashCode()}"
     }
 }

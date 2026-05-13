@@ -67,6 +67,7 @@ fun SettingsScreen(
     onNavigateToAbout: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToLxOnline: () -> Unit,
+    onNavigateToMusicFreeOnline: () -> Unit,
     onNavigateToLyricFont: () -> Unit,
     onNavigateToLogs: () -> Unit,
     playerViewModel: PlayerViewModel? = null
@@ -449,6 +450,11 @@ fun SettingsScreen(
                         title = "LX Music 在线音乐",
                         summary = "导入 LX Music API 源并搜索在线播放",
                         onClick = onNavigateToLxOnline
+                    )
+                    ArrowPreference(
+                        title = "MusicFree 插件",
+                        summary = "导入 MusicFree 插件源并管理在线音乐插件",
+                        onClick = onNavigateToMusicFreeOnline
                     )
                     ArrowPreference(
                         title = "清除封面歌词缓存",
