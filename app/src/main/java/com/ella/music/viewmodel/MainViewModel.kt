@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.PlaybackStatsStore
 import com.ella.music.data.SongPlaybackStats
 import com.ella.music.data.matchesArtistName
@@ -37,6 +38,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isScanning: StateFlow<Boolean> = repository.isScanning
     val scanProgress: StateFlow<Int> = repository.scanProgress
     val playbackStats: StateFlow<List<SongPlaybackStats>> = playbackStatsStore.stats
+    val playbackHistory: StateFlow<List<PlaybackHistoryEntry>> = playbackStatsStore.history
+    val dailyListenMs: StateFlow<Map<String, Long>> = playbackStatsStore.dailyListenMs
 
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()

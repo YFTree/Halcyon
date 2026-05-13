@@ -22,30 +22,52 @@ data class SongPlaybackStats(
     val lastPlayedAt: Long
 )
 
+data class PlaybackHistoryEntry(
+    val songId: Long,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val playedAt: Long
+)
+
 class PlaybackStatsStore private constructor(context: Context) {
     private val statsFile = File(context.applicationContext.filesDir, "playback_stats.json")
+    private val historyFile = File(context.applicationContext.filesDir, "playback_history.json")
+    private val dailyStatsFile = File(context.applicationContext.filesDir, "playback_daily_stats.json")
     private val _stats = MutableStateFlow<List<SongPlaybackStats>>(emptyList())
     val stats: StateFlow<List<SongPlaybackStats>> = _stats.asStateFlow()
+    private val _history = MutableStateFlow<List<PlaybackHistoryEntry>>(emptyList())
+    val history: StateFlow<List<PlaybackHistoryEntry>> = _history.asStateFlow()
+    private val _dailyListenMs = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val dailyListenMs: StateFlow<Map<String, Long>> = _dailyListenMs.asStateFlow()
 
     init {
-        load()
+        loadStats()
+        loadHistory()
+        loadDailyStats()
     }
 
-    suspend fun recordPlay(song: Song) = update(song) { current ->
-        current.copy(
-            playCount = current.playCount + 1,
-            lastPlayedAt = System.currentTimeMillis()
-        )
+    suspend fun recordPlay(song: Song) {
+        val now = System.currentTimeMillis()
+        update(song) { current ->
+            current.copy(
+                playCount = current.playCount + 1,
+                lastPlayedAt = now
+            )
+        }
+        appendHistory(song, now)
     }
 
     suspend fun addListenTime(song: Song, listenedMs: Long) {
         if (listenedMs <= 0) return
+        val now = System.currentTimeMillis()
         update(song) { current ->
             current.copy(
                 listenedMs = current.listenedMs + listenedMs,
-                lastPlayedAt = System.currentTimeMillis()
+                lastPlayedAt = now
             )
         }
+        addDailyListenTime(now, listenedMs)
     }
 
     private suspend fun update(
@@ -74,7 +96,31 @@ class PlaybackStatsStore private constructor(context: Context) {
         save(sorted)
     }
 
-    private fun load() {
+    private suspend fun appendHistory(song: Song, playedAt: Long) = withContext(Dispatchers.IO) {
+        val updated = (listOf(
+            PlaybackHistoryEntry(
+                songId = song.id,
+                title = song.title,
+                artist = song.artist,
+                album = song.album,
+                playedAt = playedAt
+            )
+        ) + _history.value)
+            .distinctBy { "${it.songId}:${it.playedAt}" }
+            .take(MAX_HISTORY_ITEMS)
+        _history.value = updated
+        saveHistory(updated)
+    }
+
+    private suspend fun addDailyListenTime(timestampMs: Long, listenedMs: Long) = withContext(Dispatchers.IO) {
+        val key = timestampMs.toDateKey()
+        val updated = _dailyListenMs.value.toMutableMap()
+        updated[key] = (updated[key] ?: 0L) + listenedMs
+        _dailyListenMs.value = updated.toSortedMap()
+        saveDailyStats(_dailyListenMs.value)
+    }
+
+    private fun loadStats() {
         if (!statsFile.exists()) return
         runCatching {
             val array = JSONArray(statsFile.readText())
@@ -92,6 +138,41 @@ class PlaybackStatsStore private constructor(context: Context) {
             }
         }.onFailure {
             Log.w("PlaybackStatsStore", "Failed to load playback stats", it)
+        }
+    }
+
+    private fun loadHistory() {
+        if (!historyFile.exists()) return
+        runCatching {
+            val array = JSONArray(historyFile.readText())
+            _history.value = List(array.length()) { index ->
+                val item = array.getJSONObject(index)
+                PlaybackHistoryEntry(
+                    songId = item.optLong("songId"),
+                    title = item.optString("title"),
+                    artist = item.optString("artist"),
+                    album = item.optString("album"),
+                    playedAt = item.optLong("playedAt")
+                )
+            }.filter { it.playedAt > 0L }
+                .sortedByDescending { it.playedAt }
+                .take(MAX_HISTORY_ITEMS)
+        }.onFailure {
+            Log.w("PlaybackStatsStore", "Failed to load playback history", it)
+        }
+    }
+
+    private fun loadDailyStats() {
+        if (!dailyStatsFile.exists()) return
+        runCatching {
+            val payload = JSONObject(dailyStatsFile.readText())
+            val parsed = mutableMapOf<String, Long>()
+            payload.keys().forEach { key ->
+                parsed[key] = payload.optLong(key)
+            }
+            _dailyListenMs.value = parsed.toSortedMap()
+        }.onFailure {
+            Log.w("PlaybackStatsStore", "Failed to load daily playback stats", it)
         }
     }
 
@@ -116,7 +197,49 @@ class PlaybackStatsStore private constructor(context: Context) {
         }
     }
 
+    private fun saveHistory(history: List<PlaybackHistoryEntry>) {
+        runCatching {
+            val array = JSONArray()
+            history.forEach { entry ->
+                array.put(
+                    JSONObject()
+                        .put("songId", entry.songId)
+                        .put("title", entry.title)
+                        .put("artist", entry.artist)
+                        .put("album", entry.album)
+                        .put("playedAt", entry.playedAt)
+                )
+            }
+            historyFile.writeText(array.toString())
+        }.onFailure {
+            Log.w("PlaybackStatsStore", "Failed to save playback history", it)
+        }
+    }
+
+    private fun saveDailyStats(dailyStats: Map<String, Long>) {
+        runCatching {
+            val payload = JSONObject()
+            dailyStats.forEach { (date, listenedMs) ->
+                payload.put(date, listenedMs)
+            }
+            dailyStatsFile.writeText(payload.toString())
+        }.onFailure {
+            Log.w("PlaybackStatsStore", "Failed to save daily playback stats", it)
+        }
+    }
+
+    private fun Long.toDateKey(): String {
+        val calendar = java.util.Calendar.getInstance()
+        calendar.timeInMillis = this
+        val year = calendar.get(java.util.Calendar.YEAR)
+        val month = calendar.get(java.util.Calendar.MONTH) + 1
+        val day = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+        return "%04d-%02d-%02d".format(year, month, day)
+    }
+
     companion object {
+        private const val MAX_HISTORY_ITEMS = 200
+
         @Volatile
         private var instance: PlaybackStatsStore? = null
 

@@ -6,6 +6,7 @@ import android.app.Activity
 import android.app.DownloadManager
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.media.MediaRouter2
 import android.content.Intent
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
@@ -13,6 +14,7 @@ import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import androidx.compose.runtime.DisposableEffect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -20,6 +22,7 @@ import androidx.media3.common.Player as Media3Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import android.os.Environment
+import android.provider.Settings
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -994,6 +997,7 @@ private fun PlayerProgressBlock(
     palette: PlayerPalette,
     onSeek: (Float) -> Unit
 ) {
+    val context = LocalContext.current
     var infoMode by remember(audioInfo, bluetoothDeviceName) { mutableStateOf(0) }
     val infoLabels = remember(audioInfo, bluetoothDeviceName) {
         buildList {
@@ -1029,8 +1033,17 @@ private fun PlayerProgressBlock(
                         .align(Alignment.Center)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color.White.copy(alpha = 0.10f))
-                        .clickable {
-                            if (infoLabels.size > 1) infoMode = (infoMode + 1) % infoLabels.size
+                        .pointerInput(infoLabels, bluetoothDeviceName) {
+                            detectTapGestures(
+                                onTap = {
+                                    if (infoLabels.size > 1) infoMode = (infoMode + 1) % infoLabels.size
+                                },
+                                onLongPress = {
+                                    if (!bluetoothDeviceName.isNullOrBlank()) {
+                                        openSystemOutputSwitcher(context)
+                                    }
+                                }
+                            )
                         }
                         .padding(horizontal = 10.dp, vertical = 3.dp)
                 )
@@ -1042,6 +1055,22 @@ private fun PlayerProgressBlock(
                 modifier = Modifier.align(Alignment.CenterEnd)
             )
         }
+    }
+}
+
+private fun openSystemOutputSwitcher(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        val shown = runCatching {
+            MediaRouter2.getInstance(context).showSystemOutputSwitcher()
+        }.getOrDefault(false)
+        if (shown) return
+    }
+
+    Toast.makeText(context, "当前系统不支持直接打开媒体输出面板，已跳转到蓝牙设置", Toast.LENGTH_SHORT).show()
+    runCatching {
+        context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }.onFailure {
+        context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 }
 

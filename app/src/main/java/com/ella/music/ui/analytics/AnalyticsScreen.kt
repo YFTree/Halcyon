@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -24,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,9 +33,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.SongPlaybackStats
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
@@ -48,6 +52,9 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun AnalyticsScreen(
@@ -56,6 +63,8 @@ fun AnalyticsScreen(
 ) {
     val songs by mainViewModel.songs.collectAsState()
     val playbackStats by mainViewModel.playbackStats.collectAsState()
+    val playbackHistory by mainViewModel.playbackHistory.collectAsState()
+    val dailyListenMs by mainViewModel.dailyListenMs.collectAsState()
     val analysis by produceState<LibraryAnalysis?>(initialValue = null, songs) {
         value = if (songs.isEmpty()) LibraryAnalysis(emptyList(), emptyList(), 0, 0L)
         else withContext(Dispatchers.IO) { buildLibraryAnalysis(songs, mainViewModel) }
@@ -105,6 +114,14 @@ fun AnalyticsScreen(
             }
 
             item {
+                ListenHeatmapCard(dailyListenMs = dailyListenMs)
+            }
+
+            item {
+                HistoryCard(history = playbackHistory.take(20))
+            }
+
+            item {
                 DonutChartCard(
                     title = "音频格式统计",
                     loadingText = "正在分析音频格式...",
@@ -150,6 +167,129 @@ fun AnalyticsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ListenHeatmapCard(dailyListenMs: Map<String, Long>) {
+    val days = remember(dailyListenMs) { recentDateKeys(56) }
+    val maxMs = days.maxOfOrNull { dailyListenMs[it] ?: 0L }?.coerceAtLeast(1L) ?: 1L
+    val todayListenMs = days.lastOrNull()?.let { dailyListenMs[it] } ?: 0L
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "听歌排行热力图", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "近 8 周每日听歌时长",
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                days.chunked(7).forEach { week ->
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        week.forEach { date ->
+                            val listenedMs = dailyListenMs[date] ?: 0L
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(13.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(heatmapColor(listenedMs, maxMs))
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "少",
+                    fontSize = 11.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                listOf(0.16f, 0.36f, 0.58f, 0.82f).forEach { level ->
+                    Box(
+                        modifier = Modifier
+                            .size(13.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(heatmapColor((maxMs * level).toLong(), maxMs))
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Text(
+                    text = "多",
+                    fontSize = 11.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "今天 ${formatListenDuration(todayListenMs)}",
+                    fontSize = 11.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryCard(history: List<PlaybackHistoryEntry>) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "听歌历史记录", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
+            if (history.isEmpty()) {
+                Text(
+                    text = "播放歌曲后会记录最近听过的内容",
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            } else {
+                history.forEach { entry ->
+                    HistoryRow(entry = entry)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryRow(entry: PlaybackHistoryEntry) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = entry.title,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.artist,
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Text(
+            text = formatHistoryTime(entry.playedAt),
+            fontSize = 12.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            textAlign = TextAlign.End,
+            modifier = Modifier.widthIn(min = 72.dp)
+        )
     }
 }
 
@@ -469,6 +609,46 @@ private fun formatFileSize(bytes: Long): String {
 
 private fun formatPercent(percent: Float): String {
     return if (percent < 1f && percent > 0f) "<1%" else "${percent.toInt()}%"
+}
+
+private fun recentDateKeys(days: Int): List<String> {
+    val calendar = Calendar.getInstance()
+    calendar.add(Calendar.DAY_OF_YEAR, -(days - 1))
+    return List(days) {
+        val key = "%04d-%02d-%02d".format(
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH) + 1,
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+        calendar.add(Calendar.DAY_OF_YEAR, 1)
+        key
+    }
+}
+
+private fun heatmapColor(listenedMs: Long, maxMs: Long): Color {
+    if (listenedMs <= 0L) return Color(0x1F8E8E8E)
+    val level = (listenedMs.toFloat() / maxMs.toFloat()).coerceIn(0.12f, 1f)
+    return Color(
+        red = 0.18f + 0.05f * level,
+        green = 0.48f + 0.34f * level,
+        blue = 0.84f - 0.36f * level,
+        alpha = 0.40f + 0.56f * level
+    )
+}
+
+private fun formatHistoryTime(timestampMs: Long): String {
+    if (timestampMs <= 0L) return ""
+    val now = Calendar.getInstance()
+    val then = Calendar.getInstance().apply { timeInMillis = timestampMs }
+    val sameYear = now.get(Calendar.YEAR) == then.get(Calendar.YEAR)
+    val sameDay = sameYear &&
+        now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
+    val pattern = when {
+        sameDay -> "HH:mm"
+        sameYear -> "MM-dd HH:mm"
+        else -> "yyyy-MM-dd"
+    }
+    return SimpleDateFormat(pattern, Locale.getDefault()).format(then.time)
 }
 
 private val qualityOrder = listOf("Dolby", "Master", "Hi-Res", "无损", "HQ", "LQ", "未知", "其他")
