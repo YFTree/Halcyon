@@ -15,6 +15,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.ella.music.MainActivity
+import com.ella.music.data.AppLogStore
 import com.ella.music.data.SettingsManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -96,6 +97,7 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         Log.i(TAG, "PlaybackService created")
+        AppLogStore.info(this, TAG, "PlaybackService created")
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {

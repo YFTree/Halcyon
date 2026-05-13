@@ -67,6 +67,7 @@ fun SettingsScreen(
     onNavigateToAnalytics: () -> Unit,
     onNavigateToLxOnline: () -> Unit,
     onNavigateToLyricFont: () -> Unit,
+    onNavigateToLogs: () -> Unit,
     playerViewModel: PlayerViewModel? = null
 ) {
     val context = LocalContext.current
@@ -426,6 +427,11 @@ fun SettingsScreen(
                                 Toast.makeText(context, "封面歌词缓存已清除", Toast.LENGTH_SHORT).show()
                             }
                         }
+                    )
+                    ArrowPreference(
+                        title = "日志",
+                        summary = "查看 info 日志和闪退记录",
+                        onClick = onNavigateToLogs
                     )
                     ArrowPreference(
                         title = "关于",
