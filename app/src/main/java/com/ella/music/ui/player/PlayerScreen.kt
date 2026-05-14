@@ -133,6 +133,7 @@ import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
+import com.ella.music.player.PlaybackAudioSession
 import com.ella.music.ui.components.WordLyricView
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.viewmodel.PlayerViewModel
@@ -142,6 +143,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
+import kotlin.math.ln
+import kotlin.math.sqrt
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -177,7 +180,7 @@ fun PlayerScreen(
     val repeatMode by playerViewModel.repeatMode.collectAsState()
     val playbackSpeed by playerViewModel.playbackSpeed.collectAsState()
     val playbackPitch by playerViewModel.playbackPitch.collectAsState()
-    val audioSessionId = 0
+    val audioSessionId by PlaybackAudioSession.audioSessionId.collectAsState()
     val audioVisualizerEnabled by settingsManager.audioVisualizerEnabled.collectAsState(initial = false)
     val playlist by playerViewModel.playlist.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
@@ -672,7 +675,7 @@ private fun CoverPlayerPage(
                         currentPositionMs = currentPosition,
                         fontFamily = fontFamily,
                         fontWeight = fontWeight,
-                        onLineClick = onLyricLineClick,
+                        onLineClick = { onShowLyrics() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 132.dp, max = 212.dp)
@@ -1981,6 +1984,7 @@ private fun MiniLyricsPreview(
 
     LazyColumn(
         state = listState,
+        userScrollEnabled = false,
         modifier = modifier
             .fillMaxWidth()
             .graphicsLayer {
@@ -2649,15 +2653,18 @@ private fun AudioVisualizer(
 ) {
     if (!enabled) return
     var fftData by remember { mutableStateOf<ByteArray?>(null) }
+    var levels by remember { mutableStateOf<List<Float>>(emptyList()) }
     var visualizerFailed by remember { mutableStateOf(false) }
 
     LaunchedEffect(enabled, audioSessionId, isPlaying) {
         fftData = null
+        levels = emptyList()
         visualizerFailed = false
-        if (!enabled || audioSessionId < 0) return@LaunchedEffect
+        if (!enabled || audioSessionId <= 0) return@LaunchedEffect
         val visualizer = runCatching {
             Visualizer(audioSessionId).apply {
                 captureSize = Visualizer.getCaptureSizeRange()[1].coerceAtMost(1024)
+                scalingMode = Visualizer.SCALING_MODE_NORMALIZED
                 this.enabled = true
             }
         }.onFailure { visualizerFailed = true }.getOrNull() ?: return@LaunchedEffect
@@ -2678,40 +2685,23 @@ private fun AudioVisualizer(
         }
     }
 
-    val transition = rememberInfiniteTransition(label = "audio_visualizer")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = if (isPlaying) 920 else 2600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "audio_visualizer_phase"
-    )
-    val playbackPhase = if (isPlaying) phase else 0.18f
+    LaunchedEffect(fftData, enabled, visualizerFailed) {
+        val fft = fftData
+        levels = if (enabled && !visualizerFailed && fft != null && fft.size > 8) {
+            mapFftToLogBars(fft, levels, barCount = 58)
+        } else {
+            emptyList()
+        }
+    }
+
     Canvas(modifier = modifier.graphicsLayer { alpha = if (isPlaying) 1f else 0.42f }) {
         val barCount = 58
         val bottom = size.height - 2.dp.toPx()
         val gap = size.width / barCount
         val barWidth = (gap * 0.42f).coerceIn(2.dp.toPx(), 5.dp.toPx())
-        val fft = fftData
         for (index in 0 until barCount) {
             val x = gap * index + gap / 2f
-            val normalized = if (enabled && !visualizerFailed && fft != null && fft.size > 8) {
-                val bucket = ((index + 1) * (fft.size / 2 - 1) / barCount).coerceIn(1, fft.size / 2 - 1)
-                val real = fft[bucket * 2].toInt()
-                val imag = fft[bucket * 2 + 1].toInt()
-                val magnitude = kotlin.math.sqrt((real * real + imag * imag).toFloat()) / 128f
-                (0.08f + magnitude * 1.35f).coerceIn(0.10f, 1f)
-            } else {
-                val seed = index * 0.37f + positionMs / 780f + playbackPhase * 6.28f
-                val wave = (
-                    kotlin.math.sin(seed) * 0.42f +
-                        kotlin.math.sin(seed * 0.47f + index * 0.19f) * 0.34f +
-                        kotlin.math.sin(seed * 1.71f) * 0.24f
-                    ).coerceIn(-1f, 1f)
-                if (isPlaying) (0.30f + kotlin.math.abs(wave) * 0.70f) else 0.18f
-            }
+            val normalized = levels.getOrNull(index) ?: 0.04f
             val height = size.height * normalized * if (index < 6 || index > barCount - 7) 0.58f else 1f
             drawRoundRect(
                 color = accent.copy(alpha = 0.20f + normalized * 0.56f),
@@ -2720,6 +2710,39 @@ private fun AudioVisualizer(
                 cornerRadius = CornerRadius(barWidth, barWidth)
             )
         }
+    }
+}
+
+private fun mapFftToLogBars(
+    fft: ByteArray,
+    previous: List<Float>,
+    barCount: Int
+): List<Float> {
+    val binCount = fft.size / 2
+    if (binCount <= 2) return List(barCount) { 0.04f }
+
+    return List(barCount) { index ->
+        val startRatio = index.toFloat() / barCount
+        val endRatio = (index + 1f) / barCount
+        val startBin = (1f + (binCount - 2) * startRatio * startRatio)
+            .toInt()
+            .coerceIn(1, binCount - 1)
+        val endBin = (1f + (binCount - 2) * endRatio * endRatio)
+            .toInt()
+            .coerceIn(startBin, binCount - 1)
+
+        var peak = 0f
+        for (bin in startBin..endBin) {
+            val real = fft[bin * 2].toFloat()
+            val imag = fft[bin * 2 + 1].toFloat()
+            peak = max(peak, sqrt(real * real + imag * imag))
+        }
+
+        val db = 20f * (ln(peak.coerceAtLeast(1f)) / ln(10f))
+        val normalized = ((db - 18f) / 42f).coerceIn(0f, 1f)
+        val shaped = 0.04f + normalized * normalized * 0.96f
+        val old = previous.getOrNull(index) ?: 0.04f
+        old * 0.62f + shaped * 0.38f
     }
 }
 
