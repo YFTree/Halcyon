@@ -14,9 +14,13 @@ import androidx.media3.session.SessionToken
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.Song
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.Executor
@@ -59,12 +63,14 @@ class ExoPlayerManager(private val context: Context) {
     val playlistFlow: StateFlow<List<Song>> = _playlist.asStateFlow()
     private var playerListener: Player.Listener? = null
     private var lastQueueSaveMs = 0L
+    private var lastStateSaveMs = 0L
     private var shuffleMode = SettingsManager.SHUFFLE_MODE_PSEUDO
     private var virtualPlaylistCurrentIndex: Int? = null
     private var playWhenConnected = false
     private var pendingPlaylist: PendingPlaylist? = null
 
     private val directExecutor = Executor { it.run() }
+    private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun connect() {
         val sessionToken = SessionToken(
@@ -88,6 +94,7 @@ class ExoPlayerManager(private val context: Context) {
         playerListener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
+                savePlaybackState(force = true)
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -278,7 +285,7 @@ class ExoPlayerManager(private val context: Context) {
 
     fun seekTo(positionMs: Long) {
         mediaController?.seekTo(positionMs)
-        savePlaybackQueue(force = true)
+        savePlaybackState(force = true)
     }
 
     fun toggleShuffle() {
@@ -310,7 +317,7 @@ class ExoPlayerManager(private val context: Context) {
         mediaController?.playbackParameters = PlaybackParameters(safeSpeed, safePitch)
         _playbackSpeed.value = safeSpeed
         _playbackPitch.value = safePitch
-        savePlaybackQueue()
+        savePlaybackState()
     }
 
     fun updatePosition() {
@@ -319,7 +326,7 @@ class ExoPlayerManager(private val context: Context) {
         }
         _currentPosition.value = mediaController?.currentPosition?.coerceAtLeast(0) ?: 0L
         _duration.value = mediaController?.duration?.coerceAtLeast(0) ?: 0L
-        if (_currentSong.value != null) savePlaybackQueue()
+        if (_currentSong.value != null) savePlaybackState()
     }
 
     fun updateBluetoothLyric(text: String?, secondaryText: String? = null) {
@@ -422,7 +429,7 @@ class ExoPlayerManager(private val context: Context) {
         }
         _currentSong.value = restoredSong
         _duration.value = controller.duration.coerceAtLeast(0)
-        savePlaybackQueue(force = true)
+        savePlaybackState(force = true)
     }
 
     private fun shouldUseTrueRandomShuffle(): Boolean =
@@ -475,29 +482,63 @@ class ExoPlayerManager(private val context: Context) {
         if (!force && now - lastQueueSaveMs < 2_500L) return
         lastQueueSaveMs = now
 
-        val controller = mediaController
-        val index = controller?.currentMediaItemIndex?.takeIf { it >= 0 } ?: playlist.indexOfFirst { it.id == _currentSong.value?.id }
-        val payload = JSONObject()
-            .put("index", index.coerceAtLeast(0))
-            .put("positionMs", controller?.currentPosition?.coerceAtLeast(0) ?: _currentPosition.value)
-            .put("repeatMode", controller?.repeatMode ?: _repeatMode.value)
-            .put("shuffle", controller?.shuffleModeEnabled ?: _shuffleEnabled.value)
-            .put("speed", controller?.playbackParameters?.speed ?: _playbackSpeed.value)
-            .put("pitch", controller?.playbackParameters?.pitch ?: _playbackPitch.value)
-            .put("songs", JSONArray().apply {
-                playlist.forEach { song -> put(song.toJson()) }
-            })
+        val songs = playlist.toList()
+        val snapshot = capturePlaybackState()
 
-        context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(KEY_QUEUE, payload.toString())
-            .apply()
+        persistenceScope.launch {
+            val payload = JSONObject()
+                .put("index", snapshot.index)
+                .put("positionMs", snapshot.positionMs)
+                .put("repeatMode", snapshot.repeatMode)
+                .put("shuffle", snapshot.shuffle)
+                .put("speed", snapshot.speed)
+                .put("pitch", snapshot.pitch)
+                .put("songs", JSONArray().apply {
+                    songs.forEach { song -> put(song.toJson()) }
+                })
+
+            context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_QUEUE, payload.toString())
+                .putString(KEY_STATE, snapshot.toJson().toString())
+                .apply()
+        }
+    }
+
+    private fun savePlaybackState(force: Boolean = false) {
+        if (playlist.isEmpty()) return
+        val now = System.currentTimeMillis()
+        if (!force && now - lastStateSaveMs < 2_500L) return
+        lastStateSaveMs = now
+
+        val snapshot = capturePlaybackState()
+        persistenceScope.launch {
+            context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_STATE, snapshot.toJson().toString())
+                .apply()
+        }
+    }
+
+    private fun capturePlaybackState(): PlaybackStateSnapshot {
+        val controller = mediaController
+        val index = controller?.currentMediaItemIndex?.takeIf { it >= 0 }
+            ?: playlist.indexOfFirst { it.id == _currentSong.value?.id }
+        return PlaybackStateSnapshot(
+            index = index.coerceAtLeast(0),
+            positionMs = controller?.currentPosition?.coerceAtLeast(0) ?: _currentPosition.value,
+            repeatMode = controller?.repeatMode ?: _repeatMode.value,
+            shuffle = controller?.shuffleModeEnabled ?: _shuffleEnabled.value,
+            speed = controller?.playbackParameters?.speed ?: _playbackSpeed.value,
+            pitch = controller?.playbackParameters?.pitch ?: _playbackPitch.value
+        )
     }
 
     private fun clearSavedQueue() {
         context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_QUEUE)
+            .remove(KEY_STATE)
             .apply()
     }
 
@@ -511,14 +552,18 @@ class ExoPlayerManager(private val context: Context) {
             val songsArray = payload.optJSONArray("songs") ?: JSONArray()
             val songs = (0 until songsArray.length())
                 .mapNotNull { songsArray.optJSONObject(it)?.toSongOrNull() }
+            val state = context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
+                .getString(KEY_STATE, null)
+                ?.let { runCatching { JSONObject(it) }.getOrNull() }
             SavedQueue(
                 songs = songs,
-                index = payload.optInt("index", 0),
-                positionMs = payload.optLong("positionMs", 0L),
-                repeatMode = payload.optInt("repeatMode", Player.REPEAT_MODE_OFF),
-                shuffle = payload.optBoolean("shuffle", false),
-                speed = payload.optDouble("speed", 1.0).toFloat(),
-                pitch = payload.optDouble("pitch", 1.0).toFloat()
+                index = state?.optInt("index", 0) ?: payload.optInt("index", 0),
+                positionMs = state?.optLong("positionMs", 0L) ?: payload.optLong("positionMs", 0L),
+                repeatMode = state?.optInt("repeatMode", Player.REPEAT_MODE_OFF)
+                    ?: payload.optInt("repeatMode", Player.REPEAT_MODE_OFF),
+                shuffle = state?.optBoolean("shuffle", false) ?: payload.optBoolean("shuffle", false),
+                speed = (state?.optDouble("speed", 1.0) ?: payload.optDouble("speed", 1.0)).toFloat(),
+                pitch = (state?.optDouble("pitch", 1.0) ?: payload.optDouble("pitch", 1.0)).toFloat()
             )
         }.getOrNull()
     }
@@ -573,6 +618,23 @@ class ExoPlayerManager(private val context: Context) {
         val pitch: Float
     )
 
+    private data class PlaybackStateSnapshot(
+        val index: Int,
+        val positionMs: Long,
+        val repeatMode: Int,
+        val shuffle: Boolean,
+        val speed: Float,
+        val pitch: Float
+    ) {
+        fun toJson(): JSONObject = JSONObject()
+            .put("index", index)
+            .put("positionMs", positionMs)
+            .put("repeatMode", repeatMode)
+            .put("shuffle", shuffle)
+            .put("speed", speed)
+            .put("pitch", pitch)
+    }
+
     private data class PendingPlaylist(
         val songs: List<Song>,
         val startIndex: Int
@@ -604,5 +666,6 @@ class ExoPlayerManager(private val context: Context) {
         const val EXTRA_ONLINE_ID = "com.ella.music.extra.ONLINE_ID"
         const val PLAYBACK_PREFS = "ella_playback_state"
         const val KEY_QUEUE = "queue"
+        const val KEY_STATE = "state"
     }
 }

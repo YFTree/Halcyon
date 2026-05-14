@@ -50,6 +50,7 @@ import com.ella.music.ui.components.SongItem
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Icon
@@ -89,7 +90,13 @@ fun LibraryScreen(
     var sortMode by remember { mutableStateOf(HomeSortMode.Title) }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var listCoversEnabled by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        delay(260L)
+        listCoversEnabled = true
+    }
 
     val filteredSongs = remember(songs, searchQuery) {
         if (searchQuery.isBlank()) songs
@@ -99,8 +106,8 @@ fun LibraryScreen(
                 it.album.contains(searchQuery, ignoreCase = true)
         }
     }
-    val sortedResult by produceState(
-        initialValue = HomeSortedSongs(filteredSongs, emptyMap()),
+    val sortedResult by produceState<HomeSortedSongs?>(
+        initialValue = null,
         filteredSongs,
         sortMode
     ) {
@@ -113,8 +120,8 @@ fun LibraryScreen(
             }
         }
     }
-    val sortedSongs = sortedResult.songs
-    val sortKeysBySongId = sortedResult.sortKeysBySongId
+    val sortedSongs = sortedResult?.songs.orEmpty()
+    val sortKeysBySongId = sortedResult?.sortKeysBySongId.orEmpty()
 
     Column(
         modifier = Modifier
@@ -255,6 +262,16 @@ fun LibraryScreen(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
+        } else if (sortedResult == null) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "正在整理歌曲...",
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
         } else {
             val listState = rememberLazyListState()
             var fastScrollJob by remember { mutableStateOf<Job?>(null) }
@@ -300,7 +317,7 @@ fun LibraryScreen(
                             SongItem(
                                 song = song,
                                 isCurrent = currentSong?.id == song.id,
-                                albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                                albumArtUri = if (listCoversEnabled) mainViewModel.getAlbumArtUri(song.albumId) else null,
                                 loadCoverArt = mainViewModel::getCoverArtBitmap,
                                 selectionMode = selectionMode,
                                 selected = selected,
