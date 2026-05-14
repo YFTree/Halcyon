@@ -61,6 +61,7 @@ fun ArtistScreen(
     val songs by mainViewModel.songs.collectAsState()
     val albums by mainViewModel.albums.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
+    val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
 
     val artistSongs = remember(songs, artistName) {
         mainViewModel.getSongsForArtist(artistName)
@@ -90,7 +91,7 @@ fun ArtistScreen(
                     onPlayAll = {
                         if (artistSongs.isNotEmpty()) {
                             playerViewModel.setPlaylist(artistSongs, 0)
-                            onNavigateToPlayer()
+                            if (openPlayerOnPlay) onNavigateToPlayer()
                         }
                     }
                 )
@@ -109,7 +110,7 @@ fun ArtistScreen(
                     loadAudioInfo = mainViewModel::getAudioInfo,
                     onClick = {
                         playerViewModel.setPlaylist(artistSongs, index)
-                        onNavigateToPlayer()
+                        if (openPlayerOnPlay) onNavigateToPlayer()
                     },
                     onAddToQueue = { playerViewModel.addToPlaylist(song) }
                 )

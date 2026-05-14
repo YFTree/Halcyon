@@ -79,11 +79,19 @@ class MusicFreePluginService(private val context: Context? = null) {
 
     fun importPluginScript(script: String): Pair<String, String> {
         if (script.length !in 50..9_000_000) error("插件脚本内容异常")
-        val name = extractPlatform(script)
+        val normalizedScript = normalizeModuleScript(script)
+        val name = extractPlatform(normalizedScript)
         if (name.isBlank()) error("没有识别到 MusicFree 插件 platform")
-        val supportsMusic = "search" in script || "getMediaSource" in script || "importMusicItem" in script
+        val supportsMusic = "search" in normalizedScript || "getMediaSource" in normalizedScript || "importMusicItem" in normalizedScript
         if (!supportsMusic) error("插件未声明搜索或播放能力")
-        return name to script
+        return name to normalizedScript
+    }
+
+    private fun normalizeModuleScript(script: String): String {
+        return script
+            .replace(Regex("""^\s*export\s+default\s+""", RegexOption.MULTILINE), "module.exports = ")
+            .replace(Regex("""^\s*export\s+const\s+(\w+)\s*=""", RegexOption.MULTILINE), "const $1 =")
+            .replace(Regex("""^\s*export\s+\{[^}]+}\s*;?""", RegexOption.MULTILINE), "")
     }
 
     private fun fetchText(url: String): String {

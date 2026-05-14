@@ -55,6 +55,7 @@ fun WebDavScreen(
     val savedUser by mainViewModel.settingsManager.webDavUsername.collectAsState(initial = "")
     val savedPassword by mainViewModel.settingsManager.webDavPassword.collectAsState(initial = "")
     val savedLastUrl by mainViewModel.settingsManager.webDavLastUrl.collectAsState(initial = "")
+    val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
 
     var showSettings by remember { mutableStateOf(false) }
     var webDavUrl by remember { mutableStateOf("") }
@@ -224,7 +225,7 @@ fun WebDavScreen(
                                 load(item.url)
                             } else {
                                 playerViewModel.setPlaylist(listOf(item.toRemoteSong()), 0)
-                                onNavigateToPlayer()
+                                if (openPlayerOnPlay) onNavigateToPlayer()
                             }
                         },
                         onAddToQueue = { item ->

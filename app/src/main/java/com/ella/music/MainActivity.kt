@@ -46,6 +46,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.ella.music.data.SettingsManager
+import kotlinx.coroutines.flow.first
 import com.ella.music.ui.components.LiquidGlassBottomBar
 import com.ella.music.ui.components.LiquidGlassBottomBarItem
 import com.ella.music.ui.components.MiniPlayer
@@ -142,6 +143,12 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 checkAndRequestPermissions()
                 mainVm.loadCachedLibrary()
+                if (settingsManager.startupAutoPlay.first()) {
+                    val songs = mainVm.songs.first { it.isNotEmpty() }
+                    if (playerVm.currentSong.value == null) {
+                        playerVm.setPlaylist(songs, 0)
+                    }
+                }
                 mainVm.scanMusicIfAutoEnabled()
             }
 
@@ -225,8 +232,7 @@ fun EllaApp(
         Screen.Home.route,
         Screen.Library.route,
         Screen.Album.route,
-        Screen.Folder.route,
-        Screen.Settings.route
+        Screen.Folder.route
     )
     val showBottomBar = currentRoute in bottomBarScreens
 
@@ -272,7 +278,6 @@ fun EllaApp(
         Triple(Screen.Library.route, "音乐库", MiuixIcons.Regular.Playlist),
         Triple(Screen.Album.route, "专辑", MiuixIcons.Regular.Album),
         Triple(Screen.Folder.route, "文件夹", MiuixIcons.Regular.Folder),
-        Triple(Screen.Settings.route, "设置", MiuixIcons.Regular.Settings),
     )
 
     val contentModifier = Modifier

@@ -53,6 +53,7 @@ fun AlbumDetailScreen(
 ) {
     val albums by mainViewModel.albums.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
+    val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val album = albums.find { it.id == albumId }
     val albumSongs = mainViewModel.getSongsForAlbum(albumId)
     val albumArtUri = mainViewModel.getAlbumArtUri(albumId)
@@ -72,7 +73,7 @@ fun AlbumDetailScreen(
                     onPlayAll = {
                         if (albumSongs.isNotEmpty()) {
                             playerViewModel.setPlaylist(albumSongs, 0)
-                            onNavigateToPlayer()
+                            if (openPlayerOnPlay) onNavigateToPlayer()
                         }
                     }
                 )
@@ -87,7 +88,7 @@ fun AlbumDetailScreen(
                     loadAudioInfo = mainViewModel::getAudioInfo,
                     onClick = {
                         playerViewModel.setPlaylist(albumSongs, index)
-                        onNavigateToPlayer()
+                        if (openPlayerOnPlay) onNavigateToPlayer()
                     },
                     onAddToQueue = { playerViewModel.addToPlaylist(song) }
                 )

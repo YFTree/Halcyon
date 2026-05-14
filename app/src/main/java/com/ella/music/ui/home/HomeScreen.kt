@@ -37,12 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import android.os.SystemClock
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.SongItem
 import com.ella.music.viewmodel.MainViewModel
@@ -77,6 +79,9 @@ fun LibraryScreen(
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val isScanning by mainViewModel.isScanning.collectAsState()
     val scanProgress by mainViewModel.scanProgress.collectAsState()
+    val context = LocalContext.current
+    val settingsManager = remember(context) { SettingsManager(context) }
+    val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
 
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -313,7 +318,7 @@ fun LibraryScreen(
                                         }
                                     } else {
                                         playerViewModel.setPlaylist(sortedSongs, sortedSongs.indexOf(song))
-                                        onNavigateToPlayer()
+                                        if (openPlayerOnPlay) onNavigateToPlayer()
                                     }
                                 },
                                 onAddToQueue = {

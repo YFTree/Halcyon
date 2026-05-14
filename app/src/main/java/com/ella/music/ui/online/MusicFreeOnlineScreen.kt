@@ -83,7 +83,7 @@ fun MusicFreeOnlineScreen(
     val selectedPlugin = remember(plugins, selectedPluginId) {
         plugins.firstOrNull { it.id == selectedPluginId } ?: plugins.firstOrNull()
     }
-    val onlineAutoOpenPlayer by settingsManager.onlineAutoOpenPlayer.collectAsState(initial = true)
+    val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
 
     LaunchedEffect(plugins.isEmpty()) {
         if (plugins.isEmpty()) state.importExpanded = true
@@ -176,13 +176,11 @@ fun MusicFreeOnlineScreen(
                         exit = shrinkVertically()
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                            InputField(
-                                query = state.importUrl,
-                                onQueryChange = { state.importUrl = it },
+                            OnlineTextField(
+                                value = state.importUrl,
+                                onValueChange = { state.importUrl = it },
                                 onSearch = {},
-                                expanded = true,
-                                onExpandedChange = {},
-                                label = "https://.../plugin.js"
+                                placeholder = "https://.../plugin.js"
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -277,16 +275,14 @@ fun MusicFreeOnlineScreen(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
             )
 
-            SearchBar(
-                inputField = {
-                    InputField(
-                        query = state.searchQuery,
-                        onQueryChange = { state.searchQuery = it },
-                        onSearch = {
-                            if (state.searchQuery.isBlank()) return@InputField
+            OnlineTextField(
+                value = state.searchQuery,
+                onValueChange = { state.searchQuery = it },
+                onSearch = {
+                            if (state.searchQuery.isBlank()) return@OnlineTextField
                             if (selectedPlugin == null) {
                                 showToast("请先导入或选择一个 MusicFree 插件")
-                                return@InputField
+                                return@OnlineTextField
                             }
                             scope.launch {
                                 state.isBusy = true
@@ -300,15 +296,9 @@ fun MusicFreeOnlineScreen(
                                 state.isBusy = false
                             }
                         },
-                        expanded = true,
-                        onExpandedChange = {},
-                        label = "搜索在线歌曲、歌手"
-                    )
-                },
-                expanded = true,
-                onExpandedChange = {},
+                placeholder = "搜索在线歌曲、歌手",
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-            ) {}
+            )
 
             Button(
                 enabled = !state.isBusy && state.searchQuery.isNotBlank() && selectedPlugin != null,
@@ -361,7 +351,7 @@ fun MusicFreeOnlineScreen(
                                 state.isBusy = true
                                 runCatching {
                                     playLazyOnlineQueue(item)
-                                    if (onlineAutoOpenPlayer) onNavigateToPlayer()
+                                    if (openPlayerOnPlay) onNavigateToPlayer()
                                 }.onFailure {
                                     state.message = it.localizedMessage ?: "播放失败"
                                     showToast(state.message)

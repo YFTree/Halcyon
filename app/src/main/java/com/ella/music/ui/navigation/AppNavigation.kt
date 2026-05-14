@@ -15,6 +15,7 @@ import com.ella.music.ui.about.AboutScreen
 import com.ella.music.ui.analytics.AnalyticsScreen
 import com.ella.music.ui.album.AlbumDetailScreen
 import com.ella.music.ui.album.AlbumScreen
+import com.ella.music.ui.artist.ArtistListScreen
 import com.ella.music.ui.artist.ArtistScreen
 import com.ella.music.ui.folder.FolderDetailScreen
 import com.ella.music.ui.folder.FolderScreen
@@ -34,6 +35,7 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object Library : Screen("library")
     data object Album : Screen("album")
+    data object Artist : Screen("artist")
     data object AlbumDetail : Screen("album/{albumId}") {
         fun createRoute(albumId: Long) = "album/$albumId"
     }
@@ -84,12 +86,11 @@ fun AppNavigation(
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onNavigateToLibrary = { navController.navigate(Screen.Library.route) },
+                onNavigateToArtist = { navController.navigate(Screen.Artist.route) },
                 onNavigateToAlbum = { navController.navigate(Screen.Album.route) },
                 onNavigateToFolder = { navController.navigate(Screen.Folder.route) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
                 onNavigateToAnalytics = { navController.navigate(Screen.Analytics.route) },
-                onNavigateToLxOnline = { navController.navigate(Screen.LxOnline.route) },
-                onNavigateToMusicFreeOnline = { navController.navigate(Screen.MusicFreeOnline.route) },
                 onNavigateToPlayer = { navController.navigate(Screen.Player.route) }
             )
         }
@@ -109,6 +110,15 @@ fun AppNavigation(
                 playerViewModel = playerViewModel,
                 onAlbumClick = { albumId ->
                     navController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                }
+            )
+        }
+
+        composable(Screen.Artist.route) {
+            ArtistListScreen(
+                mainViewModel = mainViewModel,
+                onArtistClick = { artistName ->
+                    navController.navigate(Screen.ArtistDetail.createRoute(artistName))
                 }
             )
         }
@@ -185,6 +195,7 @@ fun AppNavigation(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
+                onBack = { navController.popBackStack() },
                 onNavigateToAbout = { navController.navigate(Screen.About.route) },
                 onNavigateToAnalytics = { navController.navigate(Screen.Analytics.route) },
                 onNavigateToLxOnline = { navController.navigate(Screen.LxOnline.route) },

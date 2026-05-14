@@ -71,6 +71,7 @@ fun FolderDetailScreen(
 ) {
     val songs by mainViewModel.songs.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
+    val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val scope = rememberCoroutineScope()
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -255,7 +256,7 @@ fun FolderDetailScreen(
                                 loadAudioInfo = mainViewModel::getAudioInfo,
                                 onClick = {
                                     playerViewModel.setPlaylist(sortedSongs, index)
-                                    onNavigateToPlayer()
+                                    if (openPlayerOnPlay) onNavigateToPlayer()
                                 },
                                 onAddToQueue = { playerViewModel.addToPlaylist(song) }
                             )

@@ -81,7 +81,7 @@ fun LxOnlineScreen(
     val selectedSource = remember(sources, selectedSourceId) {
         sources.firstOrNull { it.id == selectedSourceId } ?: sources.firstOrNull()
     }
-    val onlineAutoOpenPlayer by settingsManager.onlineAutoOpenPlayer.collectAsState(initial = true)
+    val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     LaunchedEffect(sources.isEmpty()) {
         if (sources.isEmpty() && state.results.isEmpty()) {
             state.importExpanded = true
@@ -172,13 +172,11 @@ fun LxOnlineScreen(
                         exit = shrinkVertically()
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                            InputField(
-                                query = state.importUrl,
-                                onQueryChange = { state.importUrl = it },
+                            OnlineTextField(
+                                value = state.importUrl,
+                                onValueChange = { state.importUrl = it },
                                 onSearch = {},
-                                expanded = true,
-                                onExpandedChange = {},
-                                label = "https://.../source.js"
+                                placeholder = "https://.../source.js"
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -267,38 +265,30 @@ fun LxOnlineScreen(
                 }
             }
 
-            SearchBar(
-                inputField = {
-                    InputField(
-                        query = state.searchQuery,
-                        onQueryChange = { state.searchQuery = it },
-                        onSearch = {
-                            if (state.searchQuery.isBlank()) return@InputField
-                            if (selectedSource == null) {
-                                showToast("请先导入或选择一个源")
-                                return@InputField
-                            }
-                            scope.launch {
-                                state.isBusy = true
-                                runCatching {
-                                    state.results = service.search(state.searchQuery, selectedSource)
-                                    state.message = if (state.results.isEmpty()) "没有找到相关歌曲" else "找到 ${state.results.size} 首歌曲"
-                                }.onFailure {
-                                    state.message = it.localizedMessage ?: "搜索失败"
-                                    showToast(state.message)
-                                }
-                                state.isBusy = false
-                            }
-                        },
-                        expanded = true,
-                        onExpandedChange = {},
-                        label = "搜索在线歌曲、歌手"
-                    )
+            OnlineTextField(
+                value = state.searchQuery,
+                onValueChange = { state.searchQuery = it },
+                onSearch = {
+                    if (state.searchQuery.isBlank()) return@OnlineTextField
+                    if (selectedSource == null) {
+                        showToast("请先导入或选择一个源")
+                        return@OnlineTextField
+                    }
+                    scope.launch {
+                        state.isBusy = true
+                        runCatching {
+                            state.results = service.search(state.searchQuery, selectedSource)
+                            state.message = if (state.results.isEmpty()) "没有找到相关歌曲" else "找到 ${state.results.size} 首歌曲"
+                        }.onFailure {
+                            state.message = it.localizedMessage ?: "搜索失败"
+                            showToast(state.message)
+                        }
+                        state.isBusy = false
+                    }
                 },
-                expanded = true,
-                onExpandedChange = {},
+                placeholder = "搜索在线歌曲、歌手",
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-            ) {}
+            )
 
             Button(
                 enabled = !state.isBusy && state.searchQuery.isNotBlank() && selectedSource != null,
@@ -347,7 +337,7 @@ fun LxOnlineScreen(
                                     state.isBusy = true
                                     runCatching {
                                         playLazyOnlineQueue(item)
-                                        if (onlineAutoOpenPlayer) onNavigateToPlayer()
+                                        if (openPlayerOnPlay) onNavigateToPlayer()
                                     }.onFailure {
                                         state.message = it.localizedMessage ?: "播放失败"
                                         showToast(state.message)

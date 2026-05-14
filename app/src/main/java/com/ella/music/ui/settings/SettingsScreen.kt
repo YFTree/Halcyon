@@ -50,12 +50,14 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -64,6 +66,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun SettingsScreen(
+    onBack: () -> Unit,
     onNavigateToAbout: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToLxOnline: () -> Unit,
@@ -98,7 +101,8 @@ fun SettingsScreen(
     val shuffleMode by settingsManager.shuffleMode.collectAsState(initial = SettingsManager.SHUFFLE_MODE_PSEUDO)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val decoderMode by settingsManager.decoderMode.collectAsState(initial = 1)
-    val onlineAutoOpenPlayer by settingsManager.onlineAutoOpenPlayer.collectAsState(initial = true)
+    val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
+    val startupAutoPlay by settingsManager.startupAutoPlay.collectAsState(initial = false)
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
     val decoderLabels = listOf("系统解码", "FFmpeg 解码", "自动")
@@ -182,7 +186,17 @@ fun SettingsScreen(
     ) {
         SmallTopAppBar(
             title = "设置",
-            color = pageBackground
+            color = pageBackground,
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Back,
+                        contentDescription = "返回",
+                        tint = MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         )
 
         Column(
@@ -443,11 +457,19 @@ fun SettingsScreen(
             SettingsCardGroup {
                 Column {
                     SwitchPreference(
-                        title = "在线歌曲播放后打开播放页",
-                        summary = "开启后点 LX 或 MusicFree 歌曲会直接进入播放界面",
-                        checked = onlineAutoOpenPlayer,
+                        title = "启动后自动播放",
+                        summary = "软件启动并加载到音乐库后自动播放第一首歌",
+                        checked = startupAutoPlay,
                         onCheckedChange = {
-                            scope.launch { settingsManager.setOnlineAutoOpenPlayer(it) }
+                            scope.launch { settingsManager.setStartupAutoPlay(it) }
+                        }
+                    )
+                    SwitchPreference(
+                        title = "播放后进入播放页",
+                        summary = "本地、WebDAV 和在线歌曲点播放后自动打开播放界面",
+                        checked = openPlayerOnPlay,
+                        onCheckedChange = {
+                            scope.launch { settingsManager.setOpenPlayerOnPlay(it) }
                         }
                     )
                     ArrowPreference(
