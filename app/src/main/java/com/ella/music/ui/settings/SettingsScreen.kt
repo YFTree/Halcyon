@@ -58,7 +58,6 @@ import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
@@ -518,20 +517,12 @@ fun SettingsScreen(
                     )
                     ArrowPreference(
                         title = "日志",
-                        summary = "查看 info 日志和闪退记录",
+                        summary = "查看详细日志、警告和闪退记录",
                         onClick = onNavigateToLogs
                     )
                     ArrowPreference(
                         title = "关于",
                         summary = "Ella Music v${BuildConfig.VERSION_NAME}",
-                        startAction = {
-                            Icon(
-                                imageVector = MiuixIcons.Regular.Info,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        },
                         onClick = onNavigateToAbout
                     )
                 }

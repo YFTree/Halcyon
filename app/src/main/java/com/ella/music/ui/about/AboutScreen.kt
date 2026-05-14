@@ -135,6 +135,7 @@ private fun AboutContent(
 
     val density = LocalDensity.current
     var logoHeightDp by remember { mutableStateOf(300.dp) }
+    val logoLiftPx = with(density) { 96.dp.toPx() }
 
     val titleBlend = remember(isDark) {
         if (isDark) {
@@ -179,6 +180,7 @@ private fun AboutContent(
                 .fillMaxWidth()
                 .graphicsLayer {
                     alpha = (1f - scrollProgress * 1.35f).coerceIn(0f, 1f)
+                    translationY = -logoLiftPx * scrollProgress
                 }
                 .padding(top = padding.calculateTopPadding() + 120.dp)
                 .onSizeChanged { size -> with(density) { logoHeightDp = size.height.toDp() } },

@@ -5,6 +5,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.os.Bundle
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.LruCache
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.Executor
 import kotlin.random.Random
 
@@ -139,6 +141,13 @@ class ExoPlayerManager(private val context: Context) {
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                val song = _currentSong.value
+                AppLogStore.error(
+                    context,
+                    "PlayerError",
+                    "Playback failed code=${error.errorCodeName} song=${song?.title.orEmpty()} uri=${mediaController?.currentMediaItem?.localConfiguration?.uri}",
+                    error
+                )
                 skipToNext()
             }
         }
@@ -400,7 +409,7 @@ class ExoPlayerManager(private val context: Context) {
 
     private fun songToMediaItem(song: Song): MediaItem {
         val builder = MediaItem.Builder()
-            .setUri(song.path.toUri())
+            .setUri(song.playbackUri())
             .setMediaId(song.id.toString())
             .setMediaMetadata(song.mediaMetadata())
 
@@ -418,6 +427,20 @@ class ExoPlayerManager(private val context: Context) {
             Uri.parse("content://media/external/audio/albumart"),
             albumId
         )
+    }
+
+    private fun Song.playbackUri(): Uri {
+        if (path.startsWith("content://", ignoreCase = true) ||
+            path.startsWith("http://", ignoreCase = true) ||
+            path.startsWith("https://", ignoreCase = true) ||
+            path.startsWith("file://", ignoreCase = true)
+        ) {
+            return path.toUri()
+        }
+        if (onlineSource.isBlank() && path.startsWith("/") && id > 0L) {
+            return ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+        }
+        return if (path.startsWith("/")) Uri.fromFile(File(path)) else path.toUri()
     }
 
     private fun Song.mediaMetadata(
