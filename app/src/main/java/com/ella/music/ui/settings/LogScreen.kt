@@ -1,6 +1,8 @@
 package com.ella.music.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,8 +61,23 @@ fun LogScreen(
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
     var refreshKey by remember { mutableIntStateOf(0) }
+    var query by remember { mutableStateOf("") }
     val entries by produceState(initialValue = emptyList<AppLogEntry>(), refreshKey) {
         value = withContext(Dispatchers.IO) { AppLogStore.read(context) }
+    }
+    val filteredEntries = remember(entries, query) {
+        val keyword = query.trim()
+        if (keyword.isBlank()) {
+            entries
+        } else {
+            entries.filter { entry ->
+                entry.level.contains(keyword, ignoreCase = true) ||
+                    entry.tag.contains(keyword, ignoreCase = true) ||
+                    entry.message.contains(keyword, ignoreCase = true) ||
+                    entry.throwable.orEmpty().contains(keyword, ignoreCase = true) ||
+                    AppLogStore.formatTime(entry.time).contains(keyword, ignoreCase = true)
+            }
+        }
     }
 
     Column(
@@ -89,12 +108,12 @@ fun LogScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "只保存 info 和闪退日志",
+                    text = "记录详细日志、警告和闪退",
                     fontSize = 14.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Text(
-                    text = "最多保留最近 500 条",
+                    text = "最多保留最近 800 条",
                     fontSize = 12.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.72f)
                 )
@@ -111,10 +130,38 @@ fun LogScreen(
             }
         }
 
-        if (entries.isEmpty()) {
+        BasicTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            textStyle = TextStyle(
+                color = MiuixTheme.colorScheme.onSurface,
+                fontSize = 14.sp
+            ),
+            decorationBox = { innerTextField ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .background(MiuixTheme.colorScheme.surfaceContainer, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    if (query.isBlank()) {
+                        Text(
+                            text = "搜索日志、Tag、错误信息",
+                            fontSize = 14.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
+                    innerTextField()
+                }
+            }
+        )
+
+        if (filteredEntries.isEmpty()) {
             Spacer(modifier = Modifier.height(90.dp))
             Text(
-                text = "暂无日志",
+                text = if (entries.isEmpty()) "暂无日志" else "没有匹配的日志",
                 fontSize = 15.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -124,7 +171,7 @@ fun LogScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                items(entries) { entry ->
+                items(filteredEntries) { entry ->
                     LogEntryCard(entry = entry, isDark = isDark)
                 }
                 item { Spacer(modifier = Modifier.height(120.dp)) }

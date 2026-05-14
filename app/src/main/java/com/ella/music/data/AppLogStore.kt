@@ -1,6 +1,7 @@
 package com.ella.music.data
 
 import android.content.Context
+import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -16,12 +17,42 @@ data class AppLogEntry(
 
 object AppLogStore {
     private const val FILE_NAME = "ella_logs.tsv"
-    private const val MAX_LINES = 500
+    private const val MAX_LINES = 800
     private val lock = Any()
     private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
 
     fun info(context: Context, tag: String, message: String) {
         append(context.applicationContext, AppLogEntry(System.currentTimeMillis(), "INFO", tag, message))
+    }
+
+    fun debug(context: Context, tag: String, message: String) {
+        append(context.applicationContext, AppLogEntry(System.currentTimeMillis(), "DEBUG", tag, message))
+    }
+
+    fun warn(context: Context, tag: String, message: String, throwable: Throwable? = null) {
+        append(
+            context.applicationContext,
+            AppLogEntry(
+                time = System.currentTimeMillis(),
+                level = "WARN",
+                tag = tag,
+                message = message,
+                throwable = throwable?.stackTraceToString()
+            )
+        )
+    }
+
+    fun error(context: Context, tag: String, message: String, throwable: Throwable? = null) {
+        append(
+            context.applicationContext,
+            AppLogEntry(
+                time = System.currentTimeMillis(),
+                level = "ERROR",
+                tag = tag,
+                message = message,
+                throwable = throwable?.stackTraceToString()
+            )
+        )
     }
 
     fun crash(context: Context, threadName: String, throwable: Throwable) {
@@ -55,10 +86,18 @@ object AppLogStore {
     }
 
     private fun append(context: Context, entry: AppLogEntry) = synchronized(lock) {
+        Log.println(entry.logPriority(), entry.tag, entry.message)
         val file = logFile(context)
         val lines = if (file.exists()) file.readLines().takeLast(MAX_LINES - 1) else emptyList()
         file.parentFile?.mkdirs()
         file.writeText((lines + encode(entry)).joinToString(separator = "\n"))
+    }
+
+    private fun AppLogEntry.logPriority(): Int = when (level) {
+        "DEBUG" -> Log.DEBUG
+        "WARN" -> Log.WARN
+        "ERROR", "CRASH" -> Log.ERROR
+        else -> Log.INFO
     }
 
     private fun logFile(context: Context): File = File(context.filesDir, FILE_NAME)

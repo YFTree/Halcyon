@@ -56,8 +56,16 @@ fun SongItem(
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song.id, loadAudioInfo) {
         value = withContext(Dispatchers.IO) { loadAudioInfo?.invoke(song) }
     }
+    val shouldLoadEmbeddedCover = song.coverUrl.isBlank() && albumArtUri == null && loadCoverArt != null
+    val embeddedCover by produceState<Bitmap?>(initialValue = null, song.id, shouldLoadEmbeddedCover) {
+        value = if (shouldLoadEmbeddedCover) {
+            withContext(Dispatchers.IO) { loadCoverArt.invoke(song) }
+        } else {
+            null
+        }
+    }
     val qualityTag = audioInfo?.let { audioQualitySummary(it).listTag }
-    val coverModel = song.coverUrl.takeIf { it.isNotBlank() } ?: albumArtUri
+    val coverModel = song.coverUrl.takeIf { it.isNotBlank() } ?: albumArtUri ?: embeddedCover
 
     Row(
         modifier = modifier

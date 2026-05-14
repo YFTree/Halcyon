@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.content.ContextCompat
@@ -45,6 +46,8 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import com.ella.music.data.AppLogStore
 import com.ella.music.data.SettingsManager
 import kotlinx.coroutines.flow.first
 import com.ella.music.ui.components.LiquidGlassBottomBar
@@ -219,6 +222,7 @@ fun EllaApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val view = LocalView.current
+    val context = LocalContext.current
     val isPlayerRoute = currentRoute == Screen.Player.route
 
     LaunchedEffect(isPlayerRoute, isDarkTheme) {
@@ -318,10 +322,18 @@ fun EllaApp(
             mainViewModel = mainViewModel,
             playerViewModel = playerViewModel,
             onNavigate = { route ->
+                AppLogStore.debug(context, "BottomNav", "click route=$route current=$currentRoute")
                 if (currentRoute != route) {
                     navController.navigate(route) {
-                        popUpTo(Screen.Home.route) { inclusive = route == Screen.Home.route }
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
                     }
+                    AppLogStore.debug(context, "BottomNav", "navigate route=$route")
+                } else {
+                    AppLogStore.debug(context, "BottomNav", "ignored same route=$route")
                 }
             },
             onNavigatePlayer = { navController.navigate(Screen.Player.route) },

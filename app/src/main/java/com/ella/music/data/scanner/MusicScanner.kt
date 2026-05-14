@@ -90,12 +90,12 @@ class MusicScanner(private val context: Context) {
                 if (!file.exists()) continue
 
                 val audioFile = readAudioFile(file)
-                val tag = audioFile?.tagOrCreateDefault
+                val tag = audioFile?.safeTag(file)
 
                 if (tag != null) {
-                    if (isMissingTag(title, file.name)) title = tag.getFirst(FieldKey.TITLE)
-                    if (isMissingTag(artist)) artist = tag.getFirst(FieldKey.ARTIST)
-                    if (isMissingTag(album)) album = tag.getFirst(FieldKey.ALBUM)
+                    if (isMissingTag(title, file.name)) title = tag.safeFirst(file, FieldKey.TITLE)
+                    if (isMissingTag(artist)) artist = tag.safeFirst(file, FieldKey.ARTIST)
+                    if (isMissingTag(album)) album = tag.safeFirst(file, FieldKey.ALBUM)
                     if (duration <= 0) duration = (audioFile.audioHeader?.trackLength ?: 0) * 1000L
                 }
 
@@ -113,7 +113,7 @@ class MusicScanner(private val context: Context) {
                                 artist = props.firstValue("ARTIST", "ALBUMARTIST", "ALBUM ARTIST", "IART", "PERFORMER", "TPE1")
                             }
                             if (isMissingTag(album)) {
-                                album = props.firstValue("ALBUM", "IPRD", "TALB")
+                                album = props.firstValue("ALBUM", "IPRD", "PRODUCT", "WM/ALBUMTITLE", "TALB")
                             }
                             if (duration <= 0) {
                                 duration = ((audioProps?.length ?: 0) * 1000L)
@@ -176,19 +176,19 @@ class MusicScanner(private val context: Context) {
     }
 
     fun extractEmbeddedLyrics(path: String): String? {
-        return try {
-            val file = File(path)
-            if (!file.exists()) return null
+        val file = File(path)
+        if (!file.exists()) return null
 
-            val audioFileLyrics = readAudioFile(file)
-                ?.tagOrCreateDefault
-                ?.getFirst(FieldKey.LYRICS)
-                ?.takeIf { it.isUsableSynchronizedLyrics() }
-            if (!audioFileLyrics.isNullOrBlank()) {
-                Log.d(TAG, "Found jaudiotagger lyrics (${audioFileLyrics.length} chars) for ${file.name}")
-                return audioFileLyrics
-            }
+        val audioFileLyrics = readAudioFile(file)
+            ?.safeTag(file)
+            ?.safeFirst(file, FieldKey.LYRICS)
+            ?.takeIf { it.isUsableSynchronizedLyrics() }
+        if (!audioFileLyrics.isNullOrBlank()) {
+            Log.d(TAG, "Found jaudiotagger lyrics (${audioFileLyrics.length} chars) for ${file.name}")
+            return audioFileLyrics
+        }
 
+        runCatching {
             val tagLibLyrics = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
                 selectBestLyrics(
                     collectMetadataValues(
@@ -209,7 +209,11 @@ class MusicScanner(private val context: Context) {
                 Log.d(TAG, "Found TagLib lyrics (${tagLibLyrics.length} chars) for ${file.name}")
                 return tagLibLyrics
             }
+        }.onFailure {
+            Log.w(TAG, "TagLib lyrics extraction failed for $path", it)
+        }
 
+        return runCatching {
             MediaMetadataRetriever().useCompat { retriever ->
                 retriever.setDataSource(path)
                 val lyrics = retriever.extractMetadata(1000)
@@ -218,38 +222,39 @@ class MusicScanner(private val context: Context) {
                     lyrics
                 } else null
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Lyrics extraction failed for $path", e)
-            null
-        }
+        }.onFailure {
+            Log.w(TAG, "Retriever lyrics extraction failed for $path", it)
+        }.getOrNull()
     }
 
     fun extractCoverArt(path: String): ByteArray? {
-        return try {
-            val file = File(path)
-            if (!file.exists()) return null
+        val file = File(path)
+        if (!file.exists()) return null
 
-            val audioFileArt = readAudioFile(file)
-                ?.tagOrCreateDefault
-                ?.firstArtwork
-                ?.binaryData
-            if (audioFileArt != null) return audioFileArt
+        val audioFileArt = readAudioFile(file)
+            ?.safeTag(file)
+            ?.safeFirstArtworkData(file)
+        if (audioFileArt != null) return audioFileArt
 
+        runCatching {
             val tagLibArt = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
                 val pictures = TagLib.getPictures(fd.dup().detachFd())
                 val frontCover = pictures.firstOrNull { it.pictureType == "Front Cover" } ?: pictures.firstOrNull()
                 frontCover?.data
             }
             if (tagLibArt != null) return tagLibArt
+        }.onFailure {
+            Log.w(TAG, "TagLib cover art extraction failed for $path", it)
+        }
 
+        return runCatching {
             MediaMetadataRetriever().useCompat { retriever ->
                 retriever.setDataSource(path)
                 retriever.embeddedPicture
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Cover art extraction failed for $path", e)
-            null
-        }
+        }.onFailure {
+            Log.w(TAG, "Retriever cover art extraction failed for $path", it)
+        }.getOrNull()
     }
 
     fun extractReplayGain(path: String): Float? {
@@ -257,11 +262,11 @@ class MusicScanner(private val context: Context) {
             val file = File(path)
             if (!file.exists()) return null
             readAudioFile(file)
-                ?.tagOrCreateDefault
+                ?.safeTag(file)
                 ?.let { tag ->
                     firstNonBlank(
-                        tag.getFirst("REPLAYGAIN_TRACK_GAIN"),
-                        tag.getFirst("R128_TRACK_GAIN")
+                        tag.safeFirst(file, "REPLAYGAIN_TRACK_GAIN"),
+                        tag.safeFirst(file, "R128_TRACK_GAIN")
                     )
                 }
                 ?.parseReplayGain()
@@ -313,6 +318,36 @@ class MusicScanner(private val context: Context) {
             Log.d(TAG, "jaudiotagger read failed for ${file.path}", e)
             null
         }
+    }
+
+    private fun AudioFile.safeTag(file: File) = runCatching {
+        tagOrCreateDefault
+    }.onFailure {
+        Log.d(TAG, "jaudiotagger tag read failed for ${file.path}", it)
+    }.getOrNull()
+
+    private fun org.jaudiotagger.tag.Tag.safeFirst(file: File, key: FieldKey): String {
+        return runCatching {
+            getFirst(key).orEmpty()
+        }.onFailure {
+            Log.d(TAG, "jaudiotagger field $key unavailable for ${file.path}", it)
+        }.getOrDefault("")
+    }
+
+    private fun org.jaudiotagger.tag.Tag.safeFirst(file: File, key: String): String {
+        return runCatching {
+            getFirst(key).orEmpty()
+        }.onFailure {
+            Log.d(TAG, "jaudiotagger field $key unavailable for ${file.path}", it)
+        }.getOrDefault("")
+    }
+
+    private fun org.jaudiotagger.tag.Tag.safeFirstArtworkData(file: File): ByteArray? {
+        return runCatching {
+            firstArtwork?.binaryData
+        }.onFailure {
+            Log.d(TAG, "jaudiotagger artwork unavailable for ${file.path}", it)
+        }.getOrNull()
     }
 
     private fun firstNonBlank(vararg values: String?): String? =

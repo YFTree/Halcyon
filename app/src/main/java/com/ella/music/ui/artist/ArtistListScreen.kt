@@ -5,8 +5,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,6 +24,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,7 +34,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +47,9 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.splitArtistNames
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.viewmodel.MainViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import android.os.SystemClock
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
@@ -50,6 +61,7 @@ import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlin.math.floor
 
 @Composable
 fun ArtistListScreen(
@@ -62,6 +74,7 @@ fun ArtistListScreen(
     var searchExpanded by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
     var sortMode by remember { mutableStateOf(ArtistSortMode.Name) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     val artists = remember(songs, albums) { mainViewModel.getArtists() }
     val representativeSongsByArtist = remember(songs) {
@@ -163,29 +176,128 @@ fun ArtistListScreen(
                 Text(text = "未找到艺术家", color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 160.dp)
-            ) {
-                item {
-                    Text(
-                        text = "${filteredArtists.size} 位艺术家 · ${sortMode.label}",
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
+            val listState = rememberLazyListState()
+            var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+            val fastIndexTargets = remember(filteredArtists) {
+                filteredArtists
+                    .mapIndexed { index, artist -> artist.indexLetter() to index + 1 }
+                    .distinctBy { it.first }
+                    .toMap()
+            }
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 160.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "${filteredArtists.size} 位艺术家 · ${sortMode.label}",
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    items(filteredArtists, key = { it.name }) { artist ->
+                        ArtistRow(
+                            artist = artist,
+                            representativeSong = representativeSongsByArtist[artist.name],
+                            mainViewModel = mainViewModel,
+                            onClick = { onArtistClick(artist.name) }
+                        )
+                    }
                 }
-                items(filteredArtists, key = { it.name }) { artist ->
-                    ArtistRow(
-                        artist = artist,
-                        representativeSong = representativeSongsByArtist[artist.name],
-                        mainViewModel = mainViewModel,
-                        onClick = { onArtistClick(artist.name) }
+
+                if (sortMode == ArtistSortMode.Name && filteredArtists.size > 30) {
+                    ArtistFastIndexBar(
+                        artists = filteredArtists,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .padding(end = 2.dp),
+                        onLetterClick = { letter ->
+                            val index = fastIndexTargets[letter]
+                            if (index != null) {
+                                fastScrollJob?.cancel()
+                                fastScrollJob = scope.launch { listState.scrollToItem(index) }
+                            }
+                        }
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ArtistFastIndexBar(
+    artists: List<Artist>,
+    onLetterClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val letters = remember(artists) { artists.map { it.indexLetter() }.distinct() }
+    var heightPx by remember { mutableStateOf(1) }
+    var lastSelectedLetter by remember { mutableStateOf<String?>(null) }
+    var lastDispatchTimeMs by remember { mutableStateOf(0L) }
+
+    fun selectAt(y: Float) {
+        if (letters.isEmpty()) return
+        val now = SystemClock.uptimeMillis()
+        if (now - lastDispatchTimeMs < 80L) return
+        val index = floor((y.coerceIn(0f, heightPx.toFloat() - 1f) / heightPx) * letters.size)
+            .toInt()
+            .coerceIn(0, letters.lastIndex)
+        val letter = letters[index]
+        if (letter != lastSelectedLetter) {
+            lastSelectedLetter = letter
+            lastDispatchTimeMs = now
+            onLetterClick(letter)
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .onSizeChanged { heightPx = it.height.coerceAtLeast(1) }
+            .pointerInput(letters, heightPx) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    selectAt(down.position.y)
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+                        if (change.changedToUpIgnoreConsumed()) break
+                        if (change.pressed) {
+                            selectAt(change.position.y)
+                            change.consume()
+                        }
+                    }
+                    lastSelectedLetter = null
+                }
+            },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        letters.forEach { letter ->
+            Text(
+                text = letter,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable {
+                        lastSelectedLetter = letter
+                        lastDispatchTimeMs = SystemClock.uptimeMillis()
+                        onLetterClick(letter)
+                    }
+                    .padding(horizontal = 8.dp, vertical = 1.dp)
+            )
+        }
+    }
+}
+
+private fun Artist.indexLetter(): String {
+    val first = name.trim().firstOrNull()?.uppercaseChar()
+    return if (first != null && first in 'A'..'Z') first.toString() else "#"
 }
 
 @Composable
