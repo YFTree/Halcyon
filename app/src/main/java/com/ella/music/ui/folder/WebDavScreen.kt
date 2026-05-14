@@ -125,7 +125,8 @@ fun WebDavScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = "返回"
+                        contentDescription = "返回",
+                        tint = MiuixTheme.colorScheme.onSurface
                     )
                 }
             },

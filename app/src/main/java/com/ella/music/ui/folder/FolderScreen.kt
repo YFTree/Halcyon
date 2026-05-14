@@ -297,7 +297,8 @@ fun FolderScreen(
                                 Text(
                                     text = folderName.ifEmpty { "根目录" },
                                     fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = MiuixTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = "${folderSongs.size} 首歌曲",
@@ -347,7 +348,8 @@ private fun WebDavEntryCard(
                 Text(
                     text = "WebDAV 音乐库",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "配置和浏览 WebDAV 远程音乐目录",
@@ -397,7 +399,12 @@ private fun SavedScanFoldersCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "本地扫描目录", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "本地扫描目录",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
                     Text(
                         text = "${folders.size} 个目录，右上角加号可继续添加",
                         fontSize = 13.sp,
@@ -424,7 +431,8 @@ private fun SavedScanFoldersCard(
                         Text(
                             text = folder.substringAfterLast('/').ifBlank { folder },
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurface
                         )
                         Text(
                             text = folder,
@@ -459,7 +467,12 @@ internal fun WebDavBrowserCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "WebDAV 目录", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = "WebDAV 目录",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
                     Text(
                         text = currentUrl,
                         fontSize = 12.sp,
@@ -528,7 +541,12 @@ internal fun WebDavItemRow(
                     .clip(RoundedCornerShape(8.dp))
                     .background(MiuixTheme.colorScheme.surfaceContainer)
             ) {
-                Text(text = item.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text(
+                    text = item.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
                 Text(
                     text = if (item.isDirectory) "目录" else item.mimeType.ifBlank { "远程音频" },
                     fontSize = 12.sp,
@@ -582,7 +600,8 @@ private fun BlockedFoldersEntryCard(
                 Text(
                     text = "已屏蔽文件夹",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "$count 个文件夹已被排除，点击管理或取消屏蔽",
@@ -610,7 +629,12 @@ private fun FolderBlockDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(text = "屏蔽文件夹", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "屏蔽文件夹",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
                 Text(text = folderPath, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     Button(onClick = onDismiss) { Text("取消") }
@@ -632,7 +656,12 @@ private fun BlockedFoldersDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(text = "已屏蔽的文件夹", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "已屏蔽的文件夹",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
                 folders.forEach { folder ->
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -674,7 +703,12 @@ internal fun WebDavSettingsDialog(
                 modifier = Modifier.padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(text = "WebDAV 音乐库", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "WebDAV 音乐库",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
                 WebDavTextField("地址", url, onUrlChange)
                 WebDavTextField("用户名", username, onUsernameChange)
                 WebDavTextField("密码", password, onPasswordChange)

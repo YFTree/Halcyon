@@ -148,6 +148,7 @@ fun LxOnlineScreen(
                     Icon(
                         imageVector = MiuixIcons.Regular.Back,
                         contentDescription = "返回",
+                        tint = MiuixTheme.colorScheme.onSurface,
                         modifier = Modifier.size(24.dp)
                     )
                 }

@@ -91,7 +91,8 @@ fun LyricFontScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = "返回"
+                        contentDescription = "返回",
+                        tint = MiuixTheme.colorScheme.onSurface
                     )
                 }
             },
@@ -112,7 +113,8 @@ fun LyricFontScreen(
                 ) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Download,
-                        contentDescription = "导入字体"
+                        contentDescription = "导入字体",
+                        tint = MiuixTheme.colorScheme.onSurface
                     )
                 }
             },
@@ -159,7 +161,8 @@ fun LyricFontScreen(
                                 Text(
                                     text = "歌词字重",
                                     fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Medium,
+                                    color = MiuixTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = "当前 ${lyricFontWeight.coerceIn(100, 900)}",
@@ -267,6 +270,7 @@ private fun FontChoiceItem(
                     text = font.name,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

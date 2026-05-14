@@ -85,6 +85,7 @@ fun AnalyticsScreen(
                 Icon(
                     imageVector = MiuixIcons.Regular.Back,
                     contentDescription = "返回",
+                    tint = MiuixTheme.colorScheme.onBackground,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -92,6 +93,7 @@ fun AnalyticsScreen(
                 text = "歌曲库分析",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onBackground,
                 modifier = Modifier.padding(start = 8.dp)
             )
         }
@@ -177,7 +179,12 @@ private fun ListenHeatmapCard(dailyListenMs: Map<String, Long>) {
     val todayListenMs = days.lastOrNull()?.let { dailyListenMs[it] } ?: 0L
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "听歌排行热力图", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "听歌排行热力图",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "近 8 周每日听歌时长",
@@ -244,7 +251,12 @@ private fun ListenHeatmapCard(dailyListenMs: Map<String, Long>) {
 private fun HistoryCard(history: List<PlaybackHistoryEntry>) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "听歌历史记录", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "听歌历史记录",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
             Spacer(modifier = Modifier.height(10.dp))
             if (history.isEmpty()) {
                 Text(
@@ -272,6 +284,7 @@ private fun HistoryRow(entry: PlaybackHistoryEntry) {
             Text(
                 text = entry.title,
                 fontSize = 14.sp,
+                color = MiuixTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -302,7 +315,12 @@ private fun SummaryCard(
     val playCount = playbackStats.sumOf { it.playCount }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = "总览", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = "总览",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
             Spacer(modifier = Modifier.height(10.dp))
             StatLine("曲库歌曲", "${songs.size} 首")
             StatLine("曲库体积", formatFileSize(songs.sumOf { it.fileSize }))
@@ -323,7 +341,12 @@ private fun DonutChartCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
             Spacer(modifier = Modifier.height(12.dp))
             when {
                 buckets == null -> Text(
@@ -425,6 +448,7 @@ private fun BucketLegendRow(
         Text(
             text = bucket.label,
             fontSize = 13.sp,
+            color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
         Text(
@@ -444,7 +468,12 @@ private fun RankingCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = title, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
             Spacer(modifier = Modifier.height(10.dp))
             if (stats.isEmpty()) {
                 Text(
@@ -479,6 +508,7 @@ private fun RankingRow(index: Int, stat: SongPlaybackStats, value: String) {
             Text(
                 text = stat.title,
                 fontSize = 14.sp,
+                color = MiuixTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -511,7 +541,11 @@ private fun StatLine(label: String, value: String) {
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.weight(1f)
         )
-        Text(text = value, fontWeight = FontWeight.Medium)
+        Text(
+            text = value,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurface
+        )
     }
 }
 

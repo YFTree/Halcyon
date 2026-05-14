@@ -149,7 +149,7 @@ fun ArtistScreen(
             Icon(
                 imageVector = MiuixIcons.Regular.Back,
                 contentDescription = "返回",
-                tint = Color.Black.copy(alpha = 0.72f),
+                tint = Color.White,
                 modifier = Modifier.size(26.dp)
             )
         }
@@ -164,10 +164,9 @@ private fun ArtistHeader(
     albumCount: Int,
     onPlayAll: () -> Unit
 ) {
-    val headerTextColor = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.92f)
-    val headerSubTextColor = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.62f)
-    val headerActionColor = MiuixTheme.colorScheme.onBackground.copy(alpha = 0.86f)
-    val headerScrimColor = MiuixTheme.colorScheme.background
+    val headerTextColor = Color.White
+    val headerSubTextColor = Color.White.copy(alpha = 0.78f)
+    val headerActionColor = Color.White
 
     Box(
         modifier = Modifier
@@ -196,8 +195,8 @@ private fun ArtistHeader(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            headerScrimColor.copy(alpha = 0.04f),
-                            headerScrimColor.copy(alpha = 0.46f),
+                            Color.Black.copy(alpha = 0.05f),
+                            Color.Black.copy(alpha = 0.18f),
                             MiuixTheme.colorScheme.background
                         )
                     )
@@ -302,7 +301,8 @@ private fun ArtistAlbumRow(
             Text(
                 text = album.name,
                 fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixTheme.colorScheme.onSurface
             )
             Text(
                 text = "${album.songCount} 首歌曲",

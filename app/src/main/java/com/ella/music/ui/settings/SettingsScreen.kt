@@ -256,7 +256,11 @@ fun SettingsScreen(
                 )
 
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text(text = "最短时长过滤", fontSize = 15.sp)
+                    Text(
+                        text = "最短时长过滤",
+                        fontSize = 15.sp,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
                     Text(
                         text = "过滤短于 ${minDurationSec} 秒的音频文件",
                         fontSize = 13.sp,

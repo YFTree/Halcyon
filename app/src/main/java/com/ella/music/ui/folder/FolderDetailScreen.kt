@@ -118,6 +118,7 @@ fun FolderDetailScreen(
                 Icon(
                     imageVector = MiuixIcons.Regular.Back,
                     contentDescription = "返回",
+                    tint = MiuixTheme.colorScheme.onSurface,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -133,7 +134,8 @@ fun FolderDetailScreen(
                 Text(
                     text = folderName.ifEmpty { "根目录" },
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "${folderSongs.size} 首歌曲",
