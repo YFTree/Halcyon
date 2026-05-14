@@ -108,7 +108,7 @@ fun MusicFreeOnlineScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         SmallTopAppBar(
-            title = "MusicFree 插件",
+            title = "MusicFree 在线音乐",
             color = MiuixTheme.colorScheme.background,
             navigationIcon = {
                 IconButton(onClick = onBack) {

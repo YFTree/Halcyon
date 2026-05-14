@@ -37,17 +37,16 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,7 +54,6 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
 import kotlinx.coroutines.delay
-import kotlin.math.sin
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -213,20 +211,26 @@ fun WordLyricView(
 
     val listState = rememberLazyListState()
     var userBrowsing by remember { mutableStateOf(false) }
+    var autoScrolling by remember { mutableStateOf(false) }
     var lastUserScrollMs by remember { mutableLongStateOf(0L) }
     val isUserScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
 
     LaunchedEffect(currentIndex) {
         if (!userBrowsing && currentIndex >= 0 && currentIndex < lyrics.size) {
-            listState.animateScrollToItem(
-                index = currentIndex,
-                scrollOffset = -140
-            )
+            autoScrolling = true
+            try {
+                listState.animateScrollToItem(
+                    index = currentIndex,
+                    scrollOffset = -140
+                )
+            } finally {
+                autoScrolling = false
+            }
         }
     }
 
     LaunchedEffect(isUserScrolling) {
-        if (isUserScrolling) {
+        if (isUserScrolling && !autoScrolling) {
             userBrowsing = true
             lastUserScrollMs = android.os.SystemClock.uptimeMillis()
         } else if (userBrowsing) {
@@ -295,7 +299,7 @@ fun WordLyricView(
                 label = "lyric_line_scale"
             )
             val blur by animateFloatAsState(
-                targetValue = if (userBrowsing || isActive || distance <= 1) 0f else (distance - 1).coerceAtMost(3) * 1.35f,
+                targetValue = if (userBrowsing || isActive) 0f else distance.coerceAtMost(3) * 1.15f,
                 animationSpec = tween(durationMillis = 260, easing = LinearOutSlowInEasing),
                 label = "lyric_line_blur"
             )
@@ -489,167 +493,47 @@ private fun WordLine(
     val text = remember(displayText, words) {
         displayText.ifBlank { words.joinToString("") { it.text } }.ifBlank { "♪" }.lineBreakSafeText()
     }
-    var textLayout by remember(text, fontSizeSp, textAlign) { mutableStateOf<TextLayoutResult?>(null) }
-    val progress by animateFloatAsState(
-        targetValue = text.progressFraction(words, currentPositionMs),
-        animationSpec = tween(durationMillis = 120, easing = LinearOutSlowInEasing),
-        label = "lyric_sentence_progress"
-    )
-    val sustainWord = words.firstOrNull {
-        currentPositionMs in it.startMs..it.endMs && it.endMs - it.startMs >= 900L
-    }
-    val sustainRange = sustainWord?.let { word ->
-        var start = 0f
-        for (item in words) {
-            if (item == word) break
-            start += item.text.visualLength().coerceAtLeast(0.5f)
-        }
-        start to (start + word.text.visualLength().coerceAtLeast(0.5f))
-    }
-    val glowPulse = if (sustainWord != null) {
-        0.38f + 0.32f * ((sin(currentPositionMs / 145.0).toFloat() + 1f) / 2f)
-    } else {
-        0f
-    }
-    val baseStyle = TextStyle(
-        color = pendingColor,
-        fontSize = fontSizeSp.sp,
-        fontFamily = fontFamily,
-        fontWeight = fontWeight,
-        textAlign = textAlign
-    )
-    val highlightStyle = TextStyle(
-        color = currentColor,
-        fontSize = fontSizeSp.sp,
-        fontFamily = fontFamily,
-        fontWeight = fontWeight,
-        textAlign = textAlign
-    )
-
-    Box(modifier = modifier.fillMaxWidth()) {
-        BasicText(
-            text = text,
-            style = baseStyle,
-            maxLines = 4,
-            overflow = TextOverflow.Clip,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 5.dp)
-        )
-        if (glowPulse > 0f) {
-            BasicText(
-                text = text,
-                style = highlightStyle.copy(color = currentColor.copy(alpha = currentColor.alpha * glowPulse)),
-                maxLines = 4,
-                overflow = TextOverflow.Clip,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 5.dp)
-                    .graphicsLayer {
-                        scaleX = 1.018f
-                        scaleY = 1.018f
-                    }
-                    .blur(9.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .drawWithContent {
-                        drawTextVisualRange(textLayout, sustainRange)
-                    }
-            )
-        }
-        BasicText(
-            text = text,
-            style = highlightStyle,
-            maxLines = 4,
-            overflow = TextOverflow.Clip,
-            onTextLayout = { textLayout = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 5.dp)
-                .drawWithContent {
-                    drawTextLineProgress(textLayout, progress)
-                }
-        )
-    }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.ContentDrawScope.drawTextVisualRange(
-    layout: TextLayoutResult?,
-    visualRange: Pair<Float, Float>?
-) {
-    val result = layout
-    val range = visualRange
-    if (result == null || result.lineCount == 0 || range == null) {
-        drawContent()
-        return
-    }
-
-    val rangeStart = range.first.coerceAtLeast(0f)
-    val rangeEnd = range.second.coerceAtLeast(rangeStart)
-    val contentScope = this
-    var lineStartVisual = 0f
-    for (line in 0 until result.lineCount) {
-        val start = result.getLineStart(line)
-        val end = result.getLineEnd(line, visibleEnd = true).coerceAtLeast(start)
-        val lineText = result.layoutInput.text.text.substring(start, end)
-        val lineVisual = lineText.visualLength().coerceAtLeast(1f)
-        val lineEndVisual = lineStartVisual + lineVisual
-
-        val overlapStart = maxOf(rangeStart, lineStartVisual)
-        val overlapEnd = minOf(rangeEnd, lineEndVisual)
-        if (overlapEnd > overlapStart) {
-            val left = result.getLineLeft(line)
-            val right = result.getLineRight(line)
-            val top = result.getLineTop(line)
-            val bottom = result.getLineBottom(line)
-            val lineWidth = (right - left).coerceAtLeast(1f)
-            val localStart = ((overlapStart - lineStartVisual) / lineVisual).coerceIn(0f, 1f)
-            val localEnd = ((overlapEnd - lineStartVisual) / lineVisual).coerceIn(0f, 1f)
-            val feather = (lineWidth * 0.05f).coerceIn(6f, 18f)
-            clipRect(
-                left = (left + lineWidth * localStart - feather).coerceAtLeast(left),
-                top = top,
-                right = (left + lineWidth * localEnd + feather).coerceAtMost(right),
-                bottom = bottom
-            ) {
-                contentScope.drawContent()
+    val annotatedText = remember(text, words, currentPositionMs, currentColor, sungColor, pendingColor, fontWeight) {
+        buildAnnotatedString {
+            var appended = false
+            words.forEach { word ->
+                val wordText = word.text.lineBreakSafeText()
+                if (wordText.isEmpty()) return@forEach
+                val isCurrent = currentPositionMs in word.startMs..word.endMs
+                val isSung = currentPositionMs >= word.endMs
+                pushStyle(
+                    SpanStyle(
+                        color = when {
+                            isCurrent -> currentColor
+                            isSung -> sungColor
+                            else -> pendingColor
+                        },
+                        fontWeight = if (isCurrent) fontWeight else fontWeight.softenedLyricWeight()
+                    )
+                )
+                append(wordText)
+                pop()
+                appended = true
             }
-        }
-        lineStartVisual = lineEndVisual
-    }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.ContentDrawScope.drawTextLineProgress(
-    layout: TextLayoutResult?,
-    progress: Float
-) {
-    val result = layout
-    if (result == null || result.lineCount == 0) {
-        drawContent()
-        return
-    }
-    val target = (result.layoutInput.text.text.visualLength() * progress.coerceIn(0f, 1f))
-        .coerceAtLeast(0f)
-    val contentScope = this
-    var lineStartVisual = 0f
-    for (line in 0 until result.lineCount) {
-        val start = result.getLineStart(line)
-        val end = result.getLineEnd(line, visibleEnd = true).coerceAtLeast(start)
-        val lineText = result.layoutInput.text.text.substring(start, end)
-        val lineVisual = lineText.visualLength()
-        val lineProgress = ((target - lineStartVisual) / lineVisual).coerceIn(0f, 1f)
-        lineStartVisual += lineVisual
-        if (lineProgress <= 0f) continue
-
-        val left = result.getLineLeft(line)
-        val right = result.getLineRight(line)
-        val top = result.getLineTop(line)
-        val bottom = result.getLineBottom(line)
-        val lineWidth = (right - left).coerceAtLeast(1f)
-        val feather = (lineWidth * 0.08f).coerceIn(8f, 28f)
-        val clipRight = (left + lineWidth * lineProgress + feather).coerceAtMost(right)
-        clipRect(left = left, top = top, right = clipRight, bottom = bottom) {
-            contentScope.drawContent()
+            if (!appended) append(text)
         }
     }
+
+    BasicText(
+        text = annotatedText,
+        style = TextStyle(
+            color = pendingColor,
+            fontSize = fontSizeSp.sp,
+            fontFamily = fontFamily,
+            fontWeight = fontWeight,
+            textAlign = textAlign
+        ),
+        maxLines = 4,
+        overflow = TextOverflow.Clip,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp)
+    )
 }
 
 private const val USER_BROWSING_TIMEOUT_MS = 3_600L
@@ -754,42 +638,6 @@ private fun scaledLyricFontSp(baseSp: Int, fontScale: Float, minSp: Int): Int {
 
 private fun FontWeight.softenedLyricWeight(): FontWeight {
     return FontWeight((weight - 200).coerceIn(100, 900))
-}
-
-private fun String.progressFraction(words: List<LyricWord>, positionMs: Long): Float {
-    if (words.isEmpty()) return 0f
-    val total = visualLength().coerceAtLeast(1f)
-    if (total <= 0f) return 0f
-    var passed = 0f
-    words.forEach { word ->
-        val weight = word.text.visualLength().coerceAtLeast(0.5f)
-        when {
-            positionMs >= word.endMs -> passed += weight
-            positionMs <= word.startMs -> return (passed / total).coerceIn(0f, 1f)
-            else -> {
-                val duration = (word.endMs - word.startMs).coerceAtLeast(1L)
-                val local = ((positionMs - word.startMs).toFloat() / duration.toFloat()).coerceIn(0f, 1f)
-                return ((passed + weight * local) / total).coerceIn(0f, 1f)
-            }
-        }
-    }
-    return 1f
-}
-
-private fun lyricProgressBrush(progress: Float, color: Color): Brush {
-    val p = progress.coerceIn(0f, 1f)
-    val feather = 0.10f
-    val fadeStart = (p - feather).coerceIn(0f, 1f)
-    val fadeEnd = (p + feather).coerceIn(0f, 1f)
-    return Brush.horizontalGradient(
-        colorStops = arrayOf(
-            0f to color,
-            fadeStart to color,
-            p to color.copy(alpha = color.alpha * 0.82f),
-            fadeEnd to color.copy(alpha = 0f),
-            1f to color.copy(alpha = 0f)
-        )
-    )
 }
 
 private fun String.lineBreakSafeText(): String {

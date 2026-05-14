@@ -2958,10 +2958,9 @@ private fun com.ella.music.data.model.LyricLine.previewTextAlign(): TextAlign {
 
 private fun com.ella.music.data.model.LyricLine.previewBackgroundTextAlign(): TextAlign {
     if (!isTtml) return TextAlign.Start
-    return when (previewTextAlign()) {
-        TextAlign.End -> TextAlign.Start
-        TextAlign.Start -> TextAlign.End
-        else -> TextAlign.Center
+    return when {
+        agent.equals("v2", ignoreCase = true) -> TextAlign.End
+        else -> TextAlign.Start
     }
 }
 

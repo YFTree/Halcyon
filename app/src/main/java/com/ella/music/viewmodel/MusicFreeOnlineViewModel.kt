@@ -7,7 +7,8 @@ import androidx.lifecycle.ViewModel
 
 class MusicFreeOnlineViewModel : ViewModel() {
     var importUrl by mutableStateOf("")
+    var searchQuery by mutableStateOf("")
     var importExpanded by mutableStateOf(true)
     var isBusy by mutableStateOf(false)
-    var message by mutableStateOf("导入 MusicFree 插件后可在这里管理")
+    var message by mutableStateOf("导入 MusicFree 插件后可搜索在线歌曲")
 }

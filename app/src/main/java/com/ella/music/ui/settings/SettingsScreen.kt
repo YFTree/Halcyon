@@ -447,13 +447,13 @@ fun SettingsScreen(
                         onClick = onNavigateToAnalytics
                     )
                     ArrowPreference(
-                        title = "LX Music 在线音乐",
-                        summary = "导入 LX Music API 源并搜索在线播放",
+                        title = "LX 在线音乐",
+                        summary = "导入 LX API 源并搜索在线播放",
                         onClick = onNavigateToLxOnline
                     )
                     ArrowPreference(
-                        title = "MusicFree 插件",
-                        summary = "导入 MusicFree 插件源并管理在线音乐插件",
+                        title = "MusicFree 在线音乐",
+                        summary = "导入 MusicFree 插件源并搜索在线播放",
                         onClick = onNavigateToMusicFreeOnline
                     )
                     ArrowPreference(

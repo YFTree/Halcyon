@@ -228,52 +228,12 @@ class MusicRepository(private val context: Context) {
                         text = item.optString("lineLyric").trim()
                     )
                 }.filter { it.text.isNotBlank() }
-                val lyrics = mergeKuwoTranslatedLyrics(rawLines)
-                lyrics.takeIf { it.isNotEmpty() }
+                rawLines.takeIf { it.isNotEmpty() }
             }
         }.getOrElse {
             Log.w("MusicRepo", "Failed to fetch online lyrics for ${song.title}", it)
             null
         }
-    }
-
-    private fun mergeKuwoTranslatedLyrics(lines: List<LyricLine>): List<LyricLine> {
-        val merged = mutableListOf<LyricLine>()
-        for (line in lines.sortedBy { it.timeMs }) {
-            val previous = merged.lastOrNull()
-            if (
-                previous != null &&
-                previous.translation.isNullOrBlank() &&
-                previous.text.isLikelyDifferentLanguageFrom(line.text) &&
-                line.timeMs - previous.timeMs in 0L..KUWO_TRANSLATION_WINDOW_MS
-            ) {
-                merged[merged.lastIndex] = previous.copy(translation = line.text)
-            } else {
-                merged += line
-            }
-        }
-        return merged
-    }
-
-    private fun String.isLikelyDifferentLanguageFrom(other: String): Boolean {
-        if (equals(other, ignoreCase = true)) return false
-        return hasCjkOrHangul() != other.hasCjkOrHangul()
-    }
-
-    private fun String.hasCjkOrHangul(): Boolean = any { char ->
-        Character.UnicodeBlock.of(char) in setOf(
-            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
-            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A,
-            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B,
-            Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS,
-            Character.UnicodeBlock.HIRAGANA,
-            Character.UnicodeBlock.KATAKANA,
-            Character.UnicodeBlock.HANGUL_SYLLABLES
-        )
-    }
-
-    private companion object {
-        private const val KUWO_TRANSLATION_WINDOW_MS = 8_000L
     }
 
     fun getReplayGain(song: Song): Float? {

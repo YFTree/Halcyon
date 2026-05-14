@@ -70,6 +70,7 @@ fun AlbumCard(
         Text(
             text = album.name,
             fontSize = 14.sp,
+            color = MiuixTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
