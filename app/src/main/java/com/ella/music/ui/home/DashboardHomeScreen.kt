@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +38,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.splitArtistNames
+import com.ella.music.data.model.Song
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -70,11 +75,16 @@ fun HomeScreen(
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF5F6FA)
     val cardText = if (isDark) Color.White else Color(0xFF15151A)
-    val featuredSongs = songs.take(5)
-    val artistCount = remember(songs, albums) { mainViewModel.getArtists().size }
+    val featuredSongs = remember(songs) { songs.shuffled().take(5) }
+    val artistCount = remember(songs) {
+        songs
+            .flatMap { splitArtistNames(it.artist) }
+            .distinctBy { it.lowercase() }
+            .size
+    }
     val songsById = remember(songs) { songs.associateBy { it.id } }
     val recentSongs = remember(history, songsById) {
-        history.take(3).mapNotNull { entry -> songsById[entry.songId] }
+        history.take(8).mapNotNull { entry -> songsById[entry.songId] }
     }
 
     Column(
@@ -104,70 +114,22 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                cornerRadius = 18.dp,
-                onClick = {
+            DailyMixCard(
+                songs = songs,
+                featuredSongs = featuredSongs,
+                currentSongTitle = currentSong?.title,
+                mainViewModel = mainViewModel,
+                onPlay = {
                     val randomSong = songs.randomOrNull()
                     if (randomSong != null) {
                         playerViewModel.setPlaylist(songs, songs.indexOf(randomSong))
                         if (openPlayerOnPlay) onNavigateToPlayer()
                     }
-                }
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(190.dp)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0xFF4DD6B6), Color(0xFFFFD166), Color(0xFFFF7A90))
-                            )
-                        )
-                        .padding(20.dp)
-                ) {
-                    featuredSongs.forEachIndexed { index, song ->
-                        val size = listOf(74, 64, 58, 52, 46).getOrElse(index) { 46 }.dp
-                        SafeCoverImage(
-                            model = mainViewModel.getAlbumArtUri(song.albumId),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = (-16 - index * 28).dp, y = (14 + index * 14).dp)
-                                .size(size)
-                                .clip(CircleShape),
-                            sizePx = 256
-                        )
-                    }
-
-                    Column(modifier = Modifier.align(Alignment.CenterStart)) {
-                        Text(
-                            text = "每日精选",
-                            fontSize = 30.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF101014)
-                        )
-                        Text(
-                            text = currentSong?.let { "正在播放：${it.title}" } ?: "从你的音乐库随机开始",
-                            fontSize = 14.sp,
-                            color = Color(0xFF33333A),
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
-                        Spacer(modifier = Modifier.height(18.dp))
-                        Button(onClick = {
-                            val randomSong = songs.randomOrNull()
-                            if (randomSong != null) {
-                                playerViewModel.setPlaylist(songs, songs.indexOf(randomSong))
-                                if (openPlayerOnPlay) onNavigateToPlayer()
-                            }
-                        }) {
-                            Text(text = "播放", color = Color(0xFF101014))
-                        }
-                    }
-                }
-            }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+            )
 
             SectionTitle("音乐库")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -194,45 +156,177 @@ fun HomeScreen(
                     modifier = Modifier.padding(vertical = 12.dp)
                 )
             } else {
-                recentSongs.forEach { song ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(recentSongs, key = { it.id }) { song ->
+                        RecentSongCard(
+                            song = song,
+                            mainViewModel = mainViewModel,
+                            cardText = cardText,
+                            onClick = {
                                 playerViewModel.playSong(song)
                                 if (openPlayerOnPlay) onNavigateToPlayer()
                             }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SafeCoverImage(
-                            model = mainViewModel.getAlbumArtUri(song.albumId),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(10.dp)),
-                            sizePx = 160
                         )
-                        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
-                            Text(
-                                text = song.title,
-                                color = cardText,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = song.artist,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                fontSize = 12.sp,
-                                maxLines = 1
-                            )
-                        }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                recentSongs.take(3).forEach { song ->
+                    CompactRecentSongRow(
+                        song = song,
+                        mainViewModel = mainViewModel,
+                        cardText = cardText,
+                        onClick = {
+                            playerViewModel.playSong(song)
+                            if (openPlayerOnPlay) onNavigateToPlayer()
+                        }
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(160.dp))
+        }
+    }
+}
+
+@Composable
+private fun DailyMixCard(
+    songs: List<Song>,
+    featuredSongs: List<Song>,
+    currentSongTitle: String?,
+    mainViewModel: MainViewModel,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        cornerRadius = 18.dp,
+        onClick = onPlay
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(190.dp)
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color(0xFF4DD6B6), Color(0xFFFFD166), Color(0xFFFF7A90))
+                    )
+                )
+                .padding(20.dp)
+        ) {
+            featuredSongs.forEachIndexed { index, song ->
+                val size = listOf(74, 64, 58, 52, 46).getOrElse(index) { 46 }.dp
+                SafeCoverImage(
+                    model = mainViewModel.getAlbumArtUri(song.albumId),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-16 - index * 28).dp, y = (14 + index * 14).dp)
+                        .size(size)
+                        .clip(CircleShape),
+                    sizePx = 192
+                )
+            }
+
+            Column(modifier = Modifier.align(Alignment.CenterStart)) {
+                Text(
+                    text = "每日精选",
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF101014)
+                )
+                Text(
+                    text = currentSongTitle?.let { "正在播放：$it" } ?: "${songs.size} 首歌曲随机播放",
+                    fontSize = 14.sp,
+                    color = Color(0xFF33333A),
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                Button(onClick = onPlay) {
+                    Text(text = "播放", color = Color(0xFF101014))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecentSongCard(
+    song: Song,
+    mainViewModel: MainViewModel,
+    cardText: Color,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(132.dp)
+            .clickable(onClick = onClick)
+    ) {
+        SafeCoverImage(
+            model = mainViewModel.getAlbumArtUri(song.albumId),
+            contentDescription = null,
+            modifier = Modifier
+                .size(132.dp)
+                .clip(RoundedCornerShape(14.dp)),
+            sizePx = 220
+        )
+        Text(
+            text = song.title,
+            color = cardText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Text(
+            text = song.artist,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            fontSize = 12.sp,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun CompactRecentSongRow(
+    song: Song,
+    mainViewModel: MainViewModel,
+    cardText: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SafeCoverImage(
+            model = mainViewModel.getAlbumArtUri(song.albumId),
+            contentDescription = null,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(10.dp)),
+            sizePx = 128
+        )
+        Column(modifier = Modifier.padding(start = 12.dp).weight(1f)) {
+            Text(
+                text = song.title,
+                color = cardText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+            Text(
+                text = song.artist,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontSize = 12.sp,
+                maxLines = 1
+            )
         }
     }
 }
