@@ -30,19 +30,6 @@
 
 ---
 
-## 🔥 v1.1.0 亮点
-
-- 在线音乐入口重整到首页，LX Music、MusicFree 和 WebDAV 入口更集中。
-- MusicFree 插件导入与搜索兼容性增强，适配 `qishui.js`、酷狗、QQ 等常见音源问题。
-- 播放页、歌词页、队列面板、专辑详情和艺术家详情继续统一为深色动态视觉体系。
-- 歌词解析与外部歌词推送进一步修复，改善逐词 LRC、TTML、罗马音 / 翻译识别、桌面歌词和 SuperLyric / Lyricon 传递。
-- 修复 Media3 Controller Future 导致的启动 / 进入设置 ANR，并改进通知栏元数据刷新路径。
-- 改进 WAV / ALAC / M4A 元数据读取、专辑归类、音轨排序和音质标签识别。
-- 日志页支持详细运行日志、复制、发送分享和自动保留最近 1 / 3 / 7 / 14 / 30 天。
-- 默认仅构建 `arm64-v8a`，缩小 release 包体积。
-
----
-
 ## 🚀 功能特性
 
 ### 🎵 本地音乐播放
@@ -60,7 +47,7 @@
 - 支持深色动态流光背景，长标题会自适应缩小以保留完整信息。
 - 动态视频封面可从当前专辑文件夹、公共 Movies 目录和应用专属目录中匹配。
 - 支持专辑级视频封面复用，同一专辑内多首歌曲可共用同一个视频。
-- 支持下拉关闭播放页，并带有顶部圆角动画。
+- 支持下拉关闭播放页，下拉和直接返回都带有顶部圆角动画。
 - 提供封面页、歌词页和横屏歌词页。
 - 迷你歌词显示上一行、当前行和下一行，降低误判为无后续歌词的情况。
 - 支持底部操作菜单、播放队列面板、播放模式切换和进度控制。
@@ -78,42 +65,41 @@
 ### 🪟 桌面歌词与系统歌词
 
 - 支持桌面歌词悬浮窗。
-- 默认采用纯文字桌面歌词样式，不显示大面积黑色卡片背景。
 - 通过文字阴影提高亮色壁纸上的可读性。
 - 支持双击控制、自动隐藏和限制在屏幕范围内拖动。
 - 桌面歌词控制项包括播放 / 暂停、上一首、下一首、字体大小、锁定和关闭。
-- 支持 Lyricon Provider 集成。
+- 支持 词幕。
 - 支持 SuperLyric、Flyme / AOSP 跑马灯歌词通知和蓝牙歌词。
+- 支持 Lyric Getter 传递歌词原文。
 - 支持三星悬浮歌词翻译传递，并尽量保留逐词空格、尾部词和双行显示结构。
 
 ### 🌐 WebDAV、LX 与 MusicFree 在线音乐
 
 - 支持 WebDAV 配置、连接测试、远程目录浏览和远程音频播放。
-- WebDAV 路径支持中文、空格和其它特殊字符，并对文件夹结果进行缓存。
 - WebDAV 入口位于首页在线音乐区域，便于和 LX Music / MusicFree 一起访问。
 - 支持多源 LX Music API 导入和集中管理。
 - 支持从 URL 或本地 JS 文件导入音源。
-- 支持在线搜索、在线播放、封面显示、酷我歌词获取，以及下载到 `Music/Ella/`。
+- 支持在线搜索、在线播放、封面显示、歌词获取，以及下载到 `Music/Ella/`。
 - 支持 MusicFree 插件管理、插件广场导入、在线搜索、懒加载播放队列和下载。
 - 在线队列会跳过不可播放项目，减少播放中断。
 
 ### 🎚 播放、解码与音质
 
 - 支持 WAV、FLAC、M4A、OGG、OPUS 等音频标签读取。
-- 提供系统解码、FFmpeg 解码和自动解码模式，默认使用 FFmpeg 解码模式。
-- FFmpeg 扩展解码器可提高 ALAC / M4A 等格式兼容性。
+- 提供系统解码、FFmpeg 解码和自动解码模式，默认使用自动解码模式，如无法解码请切换 FFmpeg 解码器。
+- FFmpeg 扩展解码器可提高 ALAC / AAC 等 M4A 格式兼容性。
 - 支持 ReplayGain 音量标准化。
 - 支持睡眠定时、播完当前停止、播放速度、音调控制、队列清空、音频焦点和随机播放设置。
 - 支持音频输出切换器和听歌历史。
-- 支持 Dolby Atmos、Dolby 双 D、Master、Apple Lossless、Hi-Res、Lossless、HQ、LQ 等音质标签。
-- 音乐库列表中 24-bit / 96 kHz 等规格统一归入 Hi-Res / MQ 体系，播放页保留 Master 展示语义。
+- 支持 Dolby Atmos、Master、Apple Lossless、Hi-Res、Lossless、HQ、LQ 等音质标签展示。
+- *音乐库列表中 24-bit / 96 kHz 等规格统一归入 Hi-Res（MQ）体系。*
 - 改进 WAV、ALAC / M4A、24-bit / 96 kHz 等元数据回退与音质识别。
 
 ### 🎨 界面与设置
 
 - 基于 Miuix 的 MIUI / HyperOS 风格设置页和 UI 组件。
 - 默认使用悬浮底部导航栏，首页、音乐库和设置页可直接切换。
-- MiniPlayer 支持环形进度条和歌曲 / 歌词切换动画。
+- MiniPlayer 封面会随播放而自动旋转，支持环形进度条和歌曲 / 歌词切换动画。
 - 专辑与艺术家详情页提供大标题、渐变背景和统一信息布局。
 - 支持主题切换，以及常见播放、歌词、扫描和解码器设置。
 - 支持应用日志查看器、复制 / 发送详细日志、自动日志保留、应用备份和更丰富的诊断信息。
@@ -141,13 +127,10 @@
 首次使用建议流程：
 
 1. 安装 Ella Music。
-2. 授予音乐文件访问权限。
-3. 等待本地音乐扫描完成。
-4. 如需使用桌面歌词，授予悬浮窗权限。
-5. 如使用远程曲库，配置 WebDAV。
-6. 如需要在线音乐，导入 LX Music API 音源或 MusicFree 插件。
-7. 根据需要启用 Lyricon / SuperLyric / 跑马灯 / 蓝牙歌词选项。
-
+2. 授予音乐文件访问权限 或 前往设置页打开启动时扫描音乐选项，然后重新打开软件等待自动扫描。
+3. 扫描完成即可使用。 如需在其他页面上显示歌词，请前往设置页面开启。
+4. 如使用远程曲库，请自行配置 WebDAV。
+5. 如需要在线音乐，自行导入 LX Music API 音源或 MusicFree 插件。本软件不内置任何 API 源和插件源。
 ---
 
 ## 🖼 动态视频封面
@@ -228,18 +211,18 @@ ffmpeg-decoder/src/main/jni/ffmpeg/android-libs
 
 ## 🧩 生态能力
 
-| 分类 | 能力 |
-|:--|:--|
-| 本地音乐 | 扫描、搜索、播放、文件夹浏览、专辑 / 艺术家管理 |
-| 远程音乐 | WebDAV 连接测试、目录浏览、远程播放 |
-| 在线音乐 | LX Music API / MusicFree 音源导入、搜索、串流播放、下载 |
-| 动态封面 | 专辑文件夹视频、专辑视频、歌曲视频、fallback 视频 |
-| 歌词 | LRC、增强 LRC、TTML、Lyricify、逐词歌词、翻译、罗马音、背景人声 |
-| 系统歌词 | 桌面歌词、Lyricon、SuperLyric、跑马灯通知、蓝牙歌词 |
-| 解码 | Media3、系统解码器、FFmpeg 扩展解码器 |
-| 音频元数据 | TagLib、Jaudiotagger、封面、标签、内嵌歌词、音质标签 |
-| 统计分析 | 格式分布、音质分布、播放次数排行、听歌时长排行 |
-| UI | Jetpack Compose、Miuix、悬浮底部导航、首页仪表盘、沉浸式播放页、横屏歌词 |
+| 分类 | 能力                                                           |
+|:--|:-------------------------------------------------------------|
+| 本地音乐 | 扫描、搜索、播放、文件夹浏览、专辑 / 艺术家管理                                    |
+| 远程音乐 | WebDAV 目录浏览及播放                                               |
+| 在线音乐 | LX Music API / MusicFree 音源导入、搜索、串流播放、下载                     |
+| 动态封面 | 专辑文件夹视频、专辑视频、歌曲视频、fallback 视频                                |
+| 歌词 | LRC、增强 LRC、TTML、Lyricify、逐词歌词、翻译、罗马音、背景人声                    |
+| 系统歌词 | 桌面歌词、词幕、SuperLyric、Lyric Getter、 FLYme 状态栏歌词（Ticker 通知）、蓝牙歌词 |
+| 解码 | Media3、系统解码器、FFmpeg 扩展解码器                                    |
+| 音频元数据 | TagLib、Jaudiotagger、读取内嵌和外置歌词、显示音质标签                         |
+| 统计分析 | 格式分布、音质分布、播放次数排行、听歌时长排行                                      |
+| UI | Jetpack Compose、Miuix、悬浮底部导航、首页仪表盘、沉浸式播放页、横屏歌词               |
 
 ---
 
@@ -257,6 +240,7 @@ ffmpeg-decoder/src/main/jni/ffmpeg/android-libs
 | [Kyant Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) | 液态玻璃与背景模糊效果 |
 | [Coil](https://github.com/coil-kt/coil) | Compose 图片加载 |
 | [QuickJS Android](https://github.com/HarlonWang/quickjs-wrapper-android) | 运行 LX Music API / MusicFree JavaScript 音源 |
+ | [LX Music Mobile](https://github.com/lyswhut/lx-music-mobile) | LX Music API 兼容实现与参考 |
 | [MusicFree](https://github.com/maotoumao/MusicFree) | MusicFree 插件协议、导入兼容与运行时适配参考 |
 
 ---
@@ -269,12 +253,12 @@ Ella Music 以 **AGPL-3.0-or-later** 协议开源。由于项目包含对 MusicF
 
 ## 👥 致谢
 
-- **Codex (GPT-5.5)** — 自 1.0.2 起负责主要开发与代码协作。
+- **Codex (GPT-5.5)** — 自 1.0.2 起至今的主要开发与代码协作。
 - **Mimo-V2.5-Pro** — 负责早期 1.0.0 到 1.0.1 版本的主要开发。
 - **BetterLyrics** — 为模糊封面背景和歌词展示提供视觉参考。
 - **SPlayer** — 为播放页动效和歌词体验提供视觉参考。
 - **Retro Music Player** — 为基于 jaudiotagger 的标签读取方案提供参考。
-- 感谢 Ella Music 所使用的 Miuix、Media3、FFmpeg、Lyricon、SuperLyricApi、Jaudiotagger、Kyant TagLib、Backdrop、Coil 以及其它开源项目。
+- 感谢 Ella Music 所使用的 Miuix、Media3、FFmpeg、Lyricon、SuperLyricApi、Lyric Getter、Jaudiotagger、Kyant TagLib、Backdrop、Coil 以及其它开源项目。
 
 ---
 

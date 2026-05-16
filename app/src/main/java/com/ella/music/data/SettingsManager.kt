@@ -39,10 +39,12 @@ class SettingsManager(private val context: Context) {
         val KEY_GAPLESS = booleanPreferencesKey("gapless_playback")
         val KEY_THEME_MODE = intPreferencesKey("theme_mode")
         val KEY_TICKER_ENABLED = booleanPreferencesKey("ticker_enabled")
+        val KEY_TICKER_HIDE_NOTIFICATION = booleanPreferencesKey("ticker_hide_notification")
         val KEY_SAMSUNG_FLOATING_LYRIC_TRANSLATION = booleanPreferencesKey("samsung_floating_lyric_translation")
         val KEY_DESKTOP_LYRIC_ENABLED = booleanPreferencesKey("desktop_lyric_enabled")
         val KEY_SUPER_LYRIC_ENABLED = booleanPreferencesKey("super_lyric_enabled")
         val KEY_SUPER_LYRIC_TRANSLATION = booleanPreferencesKey("super_lyric_translation")
+        val KEY_LYRIC_GETTER_ENABLED = booleanPreferencesKey("lyric_getter_enabled")
         val KEY_MIN_DURATION = intPreferencesKey("min_duration_sec")
         val KEY_REPLAYGAIN_ENABLED = booleanPreferencesKey("replaygain_enabled")
         val KEY_AUDIO_FOCUS_DISABLED = booleanPreferencesKey("audio_focus_disabled")
@@ -95,11 +97,13 @@ class SettingsManager(private val context: Context) {
     val gaplessPlayback: Flow<Boolean> = context.dataStore.data.map { it[KEY_GAPLESS] ?: true }
     val themeMode: Flow<Int> = context.dataStore.data.map { it[KEY_THEME_MODE] ?: 0 }
     val tickerEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_ENABLED] ?: false }
+    val tickerHideNotification: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_HIDE_NOTIFICATION] ?: false }
     val samsungFloatingLyricTranslation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_SAMSUNG_FLOATING_LYRIC_TRANSLATION] ?: false }
     val desktopLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_ENABLED] ?: false }
     val superLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_SUPER_LYRIC_ENABLED] ?: false }
     val superLyricTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_SUPER_LYRIC_TRANSLATION] ?: true }
+    val lyricGetterEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_GETTER_ENABLED] ?: false }
     val minDurationSec: Flow<Int> = context.dataStore.data.map { it[KEY_MIN_DURATION] ?: 15 }
     val replayGainEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_REPLAYGAIN_ENABLED] ?: false }
     val audioFocusDisabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUDIO_FOCUS_DISABLED] ?: false }
@@ -175,6 +179,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_TICKER_ENABLED] = enabled }
     }
 
+    suspend fun setTickerHideNotification(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_TICKER_HIDE_NOTIFICATION] = enabled }
+    }
+
     suspend fun setSamsungFloatingLyricTranslation(enabled: Boolean) {
         context.dataStore.edit { it[KEY_SAMSUNG_FLOATING_LYRIC_TRANSLATION] = enabled }
     }
@@ -189,6 +197,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setSuperLyricTranslation(enabled: Boolean) {
         context.dataStore.edit { it[KEY_SUPER_LYRIC_TRANSLATION] = enabled }
+    }
+
+    suspend fun setLyricGetterEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_LYRIC_GETTER_ENABLED] = enabled }
     }
 
     suspend fun setBluetoothLyricEnabled(enabled: Boolean) {
@@ -435,10 +447,12 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_AUTO_SCAN)
             setBoolean(KEY_GAPLESS)
             setBoolean(KEY_TICKER_ENABLED)
+            setBoolean(KEY_TICKER_HIDE_NOTIFICATION)
             setBoolean(KEY_SAMSUNG_FLOATING_LYRIC_TRANSLATION)
             setBoolean(KEY_DESKTOP_LYRIC_ENABLED)
             setBoolean(KEY_SUPER_LYRIC_ENABLED)
             setBoolean(KEY_SUPER_LYRIC_TRANSLATION)
+            setBoolean(KEY_LYRIC_GETTER_ENABLED)
             setBoolean(KEY_REPLAYGAIN_ENABLED)
             setBoolean(KEY_AUDIO_FOCUS_DISABLED)
             setBoolean(KEY_LYRIC_PAGE_TRANSLATION)

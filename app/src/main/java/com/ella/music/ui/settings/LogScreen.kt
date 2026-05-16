@@ -7,8 +7,6 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -54,13 +52,13 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.SpinnerDefaults
-import top.yukonga.miuix.kmp.basic.SpinnerEntry
-import top.yukonga.miuix.kmp.basic.SpinnerItemImpl
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.DropdownDefaults
+import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.LocalDismissState
@@ -80,7 +78,7 @@ fun LogScreen(
     var retentionMenuExpanded by remember { mutableStateOf(false) }
     var retentionDays by remember { mutableIntStateOf(AppLogStore.retentionDays(context)) }
     val retentionOptions = remember { listOf(1, 3, 7, 14, 30) }
-    val retentionEntries = remember { retentionOptions.map { SpinnerEntry(title = "保留最近 $it 天") } }
+    val retentionEntries = remember { retentionOptions.map { "保留最近 $it 天" } }
     val selectedRetentionIndex = retentionOptions.indexOf(retentionDays).takeIf { it >= 0 } ?: 2
     val entries by produceState(initialValue = emptyList<AppLogEntry>(), refreshKey) {
         value = withContext(Dispatchers.IO) { AppLogStore.read(context) }
@@ -167,6 +165,7 @@ fun LogScreen(
             actions = {
                 RetentionDropdownAction(
                     expanded = retentionMenuExpanded,
+                    selectedLabel = "保留 $retentionDays 天",
                     selectedIndex = selectedRetentionIndex,
                     entries = retentionEntries,
                     onExpandedChange = { retentionMenuExpanded = it },
@@ -217,34 +216,21 @@ fun LogScreen(
             }
         }
 
-        BasicTextField(
-            value = query,
-            onValueChange = { query = it },
-            singleLine = true,
+        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            InputField(
+                query = query,
+                onQueryChange = { query = it },
+                onSearch = {},
+                expanded = true,
+                onExpandedChange = {},
+                label = "搜索日志、Tag、错误信息",
+                modifier = Modifier.fillMaxWidth(),
             textStyle = TextStyle(
                 color = MiuixTheme.colorScheme.onSurface,
                 fontSize = 14.sp
-            ),
-            cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
-            decorationBox = { innerTextField ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .background(MiuixTheme.colorScheme.surfaceContainer, androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    if (query.isBlank()) {
-                        Text(
-                            text = "搜索日志、Tag、错误信息",
-                            fontSize = 14.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
-                    }
-                    innerTextField()
-                }
-            }
-        )
+                )
+            )
+        }
 
         if (filteredEntries.isEmpty()) {
             Spacer(modifier = Modifier.height(90.dp))
@@ -279,14 +265,15 @@ fun LogScreen(
 @Composable
 private fun RetentionDropdownAction(
     expanded: Boolean,
+    selectedLabel: String,
     selectedIndex: Int,
-    entries: List<SpinnerEntry>,
+    entries: List<String>,
     onExpandedChange: (Boolean) -> Unit,
     onSelected: (Int) -> Unit
 ) {
     IconButton(onClick = { onExpandedChange(!expanded) }) {
         Text(
-            text = entries.getOrNull(selectedIndex)?.title?.removePrefix("保留最近 ") ?: "7 天",
+            text = selectedLabel,
             fontSize = 13.sp,
             color = MiuixTheme.colorScheme.primary
         )
@@ -300,12 +287,12 @@ private fun RetentionDropdownAction(
             ListPopupColumn {
                 entries.forEachIndexed { index, entry ->
                     key(index) {
-                        SpinnerItemImpl(
-                            entry = entry,
-                            entryCount = entries.size,
+                        DropdownImpl(
+                            text = entry,
+                            optionSize = entries.size,
                             isSelected = selectedIndex == index,
                             index = index,
-                            spinnerColors = SpinnerDefaults.spinnerColors(),
+                            dropdownColors = DropdownDefaults.dropdownColors(),
                             onSelectedIndexChange = { selected ->
                                 onSelected(selected)
                                 dismiss?.invoke()

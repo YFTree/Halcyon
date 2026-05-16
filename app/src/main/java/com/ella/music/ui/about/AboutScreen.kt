@@ -9,11 +9,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -25,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -65,7 +62,6 @@ import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -186,33 +182,6 @@ private fun AboutContent(
                 .onSizeChanged { size -> with(density) { logoHeightDp = size.height.toDp() } },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(90.dp)
-                    .clip(CircleShape)
-                    .then(
-                        if (blurEnable && !isDark) Modifier.textureBlur(
-                            backdrop = backdrop,
-                            shape = RoundedCornerShape(45.dp),
-                            blurRadius = 150f,
-                            noiseCoefficient = BlurDefaults.NoiseCoefficient,
-                            colors = BlurColors(blendColors = titleBlend),
-                            contentBlendMode = BlendMode.DstIn,
-                            enabled = true,
-                        ) else Modifier
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = MiuixIcons.Regular.Music,
-                    contentDescription = null,
-                    tint = colorScheme.onBackground,
-                    modifier = Modifier.size(48.dp),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             Text(
                 modifier = Modifier
                     .padding(bottom = 5.dp)

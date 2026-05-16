@@ -50,8 +50,8 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -179,7 +179,7 @@ fun AudioSettingsScreen(
     val selectedStartupPlayMode = startupPlayMode.coerceIn(startupPlayLabels.indices)
     val startupPlayEntries = remember {
         startupPlayLabels.mapIndexed { index, label ->
-            SpinnerEntry(
+            DropdownItem(
                 title = label,
                 summary = when (index) {
                     SettingsManager.STARTUP_PLAY_RANDOM -> "启动并加载音乐库后随机播放一首，从开头开始"
@@ -191,7 +191,7 @@ fun AudioSettingsScreen(
     }
     val decoderEntries = remember {
         decoderLabels.mapIndexed { index, label ->
-            SpinnerEntry(
+            DropdownItem(
                 title = label,
                 summary = when (index) {
                     0 -> "只使用 Android 系统解码；不支持的格式会播放失败"
@@ -203,7 +203,7 @@ fun AudioSettingsScreen(
     }
     val shuffleModeEntries = remember {
         shuffleModeLabels.mapIndexed { index, label ->
-            SpinnerEntry(
+            DropdownItem(
                 title = label,
                 summary = when (index) {
                     SettingsManager.SHUFFLE_MODE_TRUE_RANDOM -> "每次随机抽取，可能连续随机到同一首"
@@ -301,7 +301,8 @@ fun AudioSettingsScreen(
                         items = decoderEntries,
                         selectedIndex = selectedDecoderMode,
                         onSelectedIndexChange = { index ->
-                            scope.launch { settingsManager.setDecoderMode(index) }
+                            playerViewModel?.setDecoderMode(index)
+                                ?: scope.launch { settingsManager.setDecoderMode(index) }
                         }
                     )
                 }
@@ -439,10 +440,12 @@ fun SettingsDetailScreen(
     val lyriconTranslation by settingsManager.lyriconTranslation.collectAsState(initial = true)
     val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = false)
+    val tickerHideNotification by settingsManager.tickerHideNotification.collectAsState(initial = false)
     val samsungFloatingLyricTranslation by settingsManager.samsungFloatingLyricTranslation.collectAsState(initial = false)
     val desktopLyricEnabled by settingsManager.desktopLyricEnabled.collectAsState(initial = false)
     val superLyricEnabled by settingsManager.superLyricEnabled.collectAsState(initial = false)
     val superLyricTranslation by settingsManager.superLyricTranslation.collectAsState(initial = true)
+    val lyricGetterEnabled by settingsManager.lyricGetterEnabled.collectAsState(initial = false)
     val bluetoothLyricEnabled by settingsManager.bluetoothLyricEnabled.collectAsState(initial = false)
     val bluetoothLyricTranslation by settingsManager.bluetoothLyricTranslation.collectAsState(initial = false)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
@@ -450,7 +453,7 @@ fun SettingsDetailScreen(
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
-    val themeEntries = remember { themeLabels.map { SpinnerEntry(title = it) } }
+    val themeEntries = remember { themeLabels.map { DropdownItem(title = it) } }
 
     Column(
         modifier = Modifier
@@ -564,8 +567,8 @@ fun SettingsDetailScreen(
                         summary = "将歌词推送到词幕（Lyricon）",
                         checked = lyriconEnabled,
                         onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setLyriconEnabled(enabled) }
                             playerViewModel?.setLyriconEnabled(enabled)
+                                ?: scope.launch { settingsManager.setLyriconEnabled(enabled) }
                         }
                     )
 
@@ -575,8 +578,8 @@ fun SettingsDetailScreen(
                         enabled = lyriconEnabled,
                         checked = lyriconTranslation,
                         onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setLyriconTranslation(enabled) }
                             playerViewModel?.setLyriconTranslation(enabled)
+                                ?: scope.launch { settingsManager.setLyriconTranslation(enabled) }
                         }
                     )
 
@@ -594,8 +597,8 @@ fun SettingsDetailScreen(
                                     )
                                 )
                             } else {
-                                scope.launch { settingsManager.setDesktopLyricEnabled(enabled) }
                                 playerViewModel?.setDesktopLyricEnabled(enabled)
+                                    ?: scope.launch { settingsManager.setDesktopLyricEnabled(enabled) }
                             }
                         }
                     )
@@ -605,8 +608,8 @@ fun SettingsDetailScreen(
                         summary = "向 SuperLyric 模块发布逐字歌词",
                         checked = superLyricEnabled,
                         onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setSuperLyricEnabled(enabled) }
                             playerViewModel?.setSuperLyricEnabled(enabled)
+                                ?: scope.launch { settingsManager.setSuperLyricEnabled(enabled) }
                         }
                     )
 
@@ -616,8 +619,18 @@ fun SettingsDetailScreen(
                         enabled = superLyricEnabled,
                         checked = superLyricTranslation,
                         onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setSuperLyricTranslation(enabled) }
                             playerViewModel?.setSuperLyricTranslation(enabled)
+                                ?: scope.launch { settingsManager.setSuperLyricTranslation(enabled) }
+                        }
+                    )
+
+                    SwitchPreference(
+                        title = "启用 Lyric Getter",
+                        summary = "向 Lyric Getter 模块发布当前原文歌词",
+                        checked = lyricGetterEnabled,
+                        onCheckedChange = { enabled ->
+                            playerViewModel?.setLyricGetterEnabled(enabled)
+                                ?: scope.launch { settingsManager.setLyricGetterEnabled(enabled) }
                         }
                     )
 
@@ -626,19 +639,37 @@ fun SettingsDetailScreen(
                         summary = "在魅族设备上通过 Ticker 通知显示歌词",
                         checked = tickerEnabled,
                         onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setTickerEnabled(enabled) }
                             playerViewModel?.setTickerEnabled(enabled)
+                                ?: scope.launch { settingsManager.setTickerEnabled(enabled) }
+                        }
+                    )
+
+                    SwitchPreference(
+                        title = "隐藏 FLYme 歌词通知",
+                        summary = "复用播放通知只更新 Ticker，避免通知栏额外出现歌词通知。",
+                        enabled = tickerEnabled,
+                        checked = tickerHideNotification,
+                        onCheckedChange = { enabled ->
+                            playerViewModel?.setTickerHideNotification(enabled)
+                                ?: scope.launch {
+                                    settingsManager.setTickerHideNotification(enabled)
+                                    if (enabled) settingsManager.setSamsungFloatingLyricTranslation(false)
+                                }
                         }
                     )
 
                     SwitchPreference(
                         title = "Samsung 浮动歌词翻译",
-                        summary = "开启后把翻译写入通知正文，三星浮动通知可尝试双行显示。",
-                        enabled = tickerEnabled,
-                        checked = samsungFloatingLyricTranslation,
+                        summary = if (tickerHideNotification) {
+                            "隐藏 FLYme 歌词通知时复用播放通知，无法同时写入三星浮动通知正文。"
+                        } else {
+                            "开启后把翻译写入通知正文，三星浮动通知可尝试双行显示。"
+                        },
+                        enabled = tickerEnabled && !tickerHideNotification,
+                        checked = samsungFloatingLyricTranslation && !tickerHideNotification,
                         onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setSamsungFloatingLyricTranslation(enabled) }
                             playerViewModel?.setSamsungFloatingLyricTranslation(enabled)
+                                ?: scope.launch { settingsManager.setSamsungFloatingLyricTranslation(enabled) }
                         }
                     )
 
@@ -647,8 +678,8 @@ fun SettingsDetailScreen(
                         summary = "将当前歌词写入媒体标题，供蓝牙设备或车机显示。",
                         checked = bluetoothLyricEnabled,
                         onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setBluetoothLyricEnabled(enabled) }
                             playerViewModel?.setBluetoothLyricEnabled(enabled)
+                                ?: scope.launch { settingsManager.setBluetoothLyricEnabled(enabled) }
                         }
                     )
 
@@ -658,8 +689,8 @@ fun SettingsDetailScreen(
                         enabled = bluetoothLyricEnabled,
                         checked = bluetoothLyricTranslation,
                         onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setBluetoothLyricTranslation(enabled) }
                             playerViewModel?.setBluetoothLyricTranslation(enabled)
+                                ?: scope.launch { settingsManager.setBluetoothLyricTranslation(enabled) }
                         }
                     )
                     }

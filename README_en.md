@@ -1,9 +1,7 @@
-<!--suppress ALL -->
-
-<h1 align="center">Ella Music</h1>
+# Ella Music
 
 <p align="center">
-  <b>An Android music player tailored for a MIUI / HyperOS-style experience</b>
+  <b>An Android Music Player Inspired by MIUI / HyperOS</b>
 </p>
 
 <p align="center">
@@ -11,11 +9,11 @@
   <a href="https://github.com/Kifranei/Ella/releases"><img src="https://img.shields.io/github/downloads/Kifranei/Ella/total?style=flat&color=orange" alt="Downloads"></a>
   <a href="https://github.com/Kifranei/Ella/commits"><img src="https://img.shields.io/github/last-commit/Kifranei/Ella?style=flat" alt="Last Commit"></a>
   <a href="https://github.com/Kifranei/Ella/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Kifranei/Ella?style=flat" alt="License"></a>
-  <a href="README.md"><img src="https://img.shields.io/badge/Document-Chinese-red.svg" alt="CN"></a>
+  <a href="README.md"><img src="https://img.shields.io/badge/文档-中文-red.svg" alt="CN"></a>
 </p>
 
 <p align="center">
-  <b>Local Music · WebDAV · LX / MusicFree Online Sources · Dynamic Player · Word-level Lyrics · Desktop Lyrics · Status-bar Lyrics</b>
+  <b>Local Music · WebDAV · LX / MusicFree Online Sources · Dynamic Player UI · Word-by-Word Lyrics · Floating Lyrics · Status Bar Lyrics</b>
 </p>
 
 ---
@@ -24,135 +22,124 @@
 
 **Ella Music** is an Android music player built with **Jetpack Compose, Miuix, and AndroidX Media3**.
 
-It is centered around local music playback, while also integrating WebDAV remote libraries, LX Music API and MusicFree online sources, LRC / enhanced LRC / TTML / Lyricify lyric parsing, a dynamic now-playing screen, desktop lyric overlay, Lyricon integration, SuperLyric integration, Flyme / AOSP ticker lyrics, Bluetooth lyrics, FFmpeg extension decoding, app logs, backup / restore, and music library analytics.
+It focuses on local music playback while integrating WebDAV remote libraries, LX Music API and MusicFree online sources, LRC / Enhanced LRC / TTML / Lyricify lyric parsing, dynamic playback pages, immersive player UI, floating desktop lyrics, Lyricon integration, SuperLyric integration, Flyme / AOSP ticker lyrics, Bluetooth lyrics, FFmpeg extended decoding, application logs, backup & restore, and music library analytics.
 
-The app follows a **MIUI / HyperOS-inspired** visual and interaction style, aiming to provide a lightweight, modern, and lyric-focused music experience on Android.
-
----
-
-## 🔥 v1.1.0 Highlights
-
-- Moved online music access to Home, grouping LX Music, MusicFree, and WebDAV in one place.
-- Improved MusicFree plugin import and search compatibility for common sources such as `qishui.js`, Kugou, and QQ.
-- Continued unifying Now Playing, Lyrics, Queue, Album detail, and Artist detail pages under the dark dynamic visual system.
-- Improved lyric parsing and external lyric delivery for word-level LRC, TTML, romanization / translation recognition, desktop lyrics, SuperLyric, and Lyricon.
-- Fixed startup / Settings ANRs caused by Media3 controller Future waiting and improved notification metadata refresh behavior.
-- Improved WAV / ALAC / M4A metadata reading, album grouping, track sorting, and quality-label detection.
-- Added detailed runtime logs with copy, Send/share, and automatic retention for 1 / 3 / 7 / 14 / 30 days.
-- Release builds now default to `arm64-v8a` only to reduce APK size.
+The overall UI and interaction design are heavily inspired by **MIUI / HyperOS**, aiming to provide a lightweight, modern, lyric-focused music experience on Android.
 
 ---
 
 ## 🚀 Features
 
-### 🎵 Local music playback
+### 🎵 Local Music Playback
 
-- Local music scanning, search, playback, and folder browsing.
-- Search, sorting, fast indexing, and multi-select management for the dashboard home, album, folder, and artist pages.
-- Album pages, artist pages, song lists, current queue, mini player, and immersive now-playing screen.
-- Album grouping now considers both album title and artist to avoid merging same-name albums by different artists; album detail pages sort by track number by default.
-- CJK titles can participate in A-Z sorting through Latinized sort keys, with cached keys to reduce home-screen stalls.
-- Library analytics for play-count ranking, listen-time ranking, format distribution, and quality distribution.
+* Supports local music scanning, searching, playback, and folder browsing.
+* Dashboard, albums, folders, and artists pages support searching, sorting, fast indexing, and multi-selection management.
+* Includes album pages, artist pages, song lists, playback queue, mini player, and immersive playback page.
+* Album recognition considers both album name and artist to avoid merging same-name albums from different artists.
+* CJK titles (Chinese / Japanese / Korean) can participate in A-Z sorting through Latinized sort keys with caching to reduce homepage lag.
+* Includes music library analytics such as play count ranking, listening duration ranking, format distribution, and quality distribution.
 
-### 🖼 Now-playing and dynamic covers
+### 🖼 Playback UI & Dynamic Covers
 
-- 1:1 top cover / video cover layout for the now-playing page.
-- Dark dynamic flow background, with adaptive long-title sizing to preserve more full titles.
-- Dynamic video covers can be searched from the current album folder, public Movies directory, and app-specific directories.
-- Album-level video cover reuse is supported, so one video can be shared by multiple songs in the same album.
-- Drag-down dismiss with animated top corner radius.
-- Cover page, lyric page, and landscape lyric page.
-- Mini lyrics show the previous, current, and next lines to make upcoming lyrics clearer.
-- Bottom action menu, queue panel, playback mode switching, and progress control.
+* Playback page uses a 1:1 cover / video cover layout.
+* Supports dynamic flowing backgrounds in dark mode.
+* Long titles automatically scale down to preserve full information.
+* Dynamic video covers can be matched from album folders, public Movies directories, and app-specific directories.
+* Supports album-level video reuse across multiple tracks.
+* Pull-down gesture and back navigation both include rounded corner transition animations.
+* Provides cover page, lyric page, and landscape lyric page.
+* Mini lyrics display previous, current, and next lines to reduce false "end-of-lyrics" situations.
+* Includes bottom action menu, playback queue panel, playback mode switching, and progress controls.
 
-### 🎤 Lyric experience
+### 🎤 Lyric Experience
 
-- LRC, enhanced LRC, TTML, and Lyricify lyric parsing.
-- Word-level lyrics, translations, romanization / pronunciation, background words, `x-bg` background vocals, and TTML duet layout.
-- External LRC and embedded lyric reading.
-- Fallback support for common Chinese lyric encodings.
-- Sustain glow, continuous word-level sweep, wrapped-line progress, and click-to-seek.
-- Improved TTML / Lyricify word tails, spaces, translations, original lines, and pronunciation detection to reduce missing words and line swaps.
-- Custom lyric-page fonts from system-font previews or imported TTF / OTF / TTC files.
+* Supports LRC, Enhanced LRC, TTML, and Lyricify parsing.
+* Supports word-by-word lyrics, translations, romanization / pronunciation, background vocals, `x-bg` background vocals, and TTML duet layouts.
+* Supports external LRC files and embedded lyrics.
+* Provides fallback compatibility for common Chinese lyric encodings.
+* Supports sustained glow effects, continuous word-by-word sweep animations, line progress animations, and lyric-click seeking.
+* Improves TTML / Lyricify handling for trailing words, spaces, translations, original text, and pronunciation alignment.
+* Lyric fonts can be selected from system font previews or imported via TTF / OTF / TTC files.
 
-### 🪟 Desktop and system lyrics
+### 🪟 Floating & System Lyrics
 
-- Desktop lyric floating overlay.
-- Text-only desktop lyric style by default, without a large black card background.
-- Text shadows improve readability on bright wallpapers.
-- Double-tap controls, auto-hide, and screen-bounded dragging.
-- Desktop lyric controls for play / pause, previous, next, font size, lock, and close.
-- Lyricon Provider integration.
-- SuperLyric, Flyme / AOSP ticker lyric notifications, and Bluetooth lyric support.
-- Samsung floating lyric translation delivery, with better preservation of word spacing, tail words, and dual-line structure.
+* Supports floating desktop lyrics.
+* Text shadows improve readability on bright wallpapers.
+* Supports double-tap controls, auto-hide, and screen-bound dragging.
+* Floating lyric controls include play/pause, previous/next track, font size, lock, and close.
+* Supports Lyric Barrage.
+* Supports SuperLyric, Flyme / AOSP ticker lyrics, and Bluetooth lyrics.
+* Supports Lyric Getter raw lyric transmission.
+* Supports Samsung floating lyric translation transmission while preserving spacing, trailing words, and dual-line layouts whenever possible.
 
-### 🌐 WebDAV, LX, and MusicFree online music
+### 🌐 WebDAV, LX & MusicFree Online Music
 
-- WebDAV configuration, connection testing, remote directory browsing, and remote audio playback.
-- WebDAV paths support Chinese characters, spaces, and other special characters, with folder-result caching.
-- WebDAV is available from the Home online-music area alongside LX Music and MusicFree.
-- Multi-source LX Music API import and centralized source management.
-- Import sources from URLs or local JS files.
-- Online search, playback, artwork display, Kuwo lyric fetching, and downloads to `Music/Ella/`.
-- MusicFree plugin management, plugin-hub imports, online search, lazy playback queues, and downloads.
-- Online queues skip unplayable items to reduce playback interruptions.
+* Supports WebDAV configuration, connection testing, remote directory browsing, and remote audio playback.
+* WebDAV入口 is integrated into the homepage online music section alongside LX Music and MusicFree.
+* Supports importing and managing multiple LX Music API sources.
+* Supports importing sources from URLs or local JS files.
+* Supports online search, streaming playback, cover display, lyric retrieval, and downloads to `Music/Ella/`.
+* Supports MusicFree plugin management, plugin marketplace import, online search, lazy-loaded queues, and downloads.
+* Online queues automatically skip unavailable tracks to reduce playback interruption.
 
-### 🎚 Playback, decoding, and quality
+### 🎚 Playback, Decoding & Audio Quality
 
-- WAV, FLAC, M4A, OGG, OPUS, and other audio tag reading.
-- System, FFmpeg, and Auto decoder modes. FFmpeg is the default decoder mode.
-- FFmpeg extension decoder improves compatibility for ALAC / M4A and other formats.
-- ReplayGain volume normalization.
-- Sleep timer, stop-after-current, playback speed, pitch control, queue clearing, audio-focus control, and shuffle settings.
-- Audio output switcher and listening history.
-- Audio quality labels: Dolby Atmos, Dolby double-D, Master, Apple Lossless, Hi-Res, Lossless, HQ, and LQ.
-- Library lists classify 24-bit / 96 kHz-style material under the Hi-Res / MQ quality system, while the Now Playing page keeps the Master wording where appropriate.
-- Improved metadata fallback and quality recognition for WAV, ALAC / M4A, 24-bit / 96 kHz, and related files.
+* Supports WAV, FLAC, M4A, OGG, OPUS, and other metadata parsing.
+* Provides system decoder, FFmpeg decoder, and automatic decoding modes.
+* FFmpeg extended decoder improves compatibility for ALAC / AAC M4A formats.
+* Supports ReplayGain volume normalization.
+* Supports sleep timer, stop-after-current-track, playback speed, pitch control, queue clearing, audio focus, and shuffle settings.
+* Supports audio output switching and listening history.
+* Displays Dolby Atmos, Master, Apple Lossless, Hi-Res, Lossless, HQ, and LQ quality badges.
+* *24-bit / 96 kHz specifications are unified under the Hi-Res (MQ) category.*
+* Improves metadata fallback and quality recognition for WAV, ALAC / M4A, 24-bit / 96 kHz, and related formats.
 
-### 🎨 UI and settings
+### 🎨 UI & Settings
 
-- MIUI / HyperOS-style settings and UI components based on Miuix.
-- Default floating bottom navigation with direct access to Home, Library, and Settings.
-- MiniPlayer circular progress ring and song / lyric transition animation.
-- Album and artist detail pages with large headers, gradients, and unified information layout.
-- Theme switching and common playback, lyric, scanning, and decoder settings.
-- In-app log viewer with detailed log copy / Send sharing, automatic retention, app backup support, and richer diagnostics.
+* Built with Miuix components inspired by MIUI / HyperOS.
+* Uses a floating bottom navigation bar by default.
+* MiniPlayer cover rotates automatically during playback and supports circular progress and song/lyric transition animations.
+* Album and artist pages feature large headers, gradient backgrounds, and unified layouts.
+* Supports theme switching and playback, lyric, scanning, and decoder settings.
+* Includes application log viewer, detailed log sharing, automatic log retention, backup & restore, and richer diagnostics.
 
 ---
 
 ## 📱 Requirements
 
-| Item | Requirement |
-|:--|:--|
-| Android version | Android 10.0 / API 29 or later |
-| Target SDK | Android API 37 |
-| Default ABI | `arm64-v8a` |
-| Network | Required for WebDAV, LX / MusicFree online sources, and online lyrics |
-| Video permission | Dynamic video covers may require video media permission on Android 13+ |
-| Overlay permission | Required for desktop lyrics |
-| Notification permission | Required on Android 13 and later |
+| Item                    | Requirement                                                       |
+| :---------------------- | :---------------------------------------------------------------- |
+| Android Version         | Android 10.0 / API 29 or higher                                   |
+| Target SDK              | Android API 37                                                    |
+| Default ABI             | `arm64-v8a`                                                       |
+| Network                 | Required for WebDAV, LX / MusicFree sources, and online lyrics    |
+| Video Permission        | Android 13+ may require video media permission for dynamic covers |
+| Overlay Permission      | Required for floating lyrics                                      |
+| Notification Permission | Required on Android 13+                                           |
 
 ---
 
 ## 📦 Download
 
-Download the latest build from [Releases](https://github.com/Kifranei/Ella/releases).
+Download the latest version from [Releases](https://github.com/Kifranei/Ella/releases).
 
 Recommended first-time setup:
 
 1. Install Ella Music.
-2. Grant music file access permission.
-3. Wait for the local music scan to complete.
-4. Grant overlay permission if you want to use desktop lyrics.
-5. Configure WebDAV if you use a remote music library.
-6. Import LX Music API sources or MusicFree plugins if you need online music.
-7. Enable Lyricon / SuperLyric / Ticker / Bluetooth lyric options as needed.
+2. Grant music file access permission, or enable auto music scanning on startup in settings and reopen the app.
+3. After scanning completes, the app is ready to use.
+   To display lyrics on other pages, enable the corresponding option in settings.
+4. Configure WebDAV manually if using remote libraries.
+5. Import LX Music API sources or MusicFree plugins manually if online music is needed.
+   No API sources or plugins are bundled with the app.
 
 ---
 
-## 🖼 Dynamic video covers
+## 🖼 Dynamic Video Covers
 
-Dynamic video covers are used by the top area of the immersive now-playing page. Album-level configuration is recommended:
+Dynamic video covers are used in the immersive playback page header area.
+
+Recommended album-level structure:
 
 ```text
 Music/Album Name/
@@ -162,7 +149,7 @@ Music/Album Name/
 └── Song C.flac
 ```
 
-All songs in the same album can share the same video, avoiding duplicate video files for each track.
+All songs in the same album can share one video.
 
 Centralized management is also supported:
 
@@ -175,7 +162,8 @@ Movies/Ella/DynamicCovers/
 └── cover.mp4
 ```
 
-The actual matching order follows the implementation: generally, Ella first checks the song's local folder, then song / album videos under DynamicCovers, and finally a global fallback video.
+Actual matching order depends on implementation details.
+Typically, the app first checks the local song folder, then DynamicCovers song/album videos, and finally falls back to a global default video.
 
 ---
 
@@ -195,7 +183,7 @@ cd Ella
 .\gradlew.bat :app:assembleDebug -PellaAbi=arm64-v8a
 ```
 
-Release builds first read the following environment variables:
+Release builds prioritize the following environment variables:
 
 ```bash
 RELEASE_STORE_FILE
@@ -204,77 +192,81 @@ RELEASE_KEY_ALIAS
 RELEASE_KEY_PASSWORD
 ```
 
-If these variables are not set, the project-root `release.jks` will be used; when no release keystore is available, the release build falls back to the debug signing configuration.
+If these variables are not provided, the project will attempt to use `release.jks` in the repository root.
+If no release keystore is available, release builds will fall back to the debug signing configuration.
 
 ---
 
 ## 🎧 FFmpeg
 
-Prebuilt FFmpeg static libraries are included here:
+Prebuilt FFmpeg static libraries are located at:
 
 ```text
 ffmpeg-decoder/src/main/jni/ffmpeg/android-libs
 ```
 
-To rebuild them on Windows, run:
+To rebuild FFmpeg on Windows:
 
 ```powershell
 .\build_ffmpeg.ps1
 ```
 
-The script builds FFmpeg through WSL with the Linux Android NDK.
+The script uses WSL and the Android NDK to build FFmpeg.
 
 ---
 
 ## 🧩 Ecosystem
 
-| Category | Capability |
-|:--|:--|
-| Local music | Scanning, search, playback, folder browsing, album / artist management |
-| Remote music | WebDAV connection testing, directory browsing, remote playback |
-| Online music | LX Music API / MusicFree source import, search, streaming, downloads |
-| Dynamic covers | Album-folder video, album video, song video, fallback video |
-| Lyrics | LRC, enhanced LRC, TTML, Lyricify, word-level lyrics, translation, romanization, background vocals |
-| System lyrics | Desktop lyrics, Lyricon, SuperLyric, ticker notifications, Bluetooth lyrics |
-| Decoding | Media3, system decoder, FFmpeg extension decoder |
-| Audio metadata | TagLib, Jaudiotagger, artwork, tags, embedded lyrics, quality labels |
-| Analytics | Format distribution, quality distribution, play-count ranking, listen-time ranking |
-| UI | Jetpack Compose, Miuix, floating bottom navigation, dashboard home, immersive player, landscape lyrics |
+| Category       | Capability                                                                                               |
+| :------------- | :------------------------------------------------------------------------------------------------------- |
+| Local Music    | Scanning, searching, playback, folders, album / artist management                                        |
+| Remote Music   | WebDAV browsing and playback                                                                             |
+| Online Music   | LX Music API / MusicFree import, search, streaming, downloads                                            |
+| Dynamic Covers | Album folder videos, album videos, song videos, fallback videos                                          |
+| Lyrics         | LRC, Enhanced LRC, TTML, Lyricify, word-by-word lyrics, translation, romanization, background vocals     |
+| System Lyrics  | Floating lyrics, lyric barrage, SuperLyric, Lyric Getter, Flyme ticker lyrics, Bluetooth lyrics          |
+| Decoding       | Media3, system decoder, FFmpeg extended decoder                                                          |
+| Metadata       | TagLib, Jaudiotagger, embedded/external lyrics, quality badges                                           |
+| Analytics      | Format distribution, quality distribution, play count ranking, listening duration ranking                |
+| UI             | Jetpack Compose, Miuix, floating bottom navigation, dashboard, immersive playback page, landscape lyrics |
 
 ---
 
-## 🧱 Open-source projects
+## 🧱 Open Source Projects
 
-| Project | Purpose |
-|:--|:--|
-| [Miuix](https://github.com/compose-miuix-ui/miuix) | MIUI / HyperOS-style Compose UI components |
-| [AndroidX Media3](https://github.com/androidx/media) | Playback, media session, and ExoPlayer FFmpeg extension |
-| [FFmpeg](https://ffmpeg.org) | Software decoding for ALAC and other audio formats |
-| [Lyricon](https://github.com/proify/lyricon) | Lyric Provider API and status-bar lyrics |
-| [SuperLyricApi](https://github.com/HChenX/SuperLyricApi) | SuperLyric publishing API |
-| [Jaudiotagger](https://github.com/Adonai/jaudiotagger) | Audio tags, embedded lyrics, and embedded artwork |
-| [Kyant TagLib](https://github.com/Kyant0/TagLib) | Android / Kotlin TagLib binding |
-| [Kyant Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) | Liquid glass and backdrop blur effects |
-| [Coil](https://github.com/coil-kt/coil) | Image loading for Compose |
-| [QuickJS Android](https://github.com/HarlonWang/quickjs-wrapper-android) | Running LX Music API / MusicFree JavaScript sources |
-| [MusicFree](https://github.com/maotoumao/MusicFree) | MusicFree plugin protocol, import compatibility, and runtime adaptation reference |
+| Project                                                                  | Purpose                                                 |
+| :----------------------------------------------------------------------- | :------------------------------------------------------ |
+| [Miuix](https://github.com/compose-miuix-ui/miuix)                       | MIUI / HyperOS style Compose UI components              |
+| [AndroidX Media3](https://github.com/androidx/media)                     | Playback, media sessions, ExoPlayer FFmpeg extension    |
+| [FFmpeg](https://ffmpeg.org)                                             | Software decoding for ALAC and other formats            |
+| [Lyricon](https://github.com/proify/lyricon)                             | Lyric Provider API and status bar lyrics                |
+| [SuperLyricApi](https://github.com/HChenX/SuperLyricApi)                 | SuperLyric publishing API                               |
+| [Jaudiotagger](https://github.com/Adonai/jaudiotagger)                   | Audio tags, embedded lyrics, embedded covers            |
+| [Kyant TagLib](https://github.com/Kyant0/TagLib)                         | Android / Kotlin TagLib bindings                        |
+| [Kyant Backdrop](https://github.com/Kyant0/AndroidLiquidGlass)           | Liquid glass and blur effects                           |
+| [Coil](https://github.com/coil-kt/coil)                                  | Compose image loading                                   |
+| [QuickJS Android](https://github.com/HarlonWang/quickjs-wrapper-android) | Runtime for LX Music API / MusicFree JavaScript sources |
+| [LX Music Mobile](https://github.com/lyswhut/lx-music-mobile)            | LX Music API compatibility reference                    |
+| [MusicFree](https://github.com/maotoumao/MusicFree)                      | MusicFree plugin protocol and compatibility reference   |
 
 ---
 
 ## 📄 License
 
-Ella Music is released under **AGPL-3.0-or-later**. Because the project includes compatibility work for MusicFree plugin protocols and runtime behavior, redistributed modified versions should follow the AGPL source-availability requirements.
+Ella Music is licensed under **AGPL-3.0-or-later**.
+
+Because the project contains compatibility implementations related to the MusicFree plugin protocol and runtime adaptation, modified distributions must comply with AGPL source disclosure requirements.
 
 ---
 
 ## 👥 Credits
 
-- **Codex (GPT-5.5)** — Lead development and code collaboration since 1.0.2.
-- **Mimo-V2.5-Pro** — Lead development for early 1.0.0 to 1.0.1 builds.
-- **BetterLyrics** — Visual reference for the blurred cover background and lyric presentation.
-- **SPlayer** — Visual reference for now-playing motion and lyric experience.
-- **Retro Music Player** — Reference for the jaudiotagger-based tag reading approach.
-- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, Jaudiotagger, Kyant TagLib, Backdrop, Coil, and the other open-source projects used by Ella Music.
+* **Codex (GPT-5.5)** — Primary development and code collaboration since version 1.0.2.
+* **Mimo-V2.5-Pro** — Main development contributor for versions 1.0.0 to 1.0.1.
+* **BetterLyrics** — Visual inspiration for blurred cover backgrounds and lyric presentation.
+* **SPlayer** — Visual inspiration for playback animations and lyric experience.
+* **Retro Music Player** — Reference for jaudiotagger-based metadata reading.
+* Special thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, Lyric Getter, Jaudiotagger, Kyant TagLib, Backdrop, Coil, and all other open source projects used by Ella Music.
 
 ---
 
@@ -292,7 +284,7 @@ Ella Music is released under **AGPL-3.0-or-later**. Because the project includes
 
 ---
 
-## 👀 Visit Statistics
+## 👀 Visitor Count
 
 <p align="center">
   <img src="https://count.getloli.com/get/@kifranei_ella?theme=moebooru-h" alt="Visitor Count" />
@@ -302,4 +294,4 @@ Ella Music is released under **AGPL-3.0-or-later**. Because the project includes
 
 ## 📄 License
 
-Ella Music includes MusicFree-related compatibility code, so the project license has been changed to **AGPL-3.0-or-later**. See [LICENSE](LICENSE).
+Ella Music includes compatibility code related to MusicFree, therefore the license has been adjusted to **AGPL-3.0-or-later**. See [LICENSE](LICENSE) for details.

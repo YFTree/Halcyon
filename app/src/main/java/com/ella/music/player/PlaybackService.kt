@@ -10,6 +10,7 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -110,7 +111,7 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        mediaSession = MediaSession.Builder(this, player)
+        mediaSession = MediaSession.Builder(this, RepeatOneLockingPlayer(player))
             .setSessionActivity(pendingIntent)
             .build()
 
@@ -159,6 +160,42 @@ class PlaybackService : MediaSessionService() {
         else -> "unknown"
     }
 
+    @OptIn(UnstableApi::class)
+    private class RepeatOneLockingPlayer(player: Player) : ForwardingPlayer(player) {
+        override fun seekToNextMediaItem() {
+            if (!restartCurrentInRepeatOne()) {
+                super.seekToNextMediaItem()
+            }
+        }
+
+        override fun seekToNext() {
+            if (!restartCurrentInRepeatOne()) {
+                super.seekToNext()
+            }
+        }
+
+        override fun seekToPreviousMediaItem() {
+            if (!restartCurrentInRepeatOne()) {
+                super.seekToPreviousMediaItem()
+            }
+        }
+
+        override fun seekToPrevious() {
+            if (!restartCurrentInRepeatOne()) {
+                super.seekToPrevious()
+            }
+        }
+
+        private fun restartCurrentInRepeatOne(): Boolean {
+            if (repeatMode != Player.REPEAT_MODE_ONE) return false
+            val index = currentMediaItemIndex
+            if (mediaItemCount <= 0 || index !in 0 until mediaItemCount) return false
+            seekToDefaultPosition(index)
+            play()
+            return true
+        }
+    }
+
     private class NoArtworkMediaNotificationProvider(
         private val service: PlaybackService
     ) : MediaNotification.Provider {
@@ -166,6 +203,8 @@ class PlaybackService : MediaSessionService() {
             const val NOTIFICATION_ID = 1001
             const val CHANNEL_ID = "ella_music_playback"
             const val CHANNEL_NAME = "播放控制"
+            const val FLAG_ALWAYS_SHOW_TICKER_FALLBACK = 0x1000000
+            const val FLAG_ONLY_UPDATE_TICKER_FALLBACK = 0x2000000
         }
 
         override fun createNotification(
@@ -174,13 +213,25 @@ class PlaybackService : MediaSessionService() {
             actionFactory: MediaNotification.ActionFactory,
             onNotificationChangedCallback: MediaNotification.Provider.Callback
         ): MediaNotification {
+            PlaybackTickerState.setRefreshCallback {
+                onNotificationChangedCallback.onNotificationChanged(
+                    createNotification(
+                        mediaSession,
+                        mediaButtonPreferences,
+                        actionFactory,
+                        onNotificationChangedCallback
+                    )
+                )
+            }
             ensureChannel()
             val player = mediaSession.player
             val metadata = player.mediaMetadata
+            val tickerPayload = PlaybackTickerState.current()
             val builder = NotificationCompat.Builder(service, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_flyme_ticker)
                 .setContentTitle(metadata.title?.takeIf { it.isNotBlank() } ?: service.getString(R.string.app_name))
                 .setContentText(metadata.artist?.takeIf { it.isNotBlank() } ?: metadata.albumTitle ?: "")
+                .setTicker(tickerPayload?.text)
                 .setContentIntent(mediaSession.sessionActivity)
                 .setDeleteIntent(actionFactory.createNotificationDismissalIntent(mediaSession))
                 .setOnlyAlertOnce(true)
@@ -225,7 +276,19 @@ class PlaybackService : MediaSessionService() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 builder.foregroundServiceBehavior = NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
             }
-            return MediaNotification(NOTIFICATION_ID, builder.build())
+            val notification = builder.build()
+            if (tickerPayload != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    notification.extras.putBoolean("ticker_icon_switch", false)
+                    notification.extras.putInt("ticker_icon", R.drawable.ic_flyme_ticker)
+                    notification.extras.putString("ticker_text", tickerPayload.text)
+                    notification.extras.putString("lyric", tickerPayload.text)
+                    tickerPayload.translation?.let { notification.extras.putString("ticker_translation", it) }
+                }
+                notification.flags = notification.flags or FLAG_ALWAYS_SHOW_TICKER_FALLBACK
+                notification.flags = notification.flags or FLAG_ONLY_UPDATE_TICKER_FALLBACK
+            }
+            return MediaNotification(NOTIFICATION_ID, notification)
         }
 
         override fun handleCustomCommand(session: MediaSession, action: String, extras: android.os.Bundle): Boolean = false

@@ -34,17 +34,22 @@ class DesktopLyricBridge(private val context: Context) {
         )
     }
 
-    fun sendLyric(line: LyricLine?, positionMs: Long, showTranslation: Boolean) {
+    fun sendLyric(
+        line: LyricLine?,
+        positionMs: Long,
+        showTranslation: Boolean,
+        showPronunciation: Boolean
+    ) {
         if (!enabled || !canDrawOverlay()) return
         val lyricLine = line ?: return
-        val key = "${lyricLine.timeMs}:${positionMs / 50}"
+        val key = "${lyricLine.timeMs}:${positionMs / 50}:$showTranslation:$showPronunciation"
         if (key == lastLineKey) return
         lastLineKey = key
         context.startService(
             Intent(context, DesktopLyricService::class.java)
                 .setAction(DesktopLyricService.ACTION_UPDATE)
                 .putExtra(DesktopLyricService.EXTRA_TEXT, lyricLine.text)
-                .putExtra(DesktopLyricService.EXTRA_PRONUNCIATION, lyricLine.pronunciation.orEmpty())
+                .putExtra(DesktopLyricService.EXTRA_PRONUNCIATION, if (showPronunciation) lyricLine.pronunciation.orEmpty() else "")
                 .putExtra(DesktopLyricService.EXTRA_TRANSLATION, if (showTranslation) lyricLine.translation.orEmpty() else "")
                 .putExtra(DesktopLyricService.EXTRA_POSITION, positionMs)
                 .putExtra(DesktopLyricService.EXTRA_AGENT, lyricLine.agent.orEmpty())
@@ -54,9 +59,9 @@ class DesktopLyricBridge(private val context: Context) {
                 .putExtra(DesktopLyricService.EXTRA_WORD_TEXTS, lyricLine.words.map { it.text }.toTypedArray())
                 .putExtra(DesktopLyricService.EXTRA_WORD_STARTS, lyricLine.words.map { it.startMs }.toLongArray())
                 .putExtra(DesktopLyricService.EXTRA_WORD_ENDS, lyricLine.words.map { it.endMs }.toLongArray())
-                .putExtra(DesktopLyricService.EXTRA_PRONUNCIATION_WORD_TEXTS, lyricLine.pronunciationWords.map { it.text }.toTypedArray())
-                .putExtra(DesktopLyricService.EXTRA_PRONUNCIATION_WORD_STARTS, lyricLine.pronunciationWords.map { it.startMs }.toLongArray())
-                .putExtra(DesktopLyricService.EXTRA_PRONUNCIATION_WORD_ENDS, lyricLine.pronunciationWords.map { it.endMs }.toLongArray())
+                .putExtra(DesktopLyricService.EXTRA_PRONUNCIATION_WORD_TEXTS, if (showPronunciation) lyricLine.pronunciationWords.map { it.text }.toTypedArray() else emptyArray())
+                .putExtra(DesktopLyricService.EXTRA_PRONUNCIATION_WORD_STARTS, if (showPronunciation) lyricLine.pronunciationWords.map { it.startMs }.toLongArray() else LongArray(0))
+                .putExtra(DesktopLyricService.EXTRA_PRONUNCIATION_WORD_ENDS, if (showPronunciation) lyricLine.pronunciationWords.map { it.endMs }.toLongArray() else LongArray(0))
                 .putExtra(DesktopLyricService.EXTRA_BACKGROUND_WORD_TEXTS, lyricLine.backgroundWords.map { it.text }.toTypedArray())
                 .putExtra(DesktopLyricService.EXTRA_BACKGROUND_WORD_STARTS, lyricLine.backgroundWords.map { it.startMs }.toLongArray())
                 .putExtra(DesktopLyricService.EXTRA_BACKGROUND_WORD_ENDS, lyricLine.backgroundWords.map { it.endMs }.toLongArray())

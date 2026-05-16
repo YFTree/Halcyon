@@ -86,12 +86,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -148,6 +150,7 @@ import com.ella.music.ui.components.CoverLoadLimiter
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -238,6 +241,7 @@ fun PlayerScreen(
         }
     }
     var dragDismissOffset by remember { mutableFloatStateOf(0f) }
+    var dismissingPlayer by remember { mutableStateOf(false) }
     val animatedDismissOffset by animateFloatAsState(
         targetValue = dragDismissOffset,
         animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
@@ -249,10 +253,19 @@ fun PlayerScreen(
         setPlayerSystemBars(context.findActivity(), view)
     }
     val dragCornerRadius by animateDpAsState(
-        targetValue = if (dragDismissOffset > 1f) 28.dp else 0.dp,
+        targetValue = if (dragDismissOffset > 1f || dismissingPlayer) 28.dp else 0.dp,
         animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing),
         label = "player_drag_corner_radius"
     )
+    fun dismissWithPlayerMotion() {
+        if (dismissingPlayer) return
+        dismissingPlayer = true
+        dragDismissOffset = dismissThresholdPx
+        scope.launch {
+            delay(150)
+            onBack()
+        }
+    }
 
     val song = currentSong
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song?.id) {
@@ -272,7 +285,7 @@ fun PlayerScreen(
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song?.id) {
         value = withContext(Dispatchers.IO) { song?.let(playerViewModel::getAudioInfo) }
     }
-    BackHandler { onBack() }
+    BackHandler { dismissWithPlayerMotion() }
 
     Box(
         modifier = Modifier
@@ -308,7 +321,7 @@ fun PlayerScreen(
                     onDragEnd = {
                         closeGesture = false
                         if (dragDismissOffset >= dismissThresholdPx) {
-                            onBack()
+                            dismissWithPlayerMotion()
                         } else {
                             dragDismissOffset = 0f
                         }
@@ -708,6 +721,7 @@ private fun CoverPlayerPage(
                         showTranslation = showTranslation,
                         showPronunciation = showPronunciation,
                         currentPositionMs = currentPosition,
+                        isPlaying = isPlaying,
                         fontFamily = fontFamily,
                         fontWeight = fontWeight,
                         onLineClick = { onShowLyrics() },
@@ -915,6 +929,7 @@ private fun LandscapeCoverPlayerPage(
                     lyrics = lyrics,
                     currentIndex = currentLyricIndex,
                     currentPositionMs = currentPosition,
+                    isPlaying = isPlaying,
                     showTranslation = showTranslation,
                     showPronunciation = showPronunciation,
                     fontScale = 0.74f,
@@ -1072,6 +1087,7 @@ private fun LyricsPlayerPage(
                     lyrics = lyrics,
                     currentIndex = currentLyricIndex,
                     currentPositionMs = currentPositionMs,
+                    isPlaying = isPlaying,
                     showTranslation = showTranslation,
                     showPronunciation = showPronunciation,
                     fontScale = 0.98f,
@@ -2396,6 +2412,7 @@ private fun MiniLyricsPreview(
     showTranslation: Boolean,
     showPronunciation: Boolean,
     currentPositionMs: Long,
+    isPlaying: Boolean,
     fontFamily: FontFamily? = null,
     fontWeight: FontWeight = FontWeight.ExtraBold,
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit = {},
@@ -2412,6 +2429,11 @@ private fun MiniLyricsPreview(
         .asSequence()
         .firstOrNull { it > safeIndex && lyrics[it].hasMiniLyric() }
     val previewItems = listOfNotNull(previousIndex, safeIndex, nextIndex)
+    val smoothPositionMs = rememberSmoothMiniLyricPosition(
+        currentPositionMs = currentPositionMs,
+        isPlaying = isPlaying,
+        anchorKey = lyrics.getOrNull(safeIndex)?.miniLyricRenderKey() ?: safeIndex
+    )
 
     Column(
         modifier = modifier
@@ -2456,7 +2478,7 @@ private fun MiniLyricsPreview(
                 line = line,
                 showTranslation = showTranslation,
                 showPronunciation = showPronunciation,
-                currentPositionMs = currentPositionMs,
+                currentPositionMs = smoothPositionMs,
                 active = isActive,
                 fontFamily = fontFamily,
                 fontWeight = fontWeight,
@@ -2693,8 +2715,7 @@ private fun androidx.compose.ui.text.AnnotatedString.Builder.appendMiniTimedWord
                     progress = progress,
                     activeColor = currentColor,
                     pendingColor = pendingColor
-                ),
-                baselineShift = BaselineShift(0.04f)
+                )
             )
         }
         isSung -> appendMiniStyledText(text, sungColor, inactiveWeight)
@@ -2739,16 +2760,62 @@ private fun miniLyricSweepBrush(
     pendingColor: Color
 ): Brush {
     val edge = progress.coerceIn(0.002f, 0.998f)
-    val beforeEdge = (edge - 0.001f).coerceAtLeast(0f)
+    val featherStart = (edge - MINI_LYRIC_SWEEP_FEATHER_FRACTION).coerceAtLeast(0f)
     return Brush.horizontalGradient(
         colorStops = arrayOf(
             0f to activeColor,
-            beforeEdge to activeColor,
+            featherStart to activeColor,
             edge to pendingColor,
             1f to pendingColor
         )
     )
 }
+
+@Composable
+private fun rememberSmoothMiniLyricPosition(
+    currentPositionMs: Long,
+    isPlaying: Boolean,
+    anchorKey: Any?
+): Long {
+    var renderedPositionMs by remember(anchorKey) { mutableLongStateOf(currentPositionMs) }
+    var anchorPositionMs by remember(anchorKey) { mutableLongStateOf(currentPositionMs) }
+    var anchorFrameNanos by remember(anchorKey) { mutableLongStateOf(0L) }
+
+    LaunchedEffect(anchorKey, currentPositionMs) {
+        withFrameNanos { frameNanos ->
+            if (currentPositionMs < renderedPositionMs || currentPositionMs - renderedPositionMs > 900L) {
+                renderedPositionMs = currentPositionMs
+            }
+            anchorPositionMs = currentPositionMs
+            anchorFrameNanos = frameNanos
+            if (!isPlaying) renderedPositionMs = currentPositionMs
+        }
+    }
+
+    LaunchedEffect(anchorKey, isPlaying) {
+        if (!isPlaying) {
+            renderedPositionMs = currentPositionMs
+            return@LaunchedEffect
+        }
+        while (isActive) {
+            withFrameNanos { frameNanos ->
+                if (anchorFrameNanos <= 0L) return@withFrameNanos
+                val elapsedMs = ((frameNanos - anchorFrameNanos) / 1_000_000L).coerceAtLeast(0L)
+                val predicted = anchorPositionMs + elapsedMs
+                if (predicted >= renderedPositionMs) {
+                    renderedPositionMs = predicted
+                }
+            }
+        }
+    }
+
+    return renderedPositionMs
+}
+
+private fun com.ella.music.data.model.LyricLine.miniLyricRenderKey(): String =
+    "$timeMs|$endMs|$text|$backgroundText"
+
+private const val MINI_LYRIC_SWEEP_FEATHER_FRACTION = 0.10f
 
 @Composable
 private fun PlayerActionMenu(
@@ -3713,7 +3780,6 @@ private fun formatTime(ms: Long): String {
 
 private fun com.ella.music.data.AudioQualitySummary.playerCompactText(): String {
     return when {
-        compactLabel == "Dolby Atmos" -> "ᴰᴰ Dolby Atmos"
         compactLabel == "MQ" -> "∞ Master"
         showMobius -> "∞ $compactLabel"
         else -> compactLabel

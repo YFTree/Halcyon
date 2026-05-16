@@ -12,6 +12,9 @@
 # SuperLyricApi references this hidden framework class on supported systems.
 -dontwarn android.os.ServiceManager
 
+# Lyric Getter's Xposed module finds and hooks the public API by class and member names.
+-keep class cn.lyric.getter.api.** { *; }
+
 # jaudiotagger uses Class.getPackage().getName() while initializing readers.
 -keeppackagenames org.jaudiotagger.**
 -keepnames class org.jaudiotagger.**

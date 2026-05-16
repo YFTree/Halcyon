@@ -9,8 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.Song
@@ -57,6 +57,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import androidx.compose.ui.window.Dialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
@@ -707,24 +708,21 @@ internal fun WebDavTextField(
     value: String,
     onValueChange: (String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(text = label, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            singleLine = true,
-            textStyle = androidx.compose.ui.text.TextStyle(
-                color = MiuixTheme.colorScheme.onBackground,
-                fontSize = 14.sp
-            ),
-            cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MiuixTheme.colorScheme.surfaceContainer)
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        )
-    }
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label,
+        useLabelAsPlaceholder = true,
+        singleLine = true,
+        insideMargin = DpSize(12.dp, 10.dp),
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        cornerRadius = 12.dp,
+        textStyle = TextStyle(
+            color = MiuixTheme.colorScheme.onBackground,
+            fontSize = 14.sp
+        ),
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 internal fun WebDavItem.toRemoteSong(): Song {

@@ -16,15 +16,19 @@ class TickerBridge(private val context: Context) {
 
         // 换一个新的 Channel ID，避免旧通知渠道配置缓存影响测试
         private const val CHANNEL_ID = "ella_flyme_ticker_lyrics_v2"
-
         private const val NOTIFICATION_ID = 0x454c4c41
+        private const val LEGACY_HIDDEN_NOTIFICATION_ID = 1001
+        private const val FLAG_ALWAYS_SHOW_TICKER_FALLBACK = 0x1000000
+        private const val FLAG_ONLY_UPDATE_TICKER_FALLBACK = 0x2000000
         private const val ACTION_SEND_LYRIC = "com.meizu.flyme.ticker.ACTION_SEND"
         private const val ACTION_CLEAR_LYRIC = "com.meizu.flyme.ticker.ACTION_CLEAR"
         private const val SYSTEM_UI_PACKAGE = "com.android.systemui"
     }
 
     private var enabled = false
+    private var hideNotification = false
     private var lastPayload: Pair<String?, String?>? = null
+    private var hardCancelStandalonePending = true
 
     private val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -39,10 +43,26 @@ class TickerBridge(private val context: Context) {
 
     fun setEnabled(enabled: Boolean) {
         this.enabled = enabled
-        if (!enabled) clearLyric()
+        if (!enabled) {
+            clearLyric()
+        } else if (hideNotification) {
+            hardCancelStandalonePending = true
+            cancelStandaloneTickerNotifications()
+        }
     }
 
     fun isEnabled() = enabled
+
+    fun setHideNotification(enabled: Boolean) {
+        hideNotification = enabled
+        if (enabled) {
+            hardCancelStandalonePending = true
+            cancelStandaloneTickerNotifications()
+        } else {
+            PlaybackTickerState.clear()
+        }
+        lastPayload = null
+    }
 
     fun sendLyric(text: String?, translation: String? = null) {
         if (!enabled) return
@@ -69,7 +89,13 @@ class TickerBridge(private val context: Context) {
             }
 
             sendFlymeBroadcast(intent)
-            postTickerNotification(text, cleanTranslation)
+            if (hideNotification) {
+                PlaybackTickerState.update(text, cleanTranslation)
+                cancelStandaloneTickerNotifications()
+            } else {
+                PlaybackTickerState.clear()
+                postTickerNotification(text, cleanTranslation)
+            }
 
             Log.d(TAG, "Ticker lyric sent: $text")
         } catch (e: Exception) {
@@ -87,8 +113,42 @@ class TickerBridge(private val context: Context) {
             }
 
             sendFlymeBroadcast(intent)
-            notificationManager.cancel(NOTIFICATION_ID)
+            PlaybackTickerState.clear()
+            cancelStandaloneTickerNotifications()
         } catch (_: Exception) {
+        }
+    }
+
+    private fun cancelStandaloneTickerNotifications() {
+        notificationManager.cancel(NOTIFICATION_ID)
+        notificationManager.cancel(null, NOTIFICATION_ID)
+        notificationManager.cancel(LEGACY_HIDDEN_NOTIFICATION_ID)
+        notificationManager.cancel("ranker_group", Int.MAX_VALUE)
+        if (hardCancelStandalonePending) {
+            hardCancelStandalonePending = false
+            runCatching {
+                ensureNotificationChannel(CHANNEL_ID)
+                val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    Notification.Builder(context, CHANNEL_ID)
+                } else {
+                    Notification.Builder(context)
+                }
+                val disposable = builder
+                    .setSmallIcon(R.drawable.ic_flyme_ticker)
+                    .setContentTitle("")
+                    .setContentText("")
+                    .setShowWhen(false)
+                    .setOnlyAlertOnce(true)
+                    .setLocalOnly(true)
+                    .setOngoing(false)
+                    .setAutoCancel(true)
+                    .setPriority(Notification.PRIORITY_MIN)
+                    .build()
+                notificationManager.notify(NOTIFICATION_ID, disposable)
+                notificationManager.cancel(NOTIFICATION_ID)
+                notificationManager.cancel(null, NOTIFICATION_ID)
+                notificationManager.cancel("ranker_group", Int.MAX_VALUE)
+            }
         }
     }
 
@@ -99,13 +159,15 @@ class TickerBridge(private val context: Context) {
 
     @Suppress("DEPRECATION")
     private fun postTickerNotification(text: String, translation: String?) {
-        ensureNotificationChannel()
+        val channelId = CHANNEL_ID
+        val notificationId = NOTIFICATION_ID
+        ensureNotificationChannel(channelId)
 
         val flymeTickerSupported = isFlymeTickerSupported()
         val tickerText: CharSequence? = if (flymeTickerSupported) text else null
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(context, CHANNEL_ID)
+            Notification.Builder(context, channelId)
         } else {
             Notification.Builder(context)
         }
@@ -116,9 +178,10 @@ class TickerBridge(private val context: Context) {
             .setContentText(translation.orEmpty())
             .setTicker(tickerText)
             .setOngoing(true)
-            .setOnlyAlertOnce(false)
+            .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setLocalOnly(true)
+            .setDefaults(0)
             .setPriority(Notification.PRIORITY_MAX)
             .setCategory(Notification.CATEGORY_STATUS)
             .build()
@@ -136,21 +199,21 @@ class TickerBridge(private val context: Context) {
 
             Log.d(
                 TAG,
-                "Flyme ticker notification posted, text=$text, showFlag=$flagAlwaysShowTicker, updateFlag=$flagOnlyUpdateTicker"
+                "Flyme ticker notification posted, text=$text, hidden=$hideNotification, showFlag=$flagAlwaysShowTicker, updateFlag=$flagOnlyUpdateTicker"
             )
         } else {
-            Log.w(TAG, "Flyme ticker is not supported on this ROM")
+            Log.w(TAG, "Flyme ticker flags are using fallback values")
         }
 
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        notificationManager.notify(notificationId, notification)
     }
 
-    private fun ensureNotificationChannel() {
+    private fun ensureNotificationChannel(channelId: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        if (notificationManager.getNotificationChannel(CHANNEL_ID) != null) return
+        if (notificationManager.getNotificationChannel(channelId) != null) return
 
         val channel = NotificationChannel(
-            CHANNEL_ID,
+            channelId,
             "Flyme 状态栏歌词",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
@@ -173,8 +236,44 @@ class TickerBridge(private val context: Context) {
             field.isAccessible = true
             field.getInt(null)
         } catch (e: Throwable) {
-            Log.w(TAG, "Flyme ticker flag not found: $name")
-            0
+            when (name) {
+                "FLAG_ALWAYS_SHOW_TICKER" -> FLAG_ALWAYS_SHOW_TICKER_FALLBACK
+                "FLAG_ONLY_UPDATE_TICKER" -> FLAG_ONLY_UPDATE_TICKER_FALLBACK
+                else -> 0
+            }.also { fallback ->
+                Log.w(TAG, "Flyme ticker flag not found: $name, fallback=$fallback")
+            }
         }
+    }
+}
+
+internal object PlaybackTickerState {
+    data class Payload(
+        val text: String,
+        val translation: String?
+    )
+
+    @Volatile
+    private var payload: Payload? = null
+    private var refreshNotification: (() -> Unit)? = null
+
+    @Synchronized
+    fun setRefreshCallback(callback: (() -> Unit)?) {
+        refreshNotification = callback
+    }
+
+    fun current(): Payload? = payload
+
+    fun update(text: String?, translation: String?) {
+        payload = text
+            ?.takeIf { it.isNotBlank() }
+            ?.let { Payload(it, translation?.takeIf { value -> value.isNotBlank() }) }
+        refreshNotification?.invoke()
+    }
+
+    fun clear() {
+        if (payload == null) return
+        payload = null
+        refreshNotification?.invoke()
     }
 }

@@ -13,6 +13,7 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.repository.MusicRepository
 import com.ella.music.player.DesktopLyricBridge
 import com.ella.music.player.ExoPlayerManager
+import com.ella.music.player.LyricGetterBridge
 import com.ella.music.player.LyriconBridge
 import com.ella.music.player.SuperLyricBridge
 import com.ella.music.player.TickerBridge
@@ -21,6 +22,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -35,6 +37,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val tickerBridge = TickerBridge(application)
     val desktopLyricBridge = DesktopLyricBridge(application)
     val superLyricBridge = SuperLyricBridge()
+    val lyricGetterBridge = LyricGetterBridge(application)
     private val playbackStatsStore = PlaybackStatsStore.getInstance(application)
 
     val currentSong: StateFlow<Song?> = playerManager.currentSong
@@ -77,14 +80,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var bluetoothLyricEnabled = false
     private var bluetoothLyricTranslationEnabled = false
     private var samsungFloatingLyricTranslationEnabled = false
+    private var tickerHideNotificationEnabled = false
     private var superLyricTranslationEnabled = true
     private var lyricSourceMode = SettingsManager.LYRIC_SOURCE_AUTO
+    private var appliedDecoderMode: Int? = null
+    private var appliedAudioFocusDisabled: Boolean? = null
+    private var appliedLyricSourceMode: Int? = null
     private var lastBluetoothLyricPayload: Pair<String, String?>? = null
     private var sleepTimerJob: Job? = null
     private var externalLyricResendJob: Job? = null
     private var stopAfterCurrentSongId: Long? = null
     private var lazyOnlineQueue: LazyOnlineQueue? = null
     private var resolvingLazyQueue = false
+    private var loadedLyricSongKey: String? = null
 
     init {
         playerManager.connect()
@@ -95,6 +103,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         initTicker()
         initDesktopLyric()
         initSuperLyric()
+        initLyricGetter()
         initLyricPageTranslation()
         initBluetoothLyric()
         initShuffleMode()
@@ -117,13 +126,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun initTicker() {
         viewModelScope.launch {
             val enabled = settingsManager.tickerEnabled.first()
-            samsungFloatingLyricTranslationEnabled = settingsManager.samsungFloatingLyricTranslation.first()
+            val hideNotification = settingsManager.tickerHideNotification.first()
+            tickerHideNotificationEnabled = hideNotification
+            samsungFloatingLyricTranslationEnabled = settingsManager.samsungFloatingLyricTranslation.first() && !hideNotification
+            tickerBridge.setHideNotification(hideNotification)
             tickerBridge.setEnabled(enabled)
             if (enabled) resendTickerLyric()
         }
         viewModelScope.launch {
-            settingsManager.samsungFloatingLyricTranslation.collect { enabled ->
-                samsungFloatingLyricTranslationEnabled = enabled
+            settingsManager.tickerHideNotification.distinctUntilChanged().collect { enabled ->
+                tickerHideNotificationEnabled = enabled
+                tickerBridge.setHideNotification(enabled)
+                if (enabled && samsungFloatingLyricTranslationEnabled) {
+                    samsungFloatingLyricTranslationEnabled = false
+                    settingsManager.setSamsungFloatingLyricTranslation(false)
+                }
+                lastTickerPayload = null
+                if (tickerBridge.isEnabled()) resendTickerLyric(force = true)
+            }
+        }
+        viewModelScope.launch {
+            settingsManager.samsungFloatingLyricTranslation.distinctUntilChanged().collect { enabled ->
+                samsungFloatingLyricTranslationEnabled = enabled && !tickerHideNotificationEnabled
                 lastTickerPayload = null
                 if (tickerBridge.isEnabled()) resendTickerLyric()
             }
@@ -145,16 +169,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (enabled) resendSuperLyric()
         }
         viewModelScope.launch {
-            settingsManager.superLyricTranslation.collect { enabled ->
+            settingsManager.superLyricTranslation.distinctUntilChanged().collect { enabled ->
                 superLyricTranslationEnabled = enabled
                 if (superLyricBridge.isEnabled()) resendSuperLyric()
             }
         }
     }
 
+    private fun initLyricGetter() {
+        viewModelScope.launch {
+            settingsManager.lyricGetterEnabled.distinctUntilChanged().collect { enabled ->
+                lyricGetterBridge.setEnabled(enabled)
+                if (enabled) resendLyricGetter(force = true)
+            }
+        }
+    }
+
     private fun initBluetoothLyric() {
         viewModelScope.launch {
-            settingsManager.bluetoothLyricEnabled.collect { enabled ->
+            settingsManager.bluetoothLyricEnabled.distinctUntilChanged().collect { enabled ->
                 bluetoothLyricEnabled = enabled
                 lastBluetoothLyricPayload = null
 
@@ -166,7 +199,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         viewModelScope.launch {
-            settingsManager.bluetoothLyricTranslation.collect { enabled ->
+            settingsManager.bluetoothLyricTranslation.distinctUntilChanged().collect { enabled ->
                 bluetoothLyricTranslationEnabled = enabled
                 lastBluetoothLyricPayload = null
                 if (bluetoothLyricEnabled) resendBluetoothLyric()
@@ -176,7 +209,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun initShuffleMode() {
         viewModelScope.launch {
-            settingsManager.shuffleMode.collect { mode ->
+            settingsManager.shuffleMode.distinctUntilChanged().collect { mode ->
                 playerManager.setShuffleMode(mode)
             }
         }
@@ -184,12 +217,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun initDecoderMode() {
         viewModelScope.launch {
-            var initialized = false
             settingsManager.decoderMode.collect { mode ->
-                if (!initialized) {
-                    initialized = true
+                if (appliedDecoderMode == null) {
+                    appliedDecoderMode = mode
                     return@collect
                 }
+                if (appliedDecoderMode == mode) return@collect
+                appliedDecoderMode = mode
                 playerManager.recreatePlaybackService()
                 AppLogStore.info(getApplication(), "PlayerDecoder", "Decoder mode changed to $mode")
             }
@@ -198,12 +232,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun initAudioFocusMode() {
         viewModelScope.launch {
-            var initialized = false
-            settingsManager.audioFocusDisabled.collect { disabled ->
-                if (!initialized) {
-                    initialized = true
+            settingsManager.audioFocusDisabled.distinctUntilChanged().collect { disabled ->
+                if (appliedAudioFocusDisabled == null) {
+                    appliedAudioFocusDisabled = disabled
                     return@collect
                 }
+                if (appliedAudioFocusDisabled == disabled) return@collect
+                appliedAudioFocusDisabled = disabled
                 playerManager.recreatePlaybackService()
                 AppLogStore.info(getApplication(), "PlayerDecoder", "Audio focus disabled changed to $disabled")
             }
@@ -212,8 +247,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun initLyricSourceMode() {
         viewModelScope.launch {
-            settingsManager.lyricSourceMode.collect { mode ->
-                lyricSourceMode = mode
+            settingsManager.lyricSourceMode.distinctUntilChanged().collect { mode ->
+                val safeMode = mode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
+                if (appliedLyricSourceMode == null) {
+                    appliedLyricSourceMode = safeMode
+                    lyricSourceMode = safeMode
+                    return@collect
+                }
+                if (appliedLyricSourceMode == safeMode) return@collect
+                appliedLyricSourceMode = safeMode
+                lyricSourceMode = safeMode
                 currentSong.value?.let { reloadLyrics(it, force = true) }
             }
         }
@@ -264,10 +307,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             playerManager.currentSong.collect { song ->
                 if (song != null) {
+                    val songKey = song.lyricIdentityKey()
+                    if (loadedLyricSongKey == songKey) {
+                        updateCurrentLyricIndex()
+                        return@collect
+                    }
                     lastTickerPayload = null
                     lastBluetoothLyricPayload = null
+                    lyricGetterBridge.clearLyric()
                     val songLyrics = repository.getLyrics(song, lyricSourceMode)
                     repository.getCoverArt(song)
+                    loadedLyricSongKey = songKey
                     _lyrics.value = songLyrics
                     _currentLyricIndex.value = -1
 
@@ -281,6 +331,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         scheduleExternalLyricResend()
                     }
                 } else {
+                    loadedLyricSongKey = null
                     _lyrics.value = emptyList()
                     _currentLyricIndex.value = -1
                     clearExternalLyrics(clearLyricon = true, clearSuperLyricSong = true)
@@ -299,6 +350,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         tickerBridge.clearLyric()
                         desktopLyricBridge.clearLyric()
                         superLyricBridge.sendStop()
+                        lyricGetterBridge.clearLyric()
                         playerManager.clearBluetoothLyric()
                         lastBluetoothLyricPayload = null
                     } else {
@@ -340,6 +392,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 sendTickerLyric(index, currentLyrics)
                 sendBluetoothLyric(index, currentLyrics)
                 sendSuperLyricAt(index, currentLyrics)
+                sendLyricGetterAt(index, currentLyrics)
             }
         }
     }
@@ -398,6 +451,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         resendTickerLyric(force)
         resendDesktopLyric()
         resendSuperLyric(force)
+        resendLyricGetter(force)
     }
 
     private fun resendTickerLyric(force: Boolean = false) {
@@ -415,7 +469,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         desktopLyricBridge.sendLyric(
             line = currentLyrics.getOrNull(index),
             positionMs = currentPosition.value,
-            showTranslation = _showLyricTranslation.value
+            showTranslation = _showLyricTranslation.value,
+            showPronunciation = _showLyricPronunciation.value
         )
     }
 
@@ -423,7 +478,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (!desktopLyricBridge.isEnabled() || !isPlaying.value) return
         val index = _currentLyricIndex.value
         val line = _lyrics.value.getOrNull(index) ?: return
-        desktopLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value)
+        desktopLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value, _showLyricPronunciation.value)
     }
 
     private fun resendSuperLyric(force: Boolean = false) {
@@ -433,6 +488,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         superLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value && superLyricTranslationEnabled, force)
     }
 
+    private fun sendLyricGetterAt(index: Int, lyrics: List<LyricLine>) {
+        if (!lyricGetterBridge.isEnabled() || !isPlaying.value) return
+        lyricGetterBridge.sendLyric(lyrics.getOrNull(index))
+    }
+
+    private fun resendLyricGetter(force: Boolean = false) {
+        if (!lyricGetterBridge.isEnabled() || !isPlaying.value) return
+        lyricGetterBridge.sendLyric(_lyrics.value.getOrNull(_currentLyricIndex.value), force)
+    }
+
     private fun scheduleExternalLyricResend() {
         externalLyricResendJob?.cancel()
         externalLyricResendJob = viewModelScope.launch {
@@ -440,6 +505,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 delay(350L + attempt * 550L)
                 resendExternalLyrics(force = true)
                 resendBluetoothLyric(force = true)
+                resendLyricGetter(force = true)
             }
         }
     }
@@ -450,6 +516,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lastBluetoothLyricPayload = null
         tickerBridge.clearLyric()
         desktopLyricBridge.clearLyric()
+        lyricGetterBridge.clearLyric()
         playerManager.clearBluetoothLyric()
         if (clearLyricon) lyriconBridge.clearSong()
         if (clearSuperLyricSong) {
@@ -461,7 +528,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun initLyricPageTranslation() {
         viewModelScope.launch {
-            settingsManager.lyricPageTranslation.collect { enabled ->
+            settingsManager.lyricPageTranslation.distinctUntilChanged().collect { enabled ->
                 _showLyricTranslation.value = enabled
             }
         }
@@ -495,12 +562,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerManager.play()
     }
 
+    fun hasSavedPlaybackQueue(): Boolean = playerManager.hasSavedQueue()
+
     fun togglePlayPause() = playerManager.togglePlayPause()
     fun skipToNext() {
+        if (repeatMode.value == Player.REPEAT_MODE_ONE) {
+            playerManager.restartCurrent()
+            return
+        }
         if (!playLazyOnlineOffset(1)) playerManager.skipToNext()
     }
 
     fun skipToPrevious() {
+        if (repeatMode.value == Player.REPEAT_MODE_ONE) {
+            playerManager.restartCurrent()
+            return
+        }
         if (!playLazyOnlineOffset(-1)) playerManager.skipToPrevious()
     }
 
@@ -528,6 +605,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.setShuffleMode(mode)
             playerManager.setShuffleMode(mode)
+        }
+    }
+
+    fun setDecoderMode(mode: Int) {
+        viewModelScope.launch {
+            val safeMode = mode.coerceIn(0, 2)
+            settingsManager.setDecoderMode(safeMode)
+            if (appliedDecoderMode != safeMode) {
+                appliedDecoderMode = safeMode
+                playerManager.recreatePlaybackService()
+                AppLogStore.info(getApplication(), "PlayerDecoder", "Decoder mode changed to $safeMode")
+            }
         }
     }
     fun addToPlaylist(song: Song) {
@@ -625,6 +714,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.setLyricSourceMode(mode)
             lyricSourceMode = mode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
+            appliedLyricSourceMode = lyricSourceMode
             currentSong.value?.let { reloadLyrics(it, force = true) }
         }
     }
@@ -641,6 +731,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             repository.getLyrics(song, lyricSourceMode)
         }
+        loadedLyricSongKey = song.lyricIdentityKey()
         _lyrics.value = songLyrics
         _currentLyricIndex.value = -1
         if (lyriconBridge.isEnabled()) lyriconBridge.sendSong(song, songLyrics)
@@ -651,6 +742,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (tickerBridge.isEnabled()) resendTickerLyric(force = true)
             if (desktopLyricBridge.isEnabled()) resendDesktopLyric()
             if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
+            if (lyricGetterBridge.isEnabled()) resendLyricGetter(force = true)
             if (bluetoothLyricEnabled) resendBluetoothLyric(force = true)
             scheduleExternalLyricResend()
         }
@@ -695,6 +787,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setLyricPagePronunciation(enabled: Boolean) {
         _showLyricPronunciation.value = enabled
+        resendDesktopLyric()
     }
 
     fun setLyriconEnabled(enabled: Boolean) {
@@ -720,16 +813,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun setTickerEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setTickerEnabled(enabled)
+            tickerBridge.setHideNotification(settingsManager.tickerHideNotification.first())
             tickerBridge.setEnabled(enabled)
             lastTickerPayload = null
             if (enabled) resendTickerLyric()
         }
     }
 
+    fun setTickerHideNotification(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setTickerHideNotification(enabled)
+            tickerHideNotificationEnabled = enabled
+            tickerBridge.setHideNotification(enabled)
+            if (enabled && samsungFloatingLyricTranslationEnabled) {
+                settingsManager.setSamsungFloatingLyricTranslation(false)
+                samsungFloatingLyricTranslationEnabled = false
+            }
+            lastTickerPayload = null
+            if (tickerBridge.isEnabled()) resendTickerLyric(force = true)
+        }
+    }
+
     fun setSamsungFloatingLyricTranslation(enabled: Boolean) {
         viewModelScope.launch {
-            settingsManager.setSamsungFloatingLyricTranslation(enabled)
-            samsungFloatingLyricTranslationEnabled = enabled
+            val safeEnabled = enabled && !tickerHideNotificationEnabled
+            settingsManager.setSamsungFloatingLyricTranslation(safeEnabled)
+            samsungFloatingLyricTranslationEnabled = safeEnabled
             lastTickerPayload = null
             if (tickerBridge.isEnabled()) resendTickerLyric()
         }
@@ -751,6 +860,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 currentSong.value?.let { superLyricBridge.sendSong(it) }
                 resendSuperLyric()
             }
+        }
+    }
+
+    fun setLyricGetterEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setLyricGetterEnabled(enabled)
+            lyricGetterBridge.setEnabled(enabled)
+            if (enabled) resendLyricGetter(force = true)
         }
     }
 
@@ -881,6 +998,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         positionUpdateJob?.cancel()
         sleepTimerJob?.cancel()
         tickerBridge.clearLyric()
+        lyricGetterBridge.clearLyric()
         superLyricBridge.destroy()
         lyriconBridge.destroy()
         playerManager.disconnect()
@@ -892,3 +1010,11 @@ private data class LazyOnlineQueue(
     var index: Int,
     val resolver: suspend (Song) -> Song
 )
+
+private fun Song.lyricIdentityKey(): String {
+    return when {
+        onlineSource.isNotBlank() || onlineId.isNotBlank() -> "online:$onlineSource:$onlineId:$path"
+        path.isNotBlank() -> "path:$path"
+        else -> "id:$id"
+    }
+}

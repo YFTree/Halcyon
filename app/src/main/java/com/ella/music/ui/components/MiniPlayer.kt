@@ -30,10 +30,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +72,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clipToBounds
+import kotlinx.coroutines.isActive
 
 @Composable
 fun MiniPlayer(
@@ -89,7 +92,11 @@ fun MiniPlayer(
     onSkipNext: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val shouldLoadEmbeddedCover = song.coverUrl.isBlank() && albumArtUri == null && loadCoverArt != null
+    val preferEmbeddedCover = song.fileName.substringAfterLast('.', song.path.substringAfterLast('.'))
+        .lowercase() in setOf("m4a", "mp4", "alac", "flac", "wav", "aiff", "aif")
+    val shouldLoadEmbeddedCover = song.coverUrl.isBlank() &&
+        loadCoverArt != null &&
+        (albumArtUri == null || preferEmbeddedCover)
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song.id, shouldLoadEmbeddedCover) {
         value = if (!shouldLoadEmbeddedCover) {
             null
@@ -101,7 +108,8 @@ fun MiniPlayer(
             }
         }
     }
-    val coverModel = song.coverUrl.takeIf { it.isNotBlank() } ?: albumArtUri ?: embeddedCover
+    val coverModel = song.coverUrl.takeIf { it.isNotBlank() }
+        ?: if (preferEmbeddedCover) embeddedCover ?: albumArtUri else albumArtUri ?: embeddedCover
     val shape = RoundedCornerShape(if (liquidGlass) 24.dp else 0.dp)
     val glassBackdrop = if (liquidGlass) backdrop else null
     val useGlassLayout = liquidGlass
@@ -123,7 +131,22 @@ fun MiniPlayer(
         scrollSecondary = lyricText != null && hasTranslation
     )
     var transitionDirection by remember { mutableIntStateOf(1) }
+    var coverRotation by remember(song.id) { mutableFloatStateOf(0f) }
     val interactionSource = remember { MutableInteractionSource() }
+
+    LaunchedEffect(song.id, isPlaying) {
+        if (!isPlaying) return@LaunchedEffect
+        var lastFrameNanos = 0L
+        while (isActive) {
+            withFrameNanos { frameNanos ->
+                if (lastFrameNanos != 0L) {
+                    val elapsedMs = (frameNanos - lastFrameNanos) / 1_000_000f
+                    coverRotation = (coverRotation + elapsedMs * 360f / 20_000f) % 360f
+                }
+                lastFrameNanos = frameNanos
+            }
+        }
+    }
 
     Row(
         modifier = modifier
@@ -192,6 +215,7 @@ fun MiniPlayer(
             Box(
                 modifier = Modifier
                     .size(44.dp)
+                    .graphicsLayer { rotationZ = coverRotation }
                     .clip(CircleShape)
                     .background(MiuixTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center

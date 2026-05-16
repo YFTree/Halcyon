@@ -60,14 +60,14 @@ class MusicRepository(private val context: Context) {
     private val lyricsCache = mutableMapOf<String, List<LyricLine>>()
     private val audioInfoCache = mutableMapOf<Long, AudioInfo>()
     private val replayGainCache = mutableMapOf<Long, Float?>()
-    private val coverArtCache = object : LruCache<Long, ByteArray>(8 * 1024) {
-        override fun sizeOf(key: Long, value: ByteArray): Int = value.size / 1024
+    private val coverArtCache = object : LruCache<String, ByteArray>(8 * 1024) {
+        override fun sizeOf(key: String, value: ByteArray): Int = value.size / 1024
     }
-    private val coverBitmapCache = object : LruCache<Long, Bitmap>(16 * 1024) {
-        override fun sizeOf(key: Long, value: Bitmap): Int = value.byteCount / 1024
+    private val coverBitmapCache = object : LruCache<String, Bitmap>(16 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
     private val coverArtLock = Any()
-    private val missingCoverIds = ConcurrentHashMap.newKeySet<Long>()
+    private val missingCoverKeys = ConcurrentHashMap.newKeySet<String>()
     private val libraryCacheFile = File(context.filesDir, "music_library_cache.json")
     private val remoteAudioCacheDir = File(context.cacheDir, "webdav_audio")
 
@@ -284,9 +284,10 @@ class MusicRepository(private val context: Context) {
     }
 
     fun getCoverArt(song: Song): ByteArray? {
-        if (missingCoverIds.contains(song.id)) return null
+        val cacheKey = song.coverCacheKey()
+        if (missingCoverKeys.contains(cacheKey)) return null
         synchronized(coverArtLock) {
-            coverArtCache.get(song.id)?.let { return it }
+            coverArtCache.get(cacheKey)?.let { return it }
             val art = runCatching {
                 scanner.extractCoverArt(song.effectiveLocalPathForMetadata())
             }.getOrElse { error ->
@@ -298,9 +299,9 @@ class MusicRepository(private val context: Context) {
                 null
             }
             if (art != null) {
-                coverArtCache.put(song.id, art)
+                coverArtCache.put(cacheKey, art)
             } else {
-                missingCoverIds += song.id
+                missingCoverKeys += cacheKey
             }
             return art
         }
@@ -308,7 +309,7 @@ class MusicRepository(private val context: Context) {
 
     fun getCoverArtBitmap(song: Song, maxSize: Int = 512): Bitmap? {
         val targetSize = maxSize.coerceIn(64, 3000)
-        val cacheKey = (song.id shl 16) xor targetSize.toLong()
+        val cacheKey = "${song.coverCacheKey()}:$targetSize"
         coverBitmapCache.get(cacheKey)?.let { return it }
         return synchronized(coverArtLock) {
             coverBitmapCache.get(cacheKey)?.let { return it }
@@ -395,7 +396,7 @@ class MusicRepository(private val context: Context) {
         audioInfoCache.clear()
         replayGainCache.clear()
         coverArtCache.evictAll()
-        missingCoverIds.clear()
+        missingCoverKeys.clear()
         coverBitmapCache.evictAll()
     }
 
@@ -568,5 +569,14 @@ class MusicRepository(private val context: Context) {
                 artAlbumId = item.optLong("artAlbumId", item.optLong("id"))
             )
         }
+    }
+
+    private fun Song.coverCacheKey(): String {
+        val source = when {
+            path.isNotBlank() -> path
+            onlineSource.isNotBlank() || onlineId.isNotBlank() -> "$onlineSource:$onlineId"
+            else -> "$id:$title:$artist:$album"
+        }
+        return source.sha256()
     }
 }

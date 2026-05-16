@@ -88,6 +88,8 @@ class ExoPlayerManager(private val context: Context) {
     private val missingNotificationArtworkIds = mutableSetOf<Long>()
     private var artworkAppliedSongId: Long? = null
     private var sessionMetadataSongId: Long? = null
+    private var bluetoothMetadataSongId: Long? = null
+    private var bluetoothMetadataPayload: Pair<String?, String?>? = null
 
     fun connect() {
         val sessionToken = SessionToken(
@@ -131,7 +133,13 @@ class ExoPlayerManager(private val context: Context) {
 
         disconnect()
         context.stopService(Intent(context, PlaybackService::class.java))
-        delay(300)
+        playlist.clear()
+        _playlist.value = emptyList()
+        sessionMetadataSongId = null
+        artworkAppliedSongId = null
+        bluetoothMetadataSongId = null
+        bluetoothMetadataPayload = null
+        delay(650)
         connect()
     }
 
@@ -203,6 +211,8 @@ class ExoPlayerManager(private val context: Context) {
         AppLogStore.debug(context, "PlayerQueue", "setPlaylist size=${songs.size} start=$startIndex")
         virtualPlaylistCurrentIndex = null
         sessionMetadataSongId = null
+        bluetoothMetadataSongId = null
+        bluetoothMetadataPayload = null
         playlist.clear()
         playlist.addAll(songs)
         _playlist.value = playlist.toList()
@@ -233,6 +243,8 @@ class ExoPlayerManager(private val context: Context) {
         val safeIndex = currentIndex.coerceIn(songs.indices)
         virtualPlaylistCurrentIndex = safeIndex
         sessionMetadataSongId = null
+        bluetoothMetadataSongId = null
+        bluetoothMetadataPayload = null
         playlist.clear()
         playlist.addAll(songs.mapIndexed { index, song -> if (index == safeIndex) resolvedSong else song })
         _playlist.value = playlist.toList()
@@ -287,6 +299,8 @@ class ExoPlayerManager(private val context: Context) {
         _playlist.value = emptyList()
         _currentSong.value = null
         sessionMetadataSongId = null
+        bluetoothMetadataSongId = null
+        bluetoothMetadataPayload = null
         _currentPosition.value = 0L
         _duration.value = 0L
         mediaController?.run {
@@ -331,17 +345,31 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     fun skipToNext() {
-        if (!playTrueRandomItem()) {
-            mediaController?.seekToNext()
+        if (!restartCurrentInRepeatOne()) {
+            if (!playTrueRandomItem()) {
+                mediaController?.seekToNextMediaItem()
+            }
             updateCurrentSong()
         }
         savePlaybackQueue(force = true)
     }
 
     fun skipToPrevious() {
-        mediaController?.seekToPrevious()
+        if (!restartCurrentInRepeatOne()) {
+            mediaController?.seekToPreviousMediaItem()
+        }
         updateCurrentSong()
         savePlaybackQueue(force = true)
+    }
+
+    fun restartCurrent() {
+        mediaController?.run {
+            seekToDefaultPosition(currentMediaItemIndex.coerceAtLeast(0))
+            play()
+        }
+        _currentPosition.value = 0L
+        updateCurrentSong()
+        savePlaybackState(force = true)
     }
 
     fun seekTo(positionMs: Long) {
@@ -399,12 +427,25 @@ class ExoPlayerManager(private val context: Context) {
 
         val currentItem = controller.currentMediaItem ?: return
         val lyricText = text?.takeIf { it.isNotBlank() }
+        val lyricSecondaryText = secondaryText?.takeIf { it.isNotBlank() }
+        val payload = lyricText to lyricSecondaryText
+
+        if (lyricText == null && bluetoothMetadataSongId != song.id) return
+        if (bluetoothMetadataSongId == song.id && bluetoothMetadataPayload == payload) return
 
         val displayTitle = lyricText ?: song.title
         val displayArtist = if (lyricText != null) {
-            secondaryText?.takeIf { it.isNotBlank() } ?: "${song.title} · ${song.artist}"
+            lyricSecondaryText ?: "${song.title} · ${song.artist}"
         } else {
             song.artist
+        }
+
+        if (currentItem.mediaMetadata.title == displayTitle &&
+            currentItem.mediaMetadata.artist == displayArtist
+        ) {
+            bluetoothMetadataSongId = if (lyricText == null) null else song.id
+            bluetoothMetadataPayload = if (lyricText == null) null else payload
+            return
         }
 
         val metadata = song.mediaMetadata(displayTitle, displayArtist, notificationArtworkCache.get(song.id))
@@ -415,6 +456,8 @@ class ExoPlayerManager(private val context: Context) {
 
         runCatching {
             controller.replaceMediaItem(index, newItem)
+            bluetoothMetadataSongId = if (lyricText == null) null else song.id
+            bluetoothMetadataPayload = if (lyricText == null) null else payload
         }
     }
 
@@ -618,9 +661,23 @@ class ExoPlayerManager(private val context: Context) {
         return true
     }
 
+    private fun restartCurrentInRepeatOne(): Boolean {
+        val controller = mediaController ?: return false
+        if (controller.repeatMode != Player.REPEAT_MODE_ONE) return false
+
+        val itemCount = controller.mediaItemCount
+        val currentIndex = controller.currentMediaItemIndex
+        if (itemCount <= 0 || currentIndex !in 0 until itemCount) return false
+
+        controller.seekToDefaultPosition(currentIndex)
+        controller.play()
+        _currentPosition.value = 0L
+        return true
+    }
+
     private fun restoreSavedQueueIfNeeded() {
         val controller = mediaController ?: return
-        if (controller.mediaItemCount > 0 || playlist.isNotEmpty()) return
+        if (controller.mediaItemCount > 0) return
 
         val saved = loadSavedQueue() ?: return
         if (saved.songs.isEmpty()) return
@@ -802,6 +859,8 @@ class ExoPlayerManager(private val context: Context) {
             .put("speed", speed)
             .put("pitch", pitch)
     }
+
+    fun hasSavedQueue(): Boolean = loadSavedQueue()?.songs?.isNotEmpty() == true
 
     private data class PendingPlaylist(
         val songs: List<Song>,

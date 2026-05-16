@@ -23,6 +23,7 @@ class LyriconBridge(private val context: Context) {
     private var lastSongId: String? = null
     private var lastSong: Song? = null
     private var lastLyrics: List<LyricLine> = emptyList()
+    private var lastSentSignature: String? = null
 
     fun initialize() {
         if (provider != null) return
@@ -57,6 +58,7 @@ class LyriconBridge(private val context: Context) {
         lastSongId = null
         lastSong = null
         lastLyrics = emptyList()
+        lastSentSignature = null
     }
 
     fun setEnabled(enabled: Boolean) {
@@ -70,6 +72,7 @@ class LyriconBridge(private val context: Context) {
             lastSongId = null
             lastSong = null
             lastLyrics = emptyList()
+            lastSentSignature = null
         }
     }
 
@@ -81,13 +84,19 @@ class LyriconBridge(private val context: Context) {
         resendLastSong()
     }
 
-    fun sendSong(song: Song, lyrics: List<LyricLine>) {
+    fun sendSong(song: Song, lyrics: List<LyricLine>, force: Boolean = false) {
         if (!enabled) return
         val p = provider ?: return
 
         lastSongId = song.id.toString()
         lastSong = song
         lastLyrics = lyrics
+        val signature = song.lyriconSignature(lyrics)
+        if (!force && signature == lastSentSignature) {
+            p.player.setDisplayTranslation(displayTranslation)
+            Log.d(TAG, "Skipped duplicate Lyricon song: ${song.title} (${lyrics.size} lines)")
+            return
+        }
 
         try {
             val richLyrics = lyrics.map { line ->
@@ -135,6 +144,7 @@ class LyriconBridge(private val context: Context) {
 
             p.player.setSong(lyriconSong)
             p.player.setDisplayTranslation(displayTranslation)
+            lastSentSignature = signature
             Log.d(TAG, "Sent song to Lyricon: ${song.title} (${richLyrics.size} lines)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send song to Lyricon", e)
@@ -232,6 +242,7 @@ class LyriconBridge(private val context: Context) {
         lastSongId = null
         lastSong = null
         lastLyrics = emptyList()
+        lastSentSignature = null
         try {
             provider?.player?.setSong(null)
         } catch (e: Exception) {
@@ -241,7 +252,39 @@ class LyriconBridge(private val context: Context) {
 
     private fun resendLastSong() {
         val song = lastSong ?: return
-        sendSong(song, lastLyrics)
+        sendSong(song, lastLyrics, force = true)
+    }
+
+    private fun Song.lyriconSignature(lyrics: List<LyricLine>): String {
+        var lyricHash = 17
+        lyrics.forEach { line ->
+            lyricHash = 31 * lyricHash + line.timeMs.hashCode()
+            lyricHash = 31 * lyricHash + line.endMs.hashCode()
+            lyricHash = 31 * lyricHash + line.text.hashCode()
+            lyricHash = 31 * lyricHash + line.translation.hashCode()
+            lyricHash = 31 * lyricHash + line.backgroundText.hashCode()
+            lyricHash = 31 * lyricHash + line.backgroundTranslation.hashCode()
+            line.words.forEach { word ->
+                lyricHash = 31 * lyricHash + word.text.hashCode()
+                lyricHash = 31 * lyricHash + word.startMs.hashCode()
+                lyricHash = 31 * lyricHash + word.endMs.hashCode()
+            }
+            line.backgroundWords.forEach { word ->
+                lyricHash = 31 * lyricHash + word.text.hashCode()
+                lyricHash = 31 * lyricHash + word.startMs.hashCode()
+                lyricHash = 31 * lyricHash + word.endMs.hashCode()
+            }
+        }
+        return listOf(
+            id,
+            title,
+            artist,
+            duration,
+            path,
+            lyrics.size,
+            lyricHash,
+            displayTranslation
+        ).joinToString("|")
     }
 
     private fun LyricLine.translationForLyricon(): String? {

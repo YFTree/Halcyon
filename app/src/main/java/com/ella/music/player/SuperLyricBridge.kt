@@ -12,11 +12,13 @@ class SuperLyricBridge {
     private var enabled = false
     private var registered = false
     private var lastKey: String? = null
+    private var lastSongKey: String? = null
     private var lastSong: Song? = null
 
     fun setEnabled(enabled: Boolean) {
         this.enabled = enabled
         lastKey = null
+        lastSongKey = null
         if (enabled) {
             runCatching { register() }.onFailure {
                 Log.w(TAG, "Failed to register SuperLyric", it)
@@ -32,6 +34,10 @@ class SuperLyricBridge {
 
     fun sendSong(song: Song) {
         if (!enabled) return
+        val songKey = song.superLyricSongKey()
+        if (songKey == lastSongKey) return
+        lastSongKey = songKey
+        lastKey = null
         lastSong = song
         register()
     }
@@ -45,7 +51,8 @@ class SuperLyricBridge {
             ""
         }
         val key = "${song?.id}:${line.timeMs}:${line.endMs}:$showTranslation:$translationKey"
-        if (!force && key == lastKey) return
+        if (force && !registered) lastKey = null
+        if (key == lastKey) return
         lastKey = key
         runCatching {
             register()
@@ -101,7 +108,11 @@ class SuperLyricBridge {
         unregister()
         lastSong = null
         lastKey = null
+        lastSongKey = null
     }
+
+    private fun Song.superLyricSongKey(): String =
+        listOf(id, title, artist, album, duration, path).joinToString("|")
 
     private fun register() {
         if (registered || !SuperLyricHelper.isAvailable()) return

@@ -31,13 +31,13 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -190,6 +191,7 @@ fun WordLyricView(
     lyrics: List<LyricLine>,
     currentIndex: Int,
     currentPositionMs: Long,
+    isPlaying: Boolean,
     showTranslation: Boolean,
     showPronunciation: Boolean = true,
     modifier: Modifier = Modifier,
@@ -218,6 +220,11 @@ fun WordLyricView(
     var autoScrolling by remember { mutableStateOf(false) }
     var lastUserScrollMs by remember { mutableLongStateOf(0L) }
     val isUserScrolling by remember { derivedStateOf { listState.isScrollInProgress } }
+    val smoothPositionMs = rememberSmoothLyricPosition(
+        currentPositionMs = currentPositionMs,
+        isPlaying = isPlaying,
+        anchorKey = lyrics.getOrNull(currentIndex)?.lyricRenderKey() ?: currentIndex
+    )
 
     LaunchedEffect(currentIndex) {
         if (!userBrowsing && currentIndex >= 0 && currentIndex < lyrics.size) {
@@ -270,7 +277,7 @@ fun WordLyricView(
         item { Box(modifier = Modifier.height(topSpacer)) }
 
         itemsIndexed(lyrics) { index, line ->
-            val isActive = index == currentIndex || line.isActiveAt(currentPositionMs)
+            val isActive = index == currentIndex || line.isActiveAt(smoothPositionMs)
             val nextLine = lyrics.getOrNull(index + 1)
             val lineTextAlign = line.ttmlTextAlign()
             val backgroundTextAlign = line.ttmlBackgroundTextAlign()
@@ -331,14 +338,14 @@ fun WordLyricView(
                         WordLine(
                             displayText = line.pronunciation.orEmpty(),
                             words = line.pronunciationWords,
-                            currentPositionMs = currentPositionMs,
+                            currentPositionMs = smoothPositionMs,
                             textAlign = lineTextAlign,
                             fontSizeSp = scaledLyricFontSp(12, fontScale, minSp = 9),
                             fontFamily = fontFamily,
                             fontWeight = fontWeight.softenedLyricWeight(),
-                            currentColor = Color.White.copy(alpha = 0.86f),
+                            currentColor = Color.White.copy(alpha = 0.82f),
                             sungColor = Color.White.copy(alpha = 0.62f),
-                            pendingColor = Color.White.copy(alpha = 0.32f),
+                            pendingColor = Color.White.copy(alpha = 0.42f),
                             modifier = Modifier.padding(bottom = 1.dp)
                         )
                     } else {
@@ -361,20 +368,20 @@ fun WordLyricView(
                     WordLine(
                         displayText = line.text,
                         words = line.words,
-                        currentPositionMs = currentPositionMs,
+                        currentPositionMs = smoothPositionMs,
                         textAlign = lineTextAlign,
                         fontSizeSp = fittedLyricFontSp(line.text, scaledLyricFontSp(32, fontScale, minSp = 9), minSp = 9),
                         fontFamily = fontFamily,
                         fontWeight = fontWeight,
                         currentColor = Color.White,
-                        sungColor = Color.White.copy(alpha = 0.92f),
-                        pendingColor = Color.White.copy(alpha = 0.38f)
+                        sungColor = Color.White.copy(alpha = 0.72f),
+                        pendingColor = Color.White.copy(alpha = 0.52f)
                     )
                 } else {
                     val textColor = when {
-                        isActive -> Color.White
-                        index < currentIndex -> Color.White.copy(alpha = 0.32f)
-                        else -> Color.White.copy(alpha = 0.42f)
+                        isActive -> Color.White.copy(alpha = 0.90f)
+                        index < currentIndex -> Color.White.copy(alpha = 0.44f)
+                        else -> Color.White.copy(alpha = 0.70f)
                     }
                     Text(
                         text = line.text.ifBlank { "♪" }.lineBreakSafeText(),
@@ -394,8 +401,8 @@ fun WordLyricView(
                 if (showTranslation && !line.translation.isNullOrBlank()) {
                     val translationColor = when {
                         isActive -> Color.White.copy(alpha = 0.72f)
-                        index < currentIndex -> Color.White.copy(alpha = 0.36f)
-                        else -> Color.White.copy(alpha = 0.50f)
+                        index < currentIndex -> Color.White.copy(alpha = 0.38f)
+                        else -> Color.White.copy(alpha = 0.58f)
                     }
                     Text(
                         text = line.translation.orEmpty().lineBreakSafeText(),
@@ -421,14 +428,14 @@ fun WordLyricView(
                         WordLine(
                             displayText = line.backgroundText.orEmpty(),
                             words = line.backgroundWords,
-                            currentPositionMs = currentPositionMs,
+                            currentPositionMs = smoothPositionMs,
                             textAlign = backgroundTextAlign,
                             fontSizeSp = fittedLyricFontSp(line.backgroundText.orEmpty(), scaledLyricFontSp(22, fontScale, minSp = 8), minSp = 8),
                             fontFamily = fontFamily,
                             fontWeight = fontWeight.softenedLyricWeight(),
-                            currentColor = Color.White.copy(alpha = 0.86f),
-                            sungColor = Color.White.copy(alpha = 0.62f),
-                            pendingColor = Color.White.copy(alpha = 0.32f),
+                            currentColor = Color.White.copy(alpha = 0.78f),
+                            sungColor = Color.White.copy(alpha = 0.58f),
+                            pendingColor = Color.White.copy(alpha = 0.36f),
                             modifier = Modifier.padding(top = 3.dp)
                         )
                     } else {
@@ -467,9 +474,9 @@ fun WordLyricView(
                             .padding(top = 2.dp)
                     )
                 }
-                if (isActive && line.shouldShowInterlude(nextLine, currentPositionMs)) {
+                if (isActive && line.shouldShowInterlude(nextLine, smoothPositionMs)) {
                     InterludeDots(
-                        remainingMs = (nextLine?.timeMs ?: currentPositionMs) - currentPositionMs,
+                        remainingMs = (nextLine?.timeMs ?: smoothPositionMs) - smoothPositionMs,
                         horizontalAlignment = line.ttmlAlignment(),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -565,13 +572,7 @@ private fun AnnotatedString.Builder.appendTimedLyricWord(
                     progress = progress,
                     activeColor = currentColor,
                     pendingColor = pendingColor
-                ),
-                shadow = Shadow(
-                    color = currentColor.copy(alpha = 0.18f),
-                    offset = Offset.Zero,
-                    blurRadius = 12f
-                ),
-                baselineShift = BaselineShift(0.045f)
+                )
             )
         }
         isSung -> appendStyledLyricText(text, sungColor, inactiveWeight)
@@ -616,18 +617,62 @@ private fun lyricSweepBrush(
     pendingColor: Color
 ): Brush {
     val edge = progress.coerceIn(0.002f, 0.998f)
-    val beforeEdge = (edge - 0.04f).coerceAtLeast(0f)
-    val afterEdge = (edge + 0.015f).coerceAtMost(1f)
+    val featherStart = (edge - LYRIC_SWEEP_FEATHER_FRACTION).coerceAtLeast(0f)
     return Brush.horizontalGradient(
         colorStops = arrayOf(
             0f to activeColor,
-            beforeEdge to activeColor,
-            edge to activeColor.copy(alpha = 0.72f),
-            afterEdge to pendingColor,
+            featherStart to activeColor,
+            edge to pendingColor,
             1f to pendingColor
         )
     )
 }
+
+@Composable
+private fun rememberSmoothLyricPosition(
+    currentPositionMs: Long,
+    isPlaying: Boolean,
+    anchorKey: Any?
+): Long {
+    var renderedPositionMs by remember(anchorKey) { mutableLongStateOf(currentPositionMs) }
+    var anchorPositionMs by remember(anchorKey) { mutableLongStateOf(currentPositionMs) }
+    var anchorFrameNanos by remember(anchorKey) { mutableLongStateOf(0L) }
+
+    LaunchedEffect(anchorKey, currentPositionMs) {
+        withFrameNanos { frameNanos ->
+            if (currentPositionMs < renderedPositionMs || currentPositionMs - renderedPositionMs > 900L) {
+                renderedPositionMs = currentPositionMs
+            }
+            anchorPositionMs = currentPositionMs
+            anchorFrameNanos = frameNanos
+            if (!isPlaying) renderedPositionMs = currentPositionMs
+        }
+    }
+
+    LaunchedEffect(anchorKey, isPlaying) {
+        if (!isPlaying) {
+            renderedPositionMs = currentPositionMs
+            return@LaunchedEffect
+        }
+        while (isActive) {
+            withFrameNanos { frameNanos ->
+                if (anchorFrameNanos <= 0L) return@withFrameNanos
+                val elapsedMs = ((frameNanos - anchorFrameNanos) / 1_000_000L).coerceAtLeast(0L)
+                val predicted = anchorPositionMs + elapsedMs
+                if (predicted >= renderedPositionMs) {
+                    renderedPositionMs = predicted
+                }
+            }
+        }
+    }
+
+    return renderedPositionMs
+}
+
+private fun LyricLine.lyricRenderKey(): String =
+    "$timeMs|$endMs|$text|$backgroundText"
+
+private const val LYRIC_SWEEP_FEATHER_FRACTION = 0.10f
 
 private const val USER_BROWSING_TIMEOUT_MS = 3_600L
 

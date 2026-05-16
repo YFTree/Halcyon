@@ -144,16 +144,21 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 val canScanNow = checkAndRequestPermissions()
                 mainVm.loadCachedLibrary()
-                when (settingsManager.startupPlayMode.first()) {
-                    SettingsManager.STARTUP_PLAY_RANDOM -> {
-                        val songs = mainVm.songs.first { it.isNotEmpty() }
-                        if (playerVm.currentSong.value == null) {
-                            val startIndex = songs.indices.random()
-                            playerVm.setPlaylist(songs, startIndex)
+                if (!startupPlaybackHandled) {
+                    startupPlaybackHandled = true
+                    when (settingsManager.startupPlayMode.first()) {
+                        SettingsManager.STARTUP_PLAY_RANDOM -> {
+                            val songs = mainVm.songs.first { it.isNotEmpty() }
+                            if (playerVm.currentSong.value == null && !playerVm.hasSavedPlaybackQueue()) {
+                                val startIndex = songs.indices.random()
+                                playerVm.setPlaylist(songs, startIndex)
+                            }
                         }
-                    }
-                    SettingsManager.STARTUP_PLAY_RESUME -> {
-                        playerVm.playRestoredQueue()
+                        SettingsManager.STARTUP_PLAY_RESUME -> {
+                            if (playerVm.currentSong.value == null && playerVm.hasSavedPlaybackQueue()) {
+                                playerVm.playRestoredQueue()
+                            }
+                        }
                     }
                 }
                 if (canScanNow) mainVm.scanMusicIfAutoEnabled()
@@ -209,6 +214,10 @@ class MainActivity : ComponentActivity() {
         ) {
             requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    private companion object {
+        var startupPlaybackHandled = false
     }
 }
 
