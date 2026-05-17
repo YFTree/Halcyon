@@ -44,12 +44,14 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Constraints
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.kyant.backdrop.Backdrop
@@ -68,8 +70,6 @@ import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Pause
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clipToBounds
 import kotlinx.coroutines.isActive
@@ -385,32 +385,10 @@ private fun AutoScrollingMiniText(
     progress: Float,
     modifier: Modifier = Modifier
 ) {
-    val scrollState = rememberScrollState()
     val safeProgress = progress.coerceIn(0f, 1f)
 
-    LaunchedEffect(text, enabled) {
-        scrollState.scrollTo(0)
-    }
-
-    LaunchedEffect(text, enabled, safeProgress, scrollState.maxValue) {
-        if (enabled && scrollState.maxValue > 0) {
-            scrollState.scrollTo((scrollState.maxValue * safeProgress).toInt())
-        } else {
-            scrollState.scrollTo(0)
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clipToBounds()
-    ) {
-        Row(
-            modifier = Modifier.horizontalScroll(
-                state = scrollState,
-                enabled = false
-            )
-        ) {
+    Layout(
+        content = {
             Text(
                 text = text,
                 fontSize = fontSize.sp,
@@ -419,8 +397,48 @@ private fun AutoScrollingMiniText(
                 maxLines = 1,
                 overflow = TextOverflow.Visible
             )
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .clipToBounds()
+    ) { measurables, constraints ->
+        val placeable = measurables.first().measure(
+            constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
+        )
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else placeable.width
+        val overflowPx = (placeable.width - width).coerceAtLeast(0)
+        val scrollProgress = if (enabled && overflowPx > 0) {
+            miniMarqueeProgress(
+                progress = safeProgress,
+                overflowPx = overflowPx.toFloat(),
+                viewportPx = width
+            )
+        } else {
+            0f
+        }
+        val offsetPx = overflowPx * scrollProgress
+
+        layout(width, placeable.height) {
+            placeable.placeRelativeWithLayer(0, 0) {
+                translationX = -offsetPx
+            }
         }
     }
+}
+
+private fun miniMarqueeProgress(
+    progress: Float,
+    overflowPx: Float,
+    viewportPx: Int
+): Float {
+    val overflowRatio = overflowPx / viewportPx.coerceAtLeast(1).toFloat()
+    val startAt = 0.04f
+    val endAt = when {
+        overflowRatio >= 1.1f -> 0.76f
+        overflowRatio >= 0.55f -> 0.82f
+        else -> 0.9f
+    }
+    return ((progress - startAt) / (endAt - startAt)).coerceIn(0f, 1f)
 }
 
 private fun Color.luminance(): Float {

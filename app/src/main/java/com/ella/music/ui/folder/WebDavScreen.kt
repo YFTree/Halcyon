@@ -2,13 +2,13 @@ package com.ella.music.ui.folder
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -42,6 +42,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Folder
+import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -134,13 +135,14 @@ fun WebDavScreen(
                 }
             },
             actions = {
-                Text(
-                    text = "设置",
-                    color = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .clickable { showSettings = true }
-                        .padding(end = 16.dp)
-                )
+                IconButton(onClick = { showSettings = true }) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Settings,
+                        contentDescription = "WebDAV 设置",
+                        tint = MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
         )
 

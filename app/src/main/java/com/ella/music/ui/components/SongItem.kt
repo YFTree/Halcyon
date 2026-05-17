@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -51,6 +52,8 @@ fun SongItem(
     onLongClick: () -> Unit = {},
     onAddToQueue: (() -> Unit)? = null,
     onDownload: (() -> Unit)? = null,
+    onRemove: (() -> Unit)? = null,
+    onMore: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song.id, loadAudioInfo) {
@@ -174,10 +177,11 @@ fun SongItem(
                     .clickable(onClick = onAddToQueue),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "+",
-                    fontSize = 18.sp,
-                    color = MiuixTheme.colorScheme.primary
+                Icon(
+                    imageVector = MiuixIcons.Regular.Add,
+                    contentDescription = "添加到队列",
+                    tint = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -195,6 +199,39 @@ fun SongItem(
                     text = "↓",
                     fontSize = 16.sp,
                     color = MiuixTheme.colorScheme.primary
+                )
+            }
+        }
+        if (!selectionMode && onRemove != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFFE5484D).copy(alpha = 0.12f))
+                    .clickable(onClick = onRemove),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "×",
+                    fontSize = 16.sp,
+                    color = Color(0xFFE5484D)
+                )
+            }
+        }
+        if (!selectionMode && onMore != null) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(onClick = onMore),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "⋮",
+                    fontSize = 22.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
         }

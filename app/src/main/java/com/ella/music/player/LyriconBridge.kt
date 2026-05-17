@@ -2,12 +2,14 @@ package com.ella.music.player
 
 import android.content.Context
 import android.util.Log
+import com.ella.music.R
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import io.github.proify.lyricon.lyric.model.LyricWord
 import io.github.proify.lyricon.lyric.model.RichLyricLine
 import io.github.proify.lyricon.provider.LyriconFactory
 import io.github.proify.lyricon.provider.LyriconProvider
+import io.github.proify.lyricon.provider.ProviderLogo
 import io.github.proify.lyricon.provider.service.addConnectionListener
 
 class LyriconBridge(private val context: Context) {
@@ -30,7 +32,9 @@ class LyriconBridge(private val context: Context) {
         try {
             provider = LyriconFactory.createProvider(
                 context = context,
-                logo = null
+                logo = ProviderLogo
+                    .fromDrawable(context, R.drawable.ic_launcher, width = 96, height = 96)
+                    .copy(colorful = true)
             )
             provider?.service?.addConnectionListener {
                 onConnected {

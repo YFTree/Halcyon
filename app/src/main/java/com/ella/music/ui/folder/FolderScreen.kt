@@ -68,6 +68,7 @@ import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -76,6 +77,7 @@ fun FolderScreen(
     playerViewModel: PlayerViewModel,
     onBack: () -> Unit,
     onNavigateToPlayer: () -> Unit,
+    onNavigateToLibraryAnalysis: () -> Unit,
     onFolderClick: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -194,6 +196,8 @@ fun FolderScreen(
                 onClick = { showBlockedDialog = true }
             )
         }
+
+        LibraryAnalysisEntryCard(onClick = onNavigateToLibraryAnalysis)
 
         folderToBlock?.let { folderPath ->
             FolderBlockDialog(
@@ -333,6 +337,41 @@ private fun ScanStatusCard(scanProgress: Int) {
             color = MiuixTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
         )
+    }
+}
+
+@Composable
+private fun LibraryAnalysisEntryCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "歌曲库分析",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "总览、音频格式和音质统计",
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+            Icon(
+                imageVector = MiuixIcons.Basic.ArrowRight,
+                contentDescription = null,
+                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 
@@ -663,40 +702,36 @@ internal fun WebDavSettingsDialog(
     onSave: () -> Unit,
     onClear: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+    WindowBottomSheet(
+        show = true,
+        title = "WebDAV 音乐库",
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.padding(bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            WebDavTextField("地址", url, onUrlChange)
+            WebDavTextField("用户名", username, onUsernameChange)
+            WebDavTextField("密码", password, onPasswordChange)
+            if (!testStatus.isNullOrBlank()) {
                 Text(
-                    text = "WebDAV 音乐库",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface
+                    text = testStatus,
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.primary
                 )
-                WebDavTextField("地址", url, onUrlChange)
-                WebDavTextField("用户名", username, onUsernameChange)
-                WebDavTextField("密码", password, onPasswordChange)
-                if (!testStatus.isNullOrBlank()) {
-                    Text(
-                        text = testStatus,
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.primary
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Button(onClick = onClear) { Text("移除") }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Button(onClick = onDismiss) { Text("取消") }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = onTest) { Text("测试") }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = onSave) { Text("保存") }
-                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Button(onClick = onClear) { Text("移除") }
+                Spacer(modifier = Modifier.weight(1f))
+                Button(onClick = onDismiss) { Text("取消") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = onTest) { Text("测试") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = onSave) { Text("保存") }
             }
         }
     }

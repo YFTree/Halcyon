@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.ella.music.ui.about.AboutScreen
 import com.ella.music.ui.analytics.AnalyticsScreen
+import com.ella.music.ui.analytics.LibraryAnalysisScreen
 import com.ella.music.ui.album.AlbumDetailScreen
 import com.ella.music.ui.album.AlbumScreen
 import com.ella.music.ui.artist.ArtistListScreen
@@ -26,6 +27,8 @@ import com.ella.music.ui.home.LibraryScreen
 import com.ella.music.ui.online.LxOnlineScreen
 import com.ella.music.ui.online.MusicFreeOnlineScreen
 import com.ella.music.ui.player.PlayerScreen
+import com.ella.music.ui.playlist.PlaylistDetailScreen
+import com.ella.music.ui.playlist.PlaylistScreen
 import com.ella.music.ui.settings.AudioSettingsScreen
 import com.ella.music.ui.settings.BackupSettingsScreen
 import com.ella.music.ui.settings.LyricFontScreen
@@ -47,10 +50,15 @@ sealed class Screen(val route: String) {
         fun createRoute(artistName: String) = "artist/${java.net.URLEncoder.encode(artistName, "UTF-8")}"
     }
     data object Folder : Screen("folder")
+    data object Playlists : Screen("playlists")
+    data object PlaylistDetail : Screen("playlist/{playlistId}") {
+        fun createRoute(playlistId: String) = "playlist/${java.net.URLEncoder.encode(playlistId, "UTF-8")}"
+    }
     data object WebDav : Screen("webdav")
     data object FolderDetail : Screen("folder/{folderPath}") {
         fun createRoute(folderPath: String) = "folder/${java.net.URLEncoder.encode(folderPath, "UTF-8")}"
     }
+    data object LibraryAnalysis : Screen("library_analysis")
     data object Settings : Screen("settings")
     data object SettingsDetail : Screen("settings_detail")
     data object LyricSettings : Screen("lyric_settings")
@@ -97,6 +105,7 @@ fun AppNavigation(
                 onNavigateToArtist = { navController.navigate(Screen.Artist.route) },
                 onNavigateToAlbum = { navController.navigate(Screen.Album.route) },
                 onNavigateToFolder = { navController.navigate(Screen.Folder.route) },
+                onNavigateToPlaylists = { navController.navigate(Screen.Playlists.route) },
                 onNavigateToLxOnline = { navController.navigate(Screen.LxOnline.route) },
                 onNavigateToMusicFreeOnline = { navController.navigate(Screen.MusicFreeOnline.route) },
                 onNavigateToWebDav = { navController.navigate(Screen.WebDav.route) },
@@ -110,7 +119,9 @@ fun AppNavigation(
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onNavigateToPlayer = { navController.navigate(Screen.Player.route) },
-                onNavigateToAbout = { navController.navigate(Screen.About.route) }
+                onNavigateToAbout = { navController.navigate(Screen.About.route) },
+                onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
+                onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) }
             )
         }
 
@@ -155,9 +166,37 @@ fun AppNavigation(
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
                 onNavigateToPlayer = { navController.navigate(Screen.Player.route) },
+                onNavigateToLibraryAnalysis = { navController.navigate(Screen.LibraryAnalysis.route) },
                 onFolderClick = { folderPath ->
                     navController.navigate(Screen.FolderDetail.createRoute(folderPath))
                 }
+            )
+        }
+
+        composable(Screen.Playlists.route) {
+            PlaylistScreen(
+                mainViewModel = mainViewModel,
+                onBack = { navController.popBackStack() },
+                onPlaylistClick = { playlistId ->
+                    navController.navigate(Screen.PlaylistDetail.createRoute(playlistId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.PlaylistDetail.route,
+            arguments = listOf(navArgument("playlistId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val playlistId = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("playlistId").orEmpty(),
+                "UTF-8"
+            )
+            PlaylistDetailScreen(
+                playlistId = playlistId,
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToPlayer = { navController.navigate(Screen.Player.route) }
             )
         }
 
@@ -277,6 +316,13 @@ fun AppNavigation(
 
         composable(Screen.Analytics.route) {
             AnalyticsScreen(
+                mainViewModel = mainViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.LibraryAnalysis.route) {
+            LibraryAnalysisScreen(
                 mainViewModel = mainViewModel,
                 onBack = { navController.popBackStack() }
             )

@@ -3,6 +3,9 @@ package com.ella.music.data.musicfree
 import android.content.Context
 import com.ella.music.data.MusicFreePluginConfig
 import com.ella.music.data.model.Song
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -31,41 +34,36 @@ class MusicFreePluginService(private val context: Context? = null) {
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
 
-    suspend fun importPlugin(url: String): Pair<String, String> = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url(url.trim())
-            .header("User-Agent", USER_AGENT)
-            .header("Cache-Control", "no-cache")
-            .build()
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("导入失败: HTTP ${response.code}")
-            importPluginScript(response.body?.string().orEmpty())
-        }
-    }
-
     suspend fun importPlugins(url: String): MusicFreeImportResult = withContext(Dispatchers.IO) {
         val sourceUrl = url.trim()
         val body = fetchText(sourceUrl)
         parsePluginHub(body, sourceUrl)?.let { entries ->
-            val plugins = mutableListOf<MusicFreePluginConfig>()
-            var skipped = 0
-            entries.forEach { entry ->
-                runCatching {
-                    val script = fetchText(entry.url)
-                    val (detectedName, normalizedScript) = importPluginScript(script, entry.name)
-                    MusicFreePluginConfig(
-                        id = "musicfree_${entry.url.hashCode()}",
-                        url = entry.url,
-                        name = entry.name.ifBlank { detectedName },
-                        script = normalizedScript
-                    )
-                }.onSuccess { plugins += it }
-                    .onFailure { skipped += 1 }
+            val imported = coroutineScope {
+                entries.map { entry ->
+                    async(Dispatchers.IO) {
+                        runCatching {
+                            val script = fetchText(entry.url)
+                            val (detectedName, normalizedScript) = importPluginScript(
+                                script = script,
+                                fallbackName = entry.name,
+                                allowRuntimeInspect = false
+                            )
+                            MusicFreePluginConfig(
+                                id = "musicfree_${entry.url.hashCode()}",
+                                url = entry.url,
+                                name = entry.name.ifBlank { detectedName },
+                                script = normalizedScript
+                            )
+                        }
+                    }
+                }.awaitAll()
             }
+            val plugins = imported.mapNotNull { it.getOrNull() }
+            val skipped = imported.count { it.isFailure }
             if (plugins.isEmpty()) error("插件仓库里没有可导入的 MusicFree 音乐插件")
             return@withContext MusicFreeImportResult(plugins = plugins, skippedCount = skipped)
         }
-        val (name, script) = importPluginScript(body)
+        val (name, script) = importPluginScript(body, allowRuntimeInspect = false)
         MusicFreeImportResult(
             plugins = listOf(
                 MusicFreePluginConfig(
@@ -78,24 +76,51 @@ class MusicFreePluginService(private val context: Context? = null) {
         )
     }
 
-    fun importPluginScript(script: String, fallbackName: String = ""): Pair<String, String> {
+    @Deprecated("Use importPlugins so repository links and single scripts are handled consistently.")
+    suspend fun importPlugin(url: String): Pair<String, String> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url.trim())
+            .header("User-Agent", USER_AGENT)
+            .header("Cache-Control", "no-cache")
+            .build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error("导入失败: HTTP ${response.code}")
+            importPluginScript(response.body?.string().orEmpty(), allowRuntimeInspect = false)
+        }
+    }
+
+    fun importPluginScript(
+        script: String,
+        fallbackName: String = "",
+        allowRuntimeInspect: Boolean = true
+    ): Pair<String, String> {
         if (script.length !in 50..9_000_000) error("插件脚本内容异常")
         val normalizedScript = normalizeModuleScript(script)
-        val runtimeInfo = inspectPluginIfNeeded(normalizedScript)
-        val name = extractPlatform(normalizedScript)
+        val staticName = extractPlatform(normalizedScript)
             .ifBlank { extractPluginMetadataName(script) }
             .ifBlank { fallbackName.trim() }
+        val staticSupportsMusic = normalizedScript.hasStaticMusicCapability()
+        val runtimeInfo = if (allowRuntimeInspect && (staticName.isBlank() || !staticSupportsMusic)) {
+            inspectPluginIfNeeded(normalizedScript)
+        } else {
+            null
+        }
+        val name = staticName
             .ifBlank { runtimeInfo?.optString("platform").orEmpty() }
             .ifBlank { runtimeInfo?.optString("name").orEmpty() }
         if (name.isBlank()) error("没有识别到 MusicFree 插件 platform、@name 或仓库名称")
-        val supportsMusic = "search" in normalizedScript ||
-            "getMediaSource" in normalizedScript ||
-            "importMusicItem" in normalizedScript ||
+        val supportsMusic = staticSupportsMusic ||
             runtimeInfo?.optBoolean("hasSearch") == true ||
             runtimeInfo?.optBoolean("hasMediaSource") == true ||
             runtimeInfo?.optBoolean("hasImportMusicItem") == true
         if (!supportsMusic) error("插件未声明搜索或播放能力")
         return name to normalizedScript
+    }
+
+    private fun String.hasStaticMusicCapability(): Boolean {
+        return "search" in this ||
+            "getMediaSource" in this ||
+            "importMusicItem" in this
     }
 
     private fun inspectPluginIfNeeded(script: String): JSONObject? {

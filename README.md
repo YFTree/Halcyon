@@ -235,6 +235,9 @@ ffmpeg-decoder/src/main/jni/ffmpeg/android-libs
 | [FFmpeg](https://ffmpeg.org) | 用于 ALAC 等音频格式的软件解码 |
 | [Lyricon](https://github.com/proify/lyricon) | Lyric Provider API 和状态栏歌词 |
 | [SuperLyricApi](https://github.com/HChenX/SuperLyricApi) | SuperLyric 发布 API |
+| [SuperLyric](https://github.com/HChenX/SuperLyric) | 系统歌词模块与状态栏歌词生态参考 |
+| [Lyric Getter](https://github.com/xiaowine/Lyric-Getter) | Lyric Getter 原文歌词显示与 API 适配参考 |
+| [Lyrico](https://github.com/Replica0110/Lyrico) | 标签编辑器适配与日志页面交互参考 |
 | [Jaudiotagger](https://github.com/Adonai/jaudiotagger) | 音频标签、内嵌歌词和内嵌封面 |
 | [Kyant TagLib](https://github.com/Kyant0/TagLib) | Android / Kotlin TagLib 绑定 |
 | [Kyant Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) | 液态玻璃与背景模糊效果 |
@@ -257,8 +260,9 @@ Ella Music 以 **AGPL-3.0-or-later** 协议开源。由于项目包含对 MusicF
 - **Mimo-V2.5-Pro** — 负责早期 1.0.0 到 1.0.1 版本的主要开发。
 - **BetterLyrics** — 为模糊封面背景和歌词展示提供视觉参考。
 - **SPlayer** — 为播放页动效和歌词体验提供视觉参考。
+- **Lyrico** — 为外部标签编辑器适配和日志页面交互提供参考。
 - **Retro Music Player** — 为基于 jaudiotagger 的标签读取方案提供参考。
-- 感谢 Ella Music 所使用的 Miuix、Media3、FFmpeg、Lyricon、SuperLyricApi、Lyric Getter、Jaudiotagger、Kyant TagLib、Backdrop、Coil 以及其它开源项目。
+- 感谢 Ella Music 所使用的 Miuix、Media3、FFmpeg、Lyricon、SuperLyric、SuperLyricApi、Lyric Getter、Lyrico、Jaudiotagger、Kyant TagLib、Backdrop、Coil 以及其它开源项目。
 
 ---
 

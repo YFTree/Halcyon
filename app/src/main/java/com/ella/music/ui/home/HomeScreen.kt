@@ -3,24 +3,35 @@ package com.ella.music.ui.home
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import android.content.ClipData
+import android.content.ContentUris
+import android.content.Context
+import android.content.Intent
 import android.icu.text.Transliterator
+import android.provider.MediaStore
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -35,28 +46,42 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import androidx.core.content.FileProvider
 import android.os.SystemClock
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.UserPlaylist
+import com.ella.music.data.model.albumIdentityId
+import com.ella.music.data.splitArtistNames
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.SongItem
+import com.ella.music.ui.components.TagEditorOption
+import com.ella.music.ui.components.buildTagEditorOptions
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.launchTagEditorOption
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
@@ -75,9 +100,12 @@ fun LibraryScreen(
     mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
     onNavigateToPlayer: () -> Unit,
-    onNavigateToAbout: () -> Unit
+    onNavigateToAbout: () -> Unit,
+    onNavigateToAlbum: (Long) -> Unit = {},
+    onNavigateToArtist: (String) -> Unit = {}
 ) {
     val songs by mainViewModel.songs.collectAsState()
+    val playlists by mainViewModel.playlists.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val isScanning by mainViewModel.isScanning.collectAsState()
@@ -92,6 +120,9 @@ fun LibraryScreen(
     val sortMode = HomeSortMode.entries.getOrElse(LibrarySortUiState.librarySongSortIndex) { HomeSortMode.Title }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var actionSong by remember { mutableStateOf<Song?>(null) }
+    var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var tagEditorSong by remember { mutableStateOf<Song?>(null) }
     var listCoversEnabled by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -136,6 +167,16 @@ fun LibraryScreen(
             color = ellaPageBackground(),
             actions = {
                 if (selectionMode) {
+                    IconButton(onClick = {
+                        val selectedSongs = sortedSongs.filter { it.id in selectedIds }
+                        if (selectedSongs.isEmpty()) {
+                            Toast.makeText(context, "请先选择歌曲", Toast.LENGTH_SHORT).show()
+                        } else {
+                            playlistPickerSongs = selectedSongs
+                        }
+                    }) {
+                        Text(text = "添加到歌单", fontSize = 13.sp, color = MiuixTheme.colorScheme.primary)
+                    }
                     IconButton(onClick = {
                         val selectedSongs = sortedSongs.filter { it.id in selectedIds }
                         mainViewModel.deleteSongs(selectedSongs)
@@ -333,9 +374,7 @@ fun LibraryScreen(
                                         if (openPlayerOnPlay) onNavigateToPlayer()
                                     }
                                 },
-                                onAddToQueue = {
-                                    playerViewModel.addToPlaylist(song)
-                                }
+                                onMore = { actionSong = song }
                             )
                         }
                     }
@@ -362,9 +401,330 @@ fun LibraryScreen(
                 }
             }
         }
+
+        actionSong?.let { song ->
+            Popup(
+                alignment = Alignment.BottomCenter,
+                onDismissRequest = { actionSong = null },
+                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            ) {
+                SongActionMenu(
+                    song = song,
+                    onDismiss = { actionSong = null },
+                    onAddToPlaylist = {
+                        actionSong = null
+                        playlistPickerSongs = listOf(song)
+                    },
+                    onPlayNext = {
+                        actionSong = null
+                        playerViewModel.playNext(song)
+                        Toast.makeText(context, "已添加到下一首播放", Toast.LENGTH_SHORT).show()
+                    },
+                    onShare = {
+                        actionSong = null
+                        shareSong(context, song)
+                    },
+                    onArtist = {
+                        actionSong = null
+                        val artist = splitArtistNames(song.artist).firstOrNull().orEmpty()
+                        if (artist.isNotBlank() && !artist.equals("Unknown", ignoreCase = true)) {
+                            onNavigateToArtist(artist)
+                        } else {
+                            Toast.makeText(context, "这首歌没有可跳转的歌手信息", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onAlbum = {
+                        actionSong = null
+                        val albumId = song.albumIdentityId()
+                        if (albumId > 0L) {
+                            onNavigateToAlbum(albumId)
+                        } else {
+                            Toast.makeText(context, "这首歌没有可跳转的专辑信息", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onEditTag = {
+                        actionSong = null
+                        tagEditorSong = song
+                    },
+                    onDelete = {
+                        actionSong = null
+                        mainViewModel.deleteSongs(listOf(song))
+                        Toast.makeText(context, "已删除 ${song.title}", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+        }
+
+        playlistPickerSongs?.let { songsToAdd ->
+            Popup(
+                alignment = Alignment.BottomCenter,
+                onDismissRequest = { playlistPickerSongs = null },
+                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            ) {
+                AddToPlaylistMenu(
+                    playlists = playlists.filterNot { it.id == FAVORITES_PLAYLIST_ID },
+                    songCount = songsToAdd.size,
+                    onDismiss = { playlistPickerSongs = null },
+                    onPlaylistClick = { playlist ->
+                        mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                        Toast.makeText(context, "已添加到 ${playlist.name}", Toast.LENGTH_SHORT).show()
+                        playlistPickerSongs = null
+                        selectedIds = emptySet()
+                        selectionMode = false
+                    }
+                )
+            }
+        }
+
+        tagEditorSong?.let { song ->
+            Popup(
+                alignment = Alignment.BottomCenter,
+                onDismissRequest = { tagEditorSong = null },
+                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            ) {
+                SongTagEditorMenu(
+                    song = song,
+                    options = buildTagEditorOptions(context, song),
+                    onDismiss = { tagEditorSong = null },
+                    onOptionClick = { option ->
+                        launchTagEditorOption(context, option)
+                        tagEditorSong = null
+                    }
+                )
+            }
+        }
     }
 }
 
+
+@Composable
+private fun SongActionMenu(
+    song: Song,
+    onDismiss: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onPlayNext: () -> Unit,
+    onShare: () -> Unit,
+    onArtist: () -> Unit,
+    onAlbum: () -> Unit,
+    onEditTag: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(MiuixTheme.colorScheme.background.copy(alpha = 0.98f))
+            .navigationBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        SheetHandle()
+        Text(
+            text = song.title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MiuixTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+        )
+        LibraryMenuItem("添加到歌单", onAddToPlaylist)
+        LibraryMenuItem("下一首播放", onPlayNext)
+        LibraryMenuItem("分享", onShare)
+        LibraryMenuItem("艺术家：${song.artist.ifBlank { "未知艺术家" }}", onArtist)
+        LibraryMenuItem("专辑：${song.album.ifBlank { "未知专辑" }}", onAlbum)
+        LibraryMenuItem("编辑歌曲标签信息", onEditTag)
+        LibraryMenuItem("永久删除", onDelete, danger = true)
+        LibraryMenuItem("取消", onDismiss)
+    }
+}
+
+@Composable
+private fun AddToPlaylistMenu(
+    playlists: List<UserPlaylist>,
+    songCount: Int,
+    onDismiss: () -> Unit,
+    onPlaylistClick: (UserPlaylist) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(MiuixTheme.colorScheme.background.copy(alpha = 0.98f))
+            .navigationBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        SheetHandle()
+        Text(
+            text = "添加 $songCount 首到歌单",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+        )
+        if (playlists.isEmpty()) {
+            Text(
+                text = "暂无自定义歌单，请先在歌单页创建",
+                fontSize = 14.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 18.dp)
+            )
+        } else {
+            playlists.forEach { playlist ->
+                LibraryMenuItem(
+                    text = "${playlist.name} · ${playlist.songs.size} 首",
+                    onClick = { onPlaylistClick(playlist) }
+                )
+            }
+        }
+        LibraryMenuItem("取消", onDismiss)
+    }
+}
+
+@Composable
+private fun SongTagEditorMenu(
+    song: Song,
+    options: List<TagEditorOption>,
+    onDismiss: () -> Unit,
+    onOptionClick: (TagEditorOption) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(MiuixTheme.colorScheme.background.copy(alpha = 0.98f))
+            .navigationBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        SheetHandle()
+        Text(
+            text = "编辑歌曲标签信息",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+        )
+        Text(
+            text = song.title,
+            fontSize = 13.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+        if (options.isEmpty()) {
+            Text(
+                text = "未找到 Lyrico、LunaBeat 或音乐标签，请先安装后再试",
+                fontSize = 14.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 18.dp)
+            )
+        } else {
+            options.forEach { option ->
+                LibraryMenuItem(
+                    text = option.label,
+                    subtitle = option.summary,
+                    onClick = { onOptionClick(option) }
+                )
+            }
+        }
+        LibraryMenuItem("取消", onDismiss)
+    }
+}
+
+@Composable
+private fun SheetHandle() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(42.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(99.dp))
+                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.18f))
+        )
+    }
+}
+
+@Composable
+private fun LibraryMenuItem(
+    text: String,
+    onClick: () -> Unit,
+    subtitle: String? = null,
+    danger: Boolean = false
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.78f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            color = if (danger) Color(0xFFE5484D) else MiuixTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+    }
+}
+
+private fun shareSong(context: Context, song: Song) {
+    if (song.path.startsWith("http://") || song.path.startsWith("https://")) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, "${song.title} - ${song.artist}\n${song.path}")
+        }
+        runCatching {
+            context.startActivity(Intent.createChooser(intent, "分享歌曲"))
+        }.onFailure {
+            Toast.makeText(context, "没有可用的分享应用", Toast.LENGTH_SHORT).show()
+        }
+        return
+    }
+
+    val uri = runCatching {
+        val file = File(song.path)
+        if (file.exists() && file.isFile) {
+            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        } else {
+            ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
+        }
+    }.getOrElse {
+        ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
+    }
+
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = song.mimeType.takeIf { it.startsWith("audio/") } ?: "audio/*"
+        putExtra(Intent.EXTRA_TITLE, "${song.title} - ${song.artist}")
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        clipData = ClipData.newUri(context.contentResolver, song.title, uri)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "分享歌曲"))
+    }.onFailure {
+        Toast.makeText(context, "没有可用的分享应用", Toast.LENGTH_SHORT).show()
+    }
+}
 
 private enum class HomeSortMode(val label: String) {
     Title("歌曲名称"),

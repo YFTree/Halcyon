@@ -285,6 +285,21 @@ class ExoPlayerManager(private val context: Context) {
         savePlaybackQueue(force = true)
     }
 
+    fun playNext(song: Song) {
+        virtualPlaylistCurrentIndex = null
+        val controller = mediaController
+        val insertIndex = ((controller?.currentMediaItemIndex ?: playlist.indexOfFirst { it.id == _currentSong.value?.id }) + 1)
+            .coerceIn(0, playlist.size)
+        AppLogStore.debug(context, "PlayerQueue", "playNext title=${song.title} index=$insertIndex")
+        playlist.add(insertIndex, song)
+        _playlist.value = playlist.toList()
+        controller?.addMediaItem(insertIndex, songToMediaItem(song))
+        if ((controller?.mediaItemCount ?: 0) == 1) {
+            controller?.prepare()
+        }
+        savePlaybackQueue(force = true)
+    }
+
     fun playQueueIndex(index: Int) {
         if (index !in playlist.indices) return
         mediaController?.seekToDefaultPosition(index)

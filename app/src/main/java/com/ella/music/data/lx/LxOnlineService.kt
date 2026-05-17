@@ -33,18 +33,21 @@ class LxOnlineService(private val context: Context) {
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("导入失败: HTTP ${response.code}")
             val script = response.body?.string().orEmpty()
-            importSourceScript(script)
+            importSourceScript(script, allowRuntimeInspect = false)
         }
     }
 
-    fun importSourceScript(script: String): Pair<String, String> {
-        if (script.length !in 50..9_000_000) error("源脚本内容异常")
-        val name = extractSourceName(script)
-        LxUserApiRuntime(context, client).use { runtime ->
-            runtime.load(script, script.hashCode().toString(), name, "")
-                ?: error("源初始化失败")
+    fun importSourceScript(script: String, allowRuntimeInspect: Boolean = true): Pair<String, String> {
+        val normalized = script.trim()
+        if (normalized.length !in 50..9_000_000) error("源脚本内容异常")
+        val name = extractSourceName(normalized)
+        if (allowRuntimeInspect) {
+            LxUserApiRuntime(context, client).use { runtime ->
+                runtime.load(normalized, normalized.hashCode().toString(), name, "")
+                    ?: error("源初始化失败")
+            }
         }
-        return name to script
+        return name to normalized
     }
 
     suspend fun search(

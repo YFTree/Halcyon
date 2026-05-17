@@ -58,6 +58,7 @@ fun HomeScreen(
     onNavigateToArtist: () -> Unit,
     onNavigateToAlbum: () -> Unit,
     onNavigateToFolder: () -> Unit,
+    onNavigateToPlaylists: () -> Unit,
     onNavigateToLxOnline: () -> Unit,
     onNavigateToMusicFreeOnline: () -> Unit,
     onNavigateToWebDav: () -> Unit,
@@ -125,13 +126,13 @@ fun HomeScreen(
 
             SectionTitle("音乐库")
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                HomeTile("歌曲", "${songs.size} 首", Color(0xFF2EC4B6), onNavigateToLibrary, Modifier.weight(1f))
                 HomeTile("艺术家", "$artistCount 位", Color(0xFF118AB2), onNavigateToArtist, Modifier.weight(1f))
+                HomeTile("专辑", "${albums.size} 张", Color(0xFFFF9F1C), onNavigateToAlbum, Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                HomeTile("专辑", "${albums.size} 张", Color(0xFFFF9F1C), onNavigateToAlbum, Modifier.weight(1f))
                 HomeTile("文件夹", "按目录浏览", Color(0xFF5E60CE), onNavigateToFolder, Modifier.weight(1f))
+                HomeTile("歌单", "收藏与自建", Color(0xFFEF476F), onNavigateToPlaylists, Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {

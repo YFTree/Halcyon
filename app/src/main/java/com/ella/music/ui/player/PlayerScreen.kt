@@ -1,6 +1,5 @@
 package com.ella.music.ui.player
 
-import android.content.ContentUris
 import android.content.Context
 import android.app.Activity
 import android.app.DownloadManager
@@ -18,16 +17,15 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import androidx.compose.runtime.DisposableEffect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player as Media3Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import androidx.core.content.FileProvider
 import android.os.Environment
 import android.provider.Settings
-import android.provider.MediaStore
 import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -143,10 +141,14 @@ import com.ella.music.data.splitArtistNames
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.albumIdentityId
+import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.player.PlaybackAudioSession
 import com.ella.music.ui.components.WordLyricView
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.CoverLoadLimiter
+import com.ella.music.ui.components.TagEditorOption
+import com.ella.music.ui.components.buildTagEditorOptions
+import com.ella.music.ui.components.launchTagEditorOption
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -167,15 +169,6 @@ import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Pause
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import android.content.ClipData
-import android.content.ComponentName
-
-private data class TagEditorOption(
-    val label: String,
-    val summary: String,
-    val intents: List<Intent>
-)
-
 @Composable
 fun PlayerScreen(
     playerViewModel: PlayerViewModel,
@@ -190,9 +183,13 @@ fun PlayerScreen(
     val settingsManager = remember { SettingsManager(context) }
     val lyricFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
     val lyricFontWeightValue by settingsManager.lyricFontWeight.collectAsState(initial = 800)
+    val lyricFontScaleValue by settingsManager.lyricFontScale.collectAsState(initial = 100)
     val lyricSourceMode by settingsManager.lyricSourceMode.collectAsState(initial = SettingsManager.LYRIC_SOURCE_AUTO)
-    val lyricFontFamily = remember(lyricFontPath) { lyricFontPath.toPlayerLyricFontFamily() }
+    val lyricFontFamily = remember(lyricFontPath, lyricFontWeightValue) {
+        lyricFontPath.toPlayerLyricFontFamily(lyricFontWeightValue)
+    }
     val lyricFontWeight = remember(lyricFontWeightValue) { FontWeight(lyricFontWeightValue.coerceIn(100, 900)) }
+    val lyricFontScale = remember(lyricFontScaleValue) { lyricFontScaleValue.coerceIn(75, 130) / 100f }
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val currentPosition by playerViewModel.currentPosition.collectAsState()
@@ -209,6 +206,9 @@ fun PlayerScreen(
     val showLyrics by playerViewModel.showLyrics.collectAsState()
     val showLyricTranslation by playerViewModel.showLyricTranslation.collectAsState()
     val showLyricPronunciation by playerViewModel.showLyricPronunciation.collectAsState()
+    val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
+    val sleepTimerEndRealtimeMs by playerViewModel.sleepTimerEndRealtimeMs.collectAsState()
+    val stopAfterCurrentEnabled by playerViewModel.stopAfterCurrentEnabled.collectAsState()
     val currentLyricLine = lyrics.getOrNull(currentLyricIndex)
     val miniLyricLine = currentLyricLine
         ?.takeIf { it.hasMiniLyric() }
@@ -268,6 +268,7 @@ fun PlayerScreen(
     }
 
     val song = currentSong
+    val isCurrentSongFavorite = song?.playlistIdentityKey()?.let { it in favoriteSongKeys } == true
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song?.id) {
         value = if (song?.coverUrl?.isNotBlank() == true) {
             null
@@ -369,10 +370,12 @@ fun PlayerScreen(
                     lyricSourceMode = lyricSourceMode,
                     fontFamily = lyricFontFamily,
                     fontWeight = lyricFontWeight,
+                    fontScale = lyricFontScale,
                     palette = palette,
                     flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
                     currentPositionMs = currentPosition,
                     isPlaying = isPlaying,
+                    isFavorite = isCurrentSongFavorite,
                     audioSessionId = audioSessionId,
                     visualizerEnabled = audioVisualizerEnabled && hasVisualizerPermission,
                     onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
@@ -382,6 +385,10 @@ fun PlayerScreen(
                     },
                     onToggleTranslation = {
                         playerViewModel.setLyricPageTranslation(!showLyricTranslation)
+                    },
+                    onToggleFavorite = { playerViewModel.toggleCurrentSongFavorite() },
+                    onFontScale = { scale ->
+                        scope.launch { settingsManager.setLyricFontScale((scale * 100f).toInt()) }
                     },
                     onLyricSourceMode = { mode ->
                         playerViewModel.setLyricSourceMode(mode)
@@ -412,8 +419,11 @@ fun PlayerScreen(
                     menuExpanded = menuExpanded,
                     queueExpanded = queueExpanded,
                     playlist = playlist,
+                    sleepTimerEndRealtimeMs = sleepTimerEndRealtimeMs,
+                    stopAfterCurrentEnabled = stopAfterCurrentEnabled,
                     onDynamicCoverFailed = { dynamicCoverFailedPath = it },
                     onToggleMenu = { menuExpanded = !menuExpanded },
+                    onToggleFavorite = { playerViewModel.toggleCurrentSongFavorite() },
                     onDismissMenu = { menuExpanded = false },
                     onToggleQueue = { queueExpanded = !queueExpanded },
                     onDismissQueue = { queueExpanded = false },
@@ -460,17 +470,18 @@ fun PlayerScreen(
                         landscapeExpanded = true
                     },
                     onStopAfterCurrent = {
-                        menuExpanded = false
-                        playerViewModel.stopAfterCurrentSong()
-                        Toast.makeText(context, "当前歌曲播放完后暂停", Toast.LENGTH_SHORT).show()
+                        playerViewModel.setStopAfterCurrentEnabled(it)
+                        Toast.makeText(
+                            context,
+                            if (it) "当前歌曲播放完后暂停" else "已关闭播完当前暂停",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     },
                     onTimer = { minutes ->
-                        menuExpanded = false
                         playerViewModel.startSleepTimer(minutes)
                         Toast.makeText(context, "${minutes} 分钟后暂停播放", Toast.LENGTH_SHORT).show()
                     },
                     onCancelTimer = {
-                        menuExpanded = false
                         playerViewModel.cancelSleepTimer()
                         Toast.makeText(context, "已取消定时播放", Toast.LENGTH_SHORT).show()
                     },
@@ -482,6 +493,7 @@ fun PlayerScreen(
                     },
                     playbackSpeed = playbackSpeed,
                     playbackPitch = playbackPitch,
+                    isFavorite = isCurrentSongFavorite,
                     audioSessionId = audioSessionId,
                     visualizerEnabled = audioVisualizerEnabled && hasVisualizerPermission,
                     onVisualizerEnabled = ::setAudioVisualizerEnabled,
@@ -548,13 +560,17 @@ private fun CoverPlayerPage(
     menuExpanded: Boolean,
     queueExpanded: Boolean,
     playlist: List<Song>,
+    sleepTimerEndRealtimeMs: Long?,
+    stopAfterCurrentEnabled: Boolean,
     playbackSpeed: Float,
     playbackPitch: Float,
+    isFavorite: Boolean,
     audioSessionId: Int,
     visualizerEnabled: Boolean,
     onVisualizerEnabled: (Boolean) -> Unit,
     onDynamicCoverFailed: (String) -> Unit,
     onToggleMenu: () -> Unit,
+    onToggleFavorite: () -> Unit,
     onDismissMenu: () -> Unit,
     onToggleQueue: () -> Unit,
     onDismissQueue: () -> Unit,
@@ -571,7 +587,7 @@ private fun CoverPlayerPage(
     onArtist: () -> Unit,
     onDownload: () -> Unit,
     onLandscape: () -> Unit,
-    onStopAfterCurrent: () -> Unit,
+    onStopAfterCurrent: (Boolean) -> Unit,
     onTimer: (Int) -> Unit,
     onCancelTimer: () -> Unit,
     onSpeed: (Float) -> Unit,
@@ -709,7 +725,11 @@ private fun CoverPlayerPage(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    PlayerHeaderAction(kind = PlayerHeaderActionKind.Favorite, onClick = {})
+                    PlayerHeaderAction(
+                        kind = PlayerHeaderActionKind.Favorite,
+                        selected = isFavorite,
+                        onClick = onToggleFavorite
+                    )
                     PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
                 }
 
@@ -768,7 +788,7 @@ private fun CoverPlayerPage(
                     accent = Color.White.copy(alpha = 0.86f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(42.dp)
+                        .height(72.dp)
                 )
             }
             }
@@ -786,6 +806,8 @@ private fun CoverPlayerPage(
                     speed = playbackSpeed,
                     pitch = playbackPitch,
                     visualizerEnabled = visualizerEnabled,
+                    sleepTimerEndRealtimeMs = sleepTimerEndRealtimeMs,
+                    stopAfterCurrentEnabled = stopAfterCurrentEnabled,
                     onClose = onDismissMenu,
                     onAlbum = onAlbum,
                     onArtist = onArtist,
@@ -981,7 +1003,7 @@ private fun LandscapeCoverPlayerPage(
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .fillMaxWidth()
-                .height(38.dp)
+                .height(68.dp)
         )
     }
 }
@@ -998,16 +1020,20 @@ private fun LyricsPlayerPage(
     lyricSourceMode: Int,
     fontFamily: FontFamily?,
     fontWeight: FontWeight,
+    fontScale: Float,
     palette: PlayerPalette,
     flowEffectMode: Int,
     currentPositionMs: Long,
     isPlaying: Boolean,
+    isFavorite: Boolean,
     audioSessionId: Int,
     visualizerEnabled: Boolean,
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
     onDismissLyrics: () -> Unit,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onFontScale: (Float) -> Unit,
     onLyricSourceMode: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1049,7 +1075,8 @@ private fun LyricsPlayerPage(
                         fontSize = adaptiveTitleFontSize(song?.title ?: "未在播放", 28.sp),
                         fontWeight = FontWeight.ExtraBold,
                         color = Color.White.copy(alpha = 0.96f),
-                        maxLines = 1,
+                        maxLines = 2,
+                        lineHeight = adaptiveTitleFontSize(song?.title ?: "未在播放", 28.sp) * 1.06f,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
@@ -1061,7 +1088,11 @@ private fun LyricsPlayerPage(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                PlayerHeaderAction(kind = PlayerHeaderActionKind.Favorite, onClick = {})
+                PlayerHeaderAction(
+                    kind = PlayerHeaderActionKind.Favorite,
+                    selected = isFavorite,
+                    onClick = onToggleFavorite
+                )
                 PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = { lyricMenuExpanded = true })
             }
 
@@ -1090,7 +1121,7 @@ private fun LyricsPlayerPage(
                     isPlaying = isPlaying,
                     showTranslation = showTranslation,
                     showPronunciation = showPronunciation,
-                    fontScale = 0.98f,
+                    fontScale = fontScale,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight,
                     topSpacer = 110.dp,
@@ -1112,7 +1143,7 @@ private fun LyricsPlayerPage(
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .fillMaxWidth()
-                .height(58.dp)
+                .height(78.dp)
         )
 
         if (lyricMenuExpanded) {
@@ -1125,6 +1156,7 @@ private fun LyricsPlayerPage(
                     showPronunciation = showPronunciation,
                     showTranslation = showTranslation,
                     lyricSourceMode = lyricSourceMode,
+                    fontScale = fontScale,
                     onTogglePronunciation = {
                         lyricMenuExpanded = false
                         onTogglePronunciation()
@@ -1137,6 +1169,7 @@ private fun LyricsPlayerPage(
                         lyricMenuExpanded = false
                         onLyricSourceMode(mode)
                     },
+                    onFontScale = onFontScale,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -1288,7 +1321,7 @@ private fun LandscapeLyricsOverlay(
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .fillMaxWidth()
-                .height(54.dp)
+                .height(74.dp)
         )
     }
 
@@ -1596,7 +1629,11 @@ private enum class PlayerHeaderActionKind {
 }
 
 @Composable
-private fun PlayerHeaderAction(kind: PlayerHeaderActionKind, onClick: () -> Unit) {
+private fun PlayerHeaderAction(
+    kind: PlayerHeaderActionKind,
+    selected: Boolean = false,
+    onClick: () -> Unit
+) {
     Box(
         modifier = Modifier
             .size(52.dp)
@@ -1606,7 +1643,8 @@ private fun PlayerHeaderAction(kind: PlayerHeaderActionKind, onClick: () -> Unit
     ) {
         when (kind) {
             PlayerHeaderActionKind.Favorite -> HeartIcon(
-                color = Color.White.copy(alpha = 0.92f),
+                color = if (selected) Color(0xFFFF4D6D) else Color.White.copy(alpha = 0.92f),
+                filled = selected,
                 modifier = Modifier.size(32.dp)
             )
             PlayerHeaderActionKind.More -> MoreIcon(
@@ -1620,6 +1658,7 @@ private fun PlayerHeaderAction(kind: PlayerHeaderActionKind, onClick: () -> Unit
 @Composable
 private fun HeartIcon(
     color: Color,
+    filled: Boolean,
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
@@ -1633,7 +1672,18 @@ private fun HeartIcon(
             cubicTo(w * 0.96f, h * 0.42f, w * 0.82f, h * 0.60f, w * 0.50f, h * 0.86f)
             close()
         }
-        drawPath(path, color)
+        if (filled) {
+            drawPath(path, color)
+        } else {
+            drawPath(
+                path = path,
+                color = color,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = size.minDimension * 0.09f,
+                    cap = StrokeCap.Round
+                )
+            )
+        }
     }
 }
 
@@ -1820,11 +1870,9 @@ private fun PlayerTransportControls(
         }
         Box(contentAlignment = Alignment.Center) {
             IconButton(onClick = onToggleQueue) {
-                Text(
-                    text = "≡♪",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White.copy(alpha = 0.52f)
+                QueueListIcon(
+                    color = Color.White.copy(alpha = 0.58f),
+                    modifier = Modifier.size(28.dp)
                 )
             }
             if (queueExpanded) {
@@ -1871,13 +1919,36 @@ private fun LyricToggleButton(
 }
 
 @Composable
+private fun QueueListIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val stroke = 3.dp.toPx()
+        val startX = size.width * 0.22f
+        val endX = size.width * 0.78f
+        listOf(0.30f, 0.50f, 0.70f).forEach { yFraction ->
+            drawLine(
+                color = color,
+                start = Offset(startX, size.height * yFraction),
+                end = Offset(endX, size.height * yFraction),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+        }
+    }
+}
+
+@Composable
 private fun LyricActionMenu(
     showPronunciation: Boolean,
     showTranslation: Boolean,
     lyricSourceMode: Int,
+    fontScale: Float,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
     onLyricSourceMode: (Int) -> Unit,
+    onFontScale: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -1910,6 +1981,24 @@ private fun LyricActionMenu(
         PlayerActionMenuItem(
             text = if (showTranslation) "隐藏翻译" else "显示翻译",
             onClick = onToggleTranslation
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "歌词字号",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.74f),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+        )
+        DottedValueSlider(
+            value = fontScale.coerceIn(0.75f, 1.30f),
+            valueRange = 0.75f..1.30f,
+            steps = 11,
+            label = "${(fontScale.coerceIn(0.75f, 1.30f) * 100f).toInt()}%",
+            onValueChange = onFontScale,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(82.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -2823,12 +2912,14 @@ private fun PlayerActionMenu(
     speed: Float,
     pitch: Float,
     visualizerEnabled: Boolean,
+    sleepTimerEndRealtimeMs: Long?,
+    stopAfterCurrentEnabled: Boolean,
     onClose: () -> Unit,
     onAlbum: () -> Unit,
     onArtist: () -> Unit,
     onDownload: () -> Unit,
     onLandscape: () -> Unit,
-    onStopAfterCurrent: () -> Unit,
+    onStopAfterCurrent: (Boolean) -> Unit,
     onTimer: (Int) -> Unit,
     onCancelTimer: () -> Unit,
     onSpeed: (Float) -> Unit,
@@ -2876,6 +2967,8 @@ private fun PlayerActionMenu(
             PlayerActionSheetPage.Timer -> {
                 TimerSheetContent(
                     onBack = { page = PlayerActionSheetPage.Main },
+                    sleepTimerEndRealtimeMs = sleepTimerEndRealtimeMs,
+                    stopAfterCurrentEnabled = stopAfterCurrentEnabled,
                     onStopAfterCurrent = onStopAfterCurrent,
                     onTimer = onTimer,
                     onCancelTimer = onCancelTimer
@@ -2919,51 +3012,150 @@ private enum class PlayerActionSheetPage {
 @Composable
 private fun TimerSheetContent(
     onBack: () -> Unit,
-    onStopAfterCurrent: () -> Unit,
+    sleepTimerEndRealtimeMs: Long?,
+    stopAfterCurrentEnabled: Boolean,
+    onStopAfterCurrent: (Boolean) -> Unit,
     onTimer: (Int) -> Unit,
     onCancelTimer: () -> Unit
 ) {
     var customMinutes by remember { mutableFloatStateOf(45f) }
+    var nowRealtimeMs by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    val remainingMs = sleepTimerEndRealtimeMs
+        ?.minus(nowRealtimeMs)
+        ?.coerceAtLeast(0L)
+    val timerActive = remainingMs != null && remainingMs > 0L
+
+    LaunchedEffect(sleepTimerEndRealtimeMs) {
+        while (sleepTimerEndRealtimeMs != null) {
+            nowRealtimeMs = SystemClock.elapsedRealtime()
+            delay(1000L)
+        }
+    }
+
     HalfSheetTitle(title = "定时关闭", onBack = onBack)
     Spacer(modifier = Modifier.height(18.dp))
-    listOf(10, 15, 20, 30, 40, 60).chunked(3).forEach { row ->
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            row.forEach { minutes ->
-                HalfSheetPill(
-                    text = "$minutes 分钟",
-                    onClick = { onTimer(minutes) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            repeat(3 - row.size) { Spacer(modifier = Modifier.weight(1f)) }
-        }
+
+    if (timerActive) {
+        TimerStatusCard(
+            title = "定时播放中",
+            subtitle = "剩余 ${formatTimerRemaining(remainingMs)} 后暂停"
+        )
         Spacer(modifier = Modifier.height(12.dp))
+    } else {
+        listOf(10, 15, 20, 30, 40, 60).chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                row.forEach { minutes ->
+                    HalfSheetPill(
+                        text = "$minutes 分钟",
+                        onClick = { onTimer(minutes) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                repeat(3 - row.size) { Spacer(modifier = Modifier.weight(1f)) }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "自定义时长",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.White.copy(alpha = 0.90f)
+        )
+        DottedValueSlider(
+            value = customMinutes,
+            valueRange = 5f..120f,
+            steps = 23,
+            label = "${customMinutes.toInt()} 分钟",
+            onValueChange = { customMinutes = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(92.dp)
+        )
+        HalfSheetPill(
+            text = "开始计时: ${customMinutes.toInt()} 分钟",
+            selected = true,
+            onClick = { onTimer(customMinutes.toInt().coerceAtLeast(1)) },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(10.dp))
     }
-    Spacer(modifier = Modifier.height(8.dp))
-    Text(
-        text = "自定义时长",
-        fontSize = 16.sp,
-        fontWeight = FontWeight.ExtraBold,
-        color = Color.White.copy(alpha = 0.90f)
+
+    StopAfterCurrentRow(
+        checked = stopAfterCurrentEnabled,
+        onCheckedChange = onStopAfterCurrent
     )
-    DottedValueSlider(
-        value = customMinutes,
-        valueRange = 5f..120f,
-        steps = 23,
-        onValueChange = { customMinutes = it },
+    if (timerActive) {
+        Spacer(modifier = Modifier.height(8.dp))
+        PlayerActionMenuItem("取消定时播放", onCancelTimer)
+    }
+}
+
+@Composable
+private fun TimerStatusCard(
+    title: String,
+    subtitle: String
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(92.dp)
-    )
-    HalfSheetPill(
-        text = "开始计时:${customMinutes.toInt()} 分钟",
-        selected = true,
-        onClick = { onTimer(customMinutes.toInt().coerceAtLeast(1)) },
-        modifier = Modifier.fillMaxWidth()
-    )
-    Spacer(modifier = Modifier.height(8.dp))
-    PlayerActionMenuItem("播放完当前歌曲后暂停", onStopAfterCurrent)
-    PlayerActionMenuItem("取消定时播放", onCancelTimer)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.12f))
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color.White.copy(alpha = 0.92f)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            fontSize = 13.sp,
+            color = Color.White.copy(alpha = 0.62f)
+        )
+    }
+}
+
+@Composable
+private fun StopAfterCurrentRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(22.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.White.copy(alpha = if (checked) 0.88f else 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (checked) {
+                Text(
+                    text = "✓",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.Black.copy(alpha = 0.78f)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "播放完当前歌曲后暂停",
+            fontSize = 14.sp,
+            color = Color.White.copy(alpha = 0.92f),
+            modifier = Modifier.weight(1f)
+        )
+    }
 }
 
 @Composable
@@ -2976,7 +3168,7 @@ private fun SpeedPitchSheetContent(
 ) {
     HalfSheetTitle(title = "变速变调", onBack = onBack)
     Spacer(modifier = Modifier.height(22.dp))
-    SpeedPitchHeader(title = "变速播放", value = speed.formatPlaybackStep())
+    SpeedPitchHeader(title = "变速播放")
     DottedValueSlider(
         value = speed,
         valueRange = 0.5f..2f,
@@ -2987,7 +3179,7 @@ private fun SpeedPitchSheetContent(
             .fillMaxWidth()
             .height(100.dp)
     )
-    SpeedPitchHeader(title = "变调播放", value = pitch.formatPlaybackStep())
+    SpeedPitchHeader(title = "变调播放")
     DottedValueSlider(
         value = pitch,
         valueRange = 0.5f..2f,
@@ -3001,7 +3193,7 @@ private fun SpeedPitchSheetContent(
 }
 
 @Composable
-private fun SpeedPitchHeader(title: String, value: String) {
+private fun SpeedPitchHeader(title: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -3012,16 +3204,6 @@ private fun SpeedPitchHeader(title: String, value: String) {
             fontWeight = FontWeight.ExtraBold,
             color = Color.White.copy(alpha = 0.90f),
             modifier = Modifier.weight(1f)
-        )
-        Text(
-            text = value,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color.Black.copy(alpha = 0.78f),
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(Color.White.copy(alpha = 0.86f))
-                .padding(horizontal = 12.dp, vertical = 5.dp)
         )
     }
 }
@@ -3106,7 +3288,7 @@ private fun TagEditorSheetContent(
     }
 
     if (options.isEmpty()) {
-        TagEditorEmptyState("未找到 Lyrico 或 LunaBeat，请先安装后再试")
+        TagEditorEmptyState("未找到 Lyrico、LunaBeat 或音乐标签，请先安装后再试")
         return
     }
 
@@ -3122,7 +3304,7 @@ private fun TagEditorSheetContent(
     }
 
     Text(
-        text = "会把当前歌曲路径和媒体库 Uri 传给所选应用。",
+        text = "会把当前歌曲路径和 content Uri 传给所选应用。",
         fontSize = 13.sp,
         color = Color.White.copy(alpha = 0.48f),
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
@@ -3400,13 +3582,20 @@ private fun AudioVisualizer(
         val barCount = 58
         val bottom = size.height - 2.dp.toPx()
         val gap = size.width / barCount
-        val barWidth = (gap * 0.42f).coerceIn(2.dp.toPx(), 5.dp.toPx())
+        val barWidth = (gap * 0.58f).coerceIn(3.dp.toPx(), 7.dp.toPx())
         for (index in 0 until barCount) {
             val x = gap * index + gap / 2f
-            val normalized = levels.getOrNull(index) ?: 0.04f
-            val height = size.height * normalized * if (index < 6 || index > barCount - 7) 0.58f else 1f
+            val normalized = (levels.getOrNull(index) ?: 0.10f).coerceAtLeast(0.10f)
+            val edgeScale = if (index < 6 || index > barCount - 7) 0.70f else 1f
+            val height = (size.height * (0.18f + normalized * 0.92f) * edgeScale).coerceAtLeast(8.dp.toPx())
             drawRoundRect(
-                color = accent.copy(alpha = 0.20f + normalized * 0.56f),
+                color = accent.copy(alpha = 0.10f + normalized * 0.26f),
+                topLeft = Offset(x - barWidth, bottom - height - 6.dp.toPx()),
+                size = Size(barWidth * 2f, height + 6.dp.toPx()),
+                cornerRadius = CornerRadius(barWidth * 1.2f, barWidth * 1.2f)
+            )
+            drawRoundRect(
+                color = accent.copy(alpha = 0.36f + normalized * 0.56f),
                 topLeft = Offset(x - barWidth / 2f, bottom - height),
                 size = Size(barWidth, height),
                 cornerRadius = CornerRadius(barWidth, barWidth)
@@ -3421,7 +3610,7 @@ private fun mapFftToLogBars(
     barCount: Int
 ): List<Float> {
     val binCount = fft.size / 2
-    if (binCount <= 2) return List(barCount) { 0.04f }
+    if (binCount <= 2) return List(barCount) { 0.10f }
 
     return List(barCount) { index ->
         val startRatio = index.toFloat() / barCount
@@ -3441,10 +3630,10 @@ private fun mapFftToLogBars(
         }
 
         val db = 20f * (ln(peak.coerceAtLeast(1f)) / ln(10f))
-        val normalized = ((db - 18f) / 42f).coerceIn(0f, 1f)
-        val shaped = 0.04f + normalized * normalized * 0.96f
-        val old = previous.getOrNull(index) ?: 0.04f
-        old * 0.62f + shaped * 0.38f
+        val normalized = ((db - 14f) / 34f).coerceIn(0f, 1f)
+        val shaped = 0.10f + normalized * normalized * 0.90f
+        val old = previous.getOrNull(index) ?: 0.10f
+        old * 0.54f + shaped * 0.46f
     }
 }
 
@@ -3530,12 +3719,19 @@ private fun DynamicCoverVideo(
             PlayerView(viewContext).apply {
                 player = exoPlayer
                 useController = false
+                controllerAutoShow = false
+                controllerHideOnTouch = false
                 resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                hideController()
             }
         },
         update = { view ->
             view.player = exoPlayer
+            view.useController = false
+            view.controllerAutoShow = false
+            view.controllerHideOnTouch = false
+            view.hideController()
             exoPlayer.playWhenReady = isPlaying
         }
     )
@@ -3690,11 +3886,15 @@ private fun adaptiveTitleFontSize(text: String, maxSize: TextUnit): TextUnit {
     return (maxSize.value * scale).sp
 }
 
-private fun String.toPlayerLyricFontFamily(): FontFamily? {
+private fun String.toPlayerLyricFontFamily(weight: Int): FontFamily? {
     if (isBlank()) return null
     val file = File(this)
     if (!file.exists() || !file.canRead()) return null
-    return runCatching { FontFamily(Typeface.createFromFile(file)) }.getOrNull()
+    return runCatching {
+        val baseTypeface = Typeface.createFromFile(file)
+        val weightedTypeface = Typeface.create(baseTypeface, weight.coerceIn(100, 900), false)
+        FontFamily(weightedTypeface)
+    }.getOrNull()
 }
 
 private fun String.isMusicSymbolOnly(): Boolean {
@@ -3778,6 +3978,18 @@ private fun formatTime(ms: Long): String {
     return "%02d:%02d".format(minutes, seconds)
 }
 
+private fun formatTimerRemaining(ms: Long): String {
+    val totalSeconds = (ms / 1000).coerceAtLeast(0L)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
+    }
+}
+
 private fun com.ella.music.data.AudioQualitySummary.playerCompactText(): String {
     return when {
         compactLabel == "MQ" -> "∞ Master"
@@ -3809,141 +4021,6 @@ private fun enqueuePlayerDownload(context: Context, song: Song) {
         .setAllowedOverRoaming(true)
     val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     manager.enqueue(request)
-}
-
-private fun buildTagEditorOptions(context: Context, song: Song): List<TagEditorOption> {
-    if (song.path.startsWith("http://") || song.path.startsWith("https://")) {
-        return emptyList()
-    }
-
-    if (song.id <= 0L) {
-        return emptyList()
-    }
-
-    val mediaStoreUri = ContentUris.withAppendedId(
-        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-        song.id
-    )
-    val songFile = File(song.path)
-    val fileUri = songFile.takeIf { it.exists() && it.isFile }?.let { file ->
-        runCatching {
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        }.getOrNull()
-    }
-    val editUri = fileUri ?: mediaStoreUri
-
-    val mimeType = song.mimeType
-        .takeIf { it.startsWith("audio/") }
-        ?: "audio/*"
-
-    fun tagEditorIntent(
-        label: String,
-        action: String? = null,
-        component: ComponentName? = null,
-        packageName: String? = null,
-        dataUri: Uri = editUri,
-        streamUri: Uri = editUri
-    ): Intent {
-        return Intent(action ?: Intent.ACTION_EDIT).apply {
-            component?.let { setComponent(it) }
-            packageName?.let { setPackage(it) }
-            setDataAndType(dataUri, mimeType)
-            putExtra(Intent.EXTRA_STREAM, streamUri)
-            putExtra(Intent.EXTRA_TITLE, "${song.title} - ${song.artist}")
-            putExtra("title", song.title)
-            putExtra("artist", song.artist)
-            putExtra("album", song.album)
-            putExtra("path", song.path)
-            putExtra("filePath", song.path)
-            putExtra("id", song.id)
-            putExtra("songId", song.id)
-            putExtra("mediaId", song.id)
-            putExtra("uri", dataUri.toString())
-            putExtra("mediaStoreUri", mediaStoreUri.toString())
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            clipData = ClipData.newUri(context.contentResolver, label, dataUri)
-        }
-    }
-
-    fun Intent.canOpen(): Boolean {
-        return resolveActivity(context.packageManager) != null ||
-            component?.packageName?.let { context.isPackageInstalled(it) } == true ||
-            `package`?.let { context.isPackageInstalled(it) } == true
-    }
-
-    val options = listOf(
-        TagEditorOption(
-            label = "Lyrico",
-            summary = "使用 Lyrico 打开当前歌曲标签编辑",
-            intents = listOf(
-                tagEditorIntent(
-                    label = "Lyrico",
-                    action = "com.lonx.lyrico.action.EDIT_TAG",
-                    packageName = "com.lonx.lyrico"
-                )
-            )
-        ),
-        TagEditorOption(
-            label = "LunaBeat",
-            summary = "跳转到 LunaBeat 歌曲元数据编辑",
-            intents = listOf(
-                tagEditorIntent(
-                    label = "LunaBeat",
-                    component = ComponentName("com.example.LyricBox", "com.example.LyricBox.SongMetadataEditActivity")
-                ),
-                tagEditorIntent(
-                    label = "LunaBeat",
-                    component = ComponentName("com.example.lyricbox", "com.example.LyricBox.SongMetadataEditActivity")
-                )
-            )
-        )
-    ).mapNotNull { option ->
-        option.copy(intents = option.intents.filter { it.canOpen() })
-            .takeIf { it.intents.isNotEmpty() }
-    }
-
-    return options
-}
-
-private fun launchTagEditorOption(context: Context, option: TagEditorOption) {
-    val launched = option.intents.any { intent ->
-        runCatching {
-            val targetPackage = intent.component?.packageName ?: intent.`package`
-            targetPackage?.let { packageName ->
-                context.grantUriPermission(
-                    packageName,
-                    intent.data,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
-                val streamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
-                }
-                streamUri?.let { uri ->
-                    context.grantUriPermission(
-                        packageName,
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    )
-                }
-            }
-            context.startActivity(intent)
-            true
-        }.getOrDefault(false)
-    }
-    if (!launched) {
-        Toast.makeText(context, "无法打开标签编辑器", Toast.LENGTH_SHORT).show()
-    }
-}
-
-private fun Context.isPackageInstalled(packageName: String): Boolean {
-    return runCatching {
-        packageManager.getPackageInfo(packageName, 0)
-        true
-    }.getOrDefault(false)
 }
 
 private fun Song.dynamicCoverVideoFile(context: Context): File? {

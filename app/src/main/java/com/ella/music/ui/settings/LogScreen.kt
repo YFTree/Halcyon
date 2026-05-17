@@ -5,27 +5,26 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
-import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -35,35 +34,43 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.ella.music.data.AppLogEntry
 import com.ella.music.data.AppLogStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
-import top.yukonga.miuix.kmp.basic.ListPopupColumn
-import top.yukonga.miuix.kmp.basic.PopupPositionProvider
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.DropdownDefaults
-import top.yukonga.miuix.kmp.basic.DropdownImpl
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.theme.LocalDismissState
+import top.yukonga.miuix.kmp.icon.extended.Copy
+import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.Share
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowListPopup
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import top.yukonga.miuix.kmp.window.WindowDialog
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun LogScreen(
@@ -71,52 +78,37 @@ fun LogScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
-    val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
+    val scrollBehavior = MiuixScrollBehavior()
     var refreshKey by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
-    var retentionMenuExpanded by remember { mutableStateOf(false) }
+    var selectedLevel by remember { mutableStateOf<EllaLogLevelFilter?>(null) }
+    var selectedType by remember { mutableStateOf<EllaLogTypeFilter?>(null) }
+    var selectedEntry by remember { mutableStateOf<AppLogEntry?>(null) }
+    var showDetailSheet by remember { mutableStateOf(false) }
+    var showClearDialog by remember { mutableStateOf(false) }
     var retentionDays by remember { mutableIntStateOf(AppLogStore.retentionDays(context)) }
     val retentionOptions = remember { listOf(1, 3, 7, 14, 30) }
-    val retentionEntries = remember { retentionOptions.map { "保留最近 $it 天" } }
-    val selectedRetentionIndex = retentionOptions.indexOf(retentionDays).takeIf { it >= 0 } ?: 2
+
     val entries by produceState(initialValue = emptyList<AppLogEntry>(), refreshKey) {
         value = withContext(Dispatchers.IO) { AppLogStore.read(context) }
     }
-    val filteredEntries = remember(entries, query) {
+
+    val filteredEntries = remember(entries, selectedLevel, selectedType, query) {
         val keyword = query.trim()
-        if (keyword.isBlank()) {
-            entries
-        } else {
-            entries.filter { entry ->
-                entry.level.contains(keyword, ignoreCase = true) ||
-                    entry.tag.contains(keyword, ignoreCase = true) ||
-                    entry.message.contains(keyword, ignoreCase = true) ||
-                    entry.throwable.orEmpty().contains(keyword, ignoreCase = true) ||
-                    AppLogStore.formatTime(entry.time).contains(keyword, ignoreCase = true)
-            }
+        entries.filter { entry ->
+            (selectedLevel == null || selectedLevel?.matches(entry) == true) &&
+                (selectedType == null || selectedType?.matches(entry) == true) &&
+                (keyword.isBlank() || entry.matchesKeyword(keyword))
         }
-    }
-    val reportText by produceState(initialValue = "正在生成详细运行日志...", entries) {
-        value = withContext(Dispatchers.IO) { AppLogStore.buildDetailedReport(context, entries) }
     }
 
     fun showToast(text: String) {
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     }
 
-    fun copyLogs() {
-        scope.launch {
-            val text = withContext(Dispatchers.IO) { AppLogStore.buildDetailedReport(context, entries) }
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("Ella Music 运行日志", text))
-            showToast("详细日志已复制")
-        }
-    }
-
     fun shareLogs() {
         scope.launch {
-            val file = withContext(Dispatchers.IO) { AppLogStore.exportDetailedReport(context, entries) }
+            val file = withContext(Dispatchers.IO) { AppLogStore.exportDetailedReport(context, filteredEntries) }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
@@ -134,271 +126,412 @@ fun LogScreen(
         }
     }
 
-    fun clearOlderLogs(days: Int) {
-        retentionMenuExpanded = false
-        scope.launch {
-            val removed = withContext(Dispatchers.IO) { AppLogStore.setRetentionDays(context, days) }
-            retentionDays = days
-            refreshKey++
-            showToast(if (removed > 0) "已设为保留 $days 天，并清理 $removed 条旧日志" else "已设为保留 $days 天")
+    fun copyEntry(entry: AppLogEntry) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Ella Music 日志", entry.formatForCopy()))
+        showToast("日志已复制")
+        showDetailSheet = false
+    }
+
+    Scaffold(
+        topBar = {
+            SmallTopAppBar(
+                title = "日志",
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Back,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        enabled = filteredEntries.isNotEmpty(),
+                        onClick = ::shareLogs
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Share,
+                            contentDescription = "分享日志"
+                        )
+                    }
+                    IconButton(
+                        enabled = entries.isNotEmpty(),
+                        onClick = { showClearDialog = true }
+                    ) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Delete,
+                            contentDescription = "清空日志",
+                            tint = MiuixTheme.colorScheme.error
+                        )
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .scrollEndHaptic()
+                .overScrollVertical(),
+            contentPadding = PaddingValues(
+                top = paddingValues.calculateTopPadding() + 8.dp,
+                bottom = paddingValues.calculateBottomPadding() + 120.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            overscrollEffect = null
+        ) {
+            item("filters") {
+                Card(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    WindowDropdownPreference(
+                        title = "日志级别",
+                        items = listOf("全部") + EllaLogLevelFilter.entries.map { it.label },
+                        selectedIndex = selectedLevel?.let { EllaLogLevelFilter.entries.indexOf(it) + 1 } ?: 0,
+                        onSelectedIndexChange = { index ->
+                            selectedLevel = if (index == 0) null else EllaLogLevelFilter.entries[index - 1]
+                        }
+                    )
+                    WindowDropdownPreference(
+                        title = "日志类型",
+                        items = listOf("全部") + EllaLogTypeFilter.entries.map { it.label },
+                        selectedIndex = selectedType?.let { EllaLogTypeFilter.entries.indexOf(it) + 1 } ?: 0,
+                        onSelectedIndexChange = { index ->
+                            selectedType = if (index == 0) null else EllaLogTypeFilter.entries[index - 1]
+                        }
+                    )
+                    WindowDropdownPreference(
+                        title = "自动保留",
+                        items = retentionOptions.map { "$it 天" },
+                        selectedIndex = retentionOptions.indexOf(retentionDays).takeIf { it >= 0 } ?: 2,
+                        onSelectedIndexChange = { index ->
+                            val days = retentionOptions[index]
+                            scope.launch {
+                                val removed = withContext(Dispatchers.IO) { AppLogStore.setRetentionDays(context, days) }
+                                retentionDays = days
+                                refreshKey++
+                                showToast(if (removed > 0) "已清理 $removed 条旧日志" else "已设为保留 $days 天")
+                            }
+                        }
+                    )
+                }
+            }
+
+            item("search") {
+                InputField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onSearch = {},
+                    expanded = true,
+                    onExpandedChange = {},
+                    label = "搜索日志、Tag、错误信息",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp)
+                )
+            }
+
+            item("summary") {
+                Card(modifier = Modifier.padding(horizontal = 12.dp)) {
+                    BasicComponent(
+                        title = "运行日志",
+                        summary = "共 ${entries.size} 条，当前显示 ${filteredEntries.size} 条；最多保留最近 $retentionDays 天和 800 条记录"
+                    )
+                }
+            }
+
+            if (filteredEntries.isEmpty()) {
+                item("empty") {
+                    Card(modifier = Modifier.padding(horizontal = 12.dp)) {
+                        BasicComponent(title = if (entries.isEmpty()) "暂无日志" else "没有匹配的日志")
+                    }
+                }
+            } else {
+                items(
+                    items = filteredEntries,
+                    key = { entry -> "${entry.time}-${entry.level}-${entry.tag}-${entry.message.hashCode()}" }
+                ) { entry ->
+                    AppLogItem(
+                        entry = entry,
+                        onClick = {
+                            selectedEntry = entry
+                            showDetailSheet = true
+                        }
+                    )
+                }
+            }
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(pageBackground)
-            .windowInsetsPadding(WindowInsets.statusBars)
-    ) {
-        SmallTopAppBar(
-            title = "日志",
-            color = pageBackground,
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = "返回",
-                        tint = MiuixTheme.colorScheme.onSurface
-                    )
-                }
-            },
-            actions = {
-                RetentionDropdownAction(
-                    expanded = retentionMenuExpanded,
-                    selectedLabel = "保留 $retentionDays 天",
-                    selectedIndex = selectedRetentionIndex,
-                    entries = retentionEntries,
-                    onExpandedChange = { retentionMenuExpanded = it },
-                    onSelected = { index -> clearOlderLogs(retentionOptions[index]) }
-                )
-            }
-        )
+    AppLogDetailSheet(
+        show = showDetailSheet,
+        entry = selectedEntry,
+        onDismiss = { showDetailSheet = false },
+        onDismissFinished = {
+            showDetailSheet = false
+            selectedEntry = null
+        },
+        onCopy = ::copyEntry
+    )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
-        ) {
+    WindowDialog(
+        show = showClearDialog,
+        title = "清空日志",
+        onDismissRequest = { showClearDialog = false }
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "记录详细日志、警告和闪退",
-                fontSize = 14.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                text = "将清空全部 ${entries.size} 条持久化日志，此操作不可恢复。",
+                color = MiuixTheme.colorScheme.onSurface
             )
-            Text(
-                text = "自动保留最近 $retentionDays 天，最多 800 条；导出时会附带当前 logcat 尾部",
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.72f)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Button(
-                    onClick = ::copyLogs
-                ) {
-                    Text("复制")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = ::shareLogs
-                ) {
-                    Text("发送")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.SpaceBetween) {
+                TextButton(
+                    text = "取消",
+                    onClick = { showClearDialog = false },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(20.dp))
+                TextButton(
+                    text = "清空",
                     onClick = {
                         scope.launch {
                             withContext(Dispatchers.IO) { AppLogStore.clear(context) }
                             refreshKey++
+                            showClearDialog = false
+                            showToast("日志已清空")
                         }
-                    }
-                ) {
-                    Text("清空")
-                }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
             }
         }
+    }
+}
 
-        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-            InputField(
-                query = query,
-                onQueryChange = { query = it },
-                onSearch = {},
-                expanded = true,
-                onExpandedChange = {},
-                label = "搜索日志、Tag、错误信息",
+@Composable
+private fun AppLogItem(
+    entry: AppLogEntry,
+    onClick: () -> Unit
+) {
+    Card(modifier = Modifier.padding(horizontal = 12.dp)) {
+        BasicComponent(
+            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            onClick = onClick
+        ) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-            textStyle = TextStyle(
-                color = MiuixTheme.colorScheme.onSurface,
-                fontSize = 14.sp
-                )
-            )
-        }
-
-        if (filteredEntries.isEmpty()) {
-            Spacer(modifier = Modifier.height(90.dp))
-            Text(
-                text = if (entries.isEmpty()) "暂无日志" else "没有匹配的日志",
-                fontSize = 15.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                item {
-                    RuntimeSummaryCard(
-                        entries = entries,
-                        filteredCount = filteredEntries.size,
-                        reportText = reportText,
-                        isDark = isDark
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SeverityBadge(entry.level)
+                    Text(
+                        text = entry.detectType().label,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.onSurface
                     )
                 }
-                items(filteredEntries) { entry ->
-                    LogEntryCard(entry = entry, isDark = isDark)
-                }
-                item { Spacer(modifier = Modifier.height(120.dp)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RetentionDropdownAction(
-    expanded: Boolean,
-    selectedLabel: String,
-    selectedIndex: Int,
-    entries: List<String>,
-    onExpandedChange: (Boolean) -> Unit,
-    onSelected: (Int) -> Unit
-) {
-    IconButton(onClick = { onExpandedChange(!expanded) }) {
-        Text(
-            text = selectedLabel,
-            fontSize = 13.sp,
-            color = MiuixTheme.colorScheme.primary
-        )
-        WindowListPopup(
-            show = expanded,
-            alignment = PopupPositionProvider.Align.End,
-            onDismissRequest = { onExpandedChange(false) },
-            onDismissFinished = {}
-        ) {
-            val dismiss = LocalDismissState.current
-            ListPopupColumn {
-                entries.forEachIndexed { index, entry ->
-                    key(index) {
-                        DropdownImpl(
-                            text = entry,
-                            optionSize = entries.size,
-                            isSelected = selectedIndex == index,
-                            index = index,
-                            dropdownColors = DropdownDefaults.dropdownColors(),
-                            onSelectedIndexChange = { selected ->
-                                onSelected(selected)
-                                dismiss?.invoke()
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RuntimeSummaryCard(
-    entries: List<AppLogEntry>,
-    filteredCount: Int,
-    reportText: String,
-    isDark: Boolean
-) {
-    val cardColor = if (isDark) Color(0xFF1D1D21) else Color.White
-    val crashCount = entries.count { it.level == "CRASH" }
-    val errorCount = entries.count { it.level == "ERROR" }
-    val warnCount = entries.count { it.level == "WARN" }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 10.dp),
-        cornerRadius = 14.dp,
-        insideMargin = PaddingValues(14.dp),
-        colors = CardDefaults.defaultColors(color = cardColor)
-    ) {
-        Column {
-            Text(
-                text = "详细运行日志",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = MiuixTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "持久化 ${entries.size} 条，当前显示 $filteredCount 条，WARN $warnCount / ERROR $errorCount / CRASH $crashCount",
-                fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = reportText.lineSequence().take(9).joinToString("\n"),
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-            )
-        }
-    }
-}
-
-@Composable
-private fun LogEntryCard(
-    entry: AppLogEntry,
-    isDark: Boolean
-) {
-    val cardColor = if (isDark) Color(0xFF1D1D21) else Color.White
-    val levelColor = if (entry.level == "CRASH") Color(0xFFFF6B6B) else MiuixTheme.colorScheme.primary
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 10.dp),
-        cornerRadius = 14.dp,
-        insideMargin = PaddingValues(14.dp),
-        colors = CardDefaults.defaultColors(color = cardColor)
-    ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = entry.level,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = levelColor
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = entry.tag,
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = AppLogStore.formatTime(entry.time),
-                    fontSize = 11.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    text = formatTimeOnly(entry.time),
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 1
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = entry.message,
-                fontSize = 13.sp,
-                color = MiuixTheme.colorScheme.onSurface
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
-            entry.throwable?.let { stack ->
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = entry.tag,
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun SeverityBadge(level: String) {
+    val normalized = level.uppercase(Locale.ROOT)
+    val background = when (normalized) {
+        "ERROR", "CRASH" -> MiuixTheme.colorScheme.error
+        "WARN", "WARNING" -> MiuixTheme.colorScheme.tertiaryContainer
+        "DEBUG" -> MiuixTheme.colorScheme.secondaryContainer
+        else -> MiuixTheme.colorScheme.primary
+    }
+    val content = when (normalized) {
+        "ERROR", "CRASH" -> MiuixTheme.colorScheme.onError
+        "INFO" -> MiuixTheme.colorScheme.onPrimary
+        else -> MiuixTheme.colorScheme.onSurface
+    }
+    Text(
+        text = if (normalized == "WARN") "WARNING" else normalized,
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(background)
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+        color = content,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        fontSize = 12.sp
+    )
+}
+
+@Composable
+private fun AppLogDetailSheet(
+    show: Boolean,
+    entry: AppLogEntry?,
+    onDismiss: () -> Unit,
+    onDismissFinished: () -> Unit,
+    onCopy: (AppLogEntry) -> Unit
+) {
+    WindowBottomSheet(
+        show = show,
+        enableNestedScroll = false,
+        title = "日志详情",
+        endAction = {
+            entry?.let {
+                IconButton(onClick = { onCopy(it) }) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Copy,
+                        contentDescription = "复制日志"
+                    )
+                }
+            }
+        },
+        onDismissRequest = onDismiss,
+        onDismissFinished = onDismissFinished
+    ) {
+        entry ?: return@WindowBottomSheet
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            DetailRow(label = "时间", value = AppLogStore.formatTime(entry.time))
+            DetailRow(label = "级别", value = entry.level)
+            DetailRow(label = "类型", value = entry.detectType().label)
+            DetailRow(label = "Tag", value = entry.tag)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "消息",
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                fontWeight = FontWeight.Bold
+            )
+            SelectionContainer {
                 Text(
-                    text = stack,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    text = entry.message,
+                    modifier = Modifier.padding(top = 4.dp),
+                    color = MiuixTheme.colorScheme.onSurface
                 )
+            }
+            entry.throwable?.takeIf { it.isNotBlank() }?.let { detail ->
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "详情",
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    fontWeight = FontWeight.Bold
+                )
+                SelectionContainer {
+                    Text(
+                        text = detail,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        color = MiuixTheme.colorScheme.onSurface,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
         }
     }
 }
+
+@Composable
+private fun DetailRow(
+    label: String,
+    value: String
+) {
+    Column(modifier = Modifier.padding(bottom = 8.dp)) {
+        Text(
+            text = label,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            fontWeight = FontWeight.Bold
+        )
+        SelectionContainer {
+            Text(
+                text = value,
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+private enum class EllaLogLevelFilter(val label: String, private val aliases: Set<String>) {
+    DEBUG("调试", setOf("DEBUG")),
+    INFO("信息", setOf("INFO")),
+    WARNING("警告", setOf("WARN", "WARNING")),
+    ERROR("错误", setOf("ERROR")),
+    CRASH("闪退", setOf("CRASH"));
+
+    fun matches(entry: AppLogEntry): Boolean = entry.level.uppercase(Locale.ROOT) in aliases
+}
+
+private enum class EllaLogTypeFilter(val label: String, val keywords: Set<String>) {
+    APP("应用", emptySet()),
+    PLAYBACK("播放", setOf("player", "playback", "play", "exo", "media", "audio", "decoder", "queue", "播放", "播放器", "解码", "队列")),
+    LYRICS("歌词", setOf("lyric", "lyrics", "ticker", "superlyric", "lyricon", "flyme", "samsung", "bluetooth", "词幕", "歌词")),
+    LIBRARY("音乐库", setOf("scan", "scanner", "library", "folder", "album", "artist", "tag", "metadata", "音乐库", "扫描", "文件夹", "专辑", "艺术家", "标签")),
+    ONLINE("在线", setOf("lx", "musicfree", "webdav", "download", "plugin", "api", "network", "http", "在线", "下载", "插件")),
+    DATABASE("数据", setOf("database", "db", "room", "dao", "backup", "restore", "数据库", "备份", "恢复")),
+    CRASH("崩溃", setOf("crash", "exception", "fatal", "崩溃", "闪退"));
+
+    fun matches(entry: AppLogEntry): Boolean = entry.detectType() == this
+}
+
+private fun AppLogEntry.detectType(): EllaLogTypeFilter {
+    if (level.equals("CRASH", ignoreCase = true)) return EllaLogTypeFilter.CRASH
+    val haystack = "$tag $message ${throwable.orEmpty()}".lowercase(Locale.ROOT)
+    return EllaLogTypeFilter.entries
+        .asSequence()
+        .filter { it != EllaLogTypeFilter.APP }
+        .firstOrNull { type -> type.keywords.any { it.lowercase(Locale.ROOT) in haystack } }
+        ?: EllaLogTypeFilter.APP
+}
+
+private fun AppLogEntry.matchesKeyword(keyword: String): Boolean {
+    return level.contains(keyword, ignoreCase = true) ||
+        tag.contains(keyword, ignoreCase = true) ||
+        message.contains(keyword, ignoreCase = true) ||
+        throwable.orEmpty().contains(keyword, ignoreCase = true) ||
+        AppLogStore.formatTime(time).contains(keyword, ignoreCase = true) ||
+        detectType().label.contains(keyword, ignoreCase = true)
+}
+
+private fun AppLogEntry.formatForCopy(): String = buildString {
+    appendLine("${AppLogStore.formatTime(time)} [$level/${detectType().label}] $tag")
+    appendLine(message)
+    throwable?.takeIf { it.isNotBlank() }?.let {
+        appendLine()
+        appendLine(it)
+    }
+}
+
+private fun formatTimeOnly(timestamp: Long): String =
+    SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestamp))

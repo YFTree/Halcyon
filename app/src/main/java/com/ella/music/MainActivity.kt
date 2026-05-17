@@ -232,6 +232,7 @@ fun EllaApp(
     val currentRoute = navBackStackEntry?.destination?.route
     val view = LocalView.current
     val context = LocalContext.current
+    val settingsManager = remember { SettingsManager(context) }
     val isPlayerRoute = currentRoute == Screen.Player.route
 
     LaunchedEffect(isPlayerRoute, isDarkTheme) {
@@ -260,6 +261,7 @@ fun EllaApp(
     val duration by playerViewModel.duration.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
+    val miniPlayerShowTranslation by settingsManager.miniPlayerLyricTranslation.collectAsState(initial = true)
 
     val currentLyricLine = lyrics.getOrNull(currentLyricIndex)
     val miniPlayerLyricText = if (isPlaying) {
@@ -267,7 +269,7 @@ fun EllaApp(
     } else {
         null
     }
-    val miniPlayerLyricTranslation = if (isPlaying) {
+    val miniPlayerLyricTranslation = if (isPlaying && miniPlayerShowTranslation) {
         currentLyricLine?.translation?.takeIf { it.isNotBlank() }
     } else {
         null

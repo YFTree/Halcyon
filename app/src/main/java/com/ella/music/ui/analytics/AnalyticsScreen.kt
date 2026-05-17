@@ -62,10 +62,91 @@ fun AnalyticsScreen(
     mainViewModel: MainViewModel,
     onBack: () -> Unit
 ) {
-    val songs by mainViewModel.songs.collectAsState()
     val playbackStats by mainViewModel.playbackStats.collectAsState()
     val playbackHistory by mainViewModel.playbackHistory.collectAsState()
     val dailyListenMs by mainViewModel.dailyListenMs.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ellaPageBackground())
+            .windowInsetsPadding(WindowInsets.statusBars)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = MiuixIcons.Regular.Back,
+                    contentDescription = "返回",
+                    tint = MiuixTheme.colorScheme.onBackground,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Text(
+                text = "听歌统计",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 8.dp,
+                bottom = 32.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                HistoryCard(history = playbackHistory.take(20))
+            }
+
+            item {
+                ListenHeatmapCard(dailyListenMs = dailyListenMs)
+            }
+
+            item {
+                RankingCard(
+                    title = "听歌时长排行",
+                    emptyText = "开始播放后会自动累计听歌时长",
+                    stats = playbackStats
+                        .filter { it.listenedMs > 0L }
+                        .sortedByDescending { it.listenedMs }
+                        .take(10),
+                    valueText = { formatListenDuration(it.listenedMs) }
+                )
+            }
+
+            item {
+                RankingCard(
+                    title = "播放次数排行",
+                    emptyText = "开始播放后会自动累计播放次数",
+                    stats = playbackStats
+                        .filter { it.playCount > 0 }
+                        .sortedByDescending { it.playCount }
+                        .take(10),
+                    valueText = { "${it.playCount} 次" }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LibraryAnalysisScreen(
+    mainViewModel: MainViewModel,
+    onBack: () -> Unit
+) {
+    val songs by mainViewModel.songs.collectAsState()
+    val playbackStats by mainViewModel.playbackStats.collectAsState()
     val analysis by produceState<LibraryAnalysis?>(initialValue = null, songs) {
         value = if (songs.isEmpty()) LibraryAnalysis(emptyList(), emptyList(), 0, 0L)
         else withContext(Dispatchers.IO) { buildLibraryAnalysis(songs, mainViewModel) }
@@ -118,14 +199,6 @@ fun AnalyticsScreen(
             }
 
             item {
-                ListenHeatmapCard(dailyListenMs = dailyListenMs)
-            }
-
-            item {
-                HistoryCard(history = playbackHistory.take(20))
-            }
-
-            item {
                 DonutChartCard(
                     title = "音频格式统计",
                     loadingText = "正在分析音频格式...",
@@ -144,30 +217,6 @@ fun AnalyticsScreen(
                     total = analysis?.totalCount ?: 0,
                     totalSizeBytes = analysis?.totalSizeBytes ?: 0L,
                     palette = qualityPalette
-                )
-            }
-
-            item {
-                RankingCard(
-                    title = "听歌时长排行",
-                    emptyText = "开始播放后会自动累计听歌时长",
-                    stats = playbackStats
-                        .filter { it.listenedMs > 0L }
-                        .sortedByDescending { it.listenedMs }
-                        .take(10),
-                    valueText = { formatListenDuration(it.listenedMs) }
-                )
-            }
-
-            item {
-                RankingCard(
-                    title = "播放次数排行",
-                    emptyText = "开始播放后会自动累计播放次数",
-                    stats = playbackStats
-                        .filter { it.playCount > 0 }
-                        .sortedByDescending { it.playCount }
-                        .take(10),
-                    valueText = { "${it.playCount} 次" }
                 )
             }
         }

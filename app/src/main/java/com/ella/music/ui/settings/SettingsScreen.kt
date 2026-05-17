@@ -448,6 +448,7 @@ fun SettingsDetailScreen(
     val lyricGetterEnabled by settingsManager.lyricGetterEnabled.collectAsState(initial = false)
     val bluetoothLyricEnabled by settingsManager.bluetoothLyricEnabled.collectAsState(initial = false)
     val bluetoothLyricTranslation by settingsManager.bluetoothLyricTranslation.collectAsState(initial = false)
+    val miniPlayerLyricTranslation by settingsManager.miniPlayerLyricTranslation.collectAsState(initial = true)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
@@ -562,6 +563,15 @@ fun SettingsDetailScreen(
 
                 SettingsCardGroup {
                     Column {
+                    SwitchPreference(
+                        title = "迷你播放条显示翻译",
+                        summary = "播放栏显示歌词时同时显示翻译",
+                        checked = miniPlayerLyricTranslation,
+                        onCheckedChange = { enabled ->
+                            scope.launch { settingsManager.setMiniPlayerLyricTranslation(enabled) }
+                        }
+                    )
+
                     SwitchPreference(
                         title = "启用词幕",
                         summary = "将歌词推送到词幕（Lyricon）",

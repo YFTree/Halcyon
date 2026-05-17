@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -34,11 +35,13 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
 import com.ella.music.BuildConfig
 import com.ella.music.ui.effect.BgEffectBackground
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -182,6 +185,15 @@ private fun AboutContent(
                 .onSizeChanged { size -> with(density) { logoHeightDp = size.height.toDp() } },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_launcher),
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier
+                    .size(112.dp)
+                    .padding(bottom = 18.dp)
+                    .graphicsLayer { alpha = if (isDark) 0.74f else 0.68f },
+            )
             Text(
                 modifier = Modifier
                     .padding(bottom = 5.dp)
@@ -274,6 +286,16 @@ private fun AboutContent(
                         onClick = { uriHandler.openUri("https://github.com/imsyy/SPlayer") },
                     )
                     BasicComponent(
+                        title = "光锥音乐",
+                        summary = "外部音乐标签编辑器适配与交互参考",
+                        onClick = { uriHandler.openUri("https://coneplayer.trantor.ink/") },
+                    )
+                    BasicComponent(
+                        title = "Lyrico",
+                        summary = "外部标签编辑器适配与日志页面交互参考",
+                        onClick = { uriHandler.openUri("https://github.com/Replica0110/Lyrico") },
+                    )
+                    BasicComponent(
                         title = "Mimo-V2.5-Pro",
                         summary = "1.0.0 至 1.0.1 早期版本主要开发",
                     )
@@ -312,6 +334,26 @@ private fun AboutContent(
                         title = "Lyricon",
                         summary = "词幕 Provider API 与状态栏歌词",
                         onClick = { uriHandler.openUri("https://github.com/proify/lyricon") },
+                    )
+                    BasicComponent(
+                        title = "SuperLyricApi",
+                        summary = "SuperLyric 发布 API",
+                        onClick = { uriHandler.openUri("https://github.com/HChenX/SuperLyricApi") },
+                    )
+                    BasicComponent(
+                        title = "SuperLyric",
+                        summary = "系统歌词模块与状态栏歌词生态参考",
+                        onClick = { uriHandler.openUri("https://github.com/HChenX/SuperLyric") },
+                    )
+                    BasicComponent(
+                        title = "Lyric Getter",
+                        summary = "原文歌词显示与发布 API 适配参考",
+                        onClick = { uriHandler.openUri("https://github.com/xiaowine/Lyric-Getter") },
+                    )
+                    BasicComponent(
+                        title = "Lyrico",
+                        summary = "标签编辑器与应用日志页面参考",
+                        onClick = { uriHandler.openUri("https://github.com/Replica0110/Lyrico") },
                     )
                     BasicComponent(
                         title = "Kyant Backdrop",

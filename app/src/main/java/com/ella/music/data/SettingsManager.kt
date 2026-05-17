@@ -51,6 +51,7 @@ class SettingsManager(private val context: Context) {
         val KEY_SHUFFLE_MODE = intPreferencesKey("shuffle_mode")
         val KEY_LYRIC_SOURCE_MODE = intPreferencesKey("lyric_source_mode")
         val KEY_LYRIC_PAGE_TRANSLATION = booleanPreferencesKey("lyric_page_translation")
+        val KEY_MINI_PLAYER_LYRIC_TRANSLATION = booleanPreferencesKey("mini_player_lyric_translation")
         val KEY_PLAYER_HDR_GLOW = booleanPreferencesKey("player_hdr_glow")
         val KEY_AUDIO_VISUALIZER_ENABLED = booleanPreferencesKey("audio_visualizer_enabled")
         val KEY_WEBDAV_URL = stringPreferencesKey("webdav_url")
@@ -70,6 +71,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_FONT_NAME = stringPreferencesKey("lyric_font_name")
         val KEY_LYRIC_FONT_PATH = stringPreferencesKey("lyric_font_path")
         val KEY_LYRIC_FONT_WEIGHT = intPreferencesKey("lyric_font_weight")
+        val KEY_LYRIC_FONT_SCALE = intPreferencesKey("lyric_font_scale")
         val KEY_SCAN_INCLUDE_FOLDERS = stringPreferencesKey("scan_include_folders")
         val KEY_SCAN_EXCLUDE_FOLDERS = stringPreferencesKey("scan_exclude_folders")
         val KEY_DECODER_MODE = intPreferencesKey("decoder_mode")
@@ -112,6 +114,8 @@ class SettingsManager(private val context: Context) {
     val lyricSourceMode: Flow<Int> =
         context.dataStore.data.map { it[KEY_LYRIC_SOURCE_MODE] ?: LYRIC_SOURCE_AUTO }
     val lyricPageTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PAGE_TRANSLATION] ?: true }
+    val miniPlayerLyricTranslation: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] ?: true }
     val playerHdrGlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PLAYER_HDR_GLOW] ?: false }
     val audioVisualizerEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_AUDIO_VISUALIZER_ENABLED] ?: false }
@@ -147,6 +151,7 @@ class SettingsManager(private val context: Context) {
     val lyricFontName: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_NAME] ?: "" }
     val lyricFontPath: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_PATH] ?: "" }
     val lyricFontWeight: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_WEIGHT] ?: 800 }
+    val lyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_SCALE] ?: 100 }
     val scanIncludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_INCLUDE_FOLDERS] ?: "" }
     val scanExcludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_EXCLUDE_FOLDERS] ?: "" }
     val decoderMode: Flow<Int> = context.dataStore.data.map { it[KEY_DECODER_MODE] ?: 2 }
@@ -233,6 +238,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setLyricPageTranslation(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRIC_PAGE_TRANSLATION] = enabled }
+    }
+
+    suspend fun setMiniPlayerLyricTranslation(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] = enabled }
     }
 
     suspend fun setPlayerHdrGlow(enabled: Boolean) {
@@ -413,6 +422,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_LYRIC_FONT_WEIGHT] = weight.coerceIn(100, 900) }
     }
 
+    suspend fun setLyricFontScale(scale: Int) {
+        context.dataStore.edit { it[KEY_LYRIC_FONT_SCALE] = scale.coerceIn(75, 130) }
+    }
+
     suspend fun setScanIncludeFolders(folders: String) {
         context.dataStore.edit { it[KEY_SCAN_INCLUDE_FOLDERS] = folders.trim() }
     }
@@ -456,6 +469,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_REPLAYGAIN_ENABLED)
             setBoolean(KEY_AUDIO_FOCUS_DISABLED)
             setBoolean(KEY_LYRIC_PAGE_TRANSLATION)
+            setBoolean(KEY_MINI_PLAYER_LYRIC_TRANSLATION)
             setBoolean(KEY_PLAYER_HDR_GLOW)
             setBoolean(KEY_AUDIO_VISUALIZER_ENABLED)
             setBoolean(KEY_BLUETOOTH_LYRIC_ENABLED)
@@ -470,6 +484,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_LYRIC_SOURCE_MODE)
             setInt(KEY_DECODER_MODE)
             setInt(KEY_LYRIC_FONT_WEIGHT)
+            setInt(KEY_LYRIC_FONT_SCALE)
 
             setString(KEY_WEBDAV_URL)
             setString(KEY_WEBDAV_USERNAME)

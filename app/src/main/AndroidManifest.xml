@@ -21,6 +21,7 @@
         <package android:name="com.lonx.lyrico" />
         <package android:name="com.example.LyricBox" />
         <package android:name="com.example.lyricbox" />
+        <package android:name="com.xjcheng.musictageditor" />
         <intent>
             <action android:name="com.lonx.lyrico.action.EDIT_TAG" />
             <data android:mimeType="audio/*" />
@@ -39,7 +40,7 @@
 
         <meta-data android:name="lyricon_module" android:value="true" />
         <meta-data android:name="lyricon_module_author" android:value="Kifranei" />
-        <meta-data android:name="lyricon_module_description" android:value="请把黄昏留在最后一段旋律里。" />
+        <meta-data android:name="lyricon_module_description" android:value="请把黄昏留在最后一段旋律里" />
         <meta-data android:name="lyricon_module_tags" android:resource="@array/lyricon_module_tags" />
 
         <activity

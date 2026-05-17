@@ -6,10 +6,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.Player
 import com.ella.music.data.AppLogStore
+import com.ella.music.data.PlaylistStore
 import com.ella.music.data.PlaybackStatsStore
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.UserPlaylist
+import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.repository.MusicRepository
 import com.ella.music.player.DesktopLyricBridge
 import com.ella.music.player.ExoPlayerManager
@@ -23,7 +26,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -38,6 +44,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val desktopLyricBridge = DesktopLyricBridge(application)
     val superLyricBridge = SuperLyricBridge()
     val lyricGetterBridge = LyricGetterBridge(application)
+    private val playlistStore = PlaylistStore.getInstance(application)
     private val playbackStatsStore = PlaybackStatsStore.getInstance(application)
 
     val currentSong: StateFlow<Song?> = playerManager.currentSong
@@ -49,6 +56,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val playbackSpeed: StateFlow<Float> = playerManager.playbackSpeed
     val playbackPitch: StateFlow<Float> = playerManager.playbackPitch
     val playlist: StateFlow<List<Song>> = playerManager.playlistFlow
+    val userPlaylists: StateFlow<List<UserPlaylist>> = playlistStore.playlists
+    val favoriteSongKeys: StateFlow<Set<String>> = playlistStore.playlists
+        .map { playlists ->
+            playlists
+                .firstOrNull { it.isFavorites }
+                ?.songs
+                ?.mapTo(mutableSetOf()) { it.key }
+                ?: emptySet()
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, playlistStore.favoriteSongKeys())
 
     private val _lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val lyrics: StateFlow<List<LyricLine>> = _lyrics.asStateFlow()
@@ -67,6 +84,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _locateCurrentSongRequest = MutableStateFlow(0)
     val locateCurrentSongRequest: StateFlow<Int> = _locateCurrentSongRequest.asStateFlow()
+
+    private val _sleepTimerEndRealtimeMs = MutableStateFlow<Long?>(null)
+    val sleepTimerEndRealtimeMs: StateFlow<Long?> = _sleepTimerEndRealtimeMs.asStateFlow()
+
+    private val _stopAfterCurrentEnabled = MutableStateFlow(false)
+    val stopAfterCurrentEnabled: StateFlow<Boolean> = _stopAfterCurrentEnabled.asStateFlow()
 
     private var positionUpdateJob: Job? = null
     private var lastSentPlayingState: Boolean? = null
@@ -627,6 +650,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lazyOnlineQueue = null
         playerManager.addToPlaylist(songs)
     }
+
+    fun playNext(song: Song) {
+        lazyOnlineQueue = null
+        playerManager.playNext(song)
+    }
+
     fun playQueueIndex(index: Int) {
         if (!playLazyOnlineIndex(index)) playerManager.playQueueIndex(index)
     }
@@ -723,6 +752,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         repository.clearRemoteMetadataCache()
     }
 
+    fun toggleCurrentSongFavorite() {
+        val song = currentSong.value ?: return
+        viewModelScope.launch { playlistStore.toggleFavorite(song) }
+    }
+
+    fun isFavorite(song: Song?): Boolean =
+        song?.playlistIdentityKey()?.let { it in favoriteSongKeys.value } == true
+
     private suspend fun reloadLyrics(song: Song, force: Boolean = false) {
         lastTickerPayload = null
         lastBluetoothLyricPayload = null
@@ -750,21 +787,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun startSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
-        if (minutes <= 0) return
+        if (minutes <= 0) {
+            _sleepTimerEndRealtimeMs.value = null
+            return
+        }
+        _sleepTimerEndRealtimeMs.value = SystemClock.elapsedRealtime() + minutes * 60_000L
         sleepTimerJob = viewModelScope.launch {
             delay(minutes * 60_000L)
+            _sleepTimerEndRealtimeMs.value = null
             playerManager.pause()
         }
     }
 
-    fun stopAfterCurrentSong() {
-        stopAfterCurrentSongId = currentSong.value?.id
+    fun setStopAfterCurrentEnabled(enabled: Boolean) {
+        _stopAfterCurrentEnabled.value = enabled
+        stopAfterCurrentSongId = if (enabled) currentSong.value?.id else null
     }
 
     fun cancelSleepTimer() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
-        stopAfterCurrentSongId = null
+        _sleepTimerEndRealtimeMs.value = null
     }
 
     private fun updateSleepTimer() {
@@ -774,6 +817,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val position = currentPosition.value
         if (song.id != targetId || (total > 0L && total - position <= 850L)) {
             stopAfterCurrentSongId = null
+            _stopAfterCurrentEnabled.value = false
             playerManager.pause()
         }
     }

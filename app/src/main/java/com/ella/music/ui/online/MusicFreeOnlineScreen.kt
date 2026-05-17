@@ -115,21 +115,25 @@ fun MusicFreeOnlineScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             state.isBusy = true
-            runCatching {
-                val script = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        input.bufferedReader(Charsets.UTF_8).readText()
-                    }.orEmpty()
+            state.message = "正在导入 MusicFree 插件..."
+            try {
+                runCatching {
+                    val script = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            input.bufferedReader(Charsets.UTF_8).readText()
+                        }.orEmpty()
+                    }
+                    val (name, normalizedScript) = service.importPluginScript(script, allowRuntimeInspect = false)
+                    settingsManager.setMusicFreePlugin(uri.toString(), name, normalizedScript)
+                    state.message = "已导入 $name"
+                    state.importExpanded = false
+                }.onFailure {
+                    state.message = it.localizedMessage ?: "本地导入失败"
+                    showToast(state.message)
                 }
-                val (name, normalizedScript) = service.importPluginScript(script)
-                settingsManager.setMusicFreePlugin(uri.toString(), name, normalizedScript)
-                state.message = "已导入 $name"
-                state.importExpanded = false
-            }.onFailure {
-                state.message = it.localizedMessage ?: "本地导入失败"
-                showToast(state.message)
+            } finally {
+                state.isBusy = false
             }
-            state.isBusy = false
         }
     }
 
@@ -207,21 +211,25 @@ fun MusicFreeOnlineScreen(
                                     onClick = {
                                         scope.launch {
                                             state.isBusy = true
-                                            runCatching {
-                                                val result = service.importPlugins(state.importUrl)
-                                                settingsManager.setMusicFreePlugins(result.plugins)
-                                                state.importUrl = ""
-                                                state.message = if (result.plugins.size == 1 && result.skippedCount == 0) {
-                                                    "已导入 ${result.plugins.first().name}"
-                                                } else {
-                                                    "已导入 ${result.plugins.size} 个插件，跳过 ${result.skippedCount} 个"
+                                            state.message = "正在导入 MusicFree 插件..."
+                                            try {
+                                                runCatching {
+                                                    val result = service.importPlugins(state.importUrl)
+                                                    settingsManager.setMusicFreePlugins(result.plugins)
+                                                    state.importUrl = ""
+                                                    state.message = if (result.plugins.size == 1 && result.skippedCount == 0) {
+                                                        "已导入 ${result.plugins.first().name}"
+                                                    } else {
+                                                        "已导入 ${result.plugins.size} 个插件，跳过 ${result.skippedCount} 个"
+                                                    }
+                                                    state.importExpanded = false
+                                                }.onFailure {
+                                                    state.message = it.localizedMessage ?: "导入失败"
+                                                    showToast(state.message)
                                                 }
-                                                state.importExpanded = false
-                                            }.onFailure {
-                                                state.message = it.localizedMessage ?: "导入失败"
-                                                showToast(state.message)
+                                            } finally {
+                                                state.isBusy = false
                                             }
-                                            state.isBusy = false
                                         }
                                     }
                                 ) {

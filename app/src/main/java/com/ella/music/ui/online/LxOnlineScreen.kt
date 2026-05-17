@@ -117,22 +117,25 @@ fun LxOnlineScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             state.isBusy = true
-            runCatching {
-                val script = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        input.bufferedReader(Charsets.UTF_8).readText()
-                    }.orEmpty()
+            try {
+                runCatching {
+                    val script = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            input.bufferedReader(Charsets.UTF_8).readText()
+                        }.orEmpty()
+                    }
+                    val (name, normalizedScript) = service.importSourceScript(script, allowRuntimeInspect = false)
+                    settingsManager.setLxSource(uri.toString(), name, normalizedScript)
+                    state.importUrl = ""
+                    state.message = "已导入 $name"
+                    state.importExpanded = false
+                }.onFailure {
+                    state.message = it.localizedMessage ?: "本地导入失败"
+                    showToast(state.message)
                 }
-                val (name, normalizedScript) = service.importSourceScript(script)
-                settingsManager.setLxSource(uri.toString(), name, normalizedScript)
-                state.importUrl = ""
-                state.message = "已导入 $name"
-                state.importExpanded = false
-            }.onFailure {
-                state.message = it.localizedMessage ?: "本地导入失败"
-                showToast(state.message)
+            } finally {
+                state.isBusy = false
             }
-            state.isBusy = false
         }
     }
 
@@ -205,17 +208,20 @@ fun LxOnlineScreen(
                                     onClick = {
                                         scope.launch {
                                             state.isBusy = true
-                                            runCatching {
-                                                val (name, script) = service.importSource(state.importUrl)
-                                                settingsManager.setLxSource(state.importUrl, name, script)
-                                                state.importUrl = ""
-                                                state.message = "已导入 $name"
-                                                state.importExpanded = false
-                                            }.onFailure {
-                                                state.message = it.localizedMessage ?: "导入失败"
-                                                showToast(state.message)
+                                            try {
+                                                runCatching {
+                                                    val (name, script) = service.importSource(state.importUrl)
+                                                    settingsManager.setLxSource(state.importUrl, name, script)
+                                                    state.importUrl = ""
+                                                    state.message = "已导入 $name"
+                                                    state.importExpanded = false
+                                                }.onFailure {
+                                                    state.message = it.localizedMessage ?: "导入失败"
+                                                    showToast(state.message)
+                                                }
+                                            } finally {
+                                                state.isBusy = false
                                             }
-                                            state.isBusy = false
                                         }
                                     }
                                 ) {

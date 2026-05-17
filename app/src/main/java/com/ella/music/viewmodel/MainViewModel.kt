@@ -3,6 +3,7 @@ package com.ella.music.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.ella.music.data.PlaylistStore
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.PlaybackStatsStore
@@ -12,6 +13,9 @@ import com.ella.music.data.model.Album
 import com.ella.music.data.model.Artist
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.UserPlaylist
+import com.ella.music.data.model.playlistIdentityKey
+import com.ella.music.data.model.toSong
 import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.repository.MusicRepository
 import com.ella.music.data.splitArtistNames
@@ -28,6 +32,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val repository = MusicRepository(application)
     val settingsManager = SettingsManager(application)
+    private val playlistStore = PlaylistStore.getInstance(application)
     private val playbackStatsStore = PlaybackStatsStore.getInstance(application)
 
     val songs: StateFlow<List<Song>> = repository.songs
@@ -41,6 +46,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val playbackStats: StateFlow<List<SongPlaybackStats>> = playbackStatsStore.stats
     val playbackHistory: StateFlow<List<PlaybackHistoryEntry>> = playbackStatsStore.history
     val dailyListenMs: StateFlow<Map<String, Long>> = playbackStatsStore.dailyListenMs
+    val playlists: StateFlow<List<UserPlaylist>> = playlistStore.playlists
 
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
@@ -150,6 +156,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearOnlineMetadataCache() {
         repository.clearRemoteMetadataCache()
+    }
+
+    fun playlistSongs(playlist: UserPlaylist): List<Song> {
+        val libraryByKey = songs.value.associateBy { it.playlistIdentityKey() }
+        return playlist.songs.map { item -> libraryByKey[item.key] ?: item.toSong() }
+    }
+
+    fun createPlaylist(name: String) {
+        viewModelScope.launch { playlistStore.createPlaylist(name) }
+    }
+
+    fun deletePlaylist(id: String) {
+        viewModelScope.launch { playlistStore.deletePlaylist(id) }
+    }
+
+    fun removeSongFromPlaylist(playlistId: String, songKey: String) {
+        viewModelScope.launch { playlistStore.removeSongFromPlaylist(playlistId, songKey) }
+    }
+
+    fun addSongsToPlaylist(playlistId: String, songs: Collection<Song>) {
+        if (songs.isEmpty()) return
+        viewModelScope.launch { playlistStore.addSongsToPlaylist(playlistId, songs) }
     }
 
     fun deleteSongs(songs: Collection<Song>) {
