@@ -54,6 +54,7 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import android.icu.text.Transliterator
+import com.ella.music.data.model.albumIdentityId
 import java.util.Locale
 
 @Composable
@@ -64,11 +65,16 @@ fun AlbumScreen(
     onAlbumClick: (Long) -> Unit
 ) {
     val albums by mainViewModel.albums.collectAsState()
+    val songs by mainViewModel.songs.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
-    val sortMode = AlbumSortMode.entries.getOrElse(LibrarySortUiState.albumListSortIndex) { AlbumSortMode.Name }
+    val sortIndex by mainViewModel.settingsManager.albumListSortIndex.collectAsState(initial = LibrarySortUiState.albumListSortIndex)
+    val sortMode = AlbumSortMode.entries.getOrElse(sortIndex) { AlbumSortMode.Name }
     val scope = rememberCoroutineScope()
+    val albumDurations = remember(songs) {
+        songs.groupBy { it.albumIdentityId() }.mapValues { (_, albumSongs) -> albumSongs.sumOf { it.duration } }
+    }
 
     val filteredAlbums = remember(albums, searchQuery) {
         if (searchQuery.isBlank()) {
@@ -80,12 +86,14 @@ fun AlbumScreen(
             }
         }
     }
-    val sortedAlbums = remember(filteredAlbums, sortMode) {
+    val sortedAlbums = remember(filteredAlbums, sortMode, albumDurations) {
         when (sortMode) {
             AlbumSortMode.Name -> filteredAlbums.sortedBy { it.name.musicSortKey() }
             AlbumSortMode.Artist -> filteredAlbums.sortedBy { it.artist.musicSortKey() }
             AlbumSortMode.SongCount -> filteredAlbums.sortedByDescending { it.songCount }
-            AlbumSortMode.Year -> filteredAlbums.sortedByDescending { it.year }
+            AlbumSortMode.Duration -> filteredAlbums.sortedByDescending { albumDurations[it.id] ?: 0L }
+            AlbumSortMode.YearAsc -> filteredAlbums.sortedWith(compareBy<Album> { it.year <= 0 }.thenBy { it.year }.thenBy { it.name.musicSortKey() })
+            AlbumSortMode.YearDesc -> filteredAlbums.sortedWith(compareBy<Album> { it.year <= 0 }.thenByDescending { it.year }.thenBy { it.name.musicSortKey() })
         }
     }
 
@@ -144,6 +152,7 @@ fun AlbumScreen(
                             .fillMaxWidth()
                             .clickable {
                                 LibrarySortUiState.albumListSortIndex = mode.ordinal
+                                scope.launch { mainViewModel.settingsManager.setAlbumListSortIndex(mode.ordinal) }
                                 sortExpanded = false
                             }
                             .padding(vertical = 10.dp),
@@ -245,7 +254,9 @@ private enum class AlbumSortMode(val label: String) {
     Name("专辑名称"),
     Artist("艺术家"),
     SongCount("歌曲数量"),
-    Year("年份")
+    Duration("歌曲时长"),
+    YearAsc("发行时间正序"),
+    YearDesc("发行时间倒序")
 }
 
 private fun Album.indexLetter(): String {

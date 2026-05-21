@@ -6,6 +6,9 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -45,6 +48,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.Song
+import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.data.webdav.WebDavClient
 import com.ella.music.data.webdav.WebDavItem
 import com.ella.music.ui.components.ellaPageBackground
@@ -67,8 +71,10 @@ import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import java.util.Locale
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -89,8 +95,11 @@ fun FolderScreen(
     val scanExcludeFolders by mainViewModel.settingsManager.scanExcludeFolders.collectAsState(initial = "")
     val savedFolders = remember(scanIncludeFolders) { scanIncludeFolders.toFolderSettingList() }
     val blockedFolders = remember(scanExcludeFolders) { scanExcludeFolders.toFolderSettingList() }
+    val folderSortIndex by mainViewModel.settingsManager.folderListSortIndex.collectAsState(initial = LibrarySortUiState.folderListSortIndex)
+    val folderSortMode = FolderListSortMode.entries.getOrElse(folderSortIndex) { FolderListSortMode.Name }
     var folderToBlock by remember { mutableStateOf<String?>(null) }
     var showBlockedDialog by remember { mutableStateOf(false) }
+    var sortExpanded by remember { mutableStateOf(false) }
 
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -146,6 +155,14 @@ fun FolderScreen(
                 }
             },
             actions = {
+                IconButton(onClick = { sortExpanded = !sortExpanded }) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Sort,
+                        contentDescription = "排序",
+                        tint = MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
                 IconButton(
                     onClick = {
                         if (!isScanning) mainViewModel.scanMusic()
@@ -168,6 +185,41 @@ fun FolderScreen(
                 }
             }
         )
+
+        AnimatedVisibility(
+            visible = sortExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                FolderListSortMode.entries.forEach { mode ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = {
+                                    LibrarySortUiState.folderListSortIndex = mode.ordinal
+                                    scope.launch { mainViewModel.settingsManager.setFolderListSortIndex(mode.ordinal) }
+                                    sortExpanded = false
+                                }
+                            )
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = mode.label,
+                            fontSize = 14.sp,
+                            fontWeight = if (folderSortMode == mode) FontWeight.Bold else FontWeight.Normal,
+                            color = if (folderSortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
 
         if (isScanning) {
             ScanStatusCard(scanProgress = scanProgress)
@@ -262,7 +314,9 @@ fun FolderScreen(
                 }
             }
         } else {
-            val folders = remember(folderMap) { folderMap.entries.toList() }
+            val folders = remember(folderMap, folderSortMode) {
+                folderMap.entries.toList().sortedForFolderList(folderSortMode)
+            }
             val listState = rememberLazyListState()
             LazyColumn(
                 state = listState,
@@ -305,7 +359,7 @@ fun FolderScreen(
                                     color = MiuixTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${folderSongs.size} 首歌曲",
+                                    text = "${folderSongs.size} 首歌曲 · ${folderSongs.sumOf { it.duration }.formatFolderDuration()}",
                                     fontSize = 13.sp,
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
@@ -338,6 +392,29 @@ private fun ScanStatusCard(scanProgress: Int) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
         )
     }
+}
+
+private enum class FolderListSortMode(val label: String) {
+    Name("文件夹名"),
+    SongCount("歌曲数"),
+    Duration("歌曲时长")
+}
+
+private fun List<Map.Entry<String, List<Song>>>.sortedForFolderList(
+    mode: FolderListSortMode
+): List<Map.Entry<String, List<Song>>> {
+    return when (mode) {
+        FolderListSortMode.Name -> sortedBy { it.key.substringAfterLast('/').lowercase(Locale.ROOT) }
+        FolderListSortMode.SongCount -> sortedByDescending { it.value.size }
+        FolderListSortMode.Duration -> sortedByDescending { entry -> entry.value.sumOf { it.duration } }
+    }
+}
+
+private fun Long.formatFolderDuration(): String {
+    val totalMinutes = this / 60_000L
+    val hours = totalMinutes / 60L
+    val minutes = totalMinutes % 60L
+    return if (hours > 0) "${hours}小时${minutes}分钟" else "${minutes}分钟"
 }
 
 @Composable

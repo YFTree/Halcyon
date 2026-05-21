@@ -6,5 +6,6 @@ data class Album(
     val artist: String,
     val songCount: Int,
     val year: Int = 0,
-    val artAlbumId: Long = id
+    val artAlbumId: Long = id,
+    val albumArtist: String = ""
 )

@@ -354,6 +354,11 @@ private fun AboutContent(
                         onClick = { uriHandler.openUri("https://github.com/Replica0110/Lyrico") },
                     )
                     BasicComponent(
+                        title = "163KeyDecrypter",
+                        summary = "网易云音乐 163 key 解密流程参考",
+                        onClick = { uriHandler.openUri("https://github.com/lycode404/163KeyDecrypter") },
+                    )
+                    BasicComponent(
                         title = "Kyant Backdrop",
                         summary = "液态玻璃与背景模糊效果",
                         onClick = { uriHandler.openUri("https://github.com/Kyant0/AndroidLiquidGlass") },

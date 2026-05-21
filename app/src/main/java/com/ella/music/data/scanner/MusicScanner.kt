@@ -79,6 +79,11 @@ class MusicScanner(private val context: Context) {
                 var title = cursor.getString(titleCol) ?: ""
                 var artist = cursor.getString(artistCol) ?: ""
                 var album = cursor.getString(albumCol) ?: ""
+                var albumArtist = ""
+                var genre = ""
+                var year = ""
+                var composer = ""
+                var lyricist = ""
                 val albumId = cursor.getLong(albumIdCol)
                 var duration = cursor.getLong(durationCol)
                 val path = cursor.getString(dataCol) ?: ""
@@ -107,6 +112,15 @@ class MusicScanner(private val context: Context) {
                     if (isMissingTag(title, file.name)) title = tag.safeFirst(file, FieldKey.TITLE)
                     if (isMissingTag(artist)) artist = tag.safeFirst(file, FieldKey.ARTIST)
                     if (isMissingTag(album)) album = tag.safeFirst(file, FieldKey.ALBUM)
+                    albumArtist = tag.safeFirst(file, FieldKey.ALBUM_ARTIST)
+                    genre = tag.safeFirst(file, FieldKey.GENRE)
+                    year = tag.safeFirst(file, FieldKey.YEAR).normalizeYear()
+                    composer = tag.safeFirst(file, FieldKey.COMPOSER)
+                    lyricist = firstNonBlank(
+                        tag.safeFirst(file, "LYRICIST"),
+                        tag.safeFirst(file, "TEXT"),
+                        tag.safeFirst(file, "WRITER")
+                    ).orEmpty()
                     if (duration <= 0) duration = (audioFile.audioHeader?.trackLength ?: 0) * 1000L
                 }
 
@@ -126,6 +140,21 @@ class MusicScanner(private val context: Context) {
                             if (isMissingTag(album)) {
                                 album = props.firstValue("ALBUM", "IPRD", "PRODUCT", "WM/ALBUMTITLE", "TALB")
                             }
+                            if (albumArtist.isBlank()) {
+                                albumArtist = props.firstValue("ALBUMARTIST", "ALBUM ARTIST", "ALBUM_ARTIST", "WM/ALBUMARTIST", "TPE2")
+                            }
+                            if (genre.isBlank()) {
+                                genre = props.firstValue("GENRE", "TCON")
+                            }
+                            if (year.isBlank()) {
+                                year = props.firstValue("DATE", "YEAR", "TYER", "TDRC").normalizeYear()
+                            }
+                            if (composer.isBlank()) {
+                                composer = props.firstValue("COMPOSER", "TCOM", "WM/COMPOSER")
+                            }
+                            if (lyricist.isBlank()) {
+                                lyricist = props.firstValue("LYRICIST", "TEXT", "WRITER", "AUTHOR", "WM/WRITER")
+                            }
                             if (duration <= 0) {
                                 duration = ((audioProps?.length ?: 0) * 1000L)
                             }
@@ -139,6 +168,11 @@ class MusicScanner(private val context: Context) {
                     if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
                     if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
                     if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                    if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
+                    if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
+                    if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
+                    if (composer.isBlank()) composer = wavInfo.composer.orEmpty()
+                    if (lyricist.isBlank()) lyricist = wavInfo.lyricist.orEmpty()
                 }
 
                 if (shouldDeepRead && (isMissingTag(title, file.name) || isMissingTag(artist) || isMissingTag(album) || duration <= 0)) {
@@ -160,7 +194,28 @@ class MusicScanner(private val context: Context) {
                 if (isMissingTag(album)) album = "Unknown"
 
                 if (duration > 0 && duration >= minDurationMs) {
-                    songs.add(Song(id, title, artist, album, albumId, duration, path, fileName, size, mime, dateAdded, dateModified, trackNumber))
+                    songs.add(
+                        Song(
+                            id = id,
+                            title = title,
+                            artist = artist,
+                            album = album,
+                            albumId = albumId,
+                            duration = duration,
+                            path = path,
+                            fileName = fileName,
+                            fileSize = size,
+                            mimeType = mime,
+                            dateAdded = dateAdded,
+                            dateModified = dateModified,
+                            trackNumber = trackNumber,
+                            albumArtist = albumArtist,
+                            genre = genre,
+                            year = year,
+                            composer = composer,
+                            lyricist = lyricist
+                        )
+                    )
                     onProgress?.invoke(songs.size)
                 }
             }
@@ -312,6 +367,12 @@ class MusicScanner(private val context: Context) {
                     "albumArtist" to tag.safeFirst(file, FieldKey.ALBUM_ARTIST),
                     "genre" to tag.safeFirst(file, FieldKey.GENRE),
                     "year" to tag.safeFirst(file, FieldKey.YEAR),
+                    "composer" to tag.safeFirst(file, FieldKey.COMPOSER),
+                    "lyricist" to firstNonBlank(
+                        tag.safeFirst(file, "LYRICIST"),
+                        tag.safeFirst(file, "TEXT"),
+                        tag.safeFirst(file, "WRITER")
+                    ).orEmpty(),
                     "track" to tag.safeFirst(file, FieldKey.TRACK),
                     "comment" to tag.safeFirst(file, FieldKey.COMMENT)
                 )
@@ -342,6 +403,12 @@ class MusicScanner(private val context: Context) {
             },
             genre = jaudioValues["genre"].orEmpty().ifBlank { tagLibValues.firstTagValue("GENRE") },
             year = jaudioValues["year"].orEmpty().ifBlank { tagLibValues.firstTagValue("DATE", "YEAR") },
+            composer = jaudioValues["composer"].orEmpty().ifBlank {
+                tagLibValues.firstTagValue("COMPOSER", "TCOM", "WM/COMPOSER")
+            },
+            lyricist = jaudioValues["lyricist"].orEmpty().ifBlank {
+                tagLibValues.firstTagValue("LYRICIST", "TEXT", "WRITER", "AUTHOR", "WM/WRITER")
+            },
             track = jaudioValues["track"].orEmpty().ifBlank { tagLibValues.firstTagValue("TRACKNUMBER", "TRACK") },
             comment = jaudioValues["comment"].orEmpty().ifBlank {
                 tagLibValues.firstTagValue("COMMENT", "DESCRIPTION", "SUBTITLE")
@@ -456,7 +523,12 @@ class MusicScanner(private val context: Context) {
     private data class WavInfoTags(
         val title: String? = null,
         val artist: String? = null,
-        val album: String? = null
+        val album: String? = null,
+        val albumArtist: String? = null,
+        val genre: String? = null,
+        val year: String? = null,
+        val composer: String? = null,
+        val lyricist: String? = null
     )
 
     private fun File.readWavInfoTags(): WavInfoTags? {
@@ -495,7 +567,12 @@ class MusicScanner(private val context: Context) {
                             return@use WavInfoTags(
                                 title = values.firstInfoValue("INAM", "TITL", "TITLE", "NAME"),
                                 artist = values.firstInfoValue("IART", "ARTIST", "ALBUMARTIST", "ALBUM ARTIST", "PERFORMER"),
-                                album = values.firstInfoValue("IPRD", "IALB", "ALBUM", "PRODUCT")
+                                album = values.firstInfoValue("IPRD", "IALB", "ALBUM", "PRODUCT"),
+                                albumArtist = values.firstInfoValue("ALBUMARTIST", "ALBUM ARTIST", "IARTIST"),
+                                genre = values.firstInfoValue("IGNR", "GENRE"),
+                                year = values.firstInfoValue("ICRD", "YEAR", "DATE"),
+                                composer = values.firstInfoValue("IMUS", "COMPOSER", "TCOM"),
+                                lyricist = values.firstInfoValue("IWRI", "LYRICIST", "WRITER", "TEXT")
                             )
                         }
                     }
@@ -683,6 +760,9 @@ class MusicScanner(private val context: Context) {
 
     private fun String.normalizedPropertyKey(): String =
         lowercase().replace(" ", "").replace("_", "")
+
+    private fun String.normalizeYear(): String =
+        Regex("""\d{4}""").find(this)?.value ?: trim()
 
     private fun Int.normalizedTrackNumber(): Int =
         if (this > 1000) this % 1000 else this

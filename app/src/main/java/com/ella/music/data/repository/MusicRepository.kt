@@ -87,9 +87,12 @@ class MusicRepository(private val context: Context) {
         _isScanning.value = true
         _scanProgress.value = 0
         try {
-            _songs.value = scanner.scanAllSongs(minDurationMs, includeFolders, excludeFolders) { count ->
-                _scanProgress.value = count
-            }
+            _songs.value = scanner.scanAllSongs(
+                minDurationMs = minDurationMs,
+                includeFolders = includeFolders,
+                excludeFolders = excludeFolders,
+                deepMetadata = true
+            ) { count -> _scanProgress.value = count }
             _albums.value = _songs.value.toAlbums()
             saveLibraryCache(_songs.value, _albums.value)
         } finally {
@@ -545,9 +548,11 @@ class MusicRepository(private val context: Context) {
                 Album(
                     id = albumIdentityId,
                     name = first.album,
-                    artist = first.artist,
+                    artist = first.albumArtist.ifBlank { first.artist },
                     songCount = albumSongs.size,
-                    artAlbumId = first.albumId
+                    year = albumSongs.mapNotNull { it.year.extractYearInt() }.minOrNull() ?: 0,
+                    artAlbumId = first.albumId,
+                    albumArtist = first.albumArtist
                 )
             }
             .sortedWith(
@@ -575,6 +580,11 @@ class MusicRepository(private val context: Context) {
                     .put("dateAdded", song.dateAdded)
                     .put("dateModified", song.dateModified)
                     .put("trackNumber", song.trackNumber)
+                    .put("albumArtist", song.albumArtist)
+                    .put("genre", song.genre)
+                    .put("year", song.year)
+                    .put("composer", song.composer)
+                    .put("lyricist", song.lyricist)
                     .put("coverUrl", song.coverUrl)
                     .put("onlineSource", song.onlineSource)
                     .put("onlineId", song.onlineId)
@@ -596,6 +606,7 @@ class MusicRepository(private val context: Context) {
                     .put("songCount", album.songCount)
                     .put("year", album.year)
                     .put("artAlbumId", album.artAlbumId)
+                    .put("albumArtist", album.albumArtist)
             )
         }
         return array
@@ -618,6 +629,11 @@ class MusicRepository(private val context: Context) {
                 dateAdded = item.optLong("dateAdded"),
                 dateModified = item.optLong("dateModified"),
                 trackNumber = item.optInt("trackNumber"),
+                albumArtist = item.optString("albumArtist"),
+                genre = item.optString("genre"),
+                year = item.optString("year"),
+                composer = item.optString("composer"),
+                lyricist = item.optString("lyricist"),
                 coverUrl = item.optString("coverUrl"),
                 onlineSource = item.optString("onlineSource"),
                 onlineId = item.optString("onlineId"),
@@ -636,7 +652,8 @@ class MusicRepository(private val context: Context) {
                 artist = item.optString("artist"),
                 songCount = item.optInt("songCount"),
                 year = item.optInt("year"),
-                artAlbumId = item.optLong("artAlbumId", item.optLong("id"))
+                artAlbumId = item.optLong("artAlbumId", item.optLong("id")),
+                albumArtist = item.optString("albumArtist")
             )
         }
     }
@@ -683,6 +700,9 @@ class MusicRepository(private val context: Context) {
 
         return context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null
+            val tagInfo = runCatching {
+                scanner.extractSongTagInfo(song.effectiveLocalPathForMetadata())
+            }.getOrDefault(SongTagInfo())
             Song(
                 id = cursor.getLong(0),
                 title = cursor.getString(1)?.takeUnless { it.isBlank() || it == "<unknown>" } ?: song.title,
@@ -697,6 +717,11 @@ class MusicRepository(private val context: Context) {
                 dateAdded = cursor.getLong(10) * 1000L,
                 dateModified = cursor.getLong(11) * 1000L,
                 trackNumber = cursor.getInt(12).let { if (it > 1000) it % 1000 else it },
+                albumArtist = tagInfo.albumArtist.ifBlank { song.albumArtist },
+                genre = tagInfo.genre.ifBlank { song.genre },
+                year = tagInfo.year.ifBlank { song.year },
+                composer = tagInfo.composer.ifBlank { song.composer },
+                lyricist = tagInfo.lyricist.ifBlank { song.lyricist },
                 coverUrl = song.coverUrl,
                 onlineSource = song.onlineSource,
                 onlineId = song.onlineId,
@@ -714,4 +739,7 @@ class MusicRepository(private val context: Context) {
         }
         return source.sha256()
     }
+
+    private fun String.extractYearInt(): Int? =
+        Regex("""\d{4}""").find(this)?.value?.toIntOrNull()
 }

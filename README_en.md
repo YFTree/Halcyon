@@ -193,7 +193,7 @@ RELEASE_KEY_PASSWORD
 ```
 
 If these variables are not provided, the project will attempt to use `release.jks` in the repository root.
-If no release keystore is available, release builds will fall back to the debug signing configuration.
+If no release keystore is available, release builds fail instead of producing a debug-signed release APK.
 
 ---
 
@@ -244,6 +244,7 @@ The script uses WSL and the Android NDK to build FFmpeg.
 | [SuperLyric](https://github.com/HChenX/SuperLyric)                       | System lyric module and status-bar lyric ecosystem reference |
 | [Lyric Getter](https://github.com/xiaowine/Lyric-Getter)                 | Lyric Getter raw lyric display and API integration      |
 | [Lyrico](https://github.com/Replica0110/Lyrico)                          | Tag editor integration and log page interaction reference |
+| [163KeyDecrypter](https://github.com/lycode404/163KeyDecrypter)          | Reference for NetEase Music 163 key decryption          |
 | [Jaudiotagger](https://github.com/Adonai/jaudiotagger)                   | Audio tags, embedded lyrics, embedded covers            |
 | [Kyant TagLib](https://github.com/Kyant0/TagLib)                         | Android / Kotlin TagLib bindings                        |
 | [Kyant Backdrop](https://github.com/Kyant0/AndroidLiquidGlass)           | Liquid glass and blur effects                           |
@@ -270,7 +271,7 @@ Because the project contains compatibility implementations related to the MusicF
 * **SPlayer** — Visual inspiration for playback animations and lyric experience.
 * **Lyrico** — Reference for external tag editor integration and log page interaction.
 * **Retro Music Player** — Reference for jaudiotagger-based metadata reading.
-* Special thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyric, SuperLyricApi, Lyric Getter, Lyrico, Jaudiotagger, Kyant TagLib, Backdrop, Coil, and all other open source projects used by Ella Music.
+* Special thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyric, SuperLyricApi, Lyric Getter, Lyrico, 163KeyDecrypter, Jaudiotagger, Kyant TagLib, Backdrop, Coil, and all other open source projects used by Ella Music.
 
 ---
 

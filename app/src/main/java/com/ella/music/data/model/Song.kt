@@ -14,6 +14,11 @@ data class Song(
     val dateAdded: Long = 0L,
     val dateModified: Long = 0L,
     val trackNumber: Int = 0,
+    val albumArtist: String = "",
+    val genre: String = "",
+    val year: String = "",
+    val composer: String = "",
+    val lyricist: String = "",
     val coverUrl: String = "",
     val onlineSource: String = "",
     val onlineId: String = "",
@@ -30,7 +35,12 @@ data class Song(
 }
 
 fun Song.albumIdentityId(): Long {
-    val key = "${album.normalizedAlbumIdentityPart()}|${artist.normalizedAlbumIdentityPart()}"
+    val albumArtistPart = albumArtist.trim()
+    val key = if (albumArtistPart.isBlank()) {
+        album.normalizedAlbumIdentityPart()
+    } else {
+        "${album.normalizedAlbumIdentityPart()}|${albumArtistPart.normalizedAlbumIdentityPart()}"
+    }
     var hash = -0x340d631b7bdddcdbL
     key.forEach { char ->
         hash = hash xor char.code.toLong()

@@ -21,6 +21,8 @@ import com.ella.music.ui.album.AlbumDetailScreen
 import com.ella.music.ui.album.AlbumScreen
 import com.ella.music.ui.artist.ArtistListScreen
 import com.ella.music.ui.artist.ArtistScreen
+import com.ella.music.ui.category.MetadataCategoryDetailScreen
+import com.ella.music.ui.category.MetadataCategoryScreen
 import com.ella.music.ui.folder.FolderDetailScreen
 import com.ella.music.ui.folder.FolderScreen
 import com.ella.music.ui.folder.WebDavScreen
@@ -51,6 +53,13 @@ sealed class Screen(val route: String) {
         fun createRoute(artistName: String) = "artist/${java.net.URLEncoder.encode(artistName, "UTF-8")}"
     }
     data object Folder : Screen("folder")
+    data object MetadataCategory : Screen("category/{type}") {
+        fun createRoute(type: String) = "category/${java.net.URLEncoder.encode(type, "UTF-8")}"
+    }
+    data object MetadataCategoryDetail : Screen("category/{type}/{name}") {
+        fun createRoute(type: String, name: String) =
+            "category/${java.net.URLEncoder.encode(type, "UTF-8")}/${java.net.URLEncoder.encode(name, "UTF-8")}"
+    }
     data object Playlists : Screen("playlists")
     data object PlaylistDetail : Screen("playlist/{playlistId}") {
         fun createRoute(playlistId: String) = "playlist/${java.net.URLEncoder.encode(playlistId, "UTF-8")}"
@@ -114,6 +123,7 @@ fun AppNavigation(
                 onNavigateToMusicFreeOnline = { navController.navigate(Screen.MusicFreeOnline.route) },
                 onNavigateToWebDav = { navController.navigate(Screen.WebDav.route) },
                 onNavigateToAnalytics = { navController.navigate(Screen.Analytics.route) },
+                onNavigateToMetadataCategory = { type -> navController.navigate(Screen.MetadataCategory.createRoute(type)) },
                 onNavigateToPlayer = onNavigateToPlayer
             )
         }
@@ -174,6 +184,49 @@ fun AppNavigation(
                 onFolderClick = { folderPath ->
                     navController.navigate(Screen.FolderDetail.createRoute(folderPath))
                 }
+            )
+        }
+
+        composable(
+            route = Screen.MetadataCategory.route,
+            arguments = listOf(navArgument("type") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val type = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("type").orEmpty(),
+                "UTF-8"
+            )
+            MetadataCategoryScreen(
+                type = type,
+                mainViewModel = mainViewModel,
+                onBack = { navController.popBackStack() },
+                onCategoryClick = { name ->
+                    navController.navigate(Screen.MetadataCategoryDetail.createRoute(type, name))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.MetadataCategoryDetail.route,
+            arguments = listOf(
+                navArgument("type") { type = NavType.StringType },
+                navArgument("name") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val type = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("type").orEmpty(),
+                "UTF-8"
+            )
+            val name = java.net.URLDecoder.decode(
+                backStackEntry.arguments?.getString("name").orEmpty(),
+                "UTF-8"
+            )
+            MetadataCategoryDetailScreen(
+                type = type,
+                name = name,
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToPlayer = onNavigateToPlayer
             )
         }
 

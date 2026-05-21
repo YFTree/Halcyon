@@ -11,7 +11,12 @@ plugins {
 android {
     namespace = "com.ella.music"
     compileSdk = 37
-    val releaseStoreFile = System.getenv("RELEASE_STORE_FILE")?.let { file(it) } ?: file("release.jks")
+    val releaseStoreFile = System.getenv("RELEASE_STORE_FILE")
+        ?.takeIf { it.isNotBlank() }
+        ?.let { file(it) }
+        ?: listOf(file("release.jks"), rootProject.file("release.jks"))
+            .firstOrNull { it.exists() }
+        ?: file("release.jks")
     val releaseStorePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: "kidn0x1"
     val releaseKeyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "release"
     val releaseKeyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "kidn0x1"
@@ -63,11 +68,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = if (hasReleaseSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            if (!hasReleaseSigning) {
+                throw GradleException(
+                    "Release signing is not configured. Put release.jks in app/ or project root, " +
+                        "or set RELEASE_STORE_FILE/RELEASE_STORE_PASSWORD/RELEASE_KEY_ALIAS/RELEASE_KEY_PASSWORD."
+                )
             }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

@@ -9,6 +9,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.icu.text.Transliterator
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
@@ -43,6 +44,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -64,6 +66,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.NeteaseKeyInfo
+import com.ella.music.data.decodeNeteaseKey
 import com.ella.music.data.detailedAudioInfo
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
@@ -71,6 +75,9 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.albumIdentityId
+import com.ella.music.data.neteaseAlbumUrl
+import com.ella.music.data.neteaseArtistUrl
+import com.ella.music.data.neteaseSongUrl
 import com.ella.music.data.splitArtistNames
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.EllaSearchBar
@@ -87,12 +94,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
+import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -121,7 +130,8 @@ fun LibraryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
-    val sortMode = HomeSortMode.entries.getOrElse(LibrarySortUiState.librarySongSortIndex) { HomeSortMode.Title }
+    val sortIndex by settingsManager.librarySongSortIndex.collectAsState(initial = LibrarySortUiState.librarySongSortIndex)
+    val sortMode = HomeSortMode.entries.getOrElse(sortIndex) { HomeSortMode.Title }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var actionSong by remember { mutableStateOf<Song?>(null) }
@@ -194,7 +204,9 @@ fun LibraryScreen(
                 HomeSortMode.Title -> filteredSongs.sortedByMusicKey { it.title }
                 HomeSortMode.FileName -> filteredSongs.sortedByMusicKey { it.fileName.ifBlank { it.path.substringAfterLast('/') } }
                 HomeSortMode.DateAdded -> HomeSortedSongs(filteredSongs.sortedByDescending { it.dateAdded }, emptyMap())
+                HomeSortMode.DateAddedAsc -> HomeSortedSongs(filteredSongs.sortedBy { it.dateAdded }, emptyMap())
                 HomeSortMode.DateModified -> HomeSortedSongs(filteredSongs.sortedByDescending { it.dateModified }, emptyMap())
+                HomeSortMode.DateModifiedAsc -> HomeSortedSongs(filteredSongs.sortedBy { it.dateModified }, emptyMap())
             }
         }
     }
@@ -237,10 +249,14 @@ fun LibraryScreen(
                         Text(text = "取消", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
                     }
                 } else {
-                    IconButton(onClick = { playerViewModel.requestLocateCurrentSong() }) {
+                    IconButton(
+                        onClick = {
+                            if (!isScanning) mainViewModel.scanMusic()
+                        }
+                    ) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_my_location),
-                            contentDescription = "定位当前歌曲",
+                            imageVector = MiuixIcons.Regular.Refresh,
+                            contentDescription = "刷新音乐库",
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -292,6 +308,7 @@ fun LibraryScreen(
                             .fillMaxWidth()
                             .clickable {
                                 LibrarySortUiState.librarySongSortIndex = mode.ordinal
+                                scope.launch { settingsManager.setLibrarySongSortIndex(mode.ordinal) }
                                 sortExpanded = false
                             }
                             .padding(vertical = 10.dp),
@@ -357,12 +374,22 @@ fun LibraryScreen(
             val listState = rememberLazyListState()
             var fastScrollJob by remember { mutableStateOf<Job?>(null) }
             var handledLocateRequest by remember { mutableStateOf(locateCurrentSongRequest) }
+            val currentSongIndex = remember(sortedSongs, currentSong?.id) {
+                sortedSongs.indexOfFirst { it.id == currentSong?.id }
+            }
+            val showLocateCurrentSongButton by remember(currentSongIndex, selectionMode) {
+                derivedStateOf {
+                    if (selectionMode || currentSongIndex < 0) return@derivedStateOf false
+                    val visibleIndexes = listState.layoutInfo.visibleItemsInfo.map { it.index }
+                    if (visibleIndexes.isEmpty()) return@derivedStateOf false
+                    visibleIndexes.none { kotlin.math.abs(it - currentSongIndex) <= 2 }
+                }
+            }
 
             LaunchedEffect(locateCurrentSongRequest) {
                 if (locateCurrentSongRequest <= 0 || locateCurrentSongRequest == handledLocateRequest) return@LaunchedEffect
                 handledLocateRequest = locateCurrentSongRequest
-                val index = sortedSongs.indexOfFirst { it.id == currentSong?.id }
-                if (index >= 0) listState.animateScrollToItem(index)
+                if (currentSongIndex >= 0) listState.animateScrollToItem(currentSongIndex)
             }
 
             val fastIndexTargets = remember(sortedSongs, sortKeysBySongId) {
@@ -442,6 +469,27 @@ fun LibraryScreen(
                             }
                         }
                     )
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showLocateCurrentSongButton,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 22.dp, bottom = 176.dp)
+                ) {
+                    FloatingActionButton(
+                        onClick = { playerViewModel.requestLocateCurrentSong() },
+                        minWidth = 46.dp,
+                        minHeight = 46.dp,
+                        containerColor = MiuixTheme.colorScheme.primary
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_my_location),
+                            contentDescription = "定位当前歌曲",
+                            tint = MiuixTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
                 }
             }
         }
@@ -612,11 +660,24 @@ private fun SongInfoMenu(
     tagInfoLoader: (Song) -> SongTagInfo,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    var showNeteaseKeyInfo by remember(song.id) { mutableStateOf(false) }
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song.id, song.dateModified, song.fileSize) {
         value = withContext(Dispatchers.IO) { audioInfoLoader(song) }
     }
     val tagInfo by produceState<SongTagInfo?>(initialValue = null, song.id, song.dateModified, song.fileSize) {
         value = withContext(Dispatchers.IO) { tagInfoLoader(song) }
+    }
+    val neteaseInfo = remember(tagInfo?.neteaseKey) { decodeNeteaseKey(tagInfo?.neteaseKey.orEmpty()) }
+
+    if (showNeteaseKeyInfo && neteaseInfo != null) {
+        NeteaseKeyInfoMenu(
+            info = neteaseInfo,
+            onOpenUrl = { url -> openNeteaseUrl(context, url) },
+            onBack = { showNeteaseKeyInfo = false },
+            onDismiss = onDismiss
+        )
+        return
     }
 
     Column(
@@ -624,6 +685,7 @@ private fun SongInfoMenu(
             .fillMaxWidth()
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
             .background(MiuixTheme.colorScheme.background.copy(alpha = 0.98f))
+            .verticalScroll(rememberScrollState())
             .navigationBarsPadding()
             .padding(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -640,14 +702,124 @@ private fun SongInfoMenu(
         SongInfoRow("艺术家", tagInfo?.artist?.ifBlank { song.artist } ?: song.artist)
         SongInfoRow("专辑", tagInfo?.album?.ifBlank { song.album } ?: song.album)
         SongInfoRow("专辑艺术家", tagInfo?.albumArtist.orEmpty())
+        SongInfoRow("流派", tagInfo?.genre?.ifBlank { song.genre }.orEmpty())
+        SongInfoRow("年份", tagInfo?.year?.ifBlank { song.year }.orEmpty())
+        SongInfoRow("作曲家", tagInfo?.composer?.ifBlank { song.composer }.orEmpty())
+        SongInfoRow("作词家", tagInfo?.lyricist?.ifBlank { song.lyricist }.orEmpty())
         SongInfoRow("注释", tagInfo?.comment.orEmpty())
-        SongInfoRow("163 key", tagInfo?.neteaseKey.orEmpty())
+        if (!tagInfo?.neteaseKey.isNullOrBlank()) {
+            SongInfoActionRow(
+                label = "163 key",
+                value = neteaseInfo?.musicName?.ifBlank { null }
+                    ?: neteaseInfo?.musicId?.takeIf { it.isNotBlank() }?.let { "网易云歌曲 ID：$it" }
+                    ?: "点击查看网易云关联信息",
+                onClick = { showNeteaseKeyInfo = true }
+            )
+        }
         SongInfoRow("格式", audioInfo?.let { detailedAudioInfo(it) }.orEmpty())
         SongInfoRow("时长", song.durationText)
         SongInfoRow("大小", formatLibraryFileSize(song.fileSize))
         SongInfoRow("文件名", song.fileName.ifBlank { song.path.substringAfterLast('/') })
         SongInfoRow("路径", song.path)
         LibraryMenuItem("关闭", onDismiss)
+    }
+}
+
+@Composable
+private fun NeteaseKeyInfoMenu(
+    info: NeteaseKeyInfo,
+    onOpenUrl: (String) -> Unit,
+    onBack: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.88f)
+            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+            .background(MiuixTheme.colorScheme.background.copy(alpha = 0.98f))
+            .verticalScroll(rememberScrollState())
+            .navigationBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        SheetHandle()
+        Text(
+            text = "163 key",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+        )
+        if (!info.hasDecodedContent) {
+            SongInfoRow("状态", "没有解析出可跳转的网易云信息")
+        }
+        if (info.musicId.isNotBlank()) {
+            SongInfoActionRow(
+                label = "网易云歌曲",
+                value = listOf(info.musicName, "ID ${info.musicId}").filter { it.isNotBlank() }.joinToString(" · "),
+                onClick = { onOpenUrl(neteaseSongUrl(info.musicId)) }
+            )
+        }
+        if (info.albumId.isNotBlank()) {
+            SongInfoActionRow(
+                label = "网易云专辑",
+                value = listOf(info.albumName, "ID ${info.albumId}").filter { it.isNotBlank() }.joinToString(" · "),
+                onClick = { onOpenUrl(neteaseAlbumUrl(info.albumId)) }
+            )
+        }
+        info.artists.forEach { artist ->
+            if (artist.id.isNotBlank()) {
+                SongInfoActionRow(
+                    label = "网易云歌手",
+                    value = listOf(artist.name, "ID ${artist.id}").filter { it.isNotBlank() }.joinToString(" · "),
+                    onClick = { onOpenUrl(neteaseArtistUrl(artist.id)) }
+                )
+            } else {
+                SongInfoRow("网易云歌手", artist.name)
+            }
+        }
+        SongInfoRow("格式", info.format)
+        SongInfoRow("码率", info.bitrate.takeIf { it.isNotBlank() }?.let { "${it} bps" }.orEmpty())
+        SongInfoRow("原始 163 key", info.raw)
+        SongInfoRow("解密 JSON", info.decodedJson)
+        LibraryMenuItem("返回歌曲信息", onBack)
+        LibraryMenuItem("关闭", onDismiss)
+    }
+}
+
+@Composable
+private fun SongInfoActionRow(label: String, value: String, onClick: () -> Unit) {
+    if (value.isBlank()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = MiuixTheme.colorScheme.primary
+        )
+        Text(
+            text = value,
+            fontSize = 14.sp,
+            color = MiuixTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+private fun openNeteaseUrl(context: Context, url: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }.onFailure {
+        Toast.makeText(context, "无法打开网易云链接", Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -670,7 +842,11 @@ private fun SongInfoRow(label: String, value: String) {
             text = value,
             fontSize = 14.sp,
             color = MiuixTheme.colorScheme.onSurface,
-            maxLines = if (label == "路径") 3 else 2,
+            maxLines = when (label) {
+                "路径" -> 3
+                "原始 163 key", "解密 JSON" -> 6
+                else -> 2
+            },
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 2.dp)
         )
@@ -878,7 +1054,9 @@ private enum class HomeSortMode(val label: String) {
     Title("歌曲名称"),
     FileName("文件名"),
     DateAdded("添加时间"),
-    DateModified("修改时间")
+    DateAddedAsc("添加时间升序"),
+    DateModified("修改时间"),
+    DateModifiedAsc("修改时间升序")
 }
 
 private fun Song.indexLetter(sortKey: String? = null): String {

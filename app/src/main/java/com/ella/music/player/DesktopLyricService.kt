@@ -17,8 +17,6 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
-import android.text.TextUtils
-import android.text.TextPaint
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -558,7 +556,7 @@ class DesktopLyricService : Service() {
             val hasBackground = backgroundText.isNotBlank() || backgroundWords.isNotEmpty()
             val hasPronunciation = pronunciation.isNotBlank() || pronunciationWords.isNotEmpty()
             val primaryAlign = ttmlAlignForPrimary()
-            val backgroundAlign = primaryAlign.opposite()
+            val backgroundAlign = ttmlAlignForBackground()
             val primaryMaxWidth = maxWidthForAlign(primaryAlign)
             val backgroundMaxWidth = maxWidthForAlign(backgroundAlign)
             if (hasPronunciation && !hasBackground) {
@@ -736,14 +734,9 @@ class DesktopLyricService : Service() {
             val oldSize = paint.textSize
             val oldAlign = paint.textAlign
             val measured = paint.measureText(value)
-            if (measured > maxWidth) paint.textSize = oldSize * (maxWidth / measured).coerceIn(0.34f, 1f)
+            if (measured > maxWidth) paint.textSize = oldSize * (maxWidth / measured).coerceIn(0.28f, 1f)
             paint.textAlign = align.paintAlign
-            val fitted = if (paint.measureText(value) > maxWidth) {
-                TextUtils.ellipsize(value, TextPaint(paint), maxWidth, TextUtils.TruncateAt.END).toString()
-            } else {
-                value
-            }
-            canvas.drawText(fitted, anchorX, baseline, paint)
+            canvas.drawText(value, anchorX, baseline, paint)
             paint.textSize = oldSize
             paint.textAlign = oldAlign
         }
@@ -751,8 +744,73 @@ class DesktopLyricService : Service() {
         private fun drawTranslationText(canvas: Canvas, value: String, anchorX: Float, baseline: Float, maxWidth: Float, align: AnchorAlign) {
             val oldSize = translationPaint.textSize
             translationPaint.textSize = 15f * resources.displayMetrics.scaledDensity * fontScale * translationScale
-            drawFittedText(canvas, value, anchorX, baseline, maxWidth, align, translationPaint)
+            drawWrappedFittedText(canvas, value, anchorX, baseline, maxWidth, align, translationPaint, maxLines = 2)
             translationPaint.textSize = oldSize
+        }
+
+        private fun drawWrappedFittedText(
+            canvas: Canvas,
+            value: String,
+            anchorX: Float,
+            baseline: Float,
+            maxWidth: Float,
+            align: AnchorAlign,
+            paint: Paint,
+            maxLines: Int
+        ) {
+            if (value.isBlank()) return
+            val oldSize = paint.textSize
+            val oldAlign = paint.textAlign
+            paint.textAlign = align.paintAlign
+
+            var lines = wrapText(value, paint, maxWidth)
+            val minSize = oldSize * 0.42f
+            while ((lines.size > maxLines || lines.any { paint.measureText(it) > maxWidth }) && paint.textSize > minSize) {
+                paint.textSize *= 0.92f
+                lines = wrapText(value, paint, maxWidth)
+            }
+
+            val visibleLines = if (lines.size <= maxLines) {
+                lines
+            } else {
+                lines.take(maxLines - 1) + lines.drop(maxLines - 1).joinToString("")
+            }
+            val lineHeight = paint.fontMetrics.run { (descent - ascent) * 0.86f }
+            visibleLines.forEachIndexed { index, line ->
+                val lineOldSize = paint.textSize
+                val measured = paint.measureText(line)
+                if (measured > maxWidth) {
+                    paint.textSize = lineOldSize * (maxWidth / measured).coerceIn(0.34f, 1f)
+                }
+                canvas.drawText(line, anchorX, baseline + index * lineHeight, paint)
+                paint.textSize = lineOldSize
+            }
+
+            paint.textSize = oldSize
+            paint.textAlign = oldAlign
+        }
+
+        private fun wrapText(value: String, paint: Paint, maxWidth: Float): List<String> {
+            val text = value.trim()
+            if (text.isBlank()) return emptyList()
+            val tokens = if (text.any { it.isWhitespace() }) {
+                text.split(Regex("""(?<=\s)|(?=\s)""")).filter { it.isNotEmpty() }
+            } else {
+                text.map { it.toString() }
+            }
+            val lines = mutableListOf<String>()
+            var current = ""
+            tokens.forEach { token ->
+                val candidate = current + token
+                if (current.isNotEmpty() && paint.measureText(candidate) > maxWidth) {
+                    lines += current.trim()
+                    current = token.trimStart()
+                } else {
+                    current = candidate
+                }
+            }
+            if (current.isNotBlank()) lines += current.trim()
+            return lines
         }
 
         private fun colorWithAlpha(color: Int, alpha: Int): Int {
@@ -772,6 +830,14 @@ class DesktopLyricService : Service() {
             )
 
         private fun ttmlAlignForPrimary(): AnchorAlign {
+            if (!isTtml) return AnchorAlign.Center
+            if (agent.isBlank()) {
+                return if (backgroundText.isNotBlank() || backgroundWords.isNotEmpty()) AnchorAlign.Left else AnchorAlign.Center
+            }
+            return if (agent.equals("v2", ignoreCase = true)) AnchorAlign.Right else AnchorAlign.Left
+        }
+
+        private fun ttmlAlignForBackground(): AnchorAlign {
             if (!isTtml) return AnchorAlign.Center
             if (agent.isBlank()) {
                 return if (backgroundText.isNotBlank() || backgroundWords.isNotEmpty()) AnchorAlign.Left else AnchorAlign.Center

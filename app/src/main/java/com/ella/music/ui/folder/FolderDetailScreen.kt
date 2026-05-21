@@ -72,7 +72,8 @@ fun FolderDetailScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
-    val sortMode = FolderSongSortMode.entries.getOrElse(LibrarySortUiState.folderDetailSongSortIndex) { FolderSongSortMode.Title }
+    val sortIndex by mainViewModel.settingsManager.folderDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.folderDetailSongSortIndex)
+    val sortMode = FolderSongSortMode.entries.getOrElse(sortIndex) { FolderSongSortMode.Title }
 
     val folderSongs = remember(songs, folderPath) {
         songs.filter { it.path.startsWith(folderPath, ignoreCase = true) }
@@ -92,8 +93,11 @@ fun FolderDetailScreen(
             FolderSongSortMode.FileName -> filteredSongs.sortedBy {
                 it.fileName.ifBlank { it.path.substringAfterLast('/') }.musicSortKey()
             }
+            FolderSongSortMode.Duration -> filteredSongs.sortedByDescending { it.duration }
             FolderSongSortMode.DateAdded -> filteredSongs.sortedByDescending { it.dateAdded }
+            FolderSongSortMode.DateAddedAsc -> filteredSongs.sortedBy { it.dateAdded }
             FolderSongSortMode.DateModified -> filteredSongs.sortedByDescending { it.dateModified }
+            FolderSongSortMode.DateModifiedAsc -> filteredSongs.sortedBy { it.dateModified }
         }
     }
 
@@ -175,6 +179,7 @@ fun FolderDetailScreen(
                             .fillMaxWidth()
                             .clickable {
                                 LibrarySortUiState.folderDetailSongSortIndex = mode.ordinal
+                                scope.launch { mainViewModel.settingsManager.setFolderDetailSongSortIndex(mode.ordinal) }
                                 sortExpanded = false
                             }
                             .padding(vertical = 10.dp),
@@ -278,8 +283,11 @@ fun FolderDetailScreen(
 private enum class FolderSongSortMode(val label: String) {
     Title("歌曲名称"),
     FileName("文件名"),
+    Duration("歌曲时长"),
     DateAdded("添加时间"),
-    DateModified("修改时间")
+    DateAddedAsc("添加时间升序"),
+    DateModified("修改时间"),
+    DateModifiedAsc("修改时间升序")
 }
 
 private fun Song.indexLetter(): String {

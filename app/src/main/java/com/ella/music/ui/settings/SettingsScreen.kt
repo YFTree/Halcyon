@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -54,6 +56,7 @@ import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -486,6 +489,10 @@ fun SettingsDetailScreen(
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
+    val artistSeparators by settingsManager.artistSeparators.collectAsState(initial = "")
+    val artistProtectedNames by settingsManager.artistProtectedNames.collectAsState(initial = "")
+    val genreSeparators by settingsManager.genreSeparators.collectAsState(initial = "")
+    val genreProtectedNames by settingsManager.genreProtectedNames.collectAsState(initial = "")
     val themeLabels = listOf("跟随系统", "浅色", "深色")
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
     val themeEntries = remember { themeLabels.map { DropdownItem(title = it) } }
@@ -642,6 +649,31 @@ fun SettingsDetailScreen(
                                 Text(text = "60秒", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                             }
                         }
+
+                        SplitSettingTextField(
+                            label = "自定义艺术家分隔符",
+                            value = artistSeparators,
+                            summary = "一行一个；例如 /、feat.、&",
+                            onValueChange = { value -> scope.launch { settingsManager.setArtistSeparators(value) } }
+                        )
+                        SplitSettingTextField(
+                            label = "不拆分的艺术家",
+                            value = artistProtectedNames,
+                            summary = "一行一个；会先保护再按分隔符拆分",
+                            onValueChange = { value -> scope.launch { settingsManager.setArtistProtectedNames(value) } }
+                        )
+                        SplitSettingTextField(
+                            label = "自定义流派分隔符",
+                            value = genreSeparators,
+                            summary = "一行一个；用于流派分类",
+                            onValueChange = { value -> scope.launch { settingsManager.setGenreSeparators(value) } }
+                        )
+                        SplitSettingTextField(
+                            label = "不拆分的流派",
+                            value = genreProtectedNames,
+                            summary = "一行一个；例如带 / 的复合流派名",
+                            onValueChange = { value -> scope.launch { settingsManager.setGenreProtectedNames(value) } }
+                        )
                     }
                 }
             }
@@ -918,6 +950,43 @@ fun SettingsDetailScreen(
 
             Spacer(modifier = Modifier.height(160.dp))
         }
+    }
+}
+
+@Composable
+private fun SplitSettingTextField(
+    label: String,
+    value: String,
+    summary: String,
+    onValueChange: (String) -> Unit
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(
+            text = label,
+            fontSize = 15.sp,
+            color = MiuixTheme.colorScheme.onSurface
+        )
+        Text(
+            text = summary,
+            fontSize = 13.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+        )
+        TextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = label,
+            useLabelAsPlaceholder = true,
+            singleLine = false,
+            insideMargin = DpSize(12.dp, 10.dp),
+            backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+            cornerRadius = 12.dp,
+            textStyle = TextStyle(
+                color = MiuixTheme.colorScheme.onSurface,
+                fontSize = 14.sp
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 

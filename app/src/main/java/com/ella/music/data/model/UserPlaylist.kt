@@ -30,6 +30,11 @@ data class PlaylistSong(
     val dateAdded: Long,
     val dateModified: Long,
     val trackNumber: Int,
+    val albumArtist: String = "",
+    val genre: String = "",
+    val year: String = "",
+    val composer: String = "",
+    val lyricist: String = "",
     val coverUrl: String,
     val onlineSource: String,
     val onlineId: String,
@@ -62,6 +67,11 @@ fun Song.toPlaylistSong(addedAt: Long = System.currentTimeMillis()): PlaylistSon
         dateAdded = dateAdded,
         dateModified = dateModified,
         trackNumber = trackNumber,
+        albumArtist = albumArtist,
+        genre = genre,
+        year = year,
+        composer = composer,
+        lyricist = lyricist,
         coverUrl = coverUrl,
         onlineSource = onlineSource,
         onlineId = onlineId,
@@ -85,6 +95,11 @@ fun PlaylistSong.toSong(): Song =
         dateAdded = dateAdded,
         dateModified = dateModified,
         trackNumber = trackNumber,
+        albumArtist = albumArtist,
+        genre = genre,
+        year = year,
+        composer = composer,
+        lyricist = lyricist,
         coverUrl = coverUrl,
         onlineSource = onlineSource,
         onlineId = onlineId,
@@ -127,6 +142,11 @@ fun PlaylistSong.toJson(): JSONObject =
         .put("dateAdded", dateAdded)
         .put("dateModified", dateModified)
         .put("trackNumber", trackNumber)
+        .put("albumArtist", albumArtist)
+        .put("genre", genre)
+        .put("year", year)
+        .put("composer", composer)
+        .put("lyricist", lyricist)
         .put("coverUrl", coverUrl)
         .put("onlineSource", onlineSource)
         .put("onlineId", onlineId)
@@ -150,6 +170,11 @@ fun JSONObject.toPlaylistSong(): PlaylistSong =
         dateAdded = optLong("dateAdded"),
         dateModified = optLong("dateModified"),
         trackNumber = optInt("trackNumber"),
+        albumArtist = optString("albumArtist"),
+        genre = optString("genre"),
+        year = optString("year"),
+        composer = optString("composer"),
+        lyricist = optString("lyricist"),
         coverUrl = optString("coverUrl"),
         onlineSource = optString("onlineSource"),
         onlineId = optString("onlineId"),

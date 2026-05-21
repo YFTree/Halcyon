@@ -84,7 +84,18 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_FONT_SCALE = intPreferencesKey("lyric_font_scale")
         val KEY_SCAN_INCLUDE_FOLDERS = stringPreferencesKey("scan_include_folders")
         val KEY_SCAN_EXCLUDE_FOLDERS = stringPreferencesKey("scan_exclude_folders")
+        val KEY_ARTIST_SEPARATORS = stringPreferencesKey("artist_separators")
+        val KEY_ARTIST_PROTECTED_NAMES = stringPreferencesKey("artist_protected_names")
+        val KEY_GENRE_SEPARATORS = stringPreferencesKey("genre_separators")
+        val KEY_GENRE_PROTECTED_NAMES = stringPreferencesKey("genre_protected_names")
         val KEY_DECODER_MODE = intPreferencesKey("decoder_mode")
+        val KEY_SORT_LIBRARY_SONG = intPreferencesKey("sort_library_song")
+        val KEY_SORT_ALBUM_LIST = intPreferencesKey("sort_album_list")
+        val KEY_SORT_ARTIST_LIST = intPreferencesKey("sort_artist_list")
+        val KEY_SORT_ALBUM_DETAIL_SONG = intPreferencesKey("sort_album_detail_song")
+        val KEY_SORT_ARTIST_DETAIL_SONG = intPreferencesKey("sort_artist_detail_song")
+        val KEY_SORT_FOLDER_LIST = intPreferencesKey("sort_folder_list")
+        val KEY_SORT_FOLDER_DETAIL_SONG = intPreferencesKey("sort_folder_detail_song")
 
         val KEY_BLUETOOTH_LYRIC_ENABLED = booleanPreferencesKey("bluetooth_lyric_enabled")
         val KEY_BLUETOOTH_LYRIC_TRANSLATION = booleanPreferencesKey("bluetooth_lyric_translation")
@@ -182,7 +193,18 @@ class SettingsManager(private val context: Context) {
     val lyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_SCALE] ?: 100 }
     val scanIncludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_INCLUDE_FOLDERS] ?: "" }
     val scanExcludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_EXCLUDE_FOLDERS] ?: "" }
+    val artistSeparators: Flow<String> = context.dataStore.data.map { it[KEY_ARTIST_SEPARATORS] ?: "" }
+    val artistProtectedNames: Flow<String> = context.dataStore.data.map { it[KEY_ARTIST_PROTECTED_NAMES] ?: "" }
+    val genreSeparators: Flow<String> = context.dataStore.data.map { it[KEY_GENRE_SEPARATORS] ?: "" }
+    val genreProtectedNames: Flow<String> = context.dataStore.data.map { it[KEY_GENRE_PROTECTED_NAMES] ?: "" }
     val decoderMode: Flow<Int> = context.dataStore.data.map { it[KEY_DECODER_MODE] ?: 2 }
+    val librarySongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_LIBRARY_SONG] ?: 0 }
+    val albumListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ALBUM_LIST] ?: 0 }
+    val artistListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ARTIST_LIST] ?: 0 }
+    val albumDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ALBUM_DETAIL_SONG] ?: 0 }
+    val artistDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ARTIST_DETAIL_SONG] ?: 0 }
+    val folderListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_FOLDER_LIST] ?: 0 }
+    val folderDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_FOLDER_DETAIL_SONG] ?: 0 }
 
     val bluetoothLyricEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_ENABLED] ?: false }
@@ -495,8 +517,52 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_LYRIC_FONT_SCALE] = scale.coerceIn(75, 130) }
     }
 
+    suspend fun setLibrarySongSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_LIBRARY_SONG] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setAlbumListSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_ALBUM_LIST] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setArtistListSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_ARTIST_LIST] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setAlbumDetailSongSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_ALBUM_DETAIL_SONG] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setArtistDetailSongSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_ARTIST_DETAIL_SONG] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setFolderListSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_FOLDER_LIST] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setFolderDetailSongSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_FOLDER_DETAIL_SONG] = index.coerceAtLeast(0) }
+    }
+
     suspend fun setScanIncludeFolders(folders: String) {
         context.dataStore.edit { it[KEY_SCAN_INCLUDE_FOLDERS] = folders.trim() }
+    }
+
+    suspend fun setArtistSeparators(separators: String) {
+        context.dataStore.edit { it[KEY_ARTIST_SEPARATORS] = separators.trim() }
+    }
+
+    suspend fun setArtistProtectedNames(names: String) {
+        context.dataStore.edit { it[KEY_ARTIST_PROTECTED_NAMES] = names.trim() }
+    }
+
+    suspend fun setGenreSeparators(separators: String) {
+        context.dataStore.edit { it[KEY_GENRE_SEPARATORS] = separators.trim() }
+    }
+
+    suspend fun setGenreProtectedNames(names: String) {
+        context.dataStore.edit { it[KEY_GENRE_PROTECTED_NAMES] = names.trim() }
     }
 
     suspend fun exportSettingsJson(): JSONObject {
@@ -564,6 +630,13 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_DECODER_MODE)
             setInt(KEY_LYRIC_FONT_WEIGHT)
             setInt(KEY_LYRIC_FONT_SCALE)
+            setInt(KEY_SORT_LIBRARY_SONG)
+            setInt(KEY_SORT_ALBUM_LIST)
+            setInt(KEY_SORT_ARTIST_LIST)
+            setInt(KEY_SORT_ALBUM_DETAIL_SONG)
+            setInt(KEY_SORT_ARTIST_DETAIL_SONG)
+            setInt(KEY_SORT_FOLDER_LIST)
+            setInt(KEY_SORT_FOLDER_DETAIL_SONG)
 
             setString(KEY_WEBDAV_URL)
             setString(KEY_WEBDAV_USERNAME)
@@ -580,6 +653,10 @@ class SettingsManager(private val context: Context) {
             setString(KEY_LYRIC_FONT_PATH)
             setString(KEY_SCAN_INCLUDE_FOLDERS)
             setString(KEY_SCAN_EXCLUDE_FOLDERS)
+            setString(KEY_ARTIST_SEPARATORS)
+            setString(KEY_ARTIST_PROTECTED_NAMES)
+            setString(KEY_GENRE_SEPARATORS)
+            setString(KEY_GENRE_PROTECTED_NAMES)
         }
     }
 

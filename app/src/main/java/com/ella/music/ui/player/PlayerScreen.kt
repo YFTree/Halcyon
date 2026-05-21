@@ -13,6 +13,7 @@ import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.net.Uri
@@ -166,6 +167,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.net.URL
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -298,18 +300,19 @@ fun PlayerScreen(
     val song = currentSong
     val isCurrentSongFavorite = song?.playlistIdentityKey()?.let { it in favoriteSongKeys } == true
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
-        value = if (song?.coverUrl?.isNotBlank() == true) {
-            null
-        } else {
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    CoverLoadLimiter.run { song?.let(playerViewModel::getCoverArtBitmap) }
-                }.getOrNull()
-            }
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                CoverLoadLimiter.run { song?.takeIf { it.coverUrl.isBlank() }?.let(playerViewModel::getCoverArtBitmap) }
+            }.getOrNull()
         }
     }
-    val palette by produceState(initialValue = PlayerPalette.Default, embeddedCover) {
-        value = withContext(Dispatchers.Default) { PlayerPalette.from(embeddedCover) }
+    val paletteBitmap by produceState<Bitmap?>(initialValue = null, song?.id, song?.albumId, song?.coverUrl, song?.dateModified, song?.fileSize, embeddedCover) {
+        value = withContext(Dispatchers.IO) {
+            embeddedCover ?: song?.let { loadPaletteCoverBitmap(context, it) }
+        }
+    }
+    val palette by produceState(initialValue = PlayerPalette.Default, paletteBitmap) {
+        value = withContext(Dispatchers.Default) { PlayerPalette.from(paletteBitmap) }
     }
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
         value = withContext(Dispatchers.IO) { song?.let(playerViewModel::getAudioInfo) }
@@ -463,6 +466,7 @@ fun PlayerScreen(
                         audioSessionId = audioSessionId,
                         visualizerEnabled = audioVisualizerEnabled && hasVisualizerPermission,
                         onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
+                        onLineDoubleClick = { playerViewModel.togglePlayPause() },
                         onDismissLyrics = { playerViewModel.setShowLyrics(false) },
                         onTogglePronunciation = {
                             playerViewModel.setLyricPagePronunciation(!showLyricPronunciation)
@@ -1110,6 +1114,7 @@ private fun LyricsPlayerPage(
     audioSessionId: Int,
     visualizerEnabled: Boolean,
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onLineDoubleClick: () -> Unit,
     onDismissLyrics: () -> Unit,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
@@ -1221,6 +1226,7 @@ private fun LyricsPlayerPage(
                     bottomSpacer = 260.dp,
                     horizontalPadding = 24.dp,
                     onLineClick = onLineClick,
+                    onLineDoubleClick = onLineDoubleClick,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -2493,6 +2499,32 @@ private fun playerContentSurfaceBrush(
     )
 }
 
+private fun loadPaletteCoverBitmap(context: Context, song: Song): Bitmap? {
+    return runCatching {
+        when {
+            song.coverUrl.isNotBlank() -> URL(song.coverUrl).openStream().use { input ->
+                BitmapFactory.decodeStream(input)
+            }
+            song.albumId > 0L -> context.contentResolver
+                .openInputStream(Uri.parse("content://media/external/audio/albumart/${song.albumId}"))
+                ?.use { input -> BitmapFactory.decodeStream(input) }
+            else -> null
+        }?.scaledForPalette()
+    }.getOrNull()
+}
+
+private fun Bitmap.scaledForPalette(): Bitmap {
+    val longest = max(width, height)
+    if (longest <= 480) return this
+    val scale = 480f / longest.toFloat()
+    return Bitmap.createScaledBitmap(
+        this,
+        (width * scale).toInt().coerceAtLeast(1),
+        (height * scale).toInt().coerceAtLeast(1),
+        true
+    )
+}
+
 @Composable
 private fun FluidLyricBackground(
     palette: PlayerPalette,
@@ -2817,6 +2849,18 @@ private fun MiniLyricsPreview(
         previewItems.forEach { index ->
             val line = lyrics[index]
             val isActive = index == safeIndex
+            val visiblePartCount = line.miniVisiblePartCount(
+                showTranslation = showTranslation,
+                showPronunciation = showPronunciation
+            )
+            val blockWeight = when {
+                !isActive && visiblePartCount >= 4 -> 0.56f
+                !isActive -> 0.74f
+                visiblePartCount >= 5 -> 1.92f
+                visiblePartCount >= 4 -> 1.72f
+                visiblePartCount >= 3 -> 1.36f
+                else -> 1.16f
+            }
             val distance = kotlin.math.abs(index - safeIndex)
             val alpha by animateFloatAsState(
                 targetValue = when {
@@ -2844,14 +2888,14 @@ private fun MiniLyricsPreview(
                 fontWeight = fontWeight,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(if (isActive) 1.16f else 0.82f)
+                    .weight(blockWeight)
                     .graphicsLayer {
                         this.alpha = alpha
                         scaleX = scale
                         scaleY = scale
                     }
                     .clickable { onLineClick(line) }
-                    .padding(vertical = if (isActive) 3.dp else 1.dp)
+                    .padding(vertical = if (isActive && visiblePartCount < 4) 3.dp else 1.dp)
             )
         }
     }
@@ -2869,37 +2913,55 @@ private fun MiniLyricBlock(
     fontWeight: FontWeight = FontWeight.ExtraBold,
     modifier: Modifier = Modifier
 ) {
+    val main = line.text.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
+    val pronunciation = line.pronunciation?.takeIf { showPronunciation && it.isNotBlank() }
+    val background = line.backgroundText?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
+    val translation = line.translation?.takeIf { showTranslation && it.isNotBlank() }
+    val backgroundTranslation = line.backgroundTranslation?.takeIf { showTranslation && it.isNotBlank() }
+    val visiblePartCount = line.miniVisiblePartCount(
+        showTranslation = showTranslation,
+        showPronunciation = showPronunciation
+    )
+    val denseTtmlLayout = visiblePartCount >= 4
     val longest = listOfNotNull(
-        line.pronunciation,
-        line.text,
-        line.translation,
-        line.backgroundText,
-        line.backgroundTranslation
+        pronunciation,
+        main,
+        translation,
+        background,
+        backgroundTranslation
     ).maxOfOrNull { it.length } ?: 0
-    val mainSize = when {
+    val baseMainSize = when {
         longest > 72 -> 11.sp
         longest > 54 -> 12.sp
         longest > 38 -> 13.sp
         longest > 26 -> 14.sp
         else -> 16.sp
     }
-    val secondarySize = when {
+    val mainSize = if (denseTtmlLayout) {
+        baseMainSize.value.coerceAtMost(13f).sp
+    } else {
+        baseMainSize
+    }
+    val baseSecondarySize = when {
         longest > 72 -> 9.sp
         longest > 54 -> 10.sp
         else -> 12.sp
     }
+    val secondarySize = if (denseTtmlLayout) {
+        baseSecondarySize.value.coerceAtMost(10f).sp
+    } else {
+        baseSecondarySize
+    }
+    val pronunciationSize = if (denseTtmlLayout) 9.sp else if (secondarySize.value <= 10f) 9.sp else 11.sp
+    val activeMainSize = if (denseTtmlLayout) mainSize else (mainSize.value + 1f).sp
+    val backgroundSize = if (denseTtmlLayout) 10.sp else if (mainSize.value <= 12f) 10.sp else 13.sp
+    val backgroundTranslationSize = if (denseTtmlLayout) 9.sp else if (secondarySize.value <= 10f) 9.sp else 11.sp
 
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = line.previewHorizontalAlignment()
     ) {
-        val main = line.text.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
-        val pronunciation = line.pronunciation?.takeIf { showPronunciation && it.isNotBlank() }
-        val background = line.backgroundText?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
-        val translation = line.translation?.takeIf { showTranslation && it.isNotBlank() }
-        val backgroundTranslation = line.backgroundTranslation?.takeIf { showTranslation && it.isNotBlank() }
-
         if (pronunciation != null) {
             if (active && line.pronunciationWords.isNotEmpty()) {
                 MiniWordText(
@@ -2907,7 +2969,7 @@ private fun MiniLyricBlock(
                     words = line.pronunciationWords,
                     currentPositionMs = currentPositionMs,
                     isPlaying = isPlaying,
-                    fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
+                    fontSize = pronunciationSize,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight.softenedPlayerLyricWeight(),
                     textAlign = line.previewTextAlign(),
@@ -2918,7 +2980,7 @@ private fun MiniLyricBlock(
             } else {
                 MiniPlainLyricText(
                     text = pronunciation,
-                    fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
+                    fontSize = pronunciationSize,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight.softenedPlayerLyricWeight(),
                     color = Color.White.copy(alpha = if (active) 0.48f else 0.34f),
@@ -2936,7 +2998,7 @@ private fun MiniLyricBlock(
                     words = line.words,
                     currentPositionMs = currentPositionMs,
                     isPlaying = isPlaying,
-                    fontSize = (mainSize.value + 1f).sp,
+                    fontSize = activeMainSize,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight,
                     textAlign = line.previewTextAlign(),
@@ -2945,7 +3007,7 @@ private fun MiniLyricBlock(
             } else {
                 MiniPlainLyricText(
                     text = main,
-                    fontSize = if (active) (mainSize.value + 1f).sp else mainSize,
+                    fontSize = if (active) activeMainSize else mainSize,
                     fontFamily = fontFamily,
                     fontWeight = if (active) fontWeight else fontWeight.softenedPlayerLyricWeight(),
                     color = Color.White.copy(alpha = if (active) 0.90f else 0.70f),
@@ -2976,7 +3038,7 @@ private fun MiniLyricBlock(
                     words = line.backgroundWords,
                     currentPositionMs = currentPositionMs,
                     isPlaying = isPlaying,
-                    fontSize = if (mainSize.value <= 12f) 10.sp else 13.sp,
+                    fontSize = backgroundSize,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight.softenedPlayerLyricWeight(),
                     textAlign = line.previewBackgroundTextAlign(),
@@ -2987,7 +3049,7 @@ private fun MiniLyricBlock(
             } else {
                 MiniPlainLyricText(
                     text = background,
-                    fontSize = if (mainSize.value <= 12f) 10.sp else 13.sp,
+                    fontSize = backgroundSize,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight.softenedPlayerLyricWeight(),
                     color = Color.White.copy(alpha = if (active) 0.68f else 0.44f),
@@ -3001,7 +3063,7 @@ private fun MiniLyricBlock(
         if (backgroundTranslation != null) {
             MiniPlainLyricText(
                 text = backgroundTranslation,
-                fontSize = if (secondarySize.value <= 10f) 9.sp else 11.sp,
+                fontSize = backgroundTranslationSize,
                 fontFamily = fontFamily,
                 fontWeight = fontWeight.softenedPlayerLyricWeight(),
                 color = Color.White.copy(alpha = 0.48f),
@@ -4179,6 +4241,19 @@ private fun com.ella.music.data.model.LyricLine.hasMiniLyric(): Boolean {
         !translation.isNullOrBlank() ||
         backgroundText?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() } != null ||
         !backgroundTranslation.isNullOrBlank()
+}
+
+private fun com.ella.music.data.model.LyricLine.miniVisiblePartCount(
+    showTranslation: Boolean,
+    showPronunciation: Boolean
+): Int {
+    var count = 0
+    if (showPronunciation && !pronunciation.isNullOrBlank()) count++
+    if (text.isNotBlank() && !text.isMusicSymbolOnly()) count++
+    if (showTranslation && !translation.isNullOrBlank()) count++
+    if (!backgroundText.isNullOrBlank() && !backgroundText.isMusicSymbolOnly()) count++
+    if (showTranslation && !backgroundTranslation.isNullOrBlank()) count++
+    return count
 }
 
 private fun com.ella.music.data.model.LyricLine.previewTextAlign(): TextAlign {

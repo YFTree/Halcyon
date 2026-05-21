@@ -64,6 +64,7 @@ fun HomeScreen(
     onNavigateToMusicFreeOnline: () -> Unit,
     onNavigateToWebDav: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
+    onNavigateToMetadataCategory: (String) -> Unit,
     onNavigateToPlayer: () -> Unit
 ) {
     val songs by mainViewModel.songs.collectAsState()
@@ -79,7 +80,7 @@ fun HomeScreen(
     val featuredSongs = remember(songs) { songs.shuffled().take(3) }
     val artistCount = remember(songs) {
         songs
-            .flatMap { splitArtistNames(it.artist) }
+            .flatMap { splitArtistNames(it.artist) + splitArtistNames(it.albumArtist) }
             .distinctBy { it.lowercase() }
             .size
     }
@@ -138,6 +139,16 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 HomeTile("听歌统计", "历史和热力图", Color(0xFFE71D36), onNavigateToAnalytics, Modifier.weight(1f))
+                HomeTile("流派", "按 Genre 浏览", Color(0xFF06D6A0), { onNavigateToMetadataCategory("genre") }, Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                HomeTile("年份", "按年份归档", Color(0xFF4CC9F0), { onNavigateToMetadataCategory("year") }, Modifier.weight(1f))
+                HomeTile("作曲家", "Composer", Color(0xFFB5179E), { onNavigateToMetadataCategory("composer") }, Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                HomeTile("作词家", "Lyricist", Color(0xFFFF6D00), { onNavigateToMetadataCategory("lyricist") }, Modifier.weight(1f))
                 Spacer(modifier = Modifier.weight(1f))
             }
 

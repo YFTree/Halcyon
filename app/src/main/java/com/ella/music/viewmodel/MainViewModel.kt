@@ -11,6 +11,7 @@ import com.ella.music.data.SettingsManager
 import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.PlaybackStatsStore
 import com.ella.music.data.SongPlaybackStats
+import com.ella.music.data.NameSplitConfigStore
 import com.ella.music.data.matchesArtistName
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Artist
@@ -21,7 +22,9 @@ import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.model.toSong
 import com.ella.music.data.model.albumIdentityId
+import com.ella.music.data.parseNameSplitSetting
 import com.ella.music.data.repository.MusicRepository
+import com.ella.music.data.splitGenreNames
 import com.ella.music.data.splitArtistNames
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -56,6 +59,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
     private var scanJob: Job? = null
     private var autoScanRequested = false
+
+    init {
+        viewModelScope.launch {
+            settingsManager.artistSeparators.collect {
+                NameSplitConfigStore.artistCustomSeparators = parseNameSplitSetting(it)
+            }
+        }
+        viewModelScope.launch {
+            settingsManager.artistProtectedNames.collect {
+                NameSplitConfigStore.artistProtectedNames = parseNameSplitSetting(it)
+            }
+        }
+        viewModelScope.launch {
+            settingsManager.genreSeparators.collect {
+                NameSplitConfigStore.genreCustomSeparators = parseNameSplitSetting(it)
+            }
+        }
+        viewModelScope.launch {
+            settingsManager.genreProtectedNames.collect {
+                NameSplitConfigStore.genreProtectedNames = parseNameSplitSetting(it)
+            }
+        }
+    }
 
     fun selectTab(index: Int) {
         _selectedTab.value = index
@@ -111,10 +137,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 accumulator.songCount += 1
                 albumIdsByArtist.getOrPut(key) { mutableSetOf() } += song.albumIdentityId()
             }
+            splitArtistNames(song.albumArtist).forEach { rawName ->
+                val key = rawName.lowercase()
+                counts.getOrPut(key) { ArtistAccumulator(rawName) }
+                albumIdsByArtist.getOrPut(key) { mutableSetOf() } += song.albumIdentityId()
+            }
         }
 
         currentAlbums.forEach { album ->
-            splitArtistNames(album.artist).forEach { rawName ->
+            splitArtistNames(album.albumArtist.ifBlank { album.artist }).forEach { rawName ->
                 val key = rawName.lowercase()
                 counts.getOrPut(key) { ArtistAccumulator(rawName) }
                 if (album.id > 0L) {
@@ -139,11 +170,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getAlbumsForArtist(artistName: String): List<Album> {
+        return getParticipatedAlbumsForArtist(artistName)
+    }
+
+    fun getParticipatedAlbumsForArtist(artistName: String): List<Album> {
         val artistSongs = getSongsForArtist(artistName)
         val artistAlbumIds = artistSongs.map { it.albumIdentityId() }.toSet()
         return albums.value
-            .filter { it.id in artistAlbumIds || it.artist.matchesArtistName(artistName) }
+            .filter { it.id in artistAlbumIds }
             .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+    }
+
+    fun getReleaseAlbumsForArtist(artistName: String): List<Album> {
+        return albums.value
+            .filter { it.albumArtist.isNotBlank() && it.albumArtist.matchesArtistName(artistName) }
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+    }
+
+    fun hasAlbumArtistTags(): Boolean {
+        return songs.value.any { it.albumArtist.isNotBlank() } || albums.value.any { it.albumArtist.isNotBlank() }
+    }
+
+    fun getMetadataCategoryItems(type: String): List<MetadataCategoryItem> {
+        val groups = linkedMapOf<String, MutableList<Song>>()
+        songs.value.forEach { song ->
+            song.metadataCategoryNames(type).forEach { name ->
+                groups.getOrPut(name) { mutableListOf() } += song
+            }
+        }
+        return groups
+            .map { (name, items) ->
+                MetadataCategoryItem(
+                    name = name,
+                    songCount = items.size,
+                    albumCount = items.map { it.albumIdentityId() }.distinct().size,
+                    duration = items.sumOf { it.duration }
+                )
+            }
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+    }
+
+    fun getSongsForMetadataCategory(type: String, name: String): List<Song> {
+        val target = name.trim()
+        if (target.isBlank()) return emptyList()
+        return songs.value
+            .filter { song -> song.metadataCategoryNames(type).any { it.equals(target, ignoreCase = true) } }
+            .sortedWith(
+                compareBy<Song, String>(String.CASE_INSENSITIVE_ORDER) { it.album }
+                    .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { song -> song.title }
+            )
     }
 
     fun getAlbumArtUri(albumId: Long) = repository.getAlbumArtUri(albumId)
@@ -229,7 +305,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
+data class MetadataCategoryItem(
+    val name: String,
+    val songCount: Int,
+    val albumCount: Int,
+    val duration: Long
+)
+
 private data class ArtistAccumulator(
     val name: String,
     var songCount: Int = 0
 )
+
+private fun Song.metadataCategoryNames(type: String): List<String> {
+    return when (type) {
+        "genre" -> splitGenreNames(genre)
+        "year" -> listOfNotNull(year.extractYear())
+        "composer" -> splitArtistNames(composer)
+        "lyricist" -> splitArtistNames(lyricist)
+        else -> emptyList()
+    }
+}
+
+private fun String.extractYear(): String? {
+    return Regex("""\d{4}""").find(this)?.value
+}

@@ -15,6 +15,8 @@ data class SongTagInfo(
     val albumArtist: String = "",
     val genre: String = "",
     val year: String = "",
+    val composer: String = "",
+    val lyricist: String = "",
     val track: String = "",
     val comment: String = "",
     val neteaseKey: String = ""

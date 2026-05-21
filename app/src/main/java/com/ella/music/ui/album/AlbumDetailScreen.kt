@@ -1,7 +1,11 @@
 package com.ella.music.ui.album
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +24,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -29,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
+import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.AppleStylePlayButton
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
@@ -40,9 +48,11 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -56,9 +66,13 @@ fun AlbumDetailScreen(
     val albums by mainViewModel.albums.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
+    val sortIndex by mainViewModel.settingsManager.albumDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.albumDetailSongSortIndex)
+    val sortMode = AlbumDetailSongSortMode.entries.getOrElse(sortIndex) { AlbumDetailSongSortMode.Track }
+    val scope = rememberCoroutineScope()
+    var sortExpanded by remember { mutableStateOf(false) }
     val album = albums.find { it.id == albumId }
     val albumSongs = mainViewModel.getSongsForAlbum(albumId)
-    val sortedAlbumSongs = remember(albumSongs) { albumSongs.sortedForAlbumDetail() }
+    val sortedAlbumSongs = remember(albumSongs, sortMode) { albumSongs.sortedForAlbumDetail(sortMode) }
     val albumArtUri = mainViewModel.getAlbumArtUri(album?.artAlbumId ?: albumSongs.firstOrNull()?.albumId ?: 0L)
 
     Box(
@@ -86,7 +100,7 @@ fun AlbumDetailScreen(
 
             item {
                 Text(
-                    text = "${sortedAlbumSongs.size} 首歌曲 · 曲目顺序",
+                    text = "${sortedAlbumSongs.size} 首歌曲 · ${sortMode.label}",
                     fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -125,6 +139,54 @@ fun AlbumDetailScreen(
             )
         }
 
+        IconButton(
+            onClick = { sortExpanded = !sortExpanded },
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(end = 8.dp, top = 8.dp)
+                .size(48.dp)
+                .align(Alignment.TopEnd)
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Regular.Sort,
+                contentDescription = "排序",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = sortExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 60.dp, end = 16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.94f), androidx.compose.foundation.shape.RoundedCornerShape(18.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                AlbumDetailSongSortMode.entries.forEach { mode ->
+                    Text(
+                        text = mode.label,
+                        fontSize = 14.sp,
+                        fontWeight = if (sortMode == mode) FontWeight.Bold else FontWeight.Normal,
+                        color = if (sortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                LibrarySortUiState.albumDetailSongSortIndex = mode.ordinal
+                                scope.launch { mainViewModel.settingsManager.setAlbumDetailSongSortIndex(mode.ordinal) }
+                                sortExpanded = false
+                            }
+                            .padding(vertical = 10.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -208,11 +270,31 @@ private fun AlbumHeader(
     }
 }
 
-private fun List<Song>.sortedForAlbumDetail(): List<Song> {
-    return sortedWith(
-        compareBy<Song> { it.trackNumber <= 0 }
-            .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
-            .thenBy { it.title.lowercase(Locale.ROOT) }
-            .thenBy { it.id }
-    )
+private enum class AlbumDetailSongSortMode(val label: String) {
+    Track("曲目顺序"),
+    Title("歌曲名称"),
+    FileName("文件名"),
+    Duration("歌曲时长"),
+    DateAdded("添加时间"),
+    DateAddedAsc("添加时间升序"),
+    DateModified("修改时间"),
+    DateModifiedAsc("修改时间升序")
+}
+
+private fun List<Song>.sortedForAlbumDetail(mode: AlbumDetailSongSortMode): List<Song> {
+    return when (mode) {
+        AlbumDetailSongSortMode.Track -> sortedWith(
+            compareBy<Song> { it.trackNumber <= 0 }
+                .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
+                .thenBy { it.title.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+        AlbumDetailSongSortMode.Title -> sortedBy { it.title.lowercase(Locale.ROOT) }
+        AlbumDetailSongSortMode.FileName -> sortedBy { it.fileName.ifBlank { it.path.substringAfterLast('/') }.lowercase(Locale.ROOT) }
+        AlbumDetailSongSortMode.Duration -> sortedByDescending { it.duration }
+        AlbumDetailSongSortMode.DateAdded -> sortedByDescending { it.dateAdded }
+        AlbumDetailSongSortMode.DateAddedAsc -> sortedBy { it.dateAdded }
+        AlbumDetailSongSortMode.DateModified -> sortedByDescending { it.dateModified }
+        AlbumDetailSongSortMode.DateModifiedAsc -> sortedBy { it.dateModified }
+    }
 }

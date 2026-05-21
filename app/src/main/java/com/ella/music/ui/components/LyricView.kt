@@ -11,6 +11,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -75,7 +76,8 @@ fun LyricView(
     usePlayerColors: Boolean = false,
     topSpacer: androidx.compose.ui.unit.Dp = 200.dp,
     bottomSpacer: androidx.compose.ui.unit.Dp = 300.dp,
-    onLineClick: (LyricLine) -> Unit = {}
+    onLineClick: (LyricLine) -> Unit = {},
+    onLineDoubleClick: () -> Unit = {}
 ) {
     if (lyrics.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -126,7 +128,12 @@ fun LyricView(
             }
             val lineModifier = Modifier
                 .fillMaxWidth()
-                .clickable { onLineClick(line) }
+                .pointerInput(line) {
+                    detectTapGestures(
+                        onTap = { onLineClick(line) },
+                        onDoubleTap = { onLineDoubleClick() }
+                    )
+                }
 
             if (showPronunciation && !line.pronunciation.isNullOrBlank()) {
                 Text(
@@ -203,7 +210,8 @@ fun WordLyricView(
     topSpacer: androidx.compose.ui.unit.Dp = 180.dp,
     bottomSpacer: androidx.compose.ui.unit.Dp = 420.dp,
     horizontalPadding: androidx.compose.ui.unit.Dp = 22.dp,
-    onLineClick: (LyricLine) -> Unit = {}
+    onLineClick: (LyricLine) -> Unit = {},
+    onLineDoubleClick: () -> Unit = {}
 ) {
     if (lyrics.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -335,8 +343,16 @@ fun WordLyricView(
                         scaleY = scale
                     }
                     .blur(blur.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .clickable { onLineClick(line) }
-                    .padding(vertical = if (isActive) 6.dp else 2.dp),
+                    .pointerInput(line) {
+                        detectTapGestures(
+                            onTap = { onLineClick(line) },
+                            onDoubleTap = { onLineDoubleClick() }
+                        )
+                    }
+                    .padding(
+                        horizontal = LYRIC_EDGE_GUARD_DP,
+                        vertical = if (isActive) 6.dp else 2.dp
+                    ),
                 horizontalAlignment = line.ttmlAlignment()
             ) {
                 if (showPronunciation && !line.pronunciation.isNullOrBlank()) {
@@ -456,6 +472,7 @@ fun WordLyricView(
                             text = line.backgroundText.orEmpty().lineBreakSafeText(),
                             fontSize = fittedLyricFontSp(line.backgroundText.orEmpty(), scaledLyricFontSp(if (isActive) 22 else 13, fontScale, minSp = 8), minSp = 8).sp,
                             fontFamily = fontFamily,
+                            fontWeight = fontWeight.softenedLyricWeight(),
                             color = backgroundColor,
                             textAlign = backgroundTextAlign,
                             maxLines = if (isActive) 3 else 2,
@@ -477,6 +494,7 @@ fun WordLyricView(
                         text = line.backgroundTranslation.orEmpty().lineBreakSafeText(),
                         fontSize = fittedLyricFontSp(line.backgroundTranslation.orEmpty(), scaledLyricFontSp(if (isActive) 12 else 10, fontScale, minSp = 8), minSp = 8).sp,
                         fontFamily = fontFamily,
+                        fontWeight = fontWeight.softenedLyricWeight(),
                         color = backgroundTranslationColor,
                         textAlign = backgroundTextAlign,
                         maxLines = if (isActive) 3 else 2,
@@ -521,7 +539,7 @@ private fun WordLine(
     val text = remember(displayText, words) {
         displayText.ifBlank { words.joinToString("") { it.text } }.ifBlank { "♪" }.lineBreakSafeText()
     }
-    val annotatedText = remember(text, words, currentPositionMs, currentColor, sungColor, pendingColor, glowColor, fontWeight) {
+    val annotatedText = remember(text, words, currentPositionMs, currentColor, sungColor, pendingColor, glowColor, fontFamily, fontWeight) {
         buildAnnotatedString {
             var appended = false
             words.forEach { word ->
@@ -536,6 +554,7 @@ private fun WordLine(
                     sungColor = sungColor,
                     pendingColor = pendingColor,
                     glowColor = glowColor,
+                    fontFamily = fontFamily,
                     fontWeight = fontWeight,
                     inactiveWeight = fontWeight.softenedLyricWeight()
                 )
@@ -571,6 +590,7 @@ private fun AnnotatedString.Builder.appendTimedLyricWord(
     sungColor: Color,
     pendingColor: Color,
     glowColor: Color,
+    fontFamily: FontFamily?,
     fontWeight: FontWeight,
     inactiveWeight: FontWeight
 ) {
@@ -587,16 +607,17 @@ private fun AnnotatedString.Builder.appendTimedLyricWord(
                 brush = lyricSweepBrush(
                     progress = progress,
                     activeColor = currentColor,
-                    pendingColor = pendingColor
+                pendingColor = pendingColor
                 ),
+                fontFamily = fontFamily,
                 shadow = Shadow(
                     color = glowColor.copy(alpha = glowColor.alpha * lyricGlowAlpha(progress)),
                     blurRadius = lyricGlowRadius(progress)
                 )
             )
         }
-        isSung -> appendStyledLyricText(text, sungColor, inactiveWeight)
-        else -> appendStyledLyricText(text, pendingColor, inactiveWeight)
+        isSung -> appendStyledLyricText(text, sungColor, inactiveWeight, fontFamily)
+        else -> appendStyledLyricText(text, pendingColor, inactiveWeight, fontFamily)
     }
 }
 
@@ -604,6 +625,7 @@ private fun AnnotatedString.Builder.appendStyledLyricText(
     value: String,
     color: Color,
     fontWeight: FontWeight,
+    fontFamily: FontFamily? = null,
     brush: Brush? = null,
     shadow: Shadow? = null
 ) {
@@ -611,12 +633,14 @@ private fun AnnotatedString.Builder.appendStyledLyricText(
     val style = if (brush != null) {
         SpanStyle(
             brush = brush,
+            fontFamily = fontFamily,
             fontWeight = fontWeight,
             shadow = shadow
         )
     } else {
         SpanStyle(
             color = color,
+            fontFamily = fontFamily,
             fontWeight = fontWeight,
             shadow = shadow
         )
@@ -709,6 +733,7 @@ private const val LYRIC_UPCOMING_LINE_BLUR_STEP_DP = 1.35f
 private const val LYRIC_UPCOMING_LINE_MAX_BLUR_DP = 4.2f
 private const val LYRIC_GLOW_PRE_PLAY_ALPHA = 0.22f
 private const val LYRIC_GLOW_MAX_ALPHA = 1f
+private val LYRIC_EDGE_GUARD_DP = 10.dp
 
 private const val USER_BROWSING_TIMEOUT_MS = 3_600L
 

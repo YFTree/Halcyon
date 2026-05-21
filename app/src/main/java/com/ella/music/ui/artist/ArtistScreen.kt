@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,7 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.MapAlbum
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -73,15 +75,32 @@ fun ArtistScreen(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     var sortExpanded by remember { mutableStateOf(false) }
-    val sortMode = ArtistDetailSongSortMode.entries.getOrElse(LibrarySortUiState.artistDetailSongSortIndex) { ArtistDetailSongSortMode.Title }
+    val sortIndex by mainViewModel.settingsManager.artistDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.artistDetailSongSortIndex)
+    val sortMode = ArtistDetailSongSortMode.entries.getOrElse(sortIndex) { ArtistDetailSongSortMode.Title }
+    val scope = rememberCoroutineScope()
+    var selectedTab by remember { mutableStateOf(0) }
 
     val artistSongs = remember(songs, artistName) {
         mainViewModel.getSongsForArtist(artistName)
     }
     val sortedArtistSongs = remember(artistSongs, sortMode) { artistSongs.sortedForArtistDetail(sortMode) }
-    val artistAlbums = remember(albums, songs, artistName) {
-        mainViewModel.getAlbumsForArtist(artistName)
+    val participatedAlbums = remember(albums, songs, artistName) {
+        mainViewModel.getParticipatedAlbumsForArtist(artistName)
     }
+    val releaseAlbums = remember(albums, songs, artistName) {
+        mainViewModel.getReleaseAlbumsForArtist(artistName)
+    }
+    val showReleaseAlbums = remember(albums, songs, artistName) {
+        mainViewModel.hasAlbumArtistTags() && releaseAlbums.isNotEmpty()
+    }
+    val tabs = remember(showReleaseAlbums) {
+        buildList {
+            add(ArtistTab.Songs)
+            add(ArtistTab.ParticipatedAlbums)
+            if (showReleaseAlbums) add(ArtistTab.ReleaseAlbums)
+        }
+    }
+    val selectedArtistTab = tabs.getOrElse(selectedTab) { ArtistTab.Songs }
 
     // 暂时用该歌手第一首歌的专辑封面作为歌手页顶部大图
     val artistCoverUri = artistSongs.firstOrNull()?.albumId
@@ -102,7 +121,7 @@ fun ArtistScreen(
                     artistName = artistName,
                     coverUri = artistCoverUri,
                     songCount = sortedArtistSongs.size,
-                    albumCount = artistAlbums.size,
+                    albumCount = (participatedAlbums + releaseAlbums).distinctBy { it.id }.size,
                     onPlayAll = {
                         if (sortedArtistSongs.isNotEmpty()) {
                             playerViewModel.setPlaylist(sortedArtistSongs, 0)
@@ -113,46 +132,76 @@ fun ArtistScreen(
             }
 
             item {
-                SectionTitle("歌曲")
-            }
-
-            item {
-                Text(
-                    text = "${sortedArtistSongs.size} 首歌曲 · ${sortMode.label}",
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                ArtistTabRow(
+                    tabs = tabs,
+                    selectedTab = selectedArtistTab,
+                    onTabSelected = { tab -> selectedTab = tabs.indexOf(tab).coerceAtLeast(0) }
                 )
             }
 
-            itemsIndexed(sortedArtistSongs) { index, song ->
-                SongItem(
-                    song = song,
-                    isCurrent = currentSong?.id == song.id,
-                    albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
-                    loadCoverArt = mainViewModel::getCoverArtBitmap,
-                    loadAudioInfo = mainViewModel::getAudioInfo,
-                    onClick = {
-                        playerViewModel.setPlaylist(sortedArtistSongs, index)
-                        if (openPlayerOnPlay) onNavigateToPlayer()
-                    },
-                    onAddToQueue = { playerViewModel.addToPlaylist(song) }
-                )
-            }
+            when (selectedArtistTab) {
+                ArtistTab.Songs -> {
+                    item {
+                        Text(
+                            text = "${sortedArtistSongs.size} 首歌曲 · ${sortMode.label}",
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
 
-            if (artistAlbums.isNotEmpty()) {
-                item {
-                    SectionTitle("专辑")
+                    itemsIndexed(sortedArtistSongs) { index, song ->
+                        SongItem(
+                            song = song,
+                            isCurrent = currentSong?.id == song.id,
+                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                            loadCoverArt = mainViewModel::getCoverArtBitmap,
+                            loadAudioInfo = mainViewModel::getAudioInfo,
+                            onClick = {
+                                playerViewModel.setPlaylist(sortedArtistSongs, index)
+                                if (openPlayerOnPlay) onNavigateToPlayer()
+                            },
+                            onAddToQueue = { playerViewModel.addToPlaylist(song) }
+                        )
+                    }
                 }
 
-                items(
-                    items = artistAlbums,
-                    key = { it.id }
-                ) { album ->
-                    ArtistAlbumRow(
-                        album = album,
-                        albumArtUri = mainViewModel.getAlbumArtUri(album.artAlbumId),
-                        onClick = { onAlbumClick(album.id) }
+                ArtistTab.ParticipatedAlbums -> {
+                    item { SectionTitle("参与专辑") }
+                    items(
+                        items = participatedAlbums,
+                        key = { it.id }
+                    ) { album ->
+                        ArtistAlbumRow(
+                            album = album,
+                            albumArtUri = mainViewModel.getAlbumArtUri(album.artAlbumId),
+                            onClick = { onAlbumClick(album.id) }
+                        )
+                    }
+                }
+
+                ArtistTab.ReleaseAlbums -> {
+                    item { SectionTitle("发行专辑") }
+                    items(
+                        items = releaseAlbums,
+                        key = { it.id }
+                    ) { album ->
+                        ArtistAlbumRow(
+                            album = album,
+                            albumArtUri = mainViewModel.getAlbumArtUri(album.artAlbumId),
+                            onClick = { onAlbumClick(album.id) }
+                        )
+                    }
+                }
+            }
+
+            if (selectedArtistTab != ArtistTab.Songs && (selectedArtistTab == ArtistTab.ParticipatedAlbums && participatedAlbums.isEmpty() || selectedArtistTab == ArtistTab.ReleaseAlbums && releaseAlbums.isEmpty())) {
+                item {
+                    Text(
+                        text = "暂无专辑",
+                        fontSize = 14.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
                     )
                 }
             }
@@ -178,24 +227,26 @@ fun ArtistScreen(
             )
         }
 
-        IconButton(
-            onClick = { sortExpanded = !sortExpanded },
-            modifier = Modifier
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(end = 8.dp, top = 8.dp)
-                .size(48.dp)
-                .align(Alignment.TopEnd)
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Regular.Sort,
-                contentDescription = "排序",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+        if (selectedArtistTab == ArtistTab.Songs) {
+            IconButton(
+                onClick = { sortExpanded = !sortExpanded },
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(end = 8.dp, top = 8.dp)
+                    .size(48.dp)
+                    .align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    imageVector = MiuixIcons.Regular.Sort,
+                    contentDescription = "排序",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
 
         AnimatedVisibility(
-            visible = sortExpanded,
+            visible = sortExpanded && selectedArtistTab == ArtistTab.Songs,
             enter = expandVertically(),
             exit = shrinkVertically(),
             modifier = Modifier
@@ -219,12 +270,51 @@ fun ArtistScreen(
                             .fillMaxWidth()
                             .clickable {
                                 LibrarySortUiState.artistDetailSongSortIndex = mode.ordinal
+                                scope.launch { mainViewModel.settingsManager.setArtistDetailSongSortIndex(mode.ordinal) }
                                 sortExpanded = false
                             }
                             .padding(vertical = 10.dp)
                     )
                 }
             }
+        }
+    }
+}
+
+private enum class ArtistTab(val label: String) {
+    Songs("歌曲"),
+    ParticipatedAlbums("参与专辑"),
+    ReleaseAlbums("发行专辑")
+}
+
+@Composable
+private fun ArtistTabRow(
+    tabs: List<ArtistTab>,
+    selectedTab: ArtistTab,
+    onTabSelected: (ArtistTab) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        tabs.forEach { tab ->
+            val selected = tab == selectedTab
+            Text(
+                text = tab.label,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(
+                        if (selected) MiuixTheme.colorScheme.primary
+                        else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)
+                    )
+                    .clickable { onTabSelected(tab) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
     }
 }
@@ -322,8 +412,11 @@ private enum class ArtistDetailSongSortMode(val label: String) {
     Title("歌曲名称"),
     AlbumTrack("专辑曲序"),
     FileName("文件名"),
+    Duration("歌曲时长"),
     DateAdded("添加时间"),
-    DateModified("修改时间")
+    DateAddedAsc("添加时间升序"),
+    DateModified("修改时间"),
+    DateModifiedAsc("修改时间升序")
 }
 
 private fun List<Song>.sortedForArtistDetail(mode: ArtistDetailSongSortMode): List<Song> {
@@ -335,8 +428,11 @@ private fun List<Song>.sortedForArtistDetail(mode: ArtistDetailSongSortMode): Li
                 .thenBy { it.title.lowercase(Locale.ROOT) }
         )
         ArtistDetailSongSortMode.FileName -> sortedBy { it.fileName.ifBlank { it.path.substringAfterLast('/') }.lowercase(Locale.ROOT) }
+        ArtistDetailSongSortMode.Duration -> sortedByDescending { it.duration }
         ArtistDetailSongSortMode.DateAdded -> sortedByDescending { it.dateAdded }
+        ArtistDetailSongSortMode.DateAddedAsc -> sortedBy { it.dateAdded }
         ArtistDetailSongSortMode.DateModified -> sortedByDescending { it.dateModified }
+        ArtistDetailSongSortMode.DateModifiedAsc -> sortedBy { it.dateModified }
     }
 }
 

@@ -10,5 +10,6 @@ object LibrarySortUiState {
     var artistListSortIndex by mutableIntStateOf(0)
     var albumDetailSongSortIndex by mutableIntStateOf(0)
     var artistDetailSongSortIndex by mutableIntStateOf(0)
+    var folderListSortIndex by mutableIntStateOf(0)
     var folderDetailSongSortIndex by mutableIntStateOf(0)
 }

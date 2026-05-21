@@ -70,14 +70,15 @@ fun ArtistListScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
-    val sortMode = ArtistSortMode.entries.getOrElse(LibrarySortUiState.artistListSortIndex) { ArtistSortMode.Name }
+    val sortIndex by mainViewModel.settingsManager.artistListSortIndex.collectAsState(initial = LibrarySortUiState.artistListSortIndex)
+    val sortMode = ArtistSortMode.entries.getOrElse(sortIndex) { ArtistSortMode.Name }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
     val artists = remember(songs, albums) { mainViewModel.getArtists() }
     val representativeSongsByArtist = remember(songs) {
         buildMap {
             songs.forEach { song ->
-                splitArtistNames(song.artist).forEach { artistName ->
+                (splitArtistNames(song.artist) + splitArtistNames(song.albumArtist)).forEach { artistName ->
                     putIfAbsent(artistName, song)
                 }
             }
@@ -151,6 +152,7 @@ fun ArtistListScreen(
                             .fillMaxWidth()
                             .clickable {
                                 LibrarySortUiState.artistListSortIndex = mode.ordinal
+                                scope.launch { mainViewModel.settingsManager.setArtistListSortIndex(mode.ordinal) }
                                 sortExpanded = false
                             }
                             .padding(vertical = 10.dp)
