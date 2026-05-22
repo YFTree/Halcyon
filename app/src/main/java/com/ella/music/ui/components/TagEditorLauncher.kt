@@ -149,8 +149,15 @@ fun buildTagEditorOptions(context: Context, song: Song): List<TagEditorOption> {
     fun lunaBeatIntent(component: ComponentName): Intent {
         return Intent(Intent.ACTION_EDIT).apply {
             this.component = component
+            addCategory(Intent.CATEGORY_DEFAULT)
+            setDataAndType(defaultEditUri, mimeType)
             putExtra(Intent.EXTRA_TITLE, "${song.title} - ${song.artist}")
+            putExtra(Intent.EXTRA_STREAM, defaultEditUri)
+            putExtra("audioPath", song.path)
             putExtra("audio_path", song.path)
+            putExtra("source_audio_path", song.path)
+            putExtra("sourceTitle", song.title)
+            putExtra("sourceArtist", song.artist)
             putExtra("media_store_id", song.id)
             putExtra("title", song.title)
             putExtra("artist", song.artist)
@@ -160,9 +167,25 @@ fun buildTagEditorOptions(context: Context, song: Song): List<TagEditorOption> {
             putExtra("id", song.id)
             putExtra("songId", song.id)
             putExtra("mediaId", song.id)
+            putExtra("uri", defaultEditUri.toString())
+            putExtra("contentUrl", defaultEditUri.toString())
+            putExtra("contentUri", defaultEditUri.toString())
+            putExtra("contenturl", defaultEditUri.toString())
+            putExtra("content_uri", defaultEditUri.toString())
             mediaStoreUri?.let { putExtra("mediaStoreUri", it.toString()) }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            clipData = ClipData.newUri(context.contentResolver, "LunaBeat", defaultEditUri)
         }
+    }
+
+    fun lunaBeatSendIntent(label: String, component: ComponentName? = null): Intent {
+        return tagEditorIntent(
+            label = label,
+            action = Intent.ACTION_SEND,
+            component = component,
+            packageName = if (component == null) "com.example.LyricBox" else null
+        )
     }
 
     return listOf(
@@ -179,8 +202,8 @@ fun buildTagEditorOptions(context: Context, song: Song): List<TagEditorOption> {
             sourceSong = song
         ),
         TagEditorOption(
-            label = "LunaBeat",
-            summary = "使用真实音频路径交给 LunaBeat 编辑",
+            label = "LunaBeat（编辑元数据）",
+            summary = "打开 LunaBeat 的歌曲元数据编辑页面",
             intents = listOf(
                 lunaBeatIntent(
                     ComponentName("com.example.LyricBox", "com.example.LyricBox.SongMetadataEditActivity")
@@ -188,10 +211,26 @@ fun buildTagEditorOptions(context: Context, song: Song): List<TagEditorOption> {
                 lunaBeatIntent(
                     ComponentName("com.example.lyricbox", "com.example.LyricBox.SongMetadataEditActivity")
                 ),
-                tagEditorIntent(
-                    label = "LunaBeat",
-                    action = Intent.ACTION_SEND,
-                    packageName = "com.example.LyricBox"
+                lunaBeatSendIntent(
+                    label = "LunaBeat（编辑元数据）",
+                    component = ComponentName("com.example.LyricBox", "com.example.LyricBox.SongMetadataEditActivity")
+                )
+            ),
+            sourceSong = song
+        ),
+        TagEditorOption(
+            label = "LunaBeat（歌词打轴）",
+            summary = "打开 LunaBeat 的歌词打轴页面",
+            intents = listOf(
+                lunaBeatIntent(
+                    ComponentName("com.example.LyricBox", "com.example.LyricBox.LyricTimingActivity")
+                ),
+                lunaBeatIntent(
+                    ComponentName("com.example.lyricbox", "com.example.LyricBox.LyricTimingActivity")
+                ),
+                lunaBeatSendIntent(
+                    label = "LunaBeat（歌词打轴）",
+                    component = ComponentName("com.example.LyricBox", "com.example.LyricBox.LyricTimingActivity")
                 )
             ),
             sourceSong = song

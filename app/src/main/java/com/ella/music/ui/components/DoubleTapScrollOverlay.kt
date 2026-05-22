@@ -17,7 +17,8 @@ fun DoubleTapScrollOverlay(
     onDoubleTap: () -> Unit,
     modifier: Modifier = Modifier,
     startPadding: Dp = 56.dp,
-    endPadding: Dp = 104.dp
+    endPadding: Dp = 168.dp,
+    onClick: () -> Unit = {}
 ) {
     Box(
         modifier = modifier
@@ -25,7 +26,7 @@ fun DoubleTapScrollOverlay(
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = {},
+                onClick = onClick,
                 onDoubleClick = onDoubleTap
             )
     )

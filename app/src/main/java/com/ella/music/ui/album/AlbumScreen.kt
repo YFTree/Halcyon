@@ -1,6 +1,7 @@
 package com.ella.music.ui.album
 
 import androidx.activity.compose.BackHandler
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -34,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +46,8 @@ import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.requestPinnedEllaShortcut
+import com.ella.music.ui.navigation.Screen
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Job
@@ -68,6 +72,7 @@ fun AlbumScreen(
     onBack: () -> Unit,
     onAlbumClick: (Long) -> Unit
 ) {
+    val context = LocalContext.current
     val albums by mainViewModel.albums.collectAsState()
     val songs by mainViewModel.songs.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
@@ -252,7 +257,21 @@ fun AlbumScreen(
                             AlbumCard(
                                 album = album,
                                 albumArtUri = mainViewModel.getAlbumArtUri(album.artAlbumId),
-                                onClick = { onAlbumClick(album.id) }
+                                summary = album.summaryForSort(sortMode, albumDurations[album.id] ?: 0L),
+                                onClick = { onAlbumClick(album.id) },
+                                onLongClick = {
+                                    val ok = requestPinnedEllaShortcut(
+                                        context = context,
+                                        id = "album_${album.id}",
+                                        label = album.name,
+                                        route = Screen.AlbumDetail.createRoute(album.id)
+                                    )
+                                    Toast.makeText(
+                                        context,
+                                        if (ok) "已请求添加桌面快捷方式" else "当前桌面不支持固定快捷方式",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             )
                         }
                     }
@@ -286,6 +305,28 @@ private enum class AlbumSortMode(val label: String) {
     Duration("歌曲时长"),
     YearAsc("发行时间正序"),
     YearDesc("发行时间倒序")
+}
+
+private fun Album.summaryForSort(sortMode: AlbumSortMode, duration: Long): String {
+    val first = if (sortMode == AlbumSortMode.Duration) {
+        duration.formatAlbumDuration()
+    } else {
+        "${songCount} 首歌曲"
+    }
+    return buildList {
+        add(first)
+        if (year > 0) add(year.toString())
+        val artistText = albumArtist.trim()
+        if (artistText.isNotBlank()) add(artistText)
+    }.joinToString(" · ")
+}
+
+private fun Long.formatAlbumDuration(): String {
+    if (this <= 0L) return "00:00"
+    val totalMinutes = this / 60_000L
+    val hours = totalMinutes / 60L
+    val minutes = totalMinutes % 60L
+    return if (hours > 0) "${hours}小时${minutes}分" else "${minutes}分钟"
 }
 
 private fun Album.indexLetter(): String {

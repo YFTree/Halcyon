@@ -33,6 +33,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -94,6 +95,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -149,6 +151,7 @@ import com.ella.music.data.SettingsManager
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.model.AudioInfo
+import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.albumIdentityId
@@ -158,9 +161,11 @@ import com.ella.music.ui.components.ArtistPickerSheet
 import com.ella.music.ui.components.WordLyricView
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.CoverLoadLimiter
+import com.ella.music.ui.components.LyricSharePicker
 import com.ella.music.ui.components.TagEditorOption
 import com.ella.music.ui.components.buildTagEditorOptions
 import com.ella.music.ui.components.launchTagEditorOption
+import com.ella.music.ui.components.shareLyricCard
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -177,6 +182,7 @@ import kotlin.math.sqrt
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Music
@@ -216,6 +222,7 @@ fun PlayerScreen(
     val audioSessionId by PlaybackAudioSession.audioSessionId.collectAsState()
     val audioVisualizerEnabled by settingsManager.audioVisualizerEnabled.collectAsState(initial = false)
     val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
+    val lyricShareCustomInfo by settingsManager.lyricShareCustomInfo.collectAsState(initial = "")
     val playlist by playerViewModel.playlist.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
@@ -277,6 +284,7 @@ fun PlayerScreen(
         }
     }
     val dismissProgress = (dragDismissOffset.value / dismissThresholdPx).coerceIn(0f, 1f)
+    val dismissInProgress = dismissProgress > 0.001f || dismissingPlayer
     val dragCornerRadius = 30.dp * dismissProgress
     SideEffect {
         onDismissProgressChange(dismissProgress)
@@ -315,6 +323,25 @@ fun PlayerScreen(
     }
     val palette by produceState(initialValue = PlayerPalette.Default, paletteBitmap) {
         value = withContext(Dispatchers.Default) { PlayerPalette.from(paletteBitmap) }
+    }
+    var lyricShareInitialLine by remember { mutableStateOf<LyricLine?>(null) }
+    fun openLyricSharePicker(line: LyricLine) {
+        lyricShareInitialLine = line
+    }
+    fun shareSelectedLyrics(lines: List<LyricLine>) {
+        shareLyricCard(
+            context = context,
+            song = song,
+            lines = lines,
+            cover = embeddedCover ?: paletteBitmap,
+            backgroundColors = listOf(
+                palette.top.toArgb(),
+                palette.middle.toArgb(),
+                palette.bottom.toArgb()
+            ),
+            customInfo = lyricShareCustomInfo
+        )
+        lyricShareInitialLine = null
     }
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
         value = withContext(Dispatchers.IO) { song?.let(playerViewModel::getAudioInfo) }
@@ -439,6 +466,7 @@ fun PlayerScreen(
             PlayerFlowBackground(
                 palette = palette,
                 flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
+                animate = !dismissInProgress,
                 modifier = Modifier.fillMaxSize()
             )
             ImmersiveCoverBackground(
@@ -479,6 +507,7 @@ fun PlayerScreen(
                         visualizerEnabled = audioVisualizerEnabled && hasVisualizerPermission,
                         onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
                         onLineDoubleClick = { playerViewModel.togglePlayPause() },
+                        onLineLongClick = ::openLyricSharePicker,
                         onDismissLyrics = { playerViewModel.setShowLyrics(false) },
                         onTogglePronunciation = {
                             playerViewModel.setLyricPagePronunciation(!showLyricPronunciation)
@@ -495,6 +524,10 @@ fun PlayerScreen(
                         },
                         onLyricSourceMode = { mode ->
                             playerViewModel.setLyricSourceMode(mode)
+                        },
+                        onArtist = {
+                            playerViewModel.setShowLyrics(false)
+                            navigateToArtistOrChoose(song?.artist.orEmpty())
                         },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -534,6 +567,7 @@ fun PlayerScreen(
                         onDismissQueue = { queueExpanded = false },
                         onShowLyrics = { playerViewModel.setShowLyrics(true) },
                         onLyricLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
+                        onLyricLineLongClick = ::openLyricSharePicker,
                         onSeek = { fraction -> playerViewModel.seekTo((fraction * duration).toLong()) },
                         onCyclePlaybackMode = { playerViewModel.cyclePlaybackMode() },
                         onPrevious = { playerViewModel.skipToPrevious() },
@@ -640,6 +674,7 @@ fun PlayerScreen(
                     audioSessionId = audioSessionId,
                     visualizerEnabled = audioVisualizerEnabled && hasVisualizerPermission,
                     onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
+                    onLineLongClick = ::openLyricSharePicker,
                     onSeek = { progress ->
                         if (duration > 0L) playerViewModel.seekTo((duration * progress).toLong())
                     },
@@ -651,6 +686,18 @@ fun PlayerScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             }
+        }
+
+        lyricShareInitialLine?.let { initialLine ->
+            LyricSharePicker(
+                song = song,
+                lyrics = lyrics,
+                initialLine = initialLine,
+                cover = embeddedCover ?: paletteBitmap,
+                backgroundColors = listOf(palette.top, palette.middle, palette.bottom),
+                onDismiss = { lyricShareInitialLine = null },
+                onShare = ::shareSelectedLyrics
+            )
         }
     }
 }
@@ -697,6 +744,7 @@ private fun CoverPlayerPage(
     onDismissQueue: () -> Unit,
     onShowLyrics: () -> Unit,
     onLyricLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onLyricLineLongClick: (com.ella.music.data.model.LyricLine) -> Unit,
     onSeek: (Float) -> Unit,
     onCyclePlaybackMode: () -> Unit,
     onPrevious: () -> Unit,
@@ -756,6 +804,7 @@ private fun CoverPlayerPage(
                 onDismissQueue = onDismissQueue,
                 onShowLyrics = onShowLyrics,
                 onLyricLineClick = onLyricLineClick,
+                onLyricLineLongClick = onLyricLineLongClick,
                 onSeek = onSeek,
                 onCyclePlaybackMode = onCyclePlaybackMode,
                 onPrevious = onPrevious,
@@ -764,6 +813,7 @@ private fun CoverPlayerPage(
                 onQueueSongClick = onQueueSongClick,
                 onClearQueue = onClearQueue,
                 onLineClick = onShowLyrics,
+                onArtist = onArtist,
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -839,6 +889,7 @@ private fun CoverPlayerPage(
                         titleFontSize = 28.sp,
                         artistFontSize = 20.sp,
                         artistAlpha = 0.54f,
+                        onArtistClick = onArtist,
                         modifier = Modifier.weight(1f)
                     )
                     PlayerHeaderAction(
@@ -911,10 +962,11 @@ private fun CoverPlayerPage(
         }
 
         if (menuExpanded) {
-            Popup(
-                alignment = Alignment.BottomCenter,
-                onDismissRequest = onDismissMenu,
-                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = "更多操作",
+                onDismissRequest = onDismissMenu
             ) {
                 PlayerActionMenu(
                     modifier = Modifier.fillMaxWidth(),
@@ -971,6 +1023,7 @@ private fun LandscapeCoverPlayerPage(
     onDismissQueue: () -> Unit,
     onShowLyrics: () -> Unit,
     onLyricLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onLyricLineLongClick: (com.ella.music.data.model.LyricLine) -> Unit,
     onSeek: (Float) -> Unit,
     onCyclePlaybackMode: () -> Unit,
     onPrevious: () -> Unit,
@@ -979,6 +1032,7 @@ private fun LandscapeCoverPlayerPage(
     onQueueSongClick: (Int) -> Unit,
     onClearQueue: () -> Unit,
     onLineClick: () -> Unit,
+    onArtist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bluetoothDeviceName = rememberBluetoothOutputName()
@@ -1049,6 +1103,7 @@ private fun LandscapeCoverPlayerPage(
                         titleFontSize = 24.sp,
                         artistFontSize = 14.sp,
                         artistAlpha = 0.56f,
+                        onArtistClick = onArtist,
                         modifier = Modifier.weight(1f)
                     )
                     PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
@@ -1068,6 +1123,7 @@ private fun LandscapeCoverPlayerPage(
                     bottomSpacer = 72.dp,
                     horizontalPadding = 6.dp,
                     onLineClick = onLyricLineClick,
+                    onLineLongClick = onLyricLineLongClick,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -1139,6 +1195,7 @@ private fun LyricsPlayerPage(
     visualizerEnabled: Boolean,
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
     onLineDoubleClick: () -> Unit,
+    onLineLongClick: (com.ella.music.data.model.LyricLine) -> Unit,
     onDismissLyrics: () -> Unit,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
@@ -1146,6 +1203,7 @@ private fun LyricsPlayerPage(
     onToggleFavorite: () -> Unit,
     onFontScale: (Float) -> Unit,
     onLyricSourceMode: (Int) -> Unit,
+    onArtist: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var lyricMenuExpanded by remember { mutableStateOf(false) }
@@ -1208,6 +1266,7 @@ private fun LyricsPlayerPage(
                     titleFontSize = 28.sp,
                     artistFontSize = 20.sp,
                     artistAlpha = 0.72f,
+                    onArtistClick = onArtist,
                     modifier = Modifier.weight(1f)
                 )
                 PlayerHeaderAction(
@@ -1251,6 +1310,7 @@ private fun LyricsPlayerPage(
                     horizontalPadding = 24.dp,
                     onLineClick = onLineClick,
                     onLineDoubleClick = onLineDoubleClick,
+                    onLineLongClick = onLineLongClick,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -1270,10 +1330,11 @@ private fun LyricsPlayerPage(
         )
 
         if (lyricMenuExpanded) {
-            Popup(
-                alignment = Alignment.BottomCenter,
-                onDismissRequest = { lyricMenuExpanded = false },
-                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = "歌词显示",
+                onDismissRequest = { lyricMenuExpanded = false }
             ) {
                 LyricActionMenu(
                     showPronunciation = showPronunciation,
@@ -1326,6 +1387,7 @@ private fun LandscapeLyricsOverlay(
     audioSessionId: Int,
     visualizerEnabled: Boolean,
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onLineLongClick: (com.ella.music.data.model.LyricLine) -> Unit,
     onSeek: (Float) -> Unit,
     onCyclePlaybackMode: () -> Unit,
     onPrevious: () -> Unit,
@@ -1402,6 +1464,7 @@ private fun LandscapeLyricsOverlay(
                         fontFamily = fontFamily,
                         fontWeight = fontWeight,
                         onLineClick = onLineClick,
+                        onLineLongClick = onLineLongClick,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
@@ -1470,8 +1533,18 @@ private fun PlayerSongMetaText(
     artistFontSize: TextUnit,
     artistAlpha: Float,
     modifier: Modifier = Modifier,
-    fallbackTitle: String = "未在播放"
+    fallbackTitle: String = "未在播放",
+    onArtistClick: (() -> Unit)? = null
 ) {
+    val artist = song?.artist.orEmpty()
+    val artistModifier = if (onArtistClick != null && artist.isNotBlank()) {
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .clickable(onClick = onArtistClick)
+    } else {
+        Modifier.fillMaxWidth()
+    }
     Column(modifier = modifier) {
         PlayerSongTitleText(
             text = song?.title ?: fallbackTitle,
@@ -1490,11 +1563,11 @@ private fun PlayerSongMetaText(
             )
         }
         PlayerMarqueeText(
-            text = song?.artist.orEmpty(),
+            text = artist,
             fontSize = artistFontSize,
             fontWeight = FontWeight.Bold,
             color = Color.White.copy(alpha = artistAlpha),
-            modifier = Modifier.fillMaxWidth()
+            modifier = artistModifier
         )
     }
 }
@@ -1656,6 +1729,7 @@ private fun LandscapeLyricShowcase(
     fontFamily: FontFamily?,
     fontWeight: FontWeight,
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onLineLongClick: (com.ella.music.data.model.LyricLine) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (lyrics.isEmpty()) {
@@ -1673,7 +1747,8 @@ private fun LandscapeLyricShowcase(
                 primary = true,
                 alpha = 0.9f,
                 scale = 1f,
-                onLineClick = onLineClick
+                onLineClick = onLineClick,
+                onLineLongClick = onLineLongClick
             )
         }
         return
@@ -1716,7 +1791,8 @@ private fun LandscapeLyricShowcase(
                     2 -> 0.78f
                     else -> 0.72f
                 },
-                onLineClick = onLineClick
+                onLineClick = onLineClick,
+                onLineLongClick = onLineLongClick
             )
         }
     }
@@ -1733,7 +1809,8 @@ private fun LandscapeLyricLine(
     primary: Boolean,
     alpha: Float,
     scale: Float,
-    onLineClick: (com.ella.music.data.model.LyricLine) -> Unit
+    onLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onLineLongClick: (com.ella.music.data.model.LyricLine) -> Unit
 ) {
     if (line == null) {
         Text(
@@ -1748,7 +1825,12 @@ private fun LandscapeLyricLine(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onLineClick(line) },
+            .pointerInput(line) {
+                detectTapGestures(
+                    onTap = { onLineClick(line) },
+                    onLongPress = { onLineLongClick(line) }
+                )
+            },
         horizontalAlignment = Alignment.Start
     ) {
         val pronunciation = line.pronunciation.orEmpty()
@@ -2170,11 +2252,11 @@ private fun PlayerTransportControls(
                 )
             }
             if (queueExpanded) {
-                Popup(
-                    alignment = Alignment.BottomCenter,
-                    offset = with(density) { IntOffset(x = 0, y = 0.dp.roundToPx()) },
-                    onDismissRequest = onDismissQueue,
-                    properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+                WindowBottomSheet(
+                    show = true,
+                    enableNestedScroll = false,
+                    title = "当前播放列表",
+                    onDismissRequest = onDismissQueue
                 ) {
                     PlayerQueueMenu(
                         playlist = playlist,
@@ -2251,25 +2333,8 @@ private fun LyricActionMenu(
         modifier = modifier
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
             .background(Color.Black.copy(alpha = 0.86f))
-            .navigationBarsPadding()
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .width(42.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(99.dp))
-                .background(Color.White.copy(alpha = 0.24f))
-                .align(Alignment.CenterHorizontally)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "歌词显示",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color.White.copy(alpha = 0.94f),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
-        )
         PlayerActionMenuItem(
             text = if (showPronunciation) "隐藏注音" else "显示注音",
             onClick = onTogglePronunciation
@@ -2434,18 +2499,24 @@ private fun ImmersiveCoverBackground(
 private fun PlayerFlowBackground(
     palette: PlayerPalette,
     flowEffectMode: Int,
+    animate: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    val transition = rememberInfiniteTransition(label = "player_flow_background")
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 18_000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "player_flow_background_drift"
-    )
+    val drift = if (animate) {
+        val transition = rememberInfiniteTransition(label = "player_flow_background")
+        val animatedDrift by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 18_000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "player_flow_background_drift"
+        )
+        animatedDrift
+    } else {
+        0f
+    }
 
     Canvas(modifier = modifier.background(palette.middle)) {
         val w = size.width
@@ -2720,32 +2791,17 @@ private fun PlayerQueueMenu(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(Color.Black.copy(alpha = 0.74f))
-            .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 14.dp)
+            .padding(horizontal = 18.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color.Black.copy(alpha = 0.54f))
+            .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .width(42.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(99.dp))
-                .background(Color.White.copy(alpha = 0.24f))
-                .align(Alignment.CenterHorizontally)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "当前播放列表",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White.copy(alpha = 0.92f)
-            )
             Spacer(modifier = Modifier.weight(1f))
             if (playlist.isNotEmpty()) {
                 Text(
@@ -2942,6 +2998,7 @@ private fun MiniLyricBlock(
     val background = line.backgroundText?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
     val translation = line.translation?.takeIf { showTranslation && it.isNotBlank() }
     val backgroundTranslation = line.backgroundTranslation?.takeIf { showTranslation && it.isNotBlank() }
+    val backgroundAfterMain = line.isMiniBackgroundAfterMain()
     val visiblePartCount = line.miniVisiblePartCount(
         showTranslation = showTranslation,
         showPronunciation = showPronunciation
@@ -3015,6 +3072,20 @@ private fun MiniLyricBlock(
                 )
             }
         }
+        if (!backgroundAfterMain) {
+            MiniBackgroundLyricBlock(
+                line = line,
+                background = background,
+                backgroundTranslation = backgroundTranslation,
+                currentPositionMs = currentPositionMs,
+                active = active,
+                isPlaying = isPlaying,
+                fontFamily = fontFamily,
+                fontWeight = fontWeight,
+                backgroundSize = backgroundSize,
+                backgroundTranslationSize = backgroundTranslationSize
+            )
+        }
         if (main != null) {
             if (active && line.words.isNotEmpty()) {
                 MiniWordText(
@@ -3055,47 +3126,84 @@ private fun MiniLyricBlock(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        if (background != null) {
-            if (active && line.backgroundWords.isNotEmpty()) {
-                MiniWordText(
-                    text = background,
-                    words = line.backgroundWords,
-                    currentPositionMs = currentPositionMs,
-                    isPlaying = isPlaying,
-                    fontSize = backgroundSize,
-                    fontFamily = fontFamily,
-                    fontWeight = fontWeight.softenedPlayerLyricWeight(),
-                    textAlign = line.previewBackgroundTextAlign(),
-                    pendingAlpha = 0.36f,
-                    sungAlpha = 0.58f,
-                    currentAlpha = 0.78f
-                )
-            } else {
+        if (backgroundAfterMain) {
+            MiniBackgroundLyricBlock(
+                line = line,
+                background = background,
+                backgroundTranslation = backgroundTranslation,
+                currentPositionMs = currentPositionMs,
+                active = active,
+                isPlaying = isPlaying,
+                fontFamily = fontFamily,
+                fontWeight = fontWeight,
+                backgroundSize = backgroundSize,
+                backgroundTranslationSize = backgroundTranslationSize
+            )
+        }
+    }
+}
+
+@Composable
+private fun MiniBackgroundLyricBlock(
+    line: com.ella.music.data.model.LyricLine,
+    background: String?,
+    backgroundTranslation: String?,
+    currentPositionMs: Long,
+    active: Boolean,
+    isPlaying: Boolean,
+    fontFamily: FontFamily?,
+    fontWeight: FontWeight,
+    backgroundSize: TextUnit,
+    backgroundTranslationSize: TextUnit
+) {
+    AnimatedVisibility(
+        visible = line.isMiniBackgroundVisibleAt(currentPositionMs),
+        enter = fadeIn(animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing)),
+        exit = fadeOut(animationSpec = tween(durationMillis = 260, easing = LinearOutSlowInEasing))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (background != null) {
+                if (active && line.backgroundWords.isNotEmpty()) {
+                    MiniWordText(
+                        text = background,
+                        words = line.backgroundWords,
+                        currentPositionMs = currentPositionMs,
+                        isPlaying = isPlaying,
+                        fontSize = backgroundSize,
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight.softenedPlayerLyricWeight(),
+                        textAlign = line.previewBackgroundTextAlign(),
+                        pendingAlpha = 0.36f,
+                        sungAlpha = 0.58f,
+                        currentAlpha = 0.78f
+                    )
+                } else {
+                    MiniPlainLyricText(
+                        text = background,
+                        fontSize = backgroundSize,
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight.softenedPlayerLyricWeight(),
+                        color = Color.White.copy(alpha = if (active) 0.68f else 0.44f),
+                        textAlign = line.previewBackgroundTextAlign(),
+                        active = active,
+                        isPlaying = isPlaying,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+            if (backgroundTranslation != null) {
                 MiniPlainLyricText(
-                    text = background,
-                    fontSize = backgroundSize,
+                    text = backgroundTranslation,
+                    fontSize = backgroundTranslationSize,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight.softenedPlayerLyricWeight(),
-                    color = Color.White.copy(alpha = if (active) 0.68f else 0.44f),
+                    color = Color.White.copy(alpha = 0.48f),
                     textAlign = line.previewBackgroundTextAlign(),
                     active = active,
                     isPlaying = isPlaying,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-        }
-        if (backgroundTranslation != null) {
-            MiniPlainLyricText(
-                text = backgroundTranslation,
-                fontSize = backgroundTranslationSize,
-                fontFamily = fontFamily,
-                fontWeight = fontWeight.softenedPlayerLyricWeight(),
-                color = Color.White.copy(alpha = 0.48f),
-                textAlign = line.previewBackgroundTextAlign(),
-                active = active,
-                isPlaying = isPlaying,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 }
@@ -3333,27 +3441,10 @@ private fun PlayerActionMenu(
         modifier = modifier
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
             .background(Color.Black.copy(alpha = 0.74f))
-            .navigationBarsPadding()
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .width(42.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(99.dp))
-                .background(Color.White.copy(alpha = 0.24f))
-                .align(Alignment.CenterHorizontally)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
         when (page) {
             PlayerActionSheetPage.Main -> {
-                Text(
-                    text = "更多操作",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White.copy(alpha = 0.94f),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
-                )
                 PlayerActionMenuItem("横屏歌词", onLandscape)
                 PlayerActionMenuItem("查看专辑页", onAlbum)
                 PlayerActionMenuItem("查看歌手页", onArtist)
@@ -3935,8 +4026,9 @@ private fun AudioVisualizer(
     var fftData by remember { mutableStateOf<ByteArray?>(null) }
     var levels by remember { mutableStateOf<List<Float>>(emptyList()) }
     var visualizerFailed by remember { mutableStateOf(false) }
+    val playingState by rememberUpdatedState(isPlaying)
 
-    LaunchedEffect(enabled, audioSessionId, isPlaying) {
+    LaunchedEffect(enabled, audioSessionId) {
         fftData = null
         levels = emptyList()
         visualizerFailed = false
@@ -3951,11 +4043,15 @@ private fun AudioVisualizer(
 
         val buffer = ByteArray(visualizer.captureSize)
         try {
-            while (true) {
-                if (isPlaying) {
+            while (isActive) {
+                if (playingState) {
                     if (visualizer.getFft(buffer) == Visualizer.SUCCESS) {
                         fftData = buffer.copyOf()
                     }
+                } else {
+                    fftData = null
+                    delay(120L)
+                    continue
                 }
                 delay(33L)
             }
@@ -4285,6 +4381,18 @@ private fun com.ella.music.data.model.LyricLine.miniVisiblePartCount(
     if (!backgroundText.isNullOrBlank() && !backgroundText.isMusicSymbolOnly()) count++
     if (showTranslation && !backgroundTranslation.isNullOrBlank()) count++
     return count
+}
+
+private fun com.ella.music.data.model.LyricLine.isMiniBackgroundAfterMain(): Boolean {
+    val start = backgroundStartMs ?: backgroundWords.minOfOrNull { it.startMs }
+    val mainStart = words.minOfOrNull { it.startMs } ?: timeMs
+    return start == null || start > mainStart
+}
+
+private fun com.ella.music.data.model.LyricLine.isMiniBackgroundVisibleAt(positionMs: Long): Boolean {
+    val start = backgroundStartMs ?: backgroundWords.minOfOrNull { it.startMs } ?: return true
+    val end = backgroundEndMs ?: backgroundWords.maxOfOrNull { it.endMs } ?: endMs
+    return positionMs >= start && (end == null || positionMs <= end)
 }
 
 private fun com.ella.music.data.model.LyricLine.previewTextAlign(): TextAlign {

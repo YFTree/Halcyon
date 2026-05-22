@@ -65,6 +65,8 @@ class SettingsManager(private val context: Context) {
         val KEY_AUDIO_VISUALIZER_ENABLED = booleanPreferencesKey("audio_visualizer_enabled")
         val KEY_DYNAMIC_COVER_ENABLED = booleanPreferencesKey("dynamic_cover_enabled")
         val KEY_SHOW_PLAY_NEXT_IN_LISTS = booleanPreferencesKey("show_play_next_in_lists")
+        val KEY_LYRIC_SHARE_CUSTOM_INFO = stringPreferencesKey("lyric_share_custom_info")
+        val KEY_SHOW_ALBUM_ARTISTS = booleanPreferencesKey("show_album_artists")
         val KEY_WEBDAV_URL = stringPreferencesKey("webdav_url")
         val KEY_WEBDAV_USERNAME = stringPreferencesKey("webdav_username")
         val KEY_WEBDAV_PASSWORD = stringPreferencesKey("webdav_password")
@@ -128,6 +130,18 @@ class SettingsManager(private val context: Context) {
         const val DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
     }
 
+    private fun metadataCategorySortKey(type: String): Preferences.Key<Int> =
+        intPreferencesKey("sort_metadata_category_${type.safePreferenceSuffix()}")
+
+    private fun metadataCategoryDetailSongSortKey(type: String): Preferences.Key<Int> =
+        intPreferencesKey("sort_metadata_category_detail_song_${type.safePreferenceSuffix()}")
+
+    private fun metadataCategoryDetailAlbumSortKey(type: String): Preferences.Key<Int> =
+        intPreferencesKey("sort_metadata_category_detail_album_${type.safePreferenceSuffix()}")
+
+    private fun String.safePreferenceSuffix(): String =
+        lowercase().replace(Regex("[^a-z0-9_]+"), "_").trim('_').ifBlank { "unknown" }
+
     val lyriconEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_ENABLED] ?: false }
     val lyriconTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_TRANSLATION] ?: true }
     val autoScan: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_SCAN] ?: true }
@@ -170,6 +184,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_DYNAMIC_COVER_ENABLED] ?: false }
     val showPlayNextInLists: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_SHOW_PLAY_NEXT_IN_LISTS] ?: true }
+    val lyricShareCustomInfo: Flow<String> =
+        context.dataStore.data.map { it[KEY_LYRIC_SHARE_CUSTOM_INFO] ?: "" }
+    val showAlbumArtists: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_SHOW_ALBUM_ARTISTS] ?: false }
     val webDavUrl: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_URL] ?: "" }
     val webDavUsername: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_USERNAME] ?: "" }
     val webDavPassword: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_PASSWORD] ?: "" }
@@ -229,6 +247,14 @@ class SettingsManager(private val context: Context) {
     val categoryGridColumns: Flow<Int> = context.dataStore.data.map {
         (it[KEY_CATEGORY_GRID_COLUMNS] ?: 2).coerceIn(1, 4)
     }
+    fun metadataCategorySortIndex(type: String): Flow<Int> =
+        context.dataStore.data.map { it[metadataCategorySortKey(type)] ?: 0 }
+
+    fun metadataCategoryDetailSongSortIndex(type: String): Flow<Int> =
+        context.dataStore.data.map { it[metadataCategoryDetailSongSortKey(type)] ?: 0 }
+
+    fun metadataCategoryDetailAlbumSortIndex(type: String): Flow<Int> =
+        context.dataStore.data.map { it[metadataCategoryDetailAlbumSortKey(type)] ?: 0 }
 
     val bluetoothLyricEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_ENABLED] ?: false }
@@ -369,6 +395,21 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setShowPlayNextInLists(enabled: Boolean) {
         context.dataStore.edit { it[KEY_SHOW_PLAY_NEXT_IN_LISTS] = enabled }
+    }
+
+    suspend fun setLyricShareCustomInfo(info: String) {
+        context.dataStore.edit {
+            val trimmed = info.trim().removePrefix("@").trim()
+            if (trimmed.isBlank()) {
+                it.remove(KEY_LYRIC_SHARE_CUSTOM_INFO)
+            } else {
+                it[KEY_LYRIC_SHARE_CUSTOM_INFO] = trimmed
+            }
+        }
+    }
+
+    suspend fun setShowAlbumArtists(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_SHOW_ALBUM_ARTISTS] = enabled }
     }
 
     suspend fun setWebDavConfig(url: String, username: String, password: String) {
@@ -596,6 +637,18 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_CATEGORY_GRID_COLUMNS] = columns.coerceIn(1, 4) }
     }
 
+    suspend fun setMetadataCategorySortIndex(type: String, index: Int) {
+        context.dataStore.edit { it[metadataCategorySortKey(type)] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setMetadataCategoryDetailSongSortIndex(type: String, index: Int) {
+        context.dataStore.edit { it[metadataCategoryDetailSongSortKey(type)] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setMetadataCategoryDetailAlbumSortIndex(type: String, index: Int) {
+        context.dataStore.edit { it[metadataCategoryDetailAlbumSortKey(type)] = index.coerceAtLeast(0) }
+    }
+
     suspend fun setScanIncludeFolders(folders: String) {
         context.dataStore.edit { it[KEY_SCAN_INCLUDE_FOLDERS] = folders.trim() }
     }
@@ -670,6 +723,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_AUDIO_VISUALIZER_ENABLED)
             setBoolean(KEY_DYNAMIC_COVER_ENABLED)
             setBoolean(KEY_SHOW_PLAY_NEXT_IN_LISTS)
+            setBoolean(KEY_SHOW_ALBUM_ARTISTS)
             setBoolean(KEY_USE_ANDROID_MEDIA_LIBRARY)
             setBoolean(KEY_INITIAL_SCAN_PROMPT_HANDLED)
             setBoolean(KEY_BLUETOOTH_LYRIC_ENABLED)
@@ -717,6 +771,7 @@ class SettingsManager(private val context: Context) {
             setString(KEY_OPENAI_MODEL)
             setString(KEY_LYRIC_FONT_NAME)
             setString(KEY_LYRIC_FONT_PATH)
+            setString(KEY_LYRIC_SHARE_CUSTOM_INFO)
             setString(KEY_SCAN_INCLUDE_FOLDERS)
             setString(KEY_SCAN_EXCLUDE_FOLDERS)
             setString(KEY_ARTIST_SEPARATORS)

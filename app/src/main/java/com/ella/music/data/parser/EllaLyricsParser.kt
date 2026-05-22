@@ -269,6 +269,8 @@ internal object EllaLyricsParser {
                     backgroundText = bg?.text,
                     backgroundWords = bg?.words.orEmpty().toDisplayWords(bg?.text.orEmpty()),
                     backgroundTranslation = bg?.translation,
+                    backgroundStartMs = bg?.startMs,
+                    backgroundEndMs = bg?.endMs,
                     isTtml = true,
                     endMs = end
                 )
@@ -375,10 +377,15 @@ internal object EllaLyricsParser {
         val text = collectTtmlMainText(this, words, fallbackEnd)
             .removeBackgroundParentheses()
             .cleanLyricText()
+        val cleanedWords = words
+            .map { it.copy(text = it.text.removeBackgroundParentheses()) }
+            .filter { it.text.isNotBlank() }
         return TtmlBackground(
             text = text,
-            words = words.map { it.copy(text = it.text.removeBackgroundParentheses()) }.filter { it.text.isNotBlank() },
-            translation = translation
+            words = cleanedWords,
+            translation = translation,
+            startMs = attr("begin").parseTtmlTime() ?: cleanedWords.minOfOrNull { it.startMs },
+            endMs = attr("end").parseTtmlTime() ?: cleanedWords.maxOfOrNull { it.endMs } ?: fallbackEnd
         )
     }
 
@@ -433,6 +440,8 @@ internal object EllaLyricsParser {
                             ?: line.backgroundText.takeIf {
                                 !target.backgroundText.isNullOrBlank() && it != target.backgroundText
                             },
+                        backgroundStartMs = target.backgroundStartMs ?: line.backgroundStartMs ?: line.timeMs,
+                        backgroundEndMs = target.backgroundEndMs ?: line.backgroundEndMs ?: line.endMs,
                         endMs = listOfNotNull(target.endMs, line.endMs).maxOrNull()
                     )
                 } else {
@@ -448,7 +457,9 @@ internal object EllaLyricsParser {
     private data class TtmlBackground(
         val text: String,
         val words: List<LyricWord>,
-        val translation: String?
+        val translation: String?,
+        val startMs: Long?,
+        val endMs: Long?
     )
 
     private data class TtmlPronunciation(

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +48,7 @@ import com.ella.music.data.SettingsManager
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.widget.Toast
@@ -493,6 +495,8 @@ fun SettingsDetailScreen(
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = true)
+    val lyricShareCustomInfo by settingsManager.lyricShareCustomInfo.collectAsState(initial = "")
+    val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = false)
     val openAiApiKey by settingsManager.openAiApiKey.collectAsState(initial = "")
     val openAiBaseUrl by settingsManager.openAiBaseUrl.collectAsState(initial = SettingsManager.DEFAULT_OPENAI_BASE_URL)
     val openAiModel by settingsManager.openAiModel.collectAsState(initial = SettingsManager.DEFAULT_OPENAI_MODEL)
@@ -629,11 +633,19 @@ fun SettingsDetailScreen(
                         )
                         WindowSpinnerPreference(
                             title = "分类网格列数",
-                            summary = "专辑、流派、年份等分类页面显示为 ${categoryGridColumns.coerceIn(1, 4)} 列",
+                            summary = "专辑、流派、年份等页面显示为 ${categoryGridColumns.coerceIn(1, 4)} 列；作曲家、作词家和文件夹固定一列",
                             items = categoryGridEntries,
                             selectedIndex = (categoryGridColumns - 1).coerceIn(categoryGridEntries.indices),
                             onSelectedIndexChange = { index ->
                                 scope.launch { settingsManager.setCategoryGridColumns(index + 1) }
+                            }
+                        )
+                        SwitchPreference(
+                            title = "显示专辑艺术家",
+                            summary = "开启后将专辑艺术家并入艺术家列表，并显示发行专辑页",
+                            checked = showAlbumArtists,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setShowAlbumArtists(it) }
                             }
                         )
                         SwitchPreference(
@@ -687,6 +699,19 @@ fun SettingsDetailScreen(
                             value = openAiModel,
                             summary = "例如 ${SettingsManager.DEFAULT_OPENAI_MODEL}；可按账号可用模型自行修改",
                             onValueChange = { value -> scope.launch { settingsManager.setOpenAiModel(value) } }
+                        )
+                    }
+                }
+
+                SmallTitle(text = "歌词卡片分享")
+
+                SettingsCardGroup {
+                    Column {
+                        SplitSettingTextField(
+                            label = "自定义信息",
+                            value = lyricShareCustomInfo,
+                            summary = "留空显示 Via Ella；填写名称后显示为 Via @名称",
+                            onValueChange = { value -> scope.launch { settingsManager.setLyricShareCustomInfo(value) } }
                         )
                     }
                 }
@@ -1041,6 +1066,24 @@ private fun SplitSettingTextField(
     summary: String,
     onValueChange: (String) -> Unit
 ) {
+    var localValue by remember(label) { mutableStateOf(value) }
+    var hasPendingEdit by remember(label) { mutableStateOf(false) }
+
+    LaunchedEffect(value) {
+        if (!hasPendingEdit && value != localValue) {
+            localValue = value
+        }
+    }
+
+    LaunchedEffect(localValue) {
+        if (!hasPendingEdit) return@LaunchedEffect
+        delay(360)
+        if (localValue != value) {
+            onValueChange(localValue)
+        }
+        hasPendingEdit = false
+    }
+
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         Text(
             text = label,
@@ -1054,8 +1097,11 @@ private fun SplitSettingTextField(
             modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
         )
         TextField(
-            value = value,
-            onValueChange = onValueChange,
+            value = localValue,
+            onValueChange = {
+                localValue = it
+                hasPendingEdit = true
+            },
             label = label,
             useLabelAsPlaceholder = true,
             singleLine = false,

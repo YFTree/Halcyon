@@ -6,7 +6,8 @@ internal data class FolderTreeEntry(
     val path: String,
     val name: String,
     val songCount: Int,
-    val duration: Long
+    val duration: Long,
+    val dateModified: Long = 0L
 )
 
 internal fun Song.folderPath(): String {
@@ -43,7 +44,8 @@ internal fun List<Song>.childFoldersOf(parentPath: String): List<FolderTreeEntry
                 path = path,
                 name = path.substringAfterLast('/').ifBlank { "根目录" },
                 songCount = songs.size,
-                duration = songs.sumOf { it.duration }
+                duration = songs.sumOf { it.duration },
+                dateModified = songs.maxOfOrNull { it.dateModified } ?: 0L
             )
         }
 }

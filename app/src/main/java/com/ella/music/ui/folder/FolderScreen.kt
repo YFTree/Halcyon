@@ -46,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +55,7 @@ import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.data.webdav.WebDavClient
 import com.ella.music.data.webdav.WebDavItem
 import com.ella.music.ui.components.DoubleTapScrollOverlay
+import com.ella.music.ui.components.FolderOutlineIcon
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -140,18 +142,6 @@ fun FolderScreen(
                         Icon(
                             imageVector = MiuixIcons.Regular.Sort,
                             contentDescription = "排序",
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            if (!isScanning) mainViewModel.scanMusic()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Refresh,
-                            contentDescription = "全量扫描",
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -264,7 +254,8 @@ fun FolderScreen(
                                 path = rootFolderPath,
                                 name = rootFolderPath.substringAfterLast('/').ifBlank { "根目录" },
                                 songCount = rootDirectSongs.size,
-                                duration = rootDirectSongs.sumOf { it.duration }
+                                duration = rootDirectSongs.sumOf { it.duration },
+                                dateModified = rootDirectSongs.maxOfOrNull { it.dateModified } ?: 0L
                             )
                         )
                     }
@@ -285,52 +276,67 @@ fun FolderScreen(
                     items = folders,
                     key = { it.path }
                 ) { folder ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                            .combinedClickable(
-                                onClick = { onFolderClick(folder.path) },
-                                onLongClick = { folderToBlock = folder.path }
-                            )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.Regular.Folder,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.primary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = folder.name,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MiuixTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "${folder.songCount} 首歌曲 · ${folder.duration.formatFolderDuration()}",
-                                    fontSize = 13.sp,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
-                            }
-                            Icon(
-                                imageVector = MiuixIcons.Basic.ArrowRight,
-                                contentDescription = null,
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
+                    FolderListRow(
+                        folder = folder,
+                        onClick = { onFolderClick(folder.path) },
+                        onLongClick = { folderToBlock = folder.path }
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FolderListRow(
+    folder: FolderTreeEntry,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(MiuixTheme.colorScheme.surfaceContainer)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .padding(horizontal = 18.dp, vertical = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        FolderOutlineIcon(
+            tint = MiuixTheme.colorScheme.primary,
+            modifier = Modifier.size(42.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = folder.name,
+                fontSize = 17.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${folder.songCount} 首歌曲 · ${folder.path}",
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = MiuixIcons.Basic.ArrowRight,
+            contentDescription = null,
+            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.size(22.dp)
+        )
     }
 }
 
@@ -531,7 +537,9 @@ private fun MediaSourceModeCard(
 private enum class FolderListSortMode(val label: String) {
     Name("文件夹名"),
     SongCount("歌曲数"),
-    Duration("歌曲时长")
+    Duration("歌曲时长"),
+    DateModified("修改时间"),
+    DateModifiedAsc("修改时间升序")
 }
 
 private fun List<FolderTreeEntry>.sortedForFolderList(
@@ -541,6 +549,8 @@ private fun List<FolderTreeEntry>.sortedForFolderList(
         FolderListSortMode.Name -> sortedBy { it.name.lowercase(Locale.ROOT) }
         FolderListSortMode.SongCount -> sortedByDescending { it.songCount }
         FolderListSortMode.Duration -> sortedByDescending { it.duration }
+        FolderListSortMode.DateModified -> sortedByDescending { it.dateModified }
+        FolderListSortMode.DateModifiedAsc -> sortedBy { it.dateModified }
     }
 }
 
@@ -627,11 +637,9 @@ private fun SavedScanFoldersCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Folder,
-                        contentDescription = null,
+                    FolderOutlineIcon(
                         tint = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -643,7 +651,10 @@ private fun SavedScanFoldersCard(
                         Text(
                             text = folder,
                             fontSize = 12.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            lineHeight = 16.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     IconButton(onClick = { onRemove(folder) }) {

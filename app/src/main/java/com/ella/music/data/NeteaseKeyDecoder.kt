@@ -65,11 +65,11 @@ fun decodeNeteaseKey(value: String): NeteaseKeyInfo? {
     }
 }
 
-fun neteaseSongUrl(id: String): String = "https://music.163.com/#/song?id=$id"
+fun neteaseSongUrl(id: String): String = "https://y.music.163.com/m/song?id=$id"
 
-fun neteaseAlbumUrl(id: String): String = "https://music.163.com/#/album?id=$id"
+fun neteaseAlbumUrl(id: String): String = "https://y.music.163.com/m/album?id=$id"
 
-fun neteaseArtistUrl(id: String): String = "https://music.163.com/#/artist?id=$id"
+fun neteaseArtistUrl(id: String): String = "https://y.music.163.com/m/artist?id=$id"
 
 private fun decryptNeteaseKeyPayload(payload: String): String? {
     return runCatching {

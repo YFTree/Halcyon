@@ -1,5 +1,7 @@
 package com.ella.music.ui.album
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -23,17 +25,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +50,7 @@ import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
+import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -57,7 +63,9 @@ import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 @Composable
@@ -66,9 +74,12 @@ fun AlbumDetailScreen(
     mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
     onBack: () -> Unit,
+    onNavigateToAlbum: (Long) -> Unit = {},
+    onNavigateToArtist: (String) -> Unit = {},
     onNavigateToPlayer: () -> Unit
 ) {
     val albums by mainViewModel.albums.collectAsState()
+    val context = LocalContext.current
     val currentSong by playerViewModel.currentSong.collectAsState()
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
@@ -76,17 +87,51 @@ fun AlbumDetailScreen(
     val sortMode = AlbumDetailSongSortMode.entries.getOrElse(sortIndex) { AlbumDetailSongSortMode.Track }
     val scope = rememberCoroutineScope()
     var sortExpanded by remember { mutableStateOf(false) }
+    var actionSong by remember { mutableStateOf<Song?>(null) }
     val album = albums.find { it.id == albumId }
     val albumSongs = mainViewModel.getSongsForAlbum(albumId)
     val sortedAlbumSongs = remember(albumSongs, sortMode) { albumSongs.sortedForAlbumDetail(sortMode) }
+    val useDiscSections = sortMode == AlbumDetailSongSortMode.Track && sortedAlbumSongs.any { it.discNumber > 0 }
+    val discGroups = remember(sortedAlbumSongs, sortMode) {
+        if (sortMode == AlbumDetailSongSortMode.Track) {
+            sortedAlbumSongs.groupForDiscSections()
+        } else {
+            emptyList()
+        }
+    }
     val albumArtUri = mainViewModel.getAlbumArtUri(album?.artAlbumId ?: albumSongs.firstOrNull()?.albumId ?: 0L)
+    val neteaseAlbumUrl by produceState<String?>(initialValue = null, albumId, albumSongs) {
+        value = mainViewModel.getNeteaseAlbumUrlForAlbum(albumId)
+    }
+    val albumCopyright by produceState<String>(initialValue = "", albumId, albumSongs) {
+        value = withContext(Dispatchers.IO) {
+            albumSongs
+                .asSequence()
+                .map { mainViewModel.getSongTagInfo(it).copyright }
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinctBy { it.lowercase(Locale.ROOT) }
+                .take(3)
+                .joinToString("\n")
+        }
+    }
     val listState = rememberLazyListState()
     var scrollToTopRequest by remember { mutableStateOf(0) }
-    val currentSongItemIndex = remember(sortedAlbumSongs, currentSong?.id) {
-        sortedAlbumSongs.indexOfFirst { it.id == currentSong?.id }
-            .takeIf { it >= 0 }
-            ?.plus(2)
-            ?: -1
+    val currentSongItemIndex = remember(sortedAlbumSongs, discGroups, useDiscSections, currentSong?.id) {
+        val songIndex = sortedAlbumSongs.indexOfFirst { it.id == currentSong?.id }
+        if (songIndex < 0) {
+            -1
+        } else {
+            val discHeaderCount = if (useDiscSections) {
+                val song = sortedAlbumSongs[songIndex]
+                discGroups.count { group ->
+                    group.discNumber <= song.safeDiscNumber()
+                }
+            } else {
+                0
+            }
+            2 + discHeaderCount + songIndex
+        }
     }
 
     BackHandler(enabled = sortExpanded) {
@@ -112,6 +157,8 @@ fun AlbumDetailScreen(
                     album = album,
                     albumArtUri = albumArtUri,
                     songCount = sortedAlbumSongs.size,
+                    hasNeteaseAlbum = !neteaseAlbumUrl.isNullOrBlank(),
+                    onNeteaseAlbumClick = { openUrl(context, neteaseAlbumUrl.orEmpty()) },
                     onPlayAll = {
                         if (sortedAlbumSongs.isNotEmpty()) {
                             playerViewModel.setPlaylist(sortedAlbumSongs, 0)
@@ -130,19 +177,52 @@ fun AlbumDetailScreen(
                 )
             }
 
-            itemsIndexed(sortedAlbumSongs) { index, song ->
-                SongItem(
-                    song = song,
-                    isCurrent = currentSong?.id == song.id,
-                    albumArtUri = albumArtUri,
-                    loadCoverArt = mainViewModel::getCoverArtBitmap,
-                    loadAudioInfo = mainViewModel::getAudioInfo,
-                    onClick = {
-                        playerViewModel.setPlaylist(sortedAlbumSongs, index)
-                        if (openPlayerOnPlay) onNavigateToPlayer()
-                    },
-                    onAddToQueue = { playerViewModel.addToPlaylist(song) }
-                )
+            if (useDiscSections) {
+                discGroups.forEach { group ->
+                    item(key = "disc-${group.discNumber}") {
+                        DiscHeader(group.discNumber)
+                    }
+                    items(
+                        items = group.songs,
+                        key = { song -> song.id }
+                    ) { song ->
+                        val index = sortedAlbumSongs.indexOfFirst { it.id == song.id }
+                        AlbumSongRow(
+                            song = song,
+                            index = index,
+                            sortedAlbumSongs = sortedAlbumSongs,
+                            albumArtUri = albumArtUri,
+                            currentSongId = currentSong?.id,
+                            showTrackNumber = true,
+                            mainViewModel = mainViewModel,
+                            playerViewModel = playerViewModel,
+                            openPlayerOnPlay = openPlayerOnPlay,
+                            onNavigateToPlayer = onNavigateToPlayer,
+                            onMore = { actionSong = song }
+                        )
+                    }
+                }
+            } else {
+                itemsIndexed(sortedAlbumSongs) { index, song ->
+                    AlbumSongRow(
+                        song = song,
+                        index = index,
+                        sortedAlbumSongs = sortedAlbumSongs,
+                        albumArtUri = albumArtUri,
+                        currentSongId = currentSong?.id,
+                        showTrackNumber = sortMode == AlbumDetailSongSortMode.Track,
+                        mainViewModel = mainViewModel,
+                        playerViewModel = playerViewModel,
+                        openPlayerOnPlay = openPlayerOnPlay,
+                        onNavigateToPlayer = onNavigateToPlayer,
+                        onMore = { actionSong = song }
+                    )
+                }
+            }
+            if (albumCopyright.isNotBlank()) {
+                item(key = "album-copyright") {
+                    AlbumCopyrightFooter(albumCopyright)
+                }
             }
         }
 
@@ -231,7 +311,82 @@ fun AlbumDetailScreen(
                 .align(Alignment.BottomEnd)
                 .padding(end = 22.dp, bottom = 118.dp)
         )
+
+        SongMoreActionHost(
+            actionSong = actionSong,
+            mainViewModel = mainViewModel,
+            playerViewModel = playerViewModel,
+            onDismissAction = { actionSong = null },
+            onNavigateToAlbum = onNavigateToAlbum,
+            onNavigateToArtist = onNavigateToArtist
+        )
     }
+}
+
+@Composable
+private fun AlbumCopyrightFooter(copyright: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "版权",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+        )
+        Text(
+            text = copyright,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+        )
+    }
+}
+
+@Composable
+private fun DiscHeader(discNumber: Int) {
+    Text(
+        text = "Disc $discNumber",
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Bold,
+        color = MiuixTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 6.dp)
+    )
+}
+
+@Composable
+private fun AlbumSongRow(
+    song: Song,
+    index: Int,
+    sortedAlbumSongs: List<Song>,
+    albumArtUri: Uri?,
+    currentSongId: Long?,
+    showTrackNumber: Boolean,
+    mainViewModel: MainViewModel,
+    playerViewModel: PlayerViewModel,
+    openPlayerOnPlay: Boolean,
+    onNavigateToPlayer: () -> Unit,
+    onMore: () -> Unit
+) {
+    SongItem(
+        song = song,
+        isCurrent = currentSongId == song.id,
+        albumArtUri = albumArtUri,
+        loadCoverArt = mainViewModel::getCoverArtBitmap,
+        loadAudioInfo = mainViewModel::getAudioInfo,
+        leadingLabel = if (showTrackNumber) song.displayTrackNumber() else null,
+        leadingLabelBeforeCover = showTrackNumber,
+        onClick = {
+            val safeIndex = index.coerceAtLeast(0)
+            playerViewModel.setPlaylist(sortedAlbumSongs, safeIndex)
+            if (openPlayerOnPlay) onNavigateToPlayer()
+        },
+        onAddToQueue = { playerViewModel.addToPlaylist(song) },
+        onMore = onMore
+    )
 }
 
 @Composable
@@ -239,6 +394,8 @@ private fun AlbumHeader(
     album: Album?,
     albumArtUri: Uri?,
     songCount: Int,
+    hasNeteaseAlbum: Boolean,
+    onNeteaseAlbumClick: () -> Unit,
     onPlayAll: () -> Unit
 ) {
     val pageBackground = ellaPageBackground()
@@ -304,6 +461,19 @@ private fun AlbumHeader(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            if (hasNeteaseAlbum) {
+                Text(
+                    text = "网易云专辑",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier
+                        .background(Color.White.copy(alpha = 0.18f), androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
+                        .clickable(onClick = onNeteaseAlbumClick)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+
             AppleStylePlayButton(
                 text = "播放全部",
                 onClick = onPlayAll,
@@ -312,6 +482,11 @@ private fun AlbumHeader(
             )
         }
     }
+}
+
+private fun openUrl(context: Context, url: String) {
+    if (url.isBlank()) return
+    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
 }
 
 private enum class AlbumDetailSongSortMode(val label: String) {
@@ -324,6 +499,22 @@ private enum class AlbumDetailSongSortMode(val label: String) {
     DateModified("修改时间"),
     DateModifiedAsc("修改时间升序")
 }
+
+private data class AlbumDiscGroup(
+    val discNumber: Int,
+    val songs: List<Song>
+)
+
+private fun List<Song>.groupForDiscSections(): List<AlbumDiscGroup> =
+    groupBy { it.safeDiscNumber() }
+        .toSortedMap()
+        .map { (discNumber, songs) -> AlbumDiscGroup(discNumber, songs) }
+
+private fun Song.safeDiscNumber(): Int =
+    if (discNumber > 0) discNumber else 1
+
+private fun Song.displayTrackNumber(): String =
+    trackNumber.takeIf { it > 0 }?.toString().orEmpty()
 
 private fun List<Song>.sortedForAlbumDetail(mode: AlbumDetailSongSortMode): List<Song> {
     return when (mode) {

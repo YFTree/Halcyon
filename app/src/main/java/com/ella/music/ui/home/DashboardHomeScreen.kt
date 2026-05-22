@@ -74,13 +74,17 @@ fun HomeScreen(
     val context = LocalContext.current
     val settingsManager = remember(context) { SettingsManager(context) }
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
+    val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = false)
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = ellaPageBackground()
     val cardText = if (isDark) Color.White else Color(0xFF15151A)
     val featuredSongs = remember(songs) { songs.shuffled().take(3) }
-    val artistCount = remember(songs) {
+    val artistCount = remember(songs, showAlbumArtists) {
         songs
-            .flatMap { splitArtistNames(it.artist) + splitArtistNames(it.albumArtist) }
+            .flatMap {
+                if (showAlbumArtists) splitArtistNames(it.artist) + splitArtistNames(it.albumArtist)
+                else splitArtistNames(it.artist)
+            }
             .distinctBy { it.lowercase() }
             .size
     }
@@ -133,23 +137,23 @@ fun HomeScreen(
             }
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                HomeTile("文件夹", "按目录浏览", Color(0xFF5E60CE), onNavigateToFolder, Modifier.weight(1f))
+                HomeTile("文件夹", "按目录分类", Color(0xFF5E60CE), { onNavigateToMetadataCategory("folder") }, Modifier.weight(1f))
+                HomeTile("文件夹层次结构", "按嵌套目录浏览", Color(0xFF8338EC), onNavigateToFolder, Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 HomeTile("歌单", "收藏与自建", Color(0xFFEF476F), onNavigateToPlaylists, Modifier.weight(1f))
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 HomeTile("听歌统计", "历史和热力图", Color(0xFFE71D36), onNavigateToAnalytics, Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 HomeTile("流派", "按 Genre 浏览", Color(0xFF06D6A0), { onNavigateToMetadataCategory("genre") }, Modifier.weight(1f))
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 HomeTile("年份", "按年份归档", Color(0xFF4CC9F0), { onNavigateToMetadataCategory("year") }, Modifier.weight(1f))
-                HomeTile("作曲家", "Composer", Color(0xFFB5179E), { onNavigateToMetadataCategory("composer") }, Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                HomeTile("作曲家", "Composer", Color(0xFFB5179E), { onNavigateToMetadataCategory("composer") }, Modifier.weight(1f))
                 HomeTile("作词家", "Lyricist", Color(0xFFFF6D00), { onNavigateToMetadataCategory("lyricist") }, Modifier.weight(1f))
-                Spacer(modifier = Modifier.weight(1f))
             }
 
             SectionTitle("在线音乐")

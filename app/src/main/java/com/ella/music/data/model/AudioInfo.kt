@@ -21,6 +21,7 @@ data class SongTagInfo(
     val lyricist: String = "",
     val track: String = "",
     val comment: String = "",
+    val copyright: String = "",
     val neteaseKey: String = "",
     val rating: Int = 0
 ) {
@@ -42,9 +43,19 @@ fun String.looksLikeNeteaseKey(): Boolean {
 }
 
 private fun String.cleanDisplayComment(): String {
-    return trim()
-        .trim('《', '》', '<', '>', '「', '」', '『', '』', '"', '\'', ' ', '\t', '\r', '\n')
+    val text = trim()
+        .trim('"', '\'', ' ', '\t', '\r', '\n')
         .replace(Regex("""\s+"""), " ")
+    return text.unwrapWholeCommentMarks()
+}
+
+private fun String.unwrapWholeCommentMarks(): String {
+    val pairs = listOf('《' to '》', '「' to '」', '『' to '』', '<' to '>')
+    val first = firstOrNull() ?: return this
+    val last = lastOrNull() ?: return this
+    val pair = pairs.firstOrNull { it.first == first && it.second == last } ?: return this
+    val inner = substring(1, length - 1).trim()
+    return inner.takeIf { it.isNotBlank() && pair.first !in it && pair.second !in it } ?: this
 }
 
 private fun String.looksLikeSourceGarbageComment(): Boolean {

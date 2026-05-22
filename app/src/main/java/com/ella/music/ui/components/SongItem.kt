@@ -58,6 +58,8 @@ fun SongItem(
     onDownload: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
     onMore: (() -> Unit)? = null,
+    leadingLabel: String? = null,
+    leadingLabelBeforeCover: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -112,6 +114,17 @@ fun SongItem(
             Spacer(modifier = Modifier.width(12.dp))
         }
 
+        if (leadingLabelBeforeCover && !leadingLabel.isNullOrBlank()) {
+            Text(
+                text = leadingLabel,
+                fontSize = 14.sp,
+                color = if (isCurrent) MiuixTheme.colorScheme.primary
+                else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.width(28.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+        }
+
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -139,6 +152,17 @@ fun SongItem(
         }
 
         Spacer(modifier = Modifier.width(12.dp))
+
+        if (!leadingLabelBeforeCover && !leadingLabel.isNullOrBlank()) {
+            Text(
+                text = leadingLabel,
+                fontSize = 14.sp,
+                color = if (isCurrent) MiuixTheme.colorScheme.primary
+                else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.width(28.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+        }
 
         Column(modifier = Modifier.weight(1f)) {
             Text(

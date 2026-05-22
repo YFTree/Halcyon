@@ -1,10 +1,13 @@
 package com.ella.music.ui.artist
 
 import androidx.activity.compose.BackHandler
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,6 +52,8 @@ import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.requestPinnedEllaShortcut
+import com.ella.music.ui.navigation.Screen
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -63,32 +69,59 @@ import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun ArtistListScreen(
     mainViewModel: MainViewModel,
     onBack: () -> Unit,
     onArtistClick: (String) -> Unit
 ) {
+    val context = LocalContext.current
     val songs by mainViewModel.songs.collectAsState()
     val albums by mainViewModel.albums.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
     val sortIndex by mainViewModel.settingsManager.artistListSortIndex.collectAsState(initial = LibrarySortUiState.artistListSortIndex)
+    val showAlbumArtists by mainViewModel.settingsManager.showAlbumArtists.collectAsState(initial = false)
     val sortMode = ArtistSortMode.entries.getOrElse(sortIndex) { ArtistSortMode.Name }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var scrollToTopRequest by remember { mutableStateOf(0) }
 
-    val artists = remember(songs, albums) { mainViewModel.getArtists() }
-    val representativeSongsByArtist = remember(songs) {
+    val artists = remember(songs, albums, showAlbumArtists) { mainViewModel.getArtists(showAlbumArtists) }
+    val representativeSongsByArtist = remember(songs, showAlbumArtists) {
         buildMap {
             songs.forEach { song ->
-                (splitArtistNames(song.artist) + splitArtistNames(song.albumArtist)).forEach { artistName ->
+                val names = if (showAlbumArtists) {
+                    splitArtistNames(song.artist) + splitArtistNames(song.albumArtist)
+                } else {
+                    splitArtistNames(song.artist)
+                }
+                names.forEach { artistName ->
                     putIfAbsent(artistName, song)
                 }
             }
         }
     }
-    val filteredArtists = remember(artists, searchQuery, sortMode) {
+    val artistDurations = remember(songs) {
+        buildMap {
+            songs.forEach { song ->
+                splitArtistNames(song.artist).forEach { artistName ->
+                    put(artistName.lowercase(), (get(artistName.lowercase()) ?: 0L) + song.duration)
+                }
+            }
+        }
+    }
+    val releaseAlbumCounts = remember(albums, showAlbumArtists) {
+        buildMap {
+            if (!showAlbumArtists) return@buildMap
+            albums.forEach { album ->
+                splitArtistNames(album.albumArtist.ifBlank { album.artist }).forEach { artistName ->
+                    put(artistName.lowercase(), (get(artistName.lowercase()) ?: 0) + 1)
+                }
+            }
+        }
+    }
+    val filteredArtists = remember(artists, searchQuery, sortMode, artistDurations, releaseAlbumCounts) {
         val filtered = if (searchQuery.isBlank()) {
             artists
         } else {
@@ -98,6 +131,8 @@ fun ArtistListScreen(
             ArtistSortMode.Name -> filtered.sortedBy { it.name.lowercase() }
             ArtistSortMode.SongCount -> filtered.sortedByDescending { it.songCount }
             ArtistSortMode.AlbumCount -> filtered.sortedByDescending { it.albumCount }
+            ArtistSortMode.ReleaseAlbumCount -> filtered.sortedByDescending { releaseAlbumCounts[it.name.lowercase()] ?: 0 }
+            ArtistSortMode.Duration -> filtered.sortedByDescending { artistDurations[it.name.lowercase()] ?: 0L }
         }
     }
 
@@ -231,7 +266,25 @@ fun ArtistListScreen(
                             artist = artist,
                             representativeSong = representativeSongsByArtist[artist.name],
                             mainViewModel = mainViewModel,
-                            onClick = { onArtistClick(artist.name) }
+                            summary = artist.summaryForSort(
+                                sortMode = sortMode,
+                                duration = artistDurations[artist.name.lowercase()] ?: 0L,
+                                releaseAlbumCount = releaseAlbumCounts[artist.name.lowercase()] ?: 0
+                            ),
+                            onClick = { onArtistClick(artist.name) },
+                            onLongClick = {
+                                val ok = requestPinnedEllaShortcut(
+                                    context = context,
+                                    id = "artist_${artist.name}",
+                                    label = artist.name,
+                                    route = Screen.ArtistDetail.createRoute(artist.name)
+                                )
+                                Toast.makeText(
+                                    context,
+                                    if (ok) "已请求添加桌面快捷方式" else "当前桌面不支持固定快捷方式",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         )
                     }
                 }
@@ -263,17 +316,23 @@ private fun Artist.indexLetter(): String {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun ArtistRow(
     artist: Artist,
     representativeSong: Song?,
     mainViewModel: MainViewModel,
-    onClick: () -> Unit
+    summary: String,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(76.dp)
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -315,7 +374,7 @@ private fun ArtistRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${artist.songCount} 首歌曲 · ${artist.albumCount} 张专辑",
+                text = summary,
                 fontSize = 12.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 maxLines = 1,
@@ -328,5 +387,27 @@ private fun ArtistRow(
 private enum class ArtistSortMode(val label: String) {
     Name("名称"),
     SongCount("歌曲数"),
-    AlbumCount("专辑数")
+    AlbumCount("参与专辑数"),
+    ReleaseAlbumCount("发行专辑数"),
+    Duration("歌曲时长")
+}
+
+private fun Artist.summaryForSort(
+    sortMode: ArtistSortMode,
+    duration: Long,
+    releaseAlbumCount: Int
+): String {
+    return when (sortMode) {
+        ArtistSortMode.Duration -> "${duration.formatArtistDuration()} · ${albumCount} 张参与专辑"
+        ArtistSortMode.ReleaseAlbumCount -> "$songCount 首歌曲 · $releaseAlbumCount 张发行专辑"
+        else -> "$songCount 首歌曲 · $albumCount 张参与专辑"
+    }
+}
+
+private fun Long.formatArtistDuration(): String {
+    if (this <= 0L) return "00:00"
+    val totalMinutes = this / 60_000L
+    val hours = totalMinutes / 60L
+    val minutes = totalMinutes % 60L
+    return if (hours > 0) "${hours}小时${minutes}分" else "${minutes}分钟"
 }

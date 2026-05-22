@@ -1,5 +1,6 @@
 package com.ella.music.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -10,6 +11,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -77,7 +80,8 @@ fun LyricView(
     topSpacer: androidx.compose.ui.unit.Dp = 200.dp,
     bottomSpacer: androidx.compose.ui.unit.Dp = 300.dp,
     onLineClick: (LyricLine) -> Unit = {},
-    onLineDoubleClick: () -> Unit = {}
+    onLineDoubleClick: () -> Unit = {},
+    onLineLongClick: (LyricLine) -> Unit = {}
 ) {
     if (lyrics.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -117,6 +121,7 @@ fun LyricView(
             val isPast = index < currentIndex
             val lineTextAlign = line.ttmlTextAlign()
             val backgroundTextAlign = line.ttmlBackgroundTextAlign()
+            val backgroundAfterMain = line.isBackgroundAfterMain()
 
             val textColor = when {
                 usePlayerColors && isActive -> Color.White.copy(alpha = 0.96f)
@@ -131,7 +136,8 @@ fun LyricView(
                 .pointerInput(line) {
                     detectTapGestures(
                         onTap = { onLineClick(line) },
-                        onDoubleTap = { onLineDoubleClick() }
+                        onDoubleTap = { onLineDoubleClick() },
+                        onLongPress = { onLineLongClick(line) }
                     )
                 }
 
@@ -144,6 +150,17 @@ fun LyricView(
                     textAlign = lineTextAlign,
                     modifier = lineModifier
                         .padding(bottom = 2.dp)
+                )
+            }
+            if (!backgroundAfterMain) {
+                SimpleBackgroundLyricBlock(
+                    line = line,
+                    showTranslation = showTranslation,
+                    isActive = isActive,
+                    textColor = textColor,
+                    backgroundTextAlign = backgroundTextAlign,
+                    fontFamily = fontFamily,
+                    lineModifier = lineModifier
                 )
             }
             Text(
@@ -167,26 +184,15 @@ fun LyricView(
                         .padding(top = 2.dp)
                 )
             }
-            if (!line.backgroundText.isNullOrBlank()) {
-                Text(
-                    text = line.backgroundText.orEmpty().lineBreakSafeText(),
-                    fontSize = if (isActive) 14.sp else 12.sp,
+            if (backgroundAfterMain) {
+                SimpleBackgroundLyricBlock(
+                    line = line,
+                    showTranslation = showTranslation,
+                    isActive = isActive,
+                    textColor = textColor,
+                    backgroundTextAlign = backgroundTextAlign,
                     fontFamily = fontFamily,
-                    color = textColor.copy(alpha = 0.56f),
-                    textAlign = backgroundTextAlign,
-                    modifier = lineModifier
-                        .padding(top = 2.dp)
-                )
-            }
-            if (showTranslation && !line.backgroundTranslation.isNullOrBlank()) {
-                Text(
-                    text = line.backgroundTranslation.orEmpty().lineBreakSafeText(),
-                    fontSize = if (isActive) 13.sp else 11.sp,
-                    fontFamily = fontFamily,
-                    color = textColor.copy(alpha = 0.48f),
-                    textAlign = backgroundTextAlign,
-                    modifier = lineModifier
-                        .padding(top = 2.dp)
+                    lineModifier = lineModifier
                 )
             }
         }
@@ -211,7 +217,8 @@ fun WordLyricView(
     bottomSpacer: androidx.compose.ui.unit.Dp = 420.dp,
     horizontalPadding: androidx.compose.ui.unit.Dp = 22.dp,
     onLineClick: (LyricLine) -> Unit = {},
-    onLineDoubleClick: () -> Unit = {}
+    onLineDoubleClick: () -> Unit = {},
+    onLineLongClick: (LyricLine) -> Unit = {}
 ) {
     if (lyrics.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
@@ -291,6 +298,7 @@ fun WordLyricView(
             val nextLine = lyrics.getOrNull(index + 1)
             val lineTextAlign = line.ttmlTextAlign()
             val backgroundTextAlign = line.ttmlBackgroundTextAlign()
+            val backgroundAfterMain = line.isBackgroundAfterMain()
             val distance = when {
                 currentIndex < 0 -> 2
                 index < currentIndex -> currentIndex - index
@@ -346,7 +354,8 @@ fun WordLyricView(
                     .pointerInput(line) {
                         detectTapGestures(
                             onTap = { onLineClick(line) },
-                            onDoubleTap = { onLineDoubleClick() }
+                            onDoubleTap = { onLineDoubleClick() },
+                            onLongPress = { onLineLongClick(line) }
                         )
                     }
                     .padding(
@@ -390,6 +399,20 @@ fun WordLyricView(
                                 .padding(bottom = 2.dp)
                         )
                     }
+                }
+                if (!backgroundAfterMain) {
+                    WordBackgroundLyricBlock(
+                        line = line,
+                        isActive = isActive,
+                        currentIndex = currentIndex,
+                        index = index,
+                        smoothPositionMs = smoothPositionMs,
+                        showTranslation = showTranslation,
+                        backgroundTextAlign = backgroundTextAlign,
+                        fontScale = fontScale,
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight
+                    )
                 }
                 if (line.words.isNotEmpty() && isActive) {
                     WordLine(
@@ -446,63 +469,18 @@ fun WordLyricView(
                             .padding(top = 3.dp)
                     )
                 }
-                if (!line.backgroundText.isNullOrBlank()) {
-                    val backgroundColor = when {
-                        isActive -> Color.White.copy(alpha = 0.56f)
-                        index < currentIndex -> Color.White.copy(alpha = 0.28f)
-                        else -> Color.White.copy(alpha = 0.42f)
-                    }
-                    if (isActive && line.backgroundWords.isNotEmpty()) {
-                        WordLine(
-                            displayText = line.backgroundText.orEmpty(),
-                            words = line.backgroundWords,
-                            currentPositionMs = smoothPositionMs,
-                            textAlign = backgroundTextAlign,
-                            fontSizeSp = fittedLyricFontSp(line.backgroundText.orEmpty(), scaledLyricFontSp(22, fontScale, minSp = 8), minSp = 8),
-                            fontFamily = fontFamily,
-                            fontWeight = fontWeight.softenedLyricWeight(),
-                            currentColor = Color.White.copy(alpha = 0.78f),
-                            sungColor = Color.White.copy(alpha = 0.58f),
-                            pendingColor = Color.White.copy(alpha = 0.36f),
-                            glowColor = Color.White.copy(alpha = 0.22f),
-                            modifier = Modifier.padding(top = 3.dp)
-                        )
-                    } else {
-                        Text(
-                            text = line.backgroundText.orEmpty().lineBreakSafeText(),
-                            fontSize = fittedLyricFontSp(line.backgroundText.orEmpty(), scaledLyricFontSp(if (isActive) 22 else 13, fontScale, minSp = 8), minSp = 8).sp,
-                            fontFamily = fontFamily,
-                            fontWeight = fontWeight.softenedLyricWeight(),
-                            color = backgroundColor,
-                            textAlign = backgroundTextAlign,
-                            maxLines = if (isActive) 3 else 2,
-                            softWrap = true,
-                            overflow = TextOverflow.Clip,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 3.dp)
-                        )
-                    }
-                }
-                if (showTranslation && !line.backgroundTranslation.isNullOrBlank()) {
-                    val backgroundTranslationColor = when {
-                        isActive -> Color.White.copy(alpha = 0.44f)
-                        index < currentIndex -> Color.White.copy(alpha = 0.24f)
-                        else -> Color.White.copy(alpha = 0.36f)
-                    }
-                    Text(
-                        text = line.backgroundTranslation.orEmpty().lineBreakSafeText(),
-                        fontSize = fittedLyricFontSp(line.backgroundTranslation.orEmpty(), scaledLyricFontSp(if (isActive) 12 else 10, fontScale, minSp = 8), minSp = 8).sp,
+                if (backgroundAfterMain) {
+                    WordBackgroundLyricBlock(
+                        line = line,
+                        isActive = isActive,
+                        currentIndex = currentIndex,
+                        index = index,
+                        smoothPositionMs = smoothPositionMs,
+                        showTranslation = showTranslation,
+                        backgroundTextAlign = backgroundTextAlign,
+                        fontScale = fontScale,
                         fontFamily = fontFamily,
-                        fontWeight = fontWeight.softenedLyricWeight(),
-                        color = backgroundTranslationColor,
-                        textAlign = backgroundTextAlign,
-                        maxLines = if (isActive) 3 else 2,
-                        softWrap = true,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 2.dp)
+                        fontWeight = fontWeight
                     )
                 }
                 if (isActive && line.shouldShowInterlude(nextLine, smoothPositionMs)) {
@@ -735,6 +713,132 @@ private fun rememberSmoothLyricPosition(
 
 private fun LyricLine.lyricRenderKey(): String =
     "$timeMs|$endMs|$text|$backgroundText"
+
+@Composable
+private fun SimpleBackgroundLyricBlock(
+    line: LyricLine,
+    showTranslation: Boolean,
+    isActive: Boolean,
+    textColor: Color,
+    backgroundTextAlign: TextAlign,
+    fontFamily: FontFamily?,
+    lineModifier: Modifier
+) {
+    if (!line.backgroundText.isNullOrBlank()) {
+        Text(
+            text = line.backgroundText.orEmpty().lineBreakSafeText(),
+            fontSize = if (isActive) 14.sp else 12.sp,
+            fontFamily = fontFamily,
+            color = textColor.copy(alpha = 0.56f),
+            textAlign = backgroundTextAlign,
+            modifier = lineModifier.padding(top = 2.dp)
+        )
+    }
+    if (showTranslation && !line.backgroundTranslation.isNullOrBlank()) {
+        Text(
+            text = line.backgroundTranslation.orEmpty().lineBreakSafeText(),
+            fontSize = if (isActive) 13.sp else 11.sp,
+            fontFamily = fontFamily,
+            color = textColor.copy(alpha = 0.48f),
+            textAlign = backgroundTextAlign,
+            modifier = lineModifier.padding(top = 2.dp)
+        )
+    }
+}
+
+@Composable
+private fun WordBackgroundLyricBlock(
+    line: LyricLine,
+    isActive: Boolean,
+    currentIndex: Int,
+    index: Int,
+    smoothPositionMs: Long,
+    showTranslation: Boolean,
+    backgroundTextAlign: TextAlign,
+    fontScale: Float,
+    fontFamily: FontFamily?,
+    fontWeight: FontWeight
+) {
+    AnimatedVisibility(
+        visible = line.isBackgroundVisibleAt(smoothPositionMs),
+        enter = fadeIn(animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)),
+        exit = fadeOut(animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (!line.backgroundText.isNullOrBlank()) {
+                val backgroundColor = when {
+                    isActive -> Color.White.copy(alpha = 0.56f)
+                    index < currentIndex -> Color.White.copy(alpha = 0.28f)
+                    else -> Color.White.copy(alpha = 0.42f)
+                }
+                if (isActive && line.backgroundWords.isNotEmpty()) {
+                    WordLine(
+                        displayText = line.backgroundText.orEmpty(),
+                        words = line.backgroundWords,
+                        currentPositionMs = smoothPositionMs,
+                        textAlign = backgroundTextAlign,
+                        fontSizeSp = fittedLyricFontSp(line.backgroundText.orEmpty(), scaledLyricFontSp(22, fontScale, minSp = 8), minSp = 8),
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight.softenedLyricWeight(),
+                        currentColor = Color.White.copy(alpha = 0.78f),
+                        sungColor = Color.White.copy(alpha = 0.58f),
+                        pendingColor = Color.White.copy(alpha = 0.36f),
+                        glowColor = Color.White.copy(alpha = 0.22f),
+                        modifier = Modifier.padding(top = 3.dp)
+                    )
+                } else {
+                    Text(
+                        text = line.backgroundText.orEmpty().lineBreakSafeText(),
+                        fontSize = fittedLyricFontSp(line.backgroundText.orEmpty(), scaledLyricFontSp(if (isActive) 22 else 13, fontScale, minSp = 8), minSp = 8).sp,
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight.softenedLyricWeight(),
+                        color = backgroundColor,
+                        textAlign = backgroundTextAlign,
+                        maxLines = if (isActive) 3 else 2,
+                        softWrap = true,
+                        overflow = TextOverflow.Clip,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 3.dp)
+                    )
+                }
+            }
+            if (showTranslation && !line.backgroundTranslation.isNullOrBlank()) {
+                val backgroundTranslationColor = when {
+                    isActive -> Color.White.copy(alpha = 0.44f)
+                    index < currentIndex -> Color.White.copy(alpha = 0.24f)
+                    else -> Color.White.copy(alpha = 0.36f)
+                }
+                Text(
+                    text = line.backgroundTranslation.orEmpty().lineBreakSafeText(),
+                    fontSize = fittedLyricFontSp(line.backgroundTranslation.orEmpty(), scaledLyricFontSp(if (isActive) 12 else 10, fontScale, minSp = 8), minSp = 8).sp,
+                    fontFamily = fontFamily,
+                    fontWeight = fontWeight.softenedLyricWeight(),
+                    color = backgroundTranslationColor,
+                    textAlign = backgroundTextAlign,
+                    maxLines = if (isActive) 3 else 2,
+                    softWrap = true,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun LyricLine.isBackgroundAfterMain(): Boolean {
+    val backgroundStart = backgroundStartMs ?: backgroundWords.minOfOrNull { it.startMs }
+    val mainStart = words.minOfOrNull { it.startMs } ?: timeMs
+    return backgroundStart == null || backgroundStart > mainStart
+}
+
+private fun LyricLine.isBackgroundVisibleAt(positionMs: Long): Boolean {
+    val start = backgroundStartMs ?: backgroundWords.minOfOrNull { it.startMs } ?: return true
+    val end = backgroundEndMs ?: backgroundWords.maxOfOrNull { it.endMs } ?: endMs
+    return positionMs >= start && (end == null || positionMs <= end)
+}
 
 private const val LYRIC_SWEEP_FEATHER_FRACTION = 0.045f
 private const val LYRIC_PLAYED_LINE_BLUR_DP = 1.2f

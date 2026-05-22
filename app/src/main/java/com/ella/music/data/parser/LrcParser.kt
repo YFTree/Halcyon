@@ -96,6 +96,8 @@ object LrcParser {
                     backgroundText = background?.text,
                     backgroundWords = background?.let { it.words.toTtmlDisplayWords(it.text) }.orEmpty(),
                     backgroundTranslation = background?.translation,
+                    backgroundStartMs = background?.startMs,
+                    backgroundEndMs = background?.endMs,
                     isTtml = true,
                     endMs = end
                 )
@@ -145,6 +147,10 @@ object LrcParser {
                     backgroundText = backgrounds.firstOrNull { it.text.isNotBlank() && !it.text.isMusicSymbolOnly() }?.text,
                     backgroundWords = backgrounds.firstOrNull { it.words.isNotEmpty() }?.let { it.words.toTtmlDisplayWords(it.text) }.orEmpty(),
                     backgroundTranslation = backgrounds.firstOrNull { !it.translation.isNullOrBlank() }?.translation,
+                    backgroundStartMs = backgrounds.firstOrNull { it.text.isNotBlank() && !it.text.isMusicSymbolOnly() }?.startMs
+                        ?: backgrounds.firstOrNull { it.words.isNotEmpty() }?.startMs,
+                    backgroundEndMs = backgrounds.firstOrNull { it.text.isNotBlank() && !it.text.isMusicSymbolOnly() }?.endMs
+                        ?: backgrounds.firstOrNull { it.words.isNotEmpty() }?.endMs,
                     isTtml = true,
                     endMs = end
                 )
@@ -237,7 +243,9 @@ object LrcParser {
     private data class TtmlBackground(
         val text: String,
         val words: List<LyricWord> = emptyList(),
-        val translation: String? = null
+        val translation: String? = null,
+        val startMs: Long? = null,
+        val endMs: Long? = null
     )
 
     private data class TtmlPronunciation(
@@ -290,7 +298,9 @@ object LrcParser {
         return TtmlBackground(
             text = text,
             words = cleanedWords.toTtmlDisplayWords(text),
-            translation = translations.firstOrNull { it.isNotBlank() && !it.isMusicSymbolOnly() }
+            translation = translations.firstOrNull { it.isNotBlank() && !it.isMusicSymbolOnly() },
+            startMs = ownBegin ?: cleanedWords.minOfOrNull { it.startMs },
+            endMs = element.attr("end").parseTtmlTime() ?: cleanedWords.maxOfOrNull { it.endMs } ?: lineEndMs
         )
     }
 
@@ -324,7 +334,11 @@ object LrcParser {
         return TtmlBackground(
             text = text,
             words = words.toTtmlDisplayWords(text),
-            translation = translation
+            translation = translation,
+            startMs = beginAttributePattern.find(this)?.groupValues?.getOrNull(1)?.parseTtmlTime()
+                ?: words.minOfOrNull { it.startMs },
+            endMs = endAttributePattern.find(this)?.groupValues?.getOrNull(1)?.parseTtmlTime()
+                ?: words.maxOfOrNull { it.endMs }
         )
     }
 

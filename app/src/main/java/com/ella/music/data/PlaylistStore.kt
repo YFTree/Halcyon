@@ -29,6 +29,20 @@ data class PlaylistImportResult(
     val duplicateCount: Int
 )
 
+data class PlaylistBatchImportResult(
+    val importedPlaylists: Int,
+    val importedCount: Int,
+    val matchedCount: Int,
+    val missingCount: Int,
+    val duplicateCount: Int
+)
+
+enum class PlaylistImportMode {
+    ReplaceAll,
+    MergeReplaceExisting,
+    MergeKeepExisting
+}
+
 data class PlaylistExportResult(
     val exportedCount: Int,
     val skippedCount: Int
@@ -137,9 +151,13 @@ class PlaylistStore private constructor(context: Context) {
     }
 
     suspend fun importSaltPlayerPlaylist(uri: Uri, librarySongs: List<Song>): PlaylistImportResult =
-        importLocalPlaylist(uri, librarySongs)
+        importLocalPlaylist(uri, librarySongs, PlaylistImportMode.MergeKeepExisting)
 
-    suspend fun importLocalPlaylist(uri: Uri, librarySongs: List<Song>): PlaylistImportResult =
+    suspend fun importLocalPlaylist(
+        uri: Uri,
+        librarySongs: List<Song>,
+        mode: PlaylistImportMode = PlaylistImportMode.MergeKeepExisting
+    ): PlaylistImportResult =
         withContext(Dispatchers.IO) {
             val rawEntries = appContext.contentResolver.openInputStream(uri)
                 ?.bufferedReader(Charsets.UTF_8)
@@ -161,7 +179,9 @@ class PlaylistStore private constructor(context: Context) {
                 )
             }
 
-            val libraryByPath = librarySongs.associateBy { it.path.normalizedPlaylistPath() }
+            val libraryByPath = librarySongs
+                .flatMap { song -> song.playlistPathKeys().map { key -> key to song } }
+                .toMap()
             val libraryByFileName = librarySongs
                 .groupBy { it.path.substringAfterLast('/').ifBlank { it.fileName }.normalizedPlaylistPath() }
             var matchedCount = 0
@@ -177,14 +197,25 @@ class PlaylistStore private constructor(context: Context) {
             }
 
             synchronized(lock) {
+                val playlistName = playlistNameFromUri(uri)
+                val existing = playlists.value.firstOrNull {
+                    it.id != FAVORITES_PLAYLIST_ID && it.name.equals(playlistName, ignoreCase = true)
+                }
                 val playlist = UserPlaylist(
-                    id = "playlist-${UUID.randomUUID()}",
-                    name = playlistNameFromUri(uri),
-                    songs = playlistSongs,
+                    id = existing?.id ?: "playlist-${UUID.randomUUID()}",
+                    name = playlistName,
+                    songs = when {
+                        existing != null && mode == PlaylistImportMode.MergeKeepExisting -> {
+                            val existingKeys = existing.songs.mapTo(mutableSetOf()) { it.key }
+                            existing.songs + playlistSongs.filter { existingKeys.add(it.key) }
+                        }
+                        else -> playlistSongs
+                    },
                     createdAt = now,
                     updatedAt = now
                 )
-                val next = playlists.value + playlist
+                val withoutExisting = playlists.value.filterNot { it.id == playlist.id }
+                val next = withoutExisting + playlist
                 _playlists.value = next
                 saveLocked(next)
                 PlaylistImportResult(
@@ -193,6 +224,31 @@ class PlaylistStore private constructor(context: Context) {
                     matchedCount = matchedCount,
                     missingCount = playlistSongs.size - matchedCount,
                     duplicateCount = duplicateCount
+                )
+            }
+        }
+
+    suspend fun importLocalPlaylists(
+        uris: List<Uri>,
+        librarySongs: List<Song>,
+        mode: PlaylistImportMode = PlaylistImportMode.MergeKeepExisting
+    ): PlaylistBatchImportResult =
+        withContext(Dispatchers.IO) {
+            if (mode == PlaylistImportMode.ReplaceAll) {
+                synchronized(lock) {
+                    val next = playlists.value.filter { it.id == FAVORITES_PLAYLIST_ID }.ensureFavorites()
+                    _playlists.value = next
+                    saveLocked(next)
+                }
+            }
+            uris.fold(PlaylistBatchImportResult(0, 0, 0, 0, 0)) { total, uri ->
+                val result = importLocalPlaylist(uri, librarySongs, mode)
+                total.copy(
+                    importedPlaylists = total.importedPlaylists + if (result.playlist != null) 1 else 0,
+                    importedCount = total.importedCount + result.importedCount,
+                    matchedCount = total.matchedCount + result.matchedCount,
+                    missingCount = total.missingCount + result.missingCount,
+                    duplicateCount = total.duplicateCount + result.duplicateCount
                 )
             }
         }
@@ -224,19 +280,27 @@ class PlaylistStore private constructor(context: Context) {
         libraryByPath: Map<String, Song>,
         libraryByFileName: Map<String, List<Song>>
     ): Song? {
-        val normalized = entry.normalizedPlaylistPath()
-        libraryByPath[normalized]?.let { return it }
+        val candidates = entry.playlistEntryPathCandidates()
+        candidates.firstNotNullOfOrNull { libraryByPath[it] }?.let { return it }
 
-        if ('/' in normalized) {
-            librarySongs.firstOrNull { song ->
-                song.path.normalizedPlaylistPath().endsWith("/$normalized")
-            }?.let { return it }
+        candidates.forEach { normalized ->
+            if ('/' in normalized) {
+                librarySongs.firstOrNull { song ->
+                    song.path.normalizedPlaylistPath().endsWith("/$normalized")
+                }?.let { return it }
+            }
         }
 
-        val fileName = normalized.substringAfterLast('/')
-        return libraryByFileName[fileName]
-            ?.takeIf { it.size == 1 }
-            ?.firstOrNull()
+        return candidates
+            .asSequence()
+            .map { it.substringAfterLast('/') }
+            .distinct()
+            .mapNotNull { fileName ->
+                libraryByFileName[fileName]
+                    ?.takeIf { it.size == 1 }
+                    ?.firstOrNull()
+            }
+            .firstOrNull()
     }
 
     suspend fun exportSaltPlayerPlaylist(playlist: UserPlaylist, uri: Uri): PlaylistExportResult =
@@ -350,6 +414,51 @@ class PlaylistStore private constructor(context: Context) {
 
     private fun String.normalizedPlaylistPath(): String =
         trim().replace('\\', '/').lowercase()
+
+    private fun Song.playlistPathKeys(): List<String> =
+        path.playlistEntryPathCandidates() + fileName.playlistEntryPathCandidates()
+
+    private fun String.playlistEntryPathCandidates(): List<String> {
+        val normalized = normalizedPlaylistPath().trim('/')
+        if (normalized.isBlank()) return emptyList()
+        val candidates = linkedSetOf(normalized, "/$normalized".normalizedPlaylistPath())
+        val withoutFileScheme = removePrefix("file://").normalizedPlaylistPath().trim('/')
+        if (withoutFileScheme.isNotBlank()) {
+            candidates += withoutFileScheme
+            candidates += "/$withoutFileScheme".normalizedPlaylistPath()
+        }
+        if (normalized.startsWith("primary/")) {
+            val relative = normalized.removePrefix("primary/").trim('/')
+            candidates += relative
+            candidates += "/storage/emulated/0/$relative".normalizedPlaylistPath()
+            candidates += "/sdcard/$relative".normalizedPlaylistPath()
+        }
+        if (normalized.startsWith("storage/emulated/0/")) {
+            val relative = normalized.removePrefix("storage/emulated/0/").trim('/')
+            candidates += relative
+            candidates += "primary/$relative".normalizedPlaylistPath()
+            candidates += "/sdcard/$relative".normalizedPlaylistPath()
+        }
+        if (normalized.startsWith("/storage/emulated/0/")) {
+            val relative = normalized.removePrefix("/storage/emulated/0/").trim('/')
+            candidates += relative
+            candidates += "primary/$relative".normalizedPlaylistPath()
+            candidates += "/sdcard/$relative".normalizedPlaylistPath()
+        }
+        if (normalized.startsWith("sdcard/")) {
+            val relative = normalized.removePrefix("sdcard/").trim('/')
+            candidates += relative
+            candidates += "primary/$relative".normalizedPlaylistPath()
+            candidates += "/storage/emulated/0/$relative".normalizedPlaylistPath()
+        }
+        if (normalized.startsWith("/sdcard/")) {
+            val relative = normalized.removePrefix("/sdcard/").trim('/')
+            candidates += relative
+            candidates += "primary/$relative".normalizedPlaylistPath()
+            candidates += "/storage/emulated/0/$relative".normalizedPlaylistPath()
+        }
+        return candidates.toList()
+    }
 
     companion object {
         private const val TAG = "PlaylistStore"

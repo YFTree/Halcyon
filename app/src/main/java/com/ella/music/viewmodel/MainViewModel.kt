@@ -4,15 +4,20 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.ella.music.data.PlaylistBatchImportResult
 import com.ella.music.data.PlaylistExportResult
 import com.ella.music.data.PlaylistImportResult
+import com.ella.music.data.PlaylistImportMode
 import com.ella.music.data.PlaylistStore
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.PlaybackStatsStore
 import com.ella.music.data.SongPlaybackStats
 import com.ella.music.data.NameSplitConfigStore
+import com.ella.music.data.decodeNeteaseKey
 import com.ella.music.data.matchesArtistName
+import com.ella.music.data.neteaseAlbumUrl
+import com.ella.music.data.neteaseArtistUrl
 import com.ella.music.data.ai.OpenAiSongInterpretationConfig
 import com.ella.music.data.ai.OpenAiSongInterpretationInput
 import com.ella.music.data.ai.OpenAiSongInterpreter
@@ -139,7 +144,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return repository.getSongsForAlbum(albumId)
     }
 
-    fun getArtists(): List<Artist> {
+    fun getArtists(includeAlbumArtists: Boolean = false): List<Artist> {
         val currentSongs = songs.value
         val currentAlbums = albums.value
         val counts = linkedMapOf<String, ArtistAccumulator>()
@@ -152,19 +157,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 accumulator.songCount += 1
                 albumIdsByArtist.getOrPut(key) { mutableSetOf() } += song.albumIdentityId()
             }
-            splitArtistNames(song.albumArtist).forEach { rawName ->
-                val key = rawName.lowercase()
-                counts.getOrPut(key) { ArtistAccumulator(rawName) }
-                albumIdsByArtist.getOrPut(key) { mutableSetOf() } += song.albumIdentityId()
+            if (includeAlbumArtists) {
+                splitArtistNames(song.albumArtist).forEach { rawName ->
+                    val key = rawName.lowercase()
+                    counts.getOrPut(key) { ArtistAccumulator(rawName) }
+                    albumIdsByArtist.getOrPut(key) { mutableSetOf() } += song.albumIdentityId()
+                }
             }
         }
 
-        currentAlbums.forEach { album ->
-            splitArtistNames(album.albumArtist.ifBlank { album.artist }).forEach { rawName ->
-                val key = rawName.lowercase()
-                counts.getOrPut(key) { ArtistAccumulator(rawName) }
-                if (album.id > 0L) {
-                    albumIdsByArtist.getOrPut(key) { mutableSetOf() } += album.id
+        if (includeAlbumArtists) {
+            currentAlbums.forEach { album ->
+                splitArtistNames(album.albumArtist.ifBlank { album.artist }).forEach { rawName ->
+                    val key = rawName.lowercase()
+                    counts.getOrPut(key) { ArtistAccumulator(rawName) }
+                    if (album.id > 0L) {
+                        albumIdsByArtist.getOrPut(key) { mutableSetOf() } += album.id
+                    }
                 }
             }
         }
@@ -219,7 +228,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     name = name,
                     songCount = items.size,
                     albumCount = items.map { it.albumIdentityId() }.distinct().size,
-                    duration = items.sumOf { it.duration }
+                    duration = items.sumOf { it.duration },
+                    dateModified = items.maxOfOrNull { it.dateModified } ?: 0L,
+                    coverAlbumIds = items
+                        .mapNotNull { it.albumId.takeIf { albumId -> albumId > 0L } }
+                        .distinct()
+                        .take(3)
                 )
             }
             .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
@@ -236,6 +250,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { song -> song.title }
             )
+    }
+
+    fun hasMetadataCategory(type: String, name: String): Boolean {
+        val target = name.trim()
+        if (target.isBlank()) return false
+        return songs.value.any { song ->
+            song.metadataCategoryNames(type).any { it.equals(target, ignoreCase = true) }
+        }
+    }
+
+    suspend fun getNeteaseArtistUrlForArtist(artistName: String): String? = withContext(Dispatchers.IO) {
+        getSongsForArtist(artistName).asSequence()
+            .take(80)
+            .mapNotNull { song -> decodeNeteaseKey(repository.getSongTagInfo(song).neteaseKey) }
+            .flatMap { it.artists.asSequence() }
+            .firstOrNull { artist ->
+                artist.id.isNotBlank() && (
+                    artist.name.equals(artistName, ignoreCase = true) ||
+                        artistName.contains(artist.name, ignoreCase = true) ||
+                        artist.name.contains(artistName, ignoreCase = true)
+                    )
+            }
+            ?.id
+            ?.let(::neteaseArtistUrl)
+    }
+
+    suspend fun getNeteaseAlbumUrlForAlbum(albumId: Long): String? = withContext(Dispatchers.IO) {
+        getSongsForAlbum(albumId).asSequence()
+            .take(40)
+            .mapNotNull { song -> decodeNeteaseKey(repository.getSongTagInfo(song).neteaseKey) }
+            .firstOrNull { it.albumId.isNotBlank() }
+            ?.albumId
+            ?.let(::neteaseAlbumUrl)
     }
 
     fun getAlbumArtUri(albumId: Long) = repository.getAlbumArtUri(albumId)
@@ -294,8 +341,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return playlist.songs.map { item -> libraryByKey[item.key] ?: item.toSong() }
     }
 
-    fun createPlaylist(name: String) {
-        viewModelScope.launch { playlistStore.createPlaylist(name) }
+    fun createPlaylist(name: String, onCreated: (UserPlaylist?) -> Unit = {}) {
+        viewModelScope.launch {
+            onCreated(playlistStore.createPlaylist(name))
+        }
     }
 
     fun deletePlaylist(id: String) {
@@ -314,6 +363,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun importLocalPlaylist(uri: Uri, onResult: (Result<PlaylistImportResult>) -> Unit) {
         viewModelScope.launch {
             val result = runCatching { playlistStore.importLocalPlaylist(uri, songs.value) }
+            onResult(result)
+        }
+    }
+
+    fun importLocalPlaylists(
+        uris: List<Uri>,
+        mode: PlaylistImportMode = PlaylistImportMode.MergeKeepExisting,
+        onResult: (Result<PlaylistBatchImportResult>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = runCatching { playlistStore.importLocalPlaylists(uris, songs.value, mode) }
             onResult(result)
         }
     }
@@ -350,7 +410,9 @@ data class MetadataCategoryItem(
     val name: String,
     val songCount: Int,
     val albumCount: Int,
-    val duration: Long
+    val duration: Long,
+    val dateModified: Long = 0L,
+    val coverAlbumIds: List<Long> = emptyList()
 )
 
 private data class ArtistAccumulator(
@@ -364,10 +426,18 @@ private fun Song.metadataCategoryNames(type: String): List<String> {
         "year" -> listOfNotNull(year.extractYear())
         "composer" -> splitArtistNames(composer)
         "lyricist" -> splitArtistNames(lyricist)
+        "folder" -> listOfNotNull(parentFolderPath())
         else -> emptyList()
     }
 }
 
 private fun String.extractYear(): String? {
     return Regex("""\d{4}""").find(this)?.value
+}
+
+private fun Song.parentFolderPath(): String? {
+    val normalized = path.replace('\\', '/')
+    return normalized.substringBeforeLast('/', missingDelimiterValue = "")
+        .trim()
+        .ifBlank { null }
 }

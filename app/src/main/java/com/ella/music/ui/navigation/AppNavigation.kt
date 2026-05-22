@@ -176,6 +176,12 @@ fun AppNavigation(
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
+                onNavigateToAlbum = { targetAlbumId ->
+                    navController.navigate(Screen.AlbumDetail.createRoute(targetAlbumId))
+                },
+                onNavigateToArtist = { artistName ->
+                    navController.navigate(Screen.ArtistDetail.createRoute(artistName))
+                },
                 onNavigateToPlayer = onNavigateToPlayer
             )
         }
@@ -240,6 +246,12 @@ fun AppNavigation(
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
+                onAlbumClick = { albumId ->
+                    navController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                },
+                onArtistClick = { artistName ->
+                    navController.navigate(Screen.ArtistDetail.createRoute(artistName))
+                },
                 onNavigateToPlayer = onNavigateToPlayer
             )
         }
@@ -267,6 +279,12 @@ fun AppNavigation(
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
+                onNavigateToAlbum = { albumId ->
+                    navController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                },
+                onNavigateToArtist = { artistName ->
+                    navController.navigate(Screen.ArtistDetail.createRoute(artistName))
+                },
                 onNavigateToPlayer = onNavigateToPlayer
             )
         }
@@ -294,6 +312,9 @@ fun AppNavigation(
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
                 onAlbumClick = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
+                onMetadataCategoryClick = { type, name ->
+                    navController.navigate(Screen.MetadataCategoryDetail.createRoute(type, name))
+                },
                 onNavigateToPlayer = onNavigateToPlayer
             )
         }
@@ -311,6 +332,12 @@ fun AppNavigation(
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
+                onNavigateToAlbum = { albumId ->
+                    navController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                },
+                onNavigateToArtist = { artistName ->
+                    navController.navigate(Screen.ArtistDetail.createRoute(artistName))
+                },
                 onFolderClick = { childFolderPath ->
                     navController.navigate(Screen.FolderDetail.createRoute(childFolderPath))
                 },
@@ -374,10 +401,13 @@ fun AppNavigation(
 
         composable(Screen.LxOnline.route) {
             LxOnlineScreen(
+                mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
                 onNavigateToPlayer = onNavigateToPlayer,
-                onNavigateToSourceSettings = { navController.navigate(Screen.LxSourceSettings.route) }
+                onNavigateToSourceSettings = { navController.navigate(Screen.LxSourceSettings.route) },
+                onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
+                onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) }
             )
         }
 
@@ -389,10 +419,13 @@ fun AppNavigation(
 
         composable(Screen.MusicFreeOnline.route) {
             MusicFreeOnlineScreen(
+                mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
                 onNavigateToPlayer = onNavigateToPlayer,
-                onNavigateToPluginSettings = { navController.navigate(Screen.MusicFreePluginSettings.route) }
+                onNavigateToPluginSettings = { navController.navigate(Screen.MusicFreePluginSettings.route) },
+                onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
+                onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) }
             )
         }
 

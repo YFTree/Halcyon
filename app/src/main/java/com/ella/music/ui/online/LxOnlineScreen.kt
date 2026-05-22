@@ -38,9 +38,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.lx.LxOnlineService
 import com.ella.music.data.lx.LxOnlineSong
+import com.ella.music.data.model.Song
 import com.ella.music.ui.components.SongItem
+import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.LxOnlineViewModel
+import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -57,10 +60,13 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun LxOnlineScreen(
+    mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
     onBack: () -> Unit,
     onNavigateToPlayer: () -> Unit,
     onNavigateToSourceSettings: () -> Unit,
+    onNavigateToAlbum: (Long) -> Unit = {},
+    onNavigateToArtist: (String) -> Unit = {},
     state: LxOnlineViewModel = viewModel()
 ) {
     BackHandler(onBack = onBack)
@@ -79,6 +85,7 @@ fun LxOnlineScreen(
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val currentSourceId = selectedSource?.id.orEmpty()
     var observedSourceId by remember { mutableStateOf<String?>(null) }
+    var actionItem by remember { mutableStateOf<LxOnlineSong?>(null) }
     LaunchedEffect(currentSourceId) {
         val previousSourceId = observedSourceId
         if (previousSourceId != null && previousSourceId != currentSourceId) {
@@ -109,6 +116,13 @@ fun LxOnlineScreen(
             service.resolvePlayableSong(target, sourceScript)
         }
         state.message = "已获取 ${songs.size} 首队列歌曲，将在播放到对应歌曲时解析"
+    }
+
+    suspend fun resolveActionSong(song: Song): Song {
+        val item = actionItem?.takeIf { it.song.id == song.id }
+            ?: state.results.firstOrNull { it.song.id == song.id }
+            ?: error("在线歌曲已失效")
+        return service.resolvePlayableSong(item, selectedSource?.script.orEmpty())
     }
 
     Column(
@@ -262,6 +276,9 @@ fun LxOnlineScreen(
                                     }
                                     state.isBusy = false
                                 }
+                            },
+                            onMore = {
+                                actionItem = item
                             }
                         )
                     }
@@ -269,6 +286,18 @@ fun LxOnlineScreen(
             }
         }
     }
+
+    SongMoreActionHost(
+        actionSong = actionItem?.song,
+        mainViewModel = mainViewModel,
+        playerViewModel = playerViewModel,
+        onDismissAction = { actionItem = null },
+        onNavigateToAlbum = onNavigateToAlbum,
+        onNavigateToArtist = onNavigateToArtist,
+        showDelete = false,
+        showLocalFileActions = false,
+        resolveSongForAction = ::resolveActionSong
+    )
 }
 
 private fun enqueueDownload(context: Context, song: com.ella.music.data.model.Song) {

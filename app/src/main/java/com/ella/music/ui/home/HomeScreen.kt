@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import android.app.Activity
-import android.content.ClipData
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -55,15 +54,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.core.content.FileProvider
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
@@ -90,20 +91,25 @@ import com.ella.music.ui.components.TagEditorOption
 import com.ella.music.ui.components.buildTagEditorOptions
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.launchTagEditorOption
+import com.ella.music.ui.components.openSongSpectrumWithAspectPro
+import com.ella.music.ui.components.shareLocalSong
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
+import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
+import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Sort
@@ -141,6 +147,7 @@ fun LibraryScreen(
     var actionSong by remember { mutableStateOf<Song?>(null) }
     var artistChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
     var tagEditorSong by remember { mutableStateOf<Song?>(null) }
     var songInfoSheetSong by remember { mutableStateOf<Song?>(null) }
     var aiInterpretationSong by remember { mutableStateOf<Song?>(null) }
@@ -220,6 +227,8 @@ fun LibraryScreen(
             when (sortMode) {
                 HomeSortMode.Title -> filteredSongs.sortedByMusicKey { it.title }
                 HomeSortMode.FileName -> filteredSongs.sortedByMusicKey { it.fileName.ifBlank { it.path.substringAfterLast('/') } }
+                HomeSortMode.YearAsc -> HomeSortedSongs(filteredSongs.sortedByReleaseDate(ascending = true), emptyMap())
+                HomeSortMode.YearDesc -> HomeSortedSongs(filteredSongs.sortedByReleaseDate(ascending = false), emptyMap())
                 HomeSortMode.DateAdded -> HomeSortedSongs(filteredSongs.sortedByDescending { it.dateAdded }, emptyMap())
                 HomeSortMode.DateAddedAsc -> HomeSortedSongs(filteredSongs.sortedBy { it.dateAdded }, emptyMap())
                 HomeSortMode.DateModified -> HomeSortedSongs(filteredSongs.sortedByDescending { it.dateModified }, emptyMap())
@@ -266,7 +275,12 @@ fun LibraryScreen(
                                 playlistPickerSongs = selectedSongs
                             }
                         }) {
-                            Text(text = "添加到歌单", fontSize = 13.sp, color = MiuixTheme.colorScheme.primary)
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Add,
+                                contentDescription = "添加到歌单",
+                                tint = MiuixTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                         IconButton(onClick = {
                             val selectedSongs = sortedSongs.filter { it.id in selectedIds }
@@ -274,7 +288,12 @@ fun LibraryScreen(
                             selectedIds = emptySet()
                             selectionMode = false
                         }) {
-                            Text(text = "删除", fontSize = 13.sp, color = MiuixTheme.colorScheme.primary)
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Delete,
+                                contentDescription = "删除",
+                                tint = Color(0xFFE5484D),
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                         IconButton(onClick = {
                             selectedIds = emptySet()
@@ -543,10 +562,11 @@ fun LibraryScreen(
         }
 
         actionSong?.let { song ->
-            Popup(
-                alignment = Alignment.BottomCenter,
-                onDismissRequest = { actionSong = null },
-                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = song.title.ifBlank { "歌曲操作" },
+                onDismissRequest = { actionSong = null }
             ) {
                 SongActionMenu(
                     song = song,
@@ -562,7 +582,11 @@ fun LibraryScreen(
                     },
                     onShare = {
                         actionSong = null
-                        shareSong(context, song)
+                        shareLocalSong(context, song)
+                    },
+                    onSpectrum = {
+                        actionSong = null
+                        openSongSpectrumWithAspectPro(context, song)
                     },
                     onInfo = {
                         actionSong = null
@@ -598,10 +622,11 @@ fun LibraryScreen(
         }
 
         if (artistChoices.isNotEmpty()) {
-            Popup(
-                alignment = Alignment.BottomCenter,
-                onDismissRequest = { artistChoices = emptyList() },
-                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = "选择歌手",
+                onDismissRequest = { artistChoices = emptyList() }
             ) {
                 ArtistPickerSheet(
                     artists = artistChoices,
@@ -615,15 +640,20 @@ fun LibraryScreen(
         }
 
         playlistPickerSongs?.let { songsToAdd ->
-            Popup(
-                alignment = Alignment.BottomCenter,
-                onDismissRequest = { playlistPickerSongs = null },
-                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = "添加到歌单",
+                onDismissRequest = { playlistPickerSongs = null }
             ) {
                 AddToPlaylistMenu(
                     playlists = playlists.filterNot { it.id == FAVORITES_PLAYLIST_ID },
                     songCount = songsToAdd.size,
                     onDismiss = { playlistPickerSongs = null },
+                    onCreatePlaylist = {
+                        createPlaylistSongs = songsToAdd
+                        playlistPickerSongs = null
+                    },
                     onPlaylistClick = { playlist ->
                         mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
                         Toast.makeText(context, "已添加到 ${playlist.name}", Toast.LENGTH_SHORT).show()
@@ -635,11 +665,30 @@ fun LibraryScreen(
             }
         }
 
+        createPlaylistSongs?.let { songsToAdd ->
+            CreatePlaylistAndAddSheet(
+                songCount = songsToAdd.size,
+                onDismiss = { createPlaylistSongs = null },
+                onCreate = { name ->
+                    mainViewModel.createPlaylist(name) { playlist ->
+                        if (playlist != null) {
+                            mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                            Toast.makeText(context, "已添加到 ${playlist.name}", Toast.LENGTH_SHORT).show()
+                            selectedIds = emptySet()
+                            selectionMode = false
+                        }
+                    }
+                    createPlaylistSongs = null
+                }
+            )
+        }
+
         tagEditorSong?.let { song ->
-            Popup(
-                alignment = Alignment.BottomCenter,
-                onDismissRequest = { tagEditorSong = null },
-                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = "编辑歌曲标签信息",
+                onDismissRequest = { tagEditorSong = null }
             ) {
                 SongTagEditorMenu(
                     song = song,
@@ -654,10 +703,11 @@ fun LibraryScreen(
         }
 
         songInfoSheetSong?.let { song ->
-            Popup(
-                alignment = Alignment.BottomCenter,
-                onDismissRequest = { songInfoSheetSong = null },
-                properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = "歌曲信息",
+                onDismissRequest = { songInfoSheetSong = null }
             ) {
                 SongInfoMenu(
                     song = song,
@@ -690,6 +740,7 @@ private fun SongActionMenu(
     onAddToPlaylist: () -> Unit,
     onPlayNext: () -> Unit,
     onShare: () -> Unit,
+    onSpectrum: () -> Unit,
     onInfo: () -> Unit,
     onAiInterpret: () -> Unit,
     onArtist: () -> Unit,
@@ -700,7 +751,6 @@ private fun SongActionMenu(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight(0.88f)
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
             .background(MiuixTheme.colorScheme.background.copy(alpha = 0.98f))
             .verticalScroll(rememberScrollState())
@@ -721,6 +771,7 @@ private fun SongActionMenu(
         LibraryMenuItem("添加到歌单", onAddToPlaylist)
         LibraryMenuItem("下一首播放", onPlayNext)
         LibraryMenuItem("分享", onShare)
+        LibraryMenuItem("查看频谱", onSpectrum)
         LibraryMenuItem("AI 解读歌曲", onAiInterpret)
         LibraryMenuItem("查看歌曲信息", onInfo)
         LibraryMenuItem("艺术家：${song.artist.ifBlank { "未知艺术家" }}", onArtist)
@@ -1024,6 +1075,7 @@ private fun AddToPlaylistMenu(
     playlists: List<UserPlaylist>,
     songCount: Int,
     onDismiss: () -> Unit,
+    onCreatePlaylist: () -> Unit,
     onPlaylistClick: (UserPlaylist) -> Unit
 ) {
     Column(
@@ -1043,9 +1095,10 @@ private fun AddToPlaylistMenu(
             color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
         )
+        LibraryMenuItem("新建歌单", onCreatePlaylist)
         if (playlists.isEmpty()) {
             Text(
-                text = "暂无自定义歌单，请先在歌单页创建",
+                text = "暂无自定义歌单",
                 fontSize = 14.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 18.dp)
@@ -1059,6 +1112,60 @@ private fun AddToPlaylistMenu(
             }
         }
         LibraryMenuItem("取消", onDismiss)
+    }
+}
+
+@Composable
+private fun CreatePlaylistAndAddSheet(
+    songCount: Int,
+    onDismiss: () -> Unit,
+    onCreate: (String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
+    WindowBottomSheet(
+        show = true,
+        title = "新建歌单",
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.padding(bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "创建后会添加 $songCount 首歌曲",
+                fontSize = 13.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            TextField(
+                value = name,
+                onValueChange = { name = it },
+                label = "歌单名称",
+                useLabelAsPlaceholder = true,
+                singleLine = true,
+                insideMargin = DpSize(12.dp, 10.dp),
+                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+                cornerRadius = 12.dp,
+                textStyle = TextStyle(
+                    color = MiuixTheme.colorScheme.onSurface,
+                    fontSize = 15.sp
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = onDismiss) { Text("取消") }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { onCreate(name) }) { Text("创建") }
+            }
+        }
     }
 }
 
@@ -1167,45 +1274,6 @@ private fun LibraryMenuItem(
     }
 }
 
-private fun shareSong(context: Context, song: Song) {
-    if (song.path.startsWith("http://") || song.path.startsWith("https://")) {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "${song.title} - ${song.artist}\n${song.path}")
-        }
-        runCatching {
-            context.startActivity(Intent.createChooser(intent, "分享歌曲"))
-        }.onFailure {
-            Toast.makeText(context, "没有可用的分享应用", Toast.LENGTH_SHORT).show()
-        }
-        return
-    }
-
-    val uri = runCatching {
-        val file = File(song.path)
-        if (file.exists() && file.isFile) {
-            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        } else {
-            ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
-        }
-    }.getOrElse {
-        ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
-    }
-
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = song.mimeType.takeIf { it.startsWith("audio/") } ?: "audio/*"
-        putExtra(Intent.EXTRA_TITLE, "${song.title} - ${song.artist}")
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        clipData = ClipData.newUri(context.contentResolver, song.title, uri)
-    }
-    runCatching {
-        context.startActivity(Intent.createChooser(intent, "分享歌曲"))
-    }.onFailure {
-        Toast.makeText(context, "没有可用的分享应用", Toast.LENGTH_SHORT).show()
-    }
-}
-
 private fun formatLibraryFileSize(bytes: Long): String {
     if (bytes <= 0L) return ""
     val mb = bytes / 1024.0 / 1024.0
@@ -1222,8 +1290,30 @@ private enum class HomeSortMode(val label: String) {
     DateAdded("添加时间"),
     DateAddedAsc("添加时间升序"),
     DateModified("修改时间"),
-    DateModifiedAsc("修改时间升序")
+    DateModifiedAsc("修改时间升序"),
+    YearAsc("发行时间正序"),
+    YearDesc("发行时间倒序")
 }
+
+private fun List<Song>.sortedByReleaseDate(ascending: Boolean): List<Song> {
+    val comparator = if (ascending) {
+        compareBy<Song> { it.releaseYearOrNull() == null }
+            .thenBy { it.releaseYearOrNull() ?: Int.MAX_VALUE }
+    } else {
+        compareBy<Song> { it.releaseYearOrNull() == null }
+            .thenByDescending { it.releaseYearOrNull() ?: Int.MIN_VALUE }
+    }
+    return sortedWith(
+        comparator
+            .thenBy { it.album.lowercase(Locale.ROOT) }
+            .thenBy { if (it.discNumber > 0) it.discNumber else Int.MAX_VALUE }
+            .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
+            .thenBy { it.title.lowercase(Locale.ROOT) }
+    )
+}
+
+private fun Song.releaseYearOrNull(): Int? =
+    Regex("""\d{4}""").find(year)?.value?.toIntOrNull()
 
 private fun Song.indexLetter(sortKey: String? = null): String {
     val first = (sortKey ?: title.musicSortKey()).firstOrNull()?.uppercaseChar()

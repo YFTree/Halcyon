@@ -386,6 +386,12 @@ class MusicScanner(private val context: Context) {
                     ).orEmpty(),
                     "track" to tag.safeFirst(file, FieldKey.TRACK),
                     "comment" to tag.safeFirst(file, FieldKey.COMMENT),
+                    "copyright" to firstNonBlank(
+                        tag.safeFirst(file, "COPYRIGHT"),
+                        tag.safeFirst(file, "COPYRIGHTMESSAGE"),
+                        tag.safeFirst(file, "TCOP"),
+                        tag.safeFirst(file, "\u00a9cpy")
+                    ).orEmpty(),
                     "rating" to listOf(
                         tag.safeFirst(file, "RATING"),
                         tag.safeFirst(file, "RATE"),
@@ -433,6 +439,17 @@ class MusicScanner(private val context: Context) {
             track = jaudioValues["track"].orEmpty().ifBlank { tagLibValues.firstTagValue("TRACKNUMBER", "TRACK") },
             comment = jaudioValues["comment"].orEmpty().ifBlank {
                 tagLibValues.firstTagValue("COMMENT", "DESCRIPTION", "SUBTITLE")
+            }.cleanTagText(),
+            copyright = jaudioValues["copyright"].orEmpty().ifBlank {
+                tagLibValues.firstTagValue(
+                    "COPYRIGHT",
+                    "COPYRIGHTMESSAGE",
+                    "COPYRIGHT MESSAGE",
+                    "TCOP",
+                    "\u00a9cpy",
+                    "©cpy",
+                    "WCOP"
+                )
             }.cleanTagText(),
             neteaseKey = tagLibValues.findNeteaseKey()
                 .ifBlank { jaudioValues["comment"].orEmpty().takeIf { it.looksLikeNeteaseValue() }.orEmpty() }

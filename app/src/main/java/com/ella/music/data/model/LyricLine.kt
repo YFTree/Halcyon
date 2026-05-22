@@ -11,6 +11,8 @@ data class LyricLine(
     val backgroundText: String? = null,
     val backgroundWords: List<LyricWord> = emptyList(),
     val backgroundTranslation: String? = null,
+    val backgroundStartMs: Long? = null,
+    val backgroundEndMs: Long? = null,
     val isTtml: Boolean = false,
     val endMs: Long? = null
 )

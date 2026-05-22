@@ -1,6 +1,7 @@
 package com.ella.music
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.content.pm.PackageManager
@@ -73,6 +74,7 @@ import com.ella.music.ui.components.LiquidGlassBottomBarItem
 import com.ella.music.ui.components.MiniPlayer
 import com.ella.music.ui.components.TagEditorEditTracker
 import com.ella.music.ui.navigation.AppNavigation
+import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ROUTE
 import com.ella.music.ui.navigation.Screen
 import com.ella.music.ui.player.PlayerScreen
 import com.ella.music.ui.theme.EllaTheme
@@ -246,6 +248,19 @@ fun EllaApp(
     val initialScanPromptHandled by settingsManager.initialScanPromptHandled.collectAsState(initial = true)
     val isScanning by mainViewModel.isScanning.collectAsState()
     var showInitialScanPrompt by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val activity = context as? Activity
+        val shortcutRoute = activity?.intent?.getStringExtra(EXTRA_SHORTCUT_ROUTE).orEmpty()
+        if (shortcutRoute.isNotBlank()) {
+            runCatching {
+                navController.navigate(shortcutRoute) {
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+            activity?.intent?.removeExtra(EXTRA_SHORTCUT_ROUTE)
+        }
+    }
 
     val initialScanFolderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -353,7 +368,9 @@ fun EllaApp(
         0f
     }
 
-    val showMiniPlayer = currentSong != null && currentRoute != Screen.Player.route
+    val showMiniPlayer = currentSong != null &&
+        currentRoute != Screen.Player.route &&
+        !showPlayerOverlay
 
     val backdrop = rememberLayerBackdrop()
     val useGlass = true
@@ -371,7 +388,8 @@ fun EllaApp(
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
         showPlayerOverlay
     ) {
-        8.dp * playerDismissProgress.coerceIn(0f, 1f)
+        val maxBlur = if (isPlaying) 1.5.dp else 8.dp
+        maxBlur * playerDismissProgress.coerceIn(0f, 1f)
     } else {
         0.dp
     }

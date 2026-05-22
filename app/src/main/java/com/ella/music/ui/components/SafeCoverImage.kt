@@ -2,6 +2,7 @@ package com.ella.music.ui.components
 
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -17,13 +18,15 @@ fun SafeCoverImage(
     sizePx: Int = 1200
 ) {
     val context = LocalContext.current
-    val request = if (model is Uri || model is String) {
-        ImageRequest.Builder(context)
-            .data(model)
-            .size(sizePx)
-            .build()
-    } else {
-        model
+    val request = remember(context, model, sizePx) {
+        if (model is Uri || model is String) {
+            ImageRequest.Builder(context)
+                .data(model)
+                .size(sizePx)
+                .build()
+        } else {
+            model
+        }
     }
 
     AsyncImage(

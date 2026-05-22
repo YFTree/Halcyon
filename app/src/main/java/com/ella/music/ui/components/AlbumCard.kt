@@ -1,8 +1,9 @@
 package com.ella.music.ui.components
 
 import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -28,15 +29,21 @@ import top.yukonga.miuix.kmp.icon.extended.MapAlbum
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun AlbumCard(
     album: Album,
     albumArtUri: Uri? = null,
+    summary: String = "${album.artist} · ${album.songCount}首",
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(8.dp)
     ) {
         Box(
@@ -75,7 +82,7 @@ fun AlbumCard(
             overflow = TextOverflow.Ellipsis
         )
         Text(
-            text = "${album.artist} · ${album.songCount}首",
+            text = summary,
             fontSize = 12.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             maxLines = 1,

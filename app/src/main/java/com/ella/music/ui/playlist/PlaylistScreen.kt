@@ -1,6 +1,11 @@
 package com.ella.music.ui.playlist
 
 import android.widget.Toast
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -15,6 +20,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -26,6 +32,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,11 +42,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,12 +61,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.FIVE_STAR_PLAYLIST_ID
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
+import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.playlistIdentityKey
+import com.ella.music.data.PlaylistImportMode
 import com.ella.music.ui.components.AppleStylePlayButton
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
+import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
+import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -71,6 +88,7 @@ import top.yukonga.miuix.kmp.icon.extended.Download
 import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 import top.yukonga.miuix.kmp.icon.extended.Playlist
 import top.yukonga.miuix.kmp.icon.extended.Share
+import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import kotlinx.coroutines.launch
@@ -85,16 +103,32 @@ fun PlaylistScreen(
     val playlists by mainViewModel.playlists.collectAsState()
     val librarySongs by mainViewModel.songs.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var sortExpanded by remember { mutableStateOf(false) }
+    var playlistSortMode by remember { mutableStateOf(PlaylistSortMode.UpdatedAt) }
+    var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var showImportModeSheet by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val favorites = playlists.firstOrNull { it.id == FAVORITES_PLAYLIST_ID }
-    val customPlaylists = playlists.filterNot { it.id == FAVORITES_PLAYLIST_ID }
+    val customPlaylists = remember(playlists, playlistSortMode) {
+        playlists
+            .filterNot { it.id == FAVORITES_PLAYLIST_ID }
+            .sortedForPlaylistList(playlistSortMode)
+    }
     val fiveStarSongs by produceState(initialValue = emptyList(), librarySongs) {
         value = mainViewModel.getFiveStarSongs()
     }
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        mainViewModel.importLocalPlaylist(uri) { result ->
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        pendingImportUris = uris
+        showImportModeSheet = true
+    }
+    fun importPendingPlaylists(mode: PlaylistImportMode) {
+        val uris = pendingImportUris
+        if (uris.isEmpty()) return
+        showImportModeSheet = false
+        pendingImportUris = emptyList()
+        mainViewModel.importLocalPlaylists(uris, mode) { result ->
             result
                 .onSuccess { importResult ->
                     val message = if (importResult.importedCount == 0) {
@@ -102,7 +136,8 @@ fun PlaylistScreen(
                     } else {
                         val missingText = if (importResult.missingCount > 0) "，保留 ${importResult.missingCount} 首未匹配路径" else ""
                         val duplicateText = if (importResult.duplicateCount > 0) "，跳过 ${importResult.duplicateCount} 条重复" else ""
-                        "已导入 ${importResult.importedCount} 首，匹配 ${importResult.matchedCount} 首$missingText$duplicateText"
+                        val playlistText = if (importResult.importedPlaylists > 1) "${importResult.importedPlaylists} 个歌单，" else ""
+                        "已导入 $playlistText${importResult.importedCount} 首，匹配 ${importResult.matchedCount} 首$missingText$duplicateText"
                     }
                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
@@ -110,6 +145,9 @@ fun PlaylistScreen(
                     Toast.makeText(context, "导入失败：${it.message.orEmpty()}", Toast.LENGTH_SHORT).show()
                 }
         }
+    }
+    BackHandler(enabled = sortExpanded) {
+        sortExpanded = false
     }
 
     Column(
@@ -132,6 +170,14 @@ fun PlaylistScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { sortExpanded = !sortExpanded }) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Sort,
+                            contentDescription = "排序",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     IconButton(onClick = {
                         importLauncher.launch(
                             arrayOf(
@@ -163,10 +209,40 @@ fun PlaylistScreen(
             )
             DoubleTapScrollOverlay(
                 onDoubleTap = { scope.launch { listState.animateScrollToItem(0) } },
+                onClick = { scope.launch { listState.animateScrollToItem(0) } },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
             )
+        }
+
+        AnimatedVisibility(
+            visible = sortExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                PlaylistSortMode.entries.forEach { mode ->
+                    Text(
+                        text = mode.label,
+                        fontSize = 14.sp,
+                        fontWeight = if (playlistSortMode == mode) FontWeight.Bold else FontWeight.Normal,
+                        color = if (playlistSortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                playlistSortMode = mode
+                                sortExpanded = false
+                                scope.launch { listState.animateScrollToItem(0) }
+                            }
+                            .padding(vertical = 10.dp)
+                    )
+                }
+            }
         }
 
         LazyColumn(
@@ -193,6 +269,7 @@ fun PlaylistScreen(
                         updatedAt = 0L
                     ),
                     countOverride = fiveStarSongs.size,
+                    durationOverride = fiveStarSongs.sumOf { it.duration },
                     accent = true,
                     onClick = { onPlaylistClick(FIVE_STAR_PLAYLIST_ID) }
                 )
@@ -239,6 +316,16 @@ fun PlaylistScreen(
             }
         )
     }
+    if (showImportModeSheet) {
+        ImportPlaylistModeSheet(
+            count = pendingImportUris.size,
+            onDismiss = {
+                showImportModeSheet = false
+                pendingImportUris = emptyList()
+            },
+            onModeSelected = ::importPendingPlaylists
+        )
+    }
 }
 
 @Composable
@@ -247,6 +334,8 @@ fun PlaylistDetailScreen(
     mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
     onBack: () -> Unit,
+    onNavigateToAlbum: (Long) -> Unit = {},
+    onNavigateToArtist: (String) -> Unit = {},
     onNavigateToPlayer: () -> Unit
 ) {
     val context = LocalContext.current
@@ -275,11 +364,44 @@ fun PlaylistDetailScreen(
     }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val currentSongItemIndex = remember(songs, currentSong?.playlistIdentityKey()) {
-        songs.indexOfFirst { it.playlistIdentityKey() == currentSong?.playlistIdentityKey() }
+    var actionSong by remember { mutableStateOf<com.ella.music.data.model.Song?>(null) }
+    var sortExpanded by remember { mutableStateOf(false) }
+    var sortMode by remember { mutableStateOf(PlaylistSongSortMode.AddedAt) }
+    var searchExpanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val sortedSongs = remember(songs, sortMode) { songs.sortedForPlaylistDetail(sortMode) }
+    val displayedSongs = remember(sortedSongs, searchQuery) {
+        val query = searchQuery.trim()
+        if (query.isBlank()) {
+            sortedSongs
+        } else {
+            sortedSongs.filter { song ->
+                song.title.contains(query, ignoreCase = true) ||
+                    song.artist.contains(query, ignoreCase = true) ||
+                    song.album.contains(query, ignoreCase = true) ||
+                    song.fileName.contains(query, ignoreCase = true)
+            }
+        }
+    }
+    BackHandler(enabled = sortExpanded || searchExpanded) {
+        when {
+            searchExpanded -> {
+                searchExpanded = false
+                searchQuery = ""
+            }
+            sortExpanded -> sortExpanded = false
+        }
+    }
+    val currentSongItemIndex = remember(displayedSongs, currentSong?.playlistIdentityKey()) {
+        displayedSongs.indexOfFirst { it.playlistIdentityKey() == currentSong?.playlistIdentityKey() }
             .takeIf { it >= 0 }
-            ?.plus(1)
+            ?.plus(2)
             ?: -1
+    }
+    val playlistCoverModel = remember(sortedSongs) {
+        sortedSongs.firstOrNull()?.let { song ->
+            song.coverUrl.takeIf { it.isNotBlank() } ?: mainViewModel.getAlbumArtUri(song.albumId)
+        }
     }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         val targetPlaylist = playlist
@@ -316,6 +438,24 @@ fun PlaylistDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        searchExpanded = !searchExpanded
+                        if (!searchExpanded) searchQuery = ""
+                    }) {
+                        Text(
+                            text = "⌕",
+                            fontSize = 28.sp,
+                            color = MiuixTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(onClick = { sortExpanded = !sortExpanded }) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Sort,
+                            contentDescription = "排序",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     if (playlist != null && !isFiveStarPlaylist) {
                         IconButton(onClick = { exportLauncher.launch("${playlist.name.safePlaylistFileName()}.txt") }) {
                             Icon(
@@ -330,9 +470,59 @@ fun PlaylistDetailScreen(
             )
             DoubleTapScrollOverlay(
                 onDoubleTap = { scope.launch { listState.animateScrollToItem(0) } },
+                onClick = { scope.launch { listState.animateScrollToItem(0) } },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
+            )
+        }
+
+        AnimatedVisibility(
+            visible = sortExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                PlaylistSongSortMode.entries.forEach { mode ->
+                    Text(
+                        text = mode.label,
+                        fontSize = 14.sp,
+                        fontWeight = if (sortMode == mode) FontWeight.Bold else FontWeight.Normal,
+                        color = if (sortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                sortMode = mode
+                                sortExpanded = false
+                                scope.launch { listState.animateScrollToItem(0) }
+                            }
+                            .padding(vertical = 10.dp)
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = searchExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
+            TextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = "搜索歌单内歌曲",
+                singleLine = true,
+                textStyle = TextStyle(
+                    color = MiuixTheme.colorScheme.onSurface,
+                    fontSize = 15.sp
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
 
@@ -349,39 +539,36 @@ fun PlaylistDetailScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 150.dp)
             ) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = playlist.name,
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MiuixTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${songs.size} 首歌曲",
-                        fontSize = 14.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                    AppleStylePlayButton(
-                        text = "播放全部",
-                        onClick = {
-                            if (songs.isNotEmpty()) {
-                                playerViewModel.setPlaylist(songs, 0)
-                                if (openPlayerOnPlay) onNavigateToPlayer()
+                item {
+                    PlaylistDetailHero(
+                        playlist = playlist,
+                        coverModel = playlistCoverModel,
+                        songCount = sortedSongs.size,
+                        duration = sortedSongs.sumOf { it.duration },
+                        sortLabel = sortMode.label,
+                        onShare = {
+                            if (!isFiveStarPlaylist) {
+                                exportLauncher.launch("${playlist.name.safePlaylistFileName()}.txt")
                             }
                         }
                     )
                 }
-            }
 
-            if (songs.isEmpty()) {
+                item {
+                    PlaylistPlayAllBar(
+                        songCount = displayedSongs.size,
+                        sortLabel = sortMode.label,
+                        onPlayAll = {
+                            if (displayedSongs.isNotEmpty()) {
+                                playerViewModel.setPlaylist(displayedSongs, 0)
+                                if (openPlayerOnPlay) onNavigateToPlayer()
+                            }
+                        },
+                        onSort = { sortExpanded = !sortExpanded }
+                    )
+                }
+
+            if (displayedSongs.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -391,6 +578,7 @@ fun PlaylistDetailScreen(
                     ) {
                         Text(
                             text = when {
+                                searchQuery.isNotBlank() -> "没有匹配的歌曲"
                                 playlist.isFavorites -> "播放页点红心后会收藏到这里"
                                 playlist.isFiveStarRating -> "文件标签里评分为五星的歌曲会显示在这里"
                                 else -> "这个歌单还没有歌曲"
@@ -401,7 +589,7 @@ fun PlaylistDetailScreen(
                     }
                 }
             } else {
-                itemsIndexed(songs, key = { _, song -> song.playlistIdentityKey() }) { index, song ->
+                itemsIndexed(displayedSongs, key = { _, song -> song.playlistIdentityKey() }) { index, song ->
                     SongItem(
                         song = song,
                         isCurrent = currentSong?.playlistIdentityKey() == song.playlistIdentityKey(),
@@ -409,7 +597,7 @@ fun PlaylistDetailScreen(
                         loadCoverArt = mainViewModel::getCoverArtBitmap,
                         loadAudioInfo = mainViewModel::getAudioInfo,
                         onClick = {
-                            playerViewModel.setPlaylist(songs, index)
+                            playerViewModel.setPlaylist(displayedSongs, index)
                             if (openPlayerOnPlay) onNavigateToPlayer()
                         },
                         onAddToQueue = { playerViewModel.addToPlaylist(song) },
@@ -417,7 +605,10 @@ fun PlaylistDetailScreen(
                             {
                                 mainViewModel.removeSongFromPlaylist(playlist.id, song.playlistIdentityKey())
                             }
-                        }
+                        },
+                        onMore = { actionSong = song },
+                        leadingLabel = (index + 1).toString(),
+                        leadingLabelBeforeCover = true
                     )
                 }
             }
@@ -431,6 +622,18 @@ fun PlaylistDetailScreen(
                     .align(Alignment.BottomEnd)
                     .padding(end = 22.dp, bottom = 118.dp)
             )
+
+            SongMoreActionHost(
+                actionSong = actionSong,
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
+                onDismissAction = { actionSong = null },
+                onNavigateToAlbum = onNavigateToAlbum,
+                onNavigateToArtist = onNavigateToArtist,
+                onSongRemovedFromPlaylist = if (playlist.isFiveStarRating) null else {
+                    { song -> mainViewModel.removeSongFromPlaylist(playlist.id, song.playlistIdentityKey()) }
+                }
+            )
         }
     }
 }
@@ -439,9 +642,281 @@ private fun String.safePlaylistFileName(): String =
     replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "Ella Playlist" }
 
 @Composable
+private fun PlaylistDetailHero(
+    playlist: UserPlaylist,
+    coverModel: Any?,
+    songCount: Int,
+    duration: Long,
+    sortLabel: String,
+    onShare: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 210.dp)
+            .background(
+                Brush.verticalGradient(
+                    0f to MiuixTheme.colorScheme.primary.copy(alpha = 0.20f),
+                    0.64f to MiuixTheme.colorScheme.primary.copy(alpha = 0.08f),
+                    1f to Color.Transparent
+                )
+            )
+            .padding(horizontal = 18.dp, vertical = 18.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(128.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MiuixTheme.colorScheme.surfaceContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (coverModel != null) {
+                    SafeCoverImage(
+                        model = coverModel,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        sizePx = 256
+                    )
+                } else {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Playlist,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.size(46.dp)
+                    )
+                }
+                Text(
+                    text = "▶ $songCount",
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.Black.copy(alpha = 0.34f))
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = playlist.name,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "$songCount 首歌曲 · ${duration.formatPlaylistDuration()} · $sortLabel",
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "编辑信息 >",
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.78f)
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(0.88f)
+                .clip(RoundedCornerShape(999.dp))
+                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.72f))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PlaylistHeroAction("收藏", enabled = false, onClick = {})
+            PlaylistHeroDivider()
+            PlaylistHeroAction("评论", enabled = true, onClick = {})
+            PlaylistHeroDivider()
+            PlaylistHeroAction("分享", enabled = true, onClick = onShare)
+        }
+    }
+}
+
+@Composable
+private fun PlaylistHeroAction(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Text(
+        text = text,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color.White.copy(alpha = if (enabled) 0.92f else 0.36f),
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun PlaylistHeroDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(24.dp)
+            .background(Color.White.copy(alpha = 0.24f))
+    )
+}
+
+@Composable
+private fun PlaylistPlayAllBar(
+    songCount: Int,
+    sortLabel: String,
+    onPlayAll: () -> Unit,
+    onSort: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(MiuixTheme.colorScheme.primary)
+                .clickable(onClick = onPlayAll),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Regular.Playlist,
+                contentDescription = "播放全部",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "播放全部",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.clickable(onClick = onPlayAll)
+        )
+        Text(
+            text = "（$songCount）",
+            fontSize = 14.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            text = sortLabel,
+            fontSize = 12.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .clickable(onClick = onSort)
+                .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.70f))
+                .padding(horizontal = 10.dp, vertical = 7.dp)
+        )
+    }
+}
+
+private enum class PlaylistSortMode(val label: String) {
+    UpdatedAt("最近更新"),
+    CreatedAt("创建时间倒序"),
+    Name("名称"),
+    SongCount("歌曲数"),
+    Duration("歌曲时长")
+}
+
+private fun List<UserPlaylist>.sortedForPlaylistList(mode: PlaylistSortMode): List<UserPlaylist> {
+    return when (mode) {
+        PlaylistSortMode.UpdatedAt -> sortedByDescending { it.updatedAt }
+        PlaylistSortMode.CreatedAt -> sortedByDescending { it.createdAt }
+        PlaylistSortMode.Name -> sortedBy { it.name.lowercase() }
+        PlaylistSortMode.SongCount -> sortedByDescending { it.songs.size }
+        PlaylistSortMode.Duration -> sortedByDescending { playlist -> playlist.songs.sumOf { it.duration } }
+    }
+}
+
+private enum class PlaylistSongSortMode(val label: String) {
+    AddedAt("加入时间"),
+    Title("歌曲名称"),
+    FileName("文件名"),
+    Duration("歌曲时长"),
+    YearAsc("发行时间正序"),
+    YearDesc("发行时间倒序"),
+    DateAdded("添加时间"),
+    DateAddedAsc("添加时间升序"),
+    DateModified("修改时间"),
+    DateModifiedAsc("修改时间升序")
+}
+
+private fun List<Song>.sortedForPlaylistDetail(mode: PlaylistSongSortMode): List<Song> {
+    return when (mode) {
+        PlaylistSongSortMode.AddedAt -> this
+        PlaylistSongSortMode.Title -> sortedBy { it.title.lowercase() }
+        PlaylistSongSortMode.FileName -> sortedBy { song ->
+            song.fileName.ifBlank { song.path.substringAfterLast('/') }.lowercase()
+        }
+        PlaylistSongSortMode.Duration -> sortedByDescending { it.duration }
+        PlaylistSongSortMode.YearAsc -> sortedByReleaseDate(ascending = true)
+        PlaylistSongSortMode.YearDesc -> sortedByReleaseDate(ascending = false)
+        PlaylistSongSortMode.DateAdded -> sortedByDescending { it.dateAdded }
+        PlaylistSongSortMode.DateAddedAsc -> sortedBy { it.dateAdded }
+        PlaylistSongSortMode.DateModified -> sortedByDescending { it.dateModified }
+        PlaylistSongSortMode.DateModifiedAsc -> sortedBy { it.dateModified }
+    }
+}
+
+private fun List<Song>.sortedByReleaseDate(ascending: Boolean): List<Song> {
+    val comparator = if (ascending) {
+        compareBy<Song> { it.releaseYearOrNull() == null }
+            .thenBy { it.releaseYearOrNull() ?: Int.MAX_VALUE }
+    } else {
+        compareBy<Song> { it.releaseYearOrNull() == null }
+            .thenByDescending { it.releaseYearOrNull() ?: Int.MIN_VALUE }
+    }
+    return sortedWith(
+        comparator
+            .thenBy { it.album.lowercase() }
+            .thenBy { if (it.discNumber > 0) it.discNumber else Int.MAX_VALUE }
+            .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
+            .thenBy { it.title.lowercase() }
+    )
+}
+
+private fun Song.releaseYearOrNull(): Int? =
+    Regex("""\d{4}""").find(year)?.value?.toIntOrNull()
+
+private fun Long.formatPlaylistDuration(): String {
+    if (this <= 0L) return "00:00"
+    val totalMinutes = this / 60_000L
+    val hours = totalMinutes / 60L
+    val minutes = totalMinutes % 60L
+    return if (hours > 0) "${hours}小时${minutes}分" else "${minutes}分钟"
+}
+
+@Composable
 private fun PlaylistRow(
     playlist: UserPlaylist,
     countOverride: Int? = null,
+    durationOverride: Long? = null,
     accent: Boolean = false,
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
@@ -491,7 +966,7 @@ private fun PlaylistRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "${countOverride ?: playlist.songs.size} 首歌曲",
+                    text = "${countOverride ?: playlist.songs.size} 首歌曲 · ${(durationOverride ?: playlist.songs.sumOf { it.duration }).formatPlaylistDuration()}",
                     fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
@@ -540,6 +1015,12 @@ private fun CreatePlaylistDialog(
     onCreate: (String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
     WindowBottomSheet(
         show = true,
         title = "新建歌单",
@@ -562,13 +1043,86 @@ private fun CreatePlaylistDialog(
                     color = MiuixTheme.colorScheme.onSurface,
                     fontSize = 15.sp
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
             )
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Button(onClick = onDismiss) { Text("取消") }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(onClick = { onCreate(name) }) { Text("创建") }
             }
+        }
+    }
+}
+
+@Composable
+private fun ImportPlaylistModeSheet(
+    count: Int,
+    onDismiss: () -> Unit,
+    onModeSelected: (PlaylistImportMode) -> Unit
+) {
+    WindowBottomSheet(
+        show = true,
+        title = "导入歌单",
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.padding(bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "已选择 $count 个歌单文件",
+                fontSize = 13.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+            ImportModeItem(
+                title = "替换所有歌单",
+                summary = "清空现有自定义歌单后重新导入",
+                onClick = { onModeSelected(PlaylistImportMode.ReplaceAll) }
+            )
+            ImportModeItem(
+                title = "合并并替换同名歌单",
+                summary = "保留其它歌单，同名歌单使用导入内容覆盖",
+                onClick = { onModeSelected(PlaylistImportMode.MergeReplaceExisting) }
+            )
+            ImportModeItem(
+                title = "合并并保留同名歌单",
+                summary = "同名歌单只追加不存在的歌曲",
+                onClick = { onModeSelected(PlaylistImportMode.MergeKeepExisting) }
+            )
+            Button(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                Text("取消")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImportModeItem(
+    title: String,
+    summary: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 14.dp,
+        onClick = onClick
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface
+            )
+            Text(
+                text = summary,
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(top = 3.dp)
+            )
         }
     }
 }
