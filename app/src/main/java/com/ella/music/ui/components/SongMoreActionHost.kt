@@ -55,6 +55,7 @@ import com.ella.music.data.tagIdentityKey
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -462,6 +463,7 @@ private fun CreatePlaylistAndAddSheet(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
+        delay(220L)
         focusRequester.requestFocus()
         keyboardController?.show()
     }

@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.SpanStyle
@@ -122,6 +123,7 @@ fun LyricView(
             val lineTextAlign = line.ttmlTextAlign()
             val backgroundTextAlign = line.ttmlBackgroundTextAlign()
             val backgroundAfterMain = line.isBackgroundAfterMain()
+            val lineAlignment = line.ttmlAlignment()
 
             val textColor = when {
                 usePlayerColors && isActive -> Color.White.copy(alpha = 0.96f)
@@ -300,6 +302,7 @@ fun WordLyricView(
             val lineTextAlign = line.ttmlTextAlign()
             val backgroundTextAlign = line.ttmlBackgroundTextAlign()
             val backgroundAfterMain = line.isBackgroundAfterMain()
+            val lineAlignment = line.ttmlAlignment()
             val distance = when {
                 currentIndex < 0 -> 2
                 index < currentIndex -> currentIndex - index
@@ -350,6 +353,11 @@ fun WordLyricView(
                         alpha = lineAlpha
                         scaleX = scale
                         scaleY = scale
+                        transformOrigin = when (lineAlignment) {
+                            Alignment.Start -> TransformOrigin(0f, 0.5f)
+                            Alignment.End -> TransformOrigin(1f, 0.5f)
+                            else -> TransformOrigin.Center
+                        }
                     }
                     .blur(blur.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
                     .pointerInput(line) {
@@ -363,7 +371,7 @@ fun WordLyricView(
                         horizontal = lineHorizontalPadding,
                         vertical = if (isActive) 6.dp else 2.dp
                     ),
-                horizontalAlignment = line.ttmlAlignment()
+                horizontalAlignment = lineAlignment
             ) {
                 if (showPronunciation && !line.pronunciation.isNullOrBlank()) {
                     val pronunciationColor = when {

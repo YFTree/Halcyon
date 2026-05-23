@@ -45,8 +45,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
+import com.ella.music.data.splitArtistNames
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.AppleStylePlayButton
+import com.ella.music.ui.components.ArtistPickerSheet
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
@@ -63,6 +65,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.Dispatchers
@@ -90,6 +93,7 @@ fun AlbumDetailScreen(
     val scope = rememberCoroutineScope()
     var sortExpanded by remember { mutableStateOf(false) }
     var actionSong by remember { mutableStateOf<Song?>(null) }
+    var albumArtistChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     val album = albums.find { it.id == albumId }
     val albumSongs = mainViewModel.getSongsForAlbum(albumId)
     val sortedAlbumSongs = remember(albumSongs, sortMode) { albumSongs.sortedForAlbumDetail(sortMode) }
@@ -164,9 +168,15 @@ fun AlbumDetailScreen(
                     hasNeteaseAlbum = !neteaseAlbumUrl.isNullOrBlank(),
                     onNeteaseAlbumClick = { openUrl(context, neteaseAlbumUrl.orEmpty()) },
                     onAlbumArtistClick = {
-                        (album?.albumArtist?.takeIf { it.isNotBlank() } ?: album?.artist)
+                        val albumArtist = (album?.albumArtist?.takeIf { it.isNotBlank() } ?: album?.artist)
                             ?.takeIf { it.isNotBlank() && !it.equals("Unknown", ignoreCase = true) }
-                            ?.let(onNavigateToArtist)
+                            ?: return@AlbumHeader
+                        val artists = splitArtistNames(albumArtist).ifEmpty { listOf(albumArtist.trim()) }
+                        if (artists.size == 1) {
+                            onNavigateToArtist(artists.first())
+                        } else {
+                            albumArtistChoices = artists
+                        }
                     },
                     onPlayAll = {
                         if (sortedAlbumSongs.isNotEmpty()) {
@@ -329,6 +339,24 @@ fun AlbumDetailScreen(
             onNavigateToAlbum = onNavigateToAlbum,
             onNavigateToArtist = onNavigateToArtist
         )
+
+        if (albumArtistChoices.isNotEmpty()) {
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = "选择歌手",
+                onDismissRequest = { albumArtistChoices = emptyList() }
+            ) {
+                ArtistPickerSheet(
+                    artists = albumArtistChoices,
+                    onArtistSelected = { artist ->
+                        albumArtistChoices = emptyList()
+                        onNavigateToArtist(artist)
+                    },
+                    onDismiss = { albumArtistChoices = emptyList() }
+                )
+            }
+        }
     }
 }
 

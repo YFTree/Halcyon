@@ -69,6 +69,7 @@ import com.ella.music.ui.components.AppleStylePlayButton
 import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.DoubleTapScrollOverlay
+import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
@@ -84,6 +85,7 @@ import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Download
@@ -93,6 +95,7 @@ import top.yukonga.miuix.kmp.icon.extended.Share
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -108,7 +111,8 @@ fun PlaylistScreen(
     var sortExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    var playlistSortMode by remember { mutableStateOf(PlaylistSortMode.UpdatedAt) }
+    val playlistSortIndex by mainViewModel.settingsManager.playlistListSortIndex.collectAsState(initial = 2)
+    val playlistSortMode = PlaylistSortMode.entries.getOrElse(playlistSortIndex) { PlaylistSortMode.UpdatedAt }
     var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var showImportModeSheet by remember { mutableStateOf(false) }
     var playlistPendingDelete by remember { mutableStateOf<UserPlaylist?>(null) }
@@ -123,6 +127,11 @@ fun PlaylistScreen(
     val displayedCustomPlaylists = remember(customPlaylists, searchQuery) {
         val query = searchQuery.trim()
         if (query.isBlank()) customPlaylists else customPlaylists.filter { it.matchesPlaylistSearch(query) }
+    }
+    val playlistCoverModels = remember(playlists, librarySongs) {
+        playlists.associate { playlist ->
+            playlist.id to mainViewModel.playlistSongs(playlist).firstOrNull().playlistCoverModel()
+        }
     }
     val showFavorites = remember(favorites, searchQuery) {
         favorites != null && (searchQuery.isBlank() || favorites.matchesPlaylistSearch(searchQuery.trim()))
@@ -191,20 +200,21 @@ fun PlaylistScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        searchExpanded = !searchExpanded
-                        if (!searchExpanded) searchQuery = ""
-                    }) {
-                        Text(
-                            text = "⌕",
-                            fontSize = 28.sp,
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
-                    }
                     IconButton(onClick = { sortExpanded = !sortExpanded }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Sort,
                             contentDescription = "排序",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(onClick = {
+                        searchExpanded = !searchExpanded
+                        if (!searchExpanded) searchQuery = ""
+                    }) {
+                        Icon(
+                            imageVector = MiuixIcons.Basic.Search,
+                            contentDescription = "搜索",
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -253,18 +263,14 @@ fun PlaylistScreen(
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = "搜索歌单",
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
+            EllaSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onSearch = { searchExpanded = false },
+                placeholder = "搜索歌单",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
             )
         }
 
@@ -287,8 +293,8 @@ fun PlaylistScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                playlistSortMode = mode
                                 sortExpanded = false
+                                scope.launch { mainViewModel.settingsManager.setPlaylistListSortIndex(mode.ordinal) }
                                 scope.launch { listState.animateScrollToItem(0) }
                             }
                             .padding(vertical = 10.dp)
@@ -306,6 +312,7 @@ fun PlaylistScreen(
                 item(key = favorites.id) {
                     PlaylistRow(
                         playlist = favorites,
+                        coverModel = playlistCoverModels[favorites.id],
                         accent = true,
                         onClick = { onPlaylistClick(favorites.id) }
                     )
@@ -349,6 +356,7 @@ fun PlaylistScreen(
                 items(displayedCustomPlaylists, key = { it.id }) { playlist ->
                     PlaylistRow(
                         playlist = playlist,
+                        coverModel = playlistCoverModels[playlist.id],
                         onClick = { onPlaylistClick(playlist.id) },
                         onDelete = { playlistPendingDelete = playlist }
                     )
@@ -431,7 +439,8 @@ fun PlaylistDetailScreen(
     val scope = rememberCoroutineScope()
     var actionSong by remember { mutableStateOf<com.ella.music.data.model.Song?>(null) }
     var sortExpanded by remember { mutableStateOf(false) }
-    var sortMode by remember { mutableStateOf(PlaylistSongSortMode.AddedAt) }
+    val sortIndex by mainViewModel.settingsManager.playlistDetailSongSortIndex.collectAsState(initial = 2)
+    val sortMode = PlaylistSongSortMode.entries.getOrElse(sortIndex) { PlaylistSongSortMode.AddedAt }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var removeFromPlaylistSong by remember { mutableStateOf<Song?>(null) }
@@ -504,20 +513,21 @@ fun PlaylistDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        searchExpanded = !searchExpanded
-                        if (!searchExpanded) searchQuery = ""
-                    }) {
-                        Text(
-                            text = "⌕",
-                            fontSize = 28.sp,
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
-                    }
                     IconButton(onClick = { sortExpanded = !sortExpanded }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Sort,
                             contentDescription = "排序",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(onClick = {
+                        searchExpanded = !searchExpanded
+                        if (!searchExpanded) searchQuery = ""
+                    }) {
+                        Icon(
+                            imageVector = MiuixIcons.Basic.Search,
+                            contentDescription = "搜索",
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -563,8 +573,8 @@ fun PlaylistDetailScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                sortMode = mode
                                 sortExpanded = false
+                                scope.launch { mainViewModel.settingsManager.setPlaylistDetailSongSortIndex(mode.ordinal) }
                                 scope.launch { listState.animateScrollToItem(0) }
                             }
                             .padding(vertical = 10.dp)
@@ -578,18 +588,14 @@ fun PlaylistDetailScreen(
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = "搜索歌单内歌曲",
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
+            EllaSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onSearch = { searchExpanded = false },
+                placeholder = "搜索歌单内歌曲",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
             )
         }
 
@@ -957,9 +963,16 @@ private fun Long.formatPlaylistDuration(): String {
     return if (hours > 0) "${hours}小时${minutes}分" else "${minutes}分钟"
 }
 
+private fun Song?.playlistCoverModel(): Any? {
+    val song = this ?: return null
+    return song.coverUrl.takeIf { it.isNotBlank() }
+        ?: song.albumId.takeIf { it > 0L }?.let { Uri.parse("content://media/external/audio/albumart/$it") }
+}
+
 @Composable
 private fun PlaylistRow(
     playlist: UserPlaylist,
+    coverModel: Any? = null,
     countOverride: Int? = null,
     durationOverride: Long? = null,
     accent: Boolean = false,
@@ -982,23 +995,33 @@ private fun PlaylistRow(
             Box(
                 modifier = Modifier
                     .size(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(
                         color = if (accent) MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
                         else MiuixTheme.colorScheme.surfaceContainer,
-                        shape = RoundedCornerShape(14.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = when {
-                        playlist.isFavorites -> MiuixIcons.Regular.FavoritesFill
-                        playlist.isFiveStarRating -> FiveStarPlaylistIcon
-                        else -> MiuixIcons.Regular.Playlist
-                    },
-                    contentDescription = null,
-                    tint = if (accent) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(25.dp)
-                )
+                if (coverModel != null && !playlist.isFavorites && !playlist.isFiveStarRating) {
+                    SafeCoverImage(
+                        model = coverModel,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        sizePx = 160
+                    )
+                } else {
+                    Icon(
+                        imageVector = when {
+                            playlist.isFavorites -> MiuixIcons.Regular.FavoritesFill
+                            playlist.isFiveStarRating -> FiveStarPlaylistIcon
+                            else -> MiuixIcons.Regular.Playlist
+                        },
+                        contentDescription = null,
+                        tint = if (accent) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(25.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -1063,6 +1086,7 @@ private fun CreatePlaylistDialog(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
+        delay(220L)
         focusRequester.requestFocus()
         keyboardController?.show()
     }

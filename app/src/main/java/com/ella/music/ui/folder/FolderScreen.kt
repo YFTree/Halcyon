@@ -55,6 +55,7 @@ import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.data.webdav.WebDavClient
 import com.ella.music.data.webdav.WebDavItem
 import com.ella.music.ui.components.DoubleTapScrollOverlay
+import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FolderOutlineIcon
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
@@ -71,6 +72,7 @@ import androidx.compose.ui.window.Dialog
 import com.ella.music.data.model.albumIdentityId
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
+import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Close
@@ -147,20 +149,21 @@ fun FolderScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        searchExpanded = !searchExpanded
-                        if (!searchExpanded) searchQuery = ""
-                    }) {
-                        Text(
-                            text = "⌕",
-                            fontSize = 28.sp,
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
-                    }
                     IconButton(onClick = { sortExpanded = !sortExpanded }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Sort,
                             contentDescription = "排序",
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(onClick = {
+                        searchExpanded = !searchExpanded
+                        if (!searchExpanded) searchQuery = ""
+                    }) {
+                        Icon(
+                            imageVector = MiuixIcons.Basic.Search,
+                            contentDescription = "搜索",
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -189,18 +192,14 @@ fun FolderScreen(
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = "搜索文件夹",
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
+            EllaSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onSearch = { searchExpanded = false },
+                placeholder = "搜索文件夹",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
             )
         }
 
@@ -303,8 +302,9 @@ fun FolderScreen(
                     addAll(rootChildFolders)
                 }
                 val query = searchQuery.trim()
+                val pinnedRoot = rootFolderPath.takeIf { rootDirectSongs.isNotEmpty() }
                 entries
-                    .sortedForFolderList(folderSortMode)
+                    .sortedForFolderList(folderSortMode, pinnedPath = pinnedRoot)
                     .let { sorted ->
                         if (query.isBlank()) sorted else sorted.filter { folder ->
                             folder.name.contains(query, ignoreCase = true) ||
@@ -595,16 +595,20 @@ private enum class FolderListSortMode(val label: String) {
 }
 
 private fun List<FolderTreeEntry>.sortedForFolderList(
-    mode: FolderListSortMode
+    mode: FolderListSortMode,
+    pinnedPath: String? = null
 ): List<FolderTreeEntry> {
-    return when (mode) {
+    val sorted = when (mode) {
         FolderListSortMode.Name -> sortedBy { it.name.lowercase(Locale.ROOT) }
-        FolderListSortMode.SongCount -> sortedByDescending { it.songCount }
-        FolderListSortMode.Duration -> sortedByDescending { it.duration }
-        FolderListSortMode.AlbumCount -> sortedByDescending { it.albumCount }
-        FolderListSortMode.DateModified -> sortedByDescending { it.dateModified }
-        FolderListSortMode.DateModifiedAsc -> sortedBy { it.dateModified }
+        FolderListSortMode.SongCount -> sortedWith(compareByDescending<FolderTreeEntry> { it.songCount }.thenBy { it.name.lowercase(Locale.ROOT) })
+        FolderListSortMode.Duration -> sortedWith(compareByDescending<FolderTreeEntry> { it.duration }.thenBy { it.name.lowercase(Locale.ROOT) })
+        FolderListSortMode.AlbumCount -> sortedWith(compareByDescending<FolderTreeEntry> { it.albumCount }.thenBy { it.name.lowercase(Locale.ROOT) })
+        FolderListSortMode.DateModified -> sortedWith(compareByDescending<FolderTreeEntry> { it.dateModified }.thenBy { it.name.lowercase(Locale.ROOT) })
+        FolderListSortMode.DateModifiedAsc -> sortedWith(compareBy<FolderTreeEntry> { it.dateModified }.thenBy { it.name.lowercase(Locale.ROOT) })
     }
+    if (pinnedPath.isNullOrBlank()) return sorted
+    val pinned = sorted.firstOrNull { it.path.equals(pinnedPath, ignoreCase = true) } ?: return sorted
+    return listOf(pinned) + sorted.filterNot { it.path.equals(pinnedPath, ignoreCase = true) }
 }
 
 private fun FolderTreeEntry.summaryFor(mode: FolderListSortMode): String {

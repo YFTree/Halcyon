@@ -84,6 +84,7 @@ import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -660,6 +661,7 @@ private fun ArtistCreatePlaylistSheet(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
+        delay(220L)
         focusRequester.requestFocus()
         keyboardController?.show()
     }

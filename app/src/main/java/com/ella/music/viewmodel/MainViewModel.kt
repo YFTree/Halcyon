@@ -270,19 +270,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun getNeteaseArtistUrlForArtist(artistName: String): String? = withContext(Dispatchers.IO) {
-        getSongsForArtist(artistName).asSequence()
+        val targetNames = splitArtistNames(artistName)
+            .ifEmpty { listOf(artistName.trim()) }
+            .filter { it.isNotBlank() }
+        val targetKeys = targetNames.map { it.tagIdentityKey() }.toSet()
+        val matchedArtist = getSongsForArtist(artistName).asSequence()
             .take(80)
             .mapNotNull { song -> decodeNeteaseKey(repository.getSongTagInfo(song).neteaseKey) }
             .flatMap { it.artists.asSequence() }
             .firstOrNull { artist ->
-                artist.id.isNotBlank() && (
-                    artist.name.equals(artistName, ignoreCase = true) ||
-                        artistName.contains(artist.name, ignoreCase = true) ||
-                        artist.name.contains(artistName, ignoreCase = true)
-                    )
+                artist.id.isNotBlank() && artist.name.tagIdentityKey() in targetKeys
             }
-            ?.id
-            ?.let(::neteaseArtistUrl)
+            ?: getSongsForArtist(artistName).asSequence()
+                .take(80)
+                .mapNotNull { song -> decodeNeteaseKey(repository.getSongTagInfo(song).neteaseKey) }
+                .flatMap { it.artists.asSequence() }
+                .firstOrNull { artist ->
+                    artist.id.isNotBlank() && targetNames.any { target ->
+                        artist.name.equals(target, ignoreCase = true) ||
+                            (artist.name.length >= 3 && target.contains(artist.name, ignoreCase = true)) ||
+                            (target.length >= 3 && artist.name.contains(target, ignoreCase = true))
+                    }
+            }
+        matchedArtist?.id?.let(::neteaseArtistUrl)
     }
 
     suspend fun getNeteaseAlbumUrlForAlbum(albumId: Long): String? = withContext(Dispatchers.IO) {

@@ -1123,6 +1123,7 @@ private fun CreatePlaylistAndAddSheet(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
+        delay(220L)
         focusRequester.requestFocus()
         keyboardController?.show()
     }

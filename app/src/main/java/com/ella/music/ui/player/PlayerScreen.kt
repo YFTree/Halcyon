@@ -50,6 +50,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -60,6 +61,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -118,7 +120,6 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -271,6 +272,7 @@ fun PlayerScreen(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         )
     }
+    val effectiveAudioVisualizerEnabled = immersiveAlbumCover && audioVisualizerEnabled && hasVisualizerPermission
     val visualizerPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -281,6 +283,10 @@ fun PlayerScreen(
         if (!granted) Toast.makeText(context, "需要录音权限才能开启音频可视化", Toast.LENGTH_SHORT).show()
     }
     fun setAudioVisualizerEnabled(enabled: Boolean) {
+        if (enabled && !immersiveAlbumCover) {
+            Toast.makeText(context, "沉浸封面模式下才能使用可视化", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (enabled && !hasVisualizerPermission) {
             visualizerPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         } else {
@@ -568,7 +574,7 @@ fun PlayerScreen(
             playbackPitch = playbackPitch,
             isFavorite = isCurrentSongFavorite,
             audioSessionId = audioSessionId,
-            visualizerEnabled = audioVisualizerEnabled && hasVisualizerPermission,
+            visualizerEnabled = effectiveAudioVisualizerEnabled,
             metadataEditorId = metadataEditorId,
             lyricTimingEditorId = lyricTimingEditorId,
             onVisualizerEnabled = ::setAudioVisualizerEnabled,
@@ -603,7 +609,7 @@ fun PlayerScreen(
             isPlaying = isPlaying,
             isFavorite = isCurrentSongFavorite,
             audioSessionId = audioSessionId,
-            visualizerEnabled = audioVisualizerEnabled && hasVisualizerPermission,
+            visualizerEnabled = effectiveAudioVisualizerEnabled,
             onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
             onLineDoubleClick = { playerViewModel.togglePlayPause() },
             onLineLongClick = ::openLyricSharePicker,
@@ -874,7 +880,7 @@ fun PlayerScreen(
                     flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
                     isPlaying = isPlaying,
                     audioSessionId = audioSessionId,
-                    visualizerEnabled = audioVisualizerEnabled && hasVisualizerPermission,
+                    visualizerEnabled = effectiveAudioVisualizerEnabled,
                     onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
                     onLineLongClick = ::openLyricSharePicker,
                     onSeek = { progress ->
@@ -1119,7 +1125,7 @@ private fun CoverPlayerPage(
                         }
 
                         if (miniLyricLine != null) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             MiniLyricsPreview(
                                 lyrics = lyrics,
                                 currentIndex = currentLyricIndex,
@@ -1132,7 +1138,7 @@ private fun CoverPlayerPage(
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(132.dp)
+                                    .height(228.dp)
                                     .padding(vertical = 2.dp)
                             )
                         }
@@ -1209,7 +1215,7 @@ private fun CoverPlayerPage(
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(22.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -1232,7 +1238,7 @@ private fun CoverPlayerPage(
                         }
 
                         if (miniLyricLine != null) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             MiniLyricsPreview(
                                 lyrics = lyrics,
                                 currentIndex = currentLyricIndex,
@@ -1245,11 +1251,11 @@ private fun CoverPlayerPage(
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(if (showTranslation) 150.dp else 170.dp)
+                                    .height(if (showTranslation || showPronunciation) 226.dp else 184.dp)
                                     .padding(vertical = 2.dp)
                             )
                         } else {
-                            Spacer(modifier = Modifier.height(18.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
                         }
 
                         Spacer(modifier = Modifier.weight(1f))
@@ -1261,7 +1267,7 @@ private fun CoverPlayerPage(
                             onMore = onToggleMenu,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(modifier = Modifier.height(34.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
                         PlayerProgressBlock(
                             currentPosition = currentPosition,
                             duration = duration,
@@ -1289,20 +1295,6 @@ private fun CoverPlayerPage(
                             onClearQueue = onClearQueue,
                             modifier = Modifier.height(74.dp)
                         )
-                        if (visualizerEnabled) {
-                            AudioVisualizer(
-                                enabled = true,
-                                audioSessionId = audioSessionId,
-                                isPlaying = isPlaying,
-                                positionMs = currentPosition,
-                                accent = Color.White.copy(alpha = 0.72f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(22.dp)
-                            )
-                        } else {
-                            Spacer(modifier = Modifier.height(36.dp))
-                        }
                     }
                 }
             }
@@ -1321,6 +1313,7 @@ private fun CoverPlayerPage(
                     speed = playbackSpeed,
                     pitch = playbackPitch,
                     visualizerEnabled = visualizerEnabled,
+                    visualizerAvailable = immersiveAlbumCover,
                     metadataEditorId = metadataEditorId,
                     lyricTimingEditorId = lyricTimingEditorId,
                     sleepTimerEndRealtimeMs = sleepTimerEndRealtimeMs,
@@ -1667,10 +1660,10 @@ private fun LyricsPlayerPage(
                     fontScale = fontScale,
                     fontFamily = fontFamily,
                     fontWeight = fontWeight,
-                    topSpacer = 110.dp,
-                    bottomSpacer = if (visualizerEnabled) 214.dp else 260.dp,
+                    topSpacer = 64.dp,
+                    bottomSpacer = if (visualizerEnabled) 150.dp else 166.dp,
                     horizontalPadding = 0.dp,
-                    lineHorizontalPadding = 0.dp,
+                    lineHorizontalPadding = 12.dp,
                     onLineClick = onLineClick,
                     onLineDoubleClick = onLineDoubleClick,
                     onLineLongClick = onLineLongClick,
@@ -2532,10 +2525,10 @@ private fun LandscapeTransportControls(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onCyclePlaybackMode) {
+        PlayerTransportIconButton(onClick = onCyclePlaybackMode) {
             PlaybackModeIcon(shuffleEnabled = shuffleEnabled, repeatMode = repeatMode, accent = palette.accent)
         }
-        IconButton(onClick = onPrevious) {
+        PlayerTransportIconButton(onClick = onPrevious) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_previous),
                 contentDescription = "上一首",
@@ -2548,7 +2541,7 @@ private fun LandscapeTransportControls(
                 .size(54.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.15f))
-                .clickable(onClick = onPlayPause),
+                .playerNoIndicationClick(onPlayPause),
             contentAlignment = Alignment.Center
         ) {
             CenteredPlayPauseGlyph(
@@ -2557,7 +2550,7 @@ private fun LandscapeTransportControls(
                 modifier = Modifier.size(34.dp)
             )
         }
-        IconButton(onClick = onNext) {
+        PlayerTransportIconButton(onClick = onNext) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_next),
                 contentDescription = "下一首",
@@ -2607,6 +2600,14 @@ private enum class PlayerHeaderActionKind {
 }
 
 @Composable
+private fun Modifier.playerNoIndicationClick(onClick: () -> Unit): Modifier =
+    clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        onClick = onClick
+    )
+
+@Composable
 private fun PlayerQuickActionRow(
     onSongInfo: () -> Unit,
     onShareSong: () -> Unit,
@@ -2617,7 +2618,7 @@ private fun PlayerQuickActionRow(
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         PlayerQuickAction("信息", PlayerQuickActionKind.Info, onSongInfo)
@@ -2642,16 +2643,15 @@ private fun PlayerQuickAction(
     kind: PlayerQuickActionKind,
     onClick: () -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+    Box(
+        contentAlignment = Alignment.Center,
         modifier = Modifier
-            .width(48.dp)
-            .clickable(onClick = onClick)
+            .size(42.dp)
+            .playerNoIndicationClick(onClick)
     ) {
         Box(
             modifier = Modifier
-                .size(38.dp)
+                .size(36.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.12f)),
             contentAlignment = Alignment.Center
@@ -2659,17 +2659,9 @@ private fun PlayerQuickAction(
             QuickActionIcon(
                 kind = kind,
                 color = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(19.dp)
             )
         }
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = Color.White.copy(alpha = 0.62f),
-            textAlign = TextAlign.Center
-        )
     }
 }
 
@@ -2725,7 +2717,7 @@ private fun PlayerHeaderAction(
         modifier = Modifier
             .size(42.dp)
             .clip(CircleShape)
-            .clickable(onClick = onClick),
+            .playerNoIndicationClick(onClick),
         contentAlignment = Alignment.Center
     ) {
         when (kind) {
@@ -2921,10 +2913,10 @@ private fun PlayerTransportControls(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onCyclePlaybackMode) {
+        PlayerTransportIconButton(onClick = onCyclePlaybackMode) {
             PlaybackModeIcon(shuffleEnabled = shuffleEnabled, repeatMode = repeatMode, accent = palette.accent)
         }
-        IconButton(onClick = onPrevious) {
+        PlayerTransportIconButton(onClick = onPrevious) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_previous),
                 contentDescription = "上一首",
@@ -2937,7 +2929,7 @@ private fun PlayerTransportControls(
                 .size(64.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.18f))
-                .clickable(onClick = onPlayPause),
+                .playerNoIndicationClick(onPlayPause),
             contentAlignment = Alignment.Center
         ) {
             CenteredPlayPauseGlyph(
@@ -2946,7 +2938,7 @@ private fun PlayerTransportControls(
                 modifier = Modifier.size(if (isPlaying) 38.dp else 40.dp)
             )
         }
-        IconButton(onClick = onNext) {
+        PlayerTransportIconButton(onClick = onNext) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_next),
                 contentDescription = "下一首",
@@ -2955,7 +2947,7 @@ private fun PlayerTransportControls(
             )
         }
         Box(contentAlignment = Alignment.Center) {
-            IconButton(onClick = onToggleQueue) {
+            PlayerTransportIconButton(onClick = onToggleQueue) {
                 QueueListIcon(
                     color = Color.White.copy(alpha = 0.58f),
                     modifier = Modifier.size(28.dp)
@@ -2979,6 +2971,20 @@ private fun PlayerTransportControls(
             }
         }
     }
+}
+
+@Composable
+private fun PlayerTransportIconButton(
+    onClick: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .playerNoIndicationClick(onClick),
+        contentAlignment = Alignment.Center,
+        content = content
+    )
 }
 
 @Composable
@@ -3249,48 +3255,6 @@ private fun PlayerFlowBackground(
     modifier: Modifier = Modifier
 ) {
     val transition = rememberInfiniteTransition(label = "player_flow_background")
-    val slowRotation = if (animate) {
-        val value by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 180_000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "player_flow_background_slow"
-        )
-        value
-    } else {
-        0f
-    }
-    val midRotation = if (animate) {
-        val value by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = -360f,
-                animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 150_000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "player_flow_background_mid"
-        )
-        value
-    } else {
-        0f
-    }
-    val fastRotation = if (animate) {
-        val value by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = -360f,
-                animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 120_000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "player_flow_background_fast"
-        )
-        value
-    } else {
-        0f
-    }
     val sweepDrift = if (animate) {
         val value by transition.animateFloat(
                 initialValue = 0f,
@@ -3324,78 +3288,24 @@ private fun PlayerFlowBackground(
             )
         )
 
-        fun drawLegacyLayer(
-            center: Offset,
-            widthFactor: Float,
-            heightFactor: Float,
-            degrees: Float,
-            color: Color,
-            alpha: Float
-        ) {
-            val layerSize = Size(maxSide * widthFactor, maxSide * heightFactor)
-            rotate(degrees = degrees, pivot = center) {
-                drawOval(
-                    brush = Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0.00f to color.lighten(0.30f).copy(alpha = alpha * 0.76f),
-                            0.38f to color.copy(alpha = alpha * 0.46f),
-                            0.68f to color.darken(0.10f).copy(alpha = alpha * 0.12f),
-                            1.00f to Color.Transparent
-                        ),
-                        center = center,
-                        radius = max(layerSize.width, layerSize.height) * 0.72f
-                    ),
-                    topLeft = Offset(center.x - layerSize.width / 2f, center.y - layerSize.height / 2f),
-                    size = layerSize
-                )
-            }
-        }
-
-        drawLegacyLayer(
-            center = Offset(w * 0.50f, h * 0.48f),
-            widthFactor = 1.62f,
-            heightFactor = 1.34f,
-            degrees = slowRotation,
-            color = palette.accent.boosted(),
-            alpha = 0.30f
-        )
-        drawLegacyLayer(
-            center = Offset(w * 0.12f, -h * 0.06f),
-            widthFactor = 1.45f,
-            heightFactor = 1.16f,
-            degrees = midRotation,
-            color = palette.top.boosted().lighten(0.12f),
-            alpha = 0.24f
-        )
-        drawLegacyLayer(
-            center = Offset(w * 0.18f, h * 1.05f),
-            widthFactor = 1.38f,
-            heightFactor = 1.04f,
-            degrees = fastRotation,
-            color = palette.bottom.boosted().lighten(0.10f),
-            alpha = 0.22f
-        )
-
-        drawRect(Color.White.copy(alpha = 0.05f))
         drawRect(
-            brush = Brush.radialGradient(
+            brush = Brush.linearGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.12f),
-                    Color.White.copy(alpha = 0.04f),
+                    Color.White.copy(alpha = 0.10f),
+                    palette.accent.lighten(0.20f).copy(alpha = 0.08f),
                     Color.Transparent
                 ),
-                center = Offset(w * 0.20f, h * 0.02f),
-                radius = maxSide * 0.86f
+                start = Offset(0f, 0f),
+                end = Offset(w, h * 0.72f)
             )
         )
         drawRect(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    palette.accent.lighten(0.30f).copy(alpha = 0.12f),
-                    Color.Transparent
-                ),
-                center = Offset(w * 0.90f, h * 0.72f),
-                radius = maxSide * 0.72f
+            brush = Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to Color.White.copy(alpha = 0.06f),
+                    0.48f to Color.Transparent,
+                    1.0f to Color.Black.copy(alpha = 0.28f)
+                )
             )
         )
 
@@ -3654,15 +3564,16 @@ private fun PlayerQueueMenu(
         ) {
             Spacer(modifier = Modifier.weight(1f))
             if (playlist.isNotEmpty()) {
-                IconButton(
-                    onClick = {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .playerNoIndicationClick {
                         if (currentIndex >= 0) {
                             scope.launch { listState.animateScrollToItem(currentIndex) }
                         }
                     },
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_my_location),
@@ -3671,11 +3582,12 @@ private fun PlayerQueueMenu(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-                IconButton(
-                    onClick = onClearQueue,
+                Box(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
+                        .playerNoIndicationClick(onClearQueue),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_delete),
@@ -4289,6 +4201,7 @@ private fun PlayerActionMenu(
     speed: Float,
     pitch: Float,
     visualizerEnabled: Boolean,
+    visualizerAvailable: Boolean,
     metadataEditorId: String,
     lyricTimingEditorId: String,
     sleepTimerEndRealtimeMs: Long?,
@@ -4363,7 +4276,9 @@ private fun PlayerActionMenu(
                 }
                 PlayerActionMenuItem("定时关闭", { page = PlayerActionSheetPage.Timer })
                 PlayerActionMenuItem("变速变调", { page = PlayerActionSheetPage.Speed })
-                PlayerActionMenuItem("可视化设置", { page = PlayerActionSheetPage.Visualizer })
+                if (visualizerAvailable) {
+                    PlayerActionMenuItem("可视化设置", { page = PlayerActionSheetPage.Visualizer })
+                }
             }
             PlayerActionSheetPage.Timer -> {
                 TimerSheetContent(

@@ -105,6 +105,8 @@ class SettingsManager(private val context: Context) {
         val KEY_SORT_ARTIST_DETAIL_SONG = intPreferencesKey("sort_artist_detail_song")
         val KEY_SORT_FOLDER_LIST = intPreferencesKey("sort_folder_list")
         val KEY_SORT_FOLDER_DETAIL_SONG = intPreferencesKey("sort_folder_detail_song")
+        val KEY_SORT_PLAYLIST_LIST = intPreferencesKey("sort_playlist_list")
+        val KEY_SORT_PLAYLIST_DETAIL_SONG = intPreferencesKey("sort_playlist_detail_song")
         val KEY_CATEGORY_GRID_COLUMNS = intPreferencesKey("category_grid_columns")
         val KEY_HOME_DAILY_MIX_VISIBLE = booleanPreferencesKey("home_daily_mix_visible")
         val KEY_HOME_SECTION_ORDER = stringPreferencesKey("home_section_order")
@@ -265,6 +267,8 @@ class SettingsManager(private val context: Context) {
     val artistDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ARTIST_DETAIL_SONG] ?: 0 }
     val folderListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_FOLDER_LIST] ?: 0 }
     val folderDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_FOLDER_DETAIL_SONG] ?: 0 }
+    val playlistListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_PLAYLIST_LIST] ?: 2 }
+    val playlistDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_PLAYLIST_DETAIL_SONG] ?: 2 }
     val categoryGridColumns: Flow<Int> = context.dataStore.data.map {
         (it[KEY_CATEGORY_GRID_COLUMNS] ?: 2).coerceIn(1, 4)
     }
@@ -662,6 +666,14 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_SORT_FOLDER_DETAIL_SONG] = index.coerceAtLeast(0) }
     }
 
+    suspend fun setPlaylistListSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_PLAYLIST_LIST] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setPlaylistDetailSongSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_PLAYLIST_DETAIL_SONG] = index.coerceAtLeast(0) }
+    }
+
     suspend fun setCategoryGridColumns(columns: Int) {
         context.dataStore.edit { it[KEY_CATEGORY_GRID_COLUMNS] = columns.coerceIn(1, 4) }
     }
@@ -809,7 +821,22 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_SORT_ARTIST_DETAIL_SONG)
             setInt(KEY_SORT_FOLDER_LIST)
             setInt(KEY_SORT_FOLDER_DETAIL_SONG)
+            setInt(KEY_SORT_PLAYLIST_LIST)
+            setInt(KEY_SORT_PLAYLIST_DETAIL_SONG)
             setInt(KEY_CATEGORY_GRID_COLUMNS)
+
+            val dynamicSortKeyPrefixes = listOf(
+                "sort_metadata_category_",
+                "sort_metadata_category_detail_song_",
+                "sort_metadata_category_detail_album_"
+            )
+            val payloadKeys = payload.keys()
+            while (payloadKeys.hasNext()) {
+                val keyName = payloadKeys.next()
+                if (dynamicSortKeyPrefixes.any { keyName.startsWith(it) } && !payload.isNull(keyName)) {
+                    prefs[intPreferencesKey(keyName)] = payload.optInt(keyName)
+                }
+            }
 
             setString(KEY_WEBDAV_URL)
             setString(KEY_WEBDAV_USERNAME)

@@ -180,6 +180,7 @@ private fun JSONObject.optStringList(vararg names: String): List<String> {
 
 private fun JSONObject.optArtists(): List<NeteaseArtist> {
     val candidates = listOf("artist", "artists", "artistsInfo", "ar")
+    val pairedIds = optArtistIds()
     val artists = buildList {
         candidates.forEach { key ->
             if (!has(key) || isNull(key)) return@forEach
@@ -191,18 +192,59 @@ private fun JSONObject.optArtists(): List<NeteaseArtist> {
                 }
                 is JSONObject -> parseArtist(value)?.let(::add)
                 is String -> value.splitNeteaseArtistNames()
-                    .forEach { add(NeteaseArtist(id = "", name = it)) }
+                    .forEachIndexed { index, rawName ->
+                        val inline = rawName.extractInlineNeteaseArtist()
+                        add(
+                            NeteaseArtist(
+                                id = inline?.id?.takeIf { it.isNotBlank() } ?: pairedIds.getOrNull(index).orEmpty(),
+                                name = inline?.name ?: rawName
+                            )
+                        )
+                    }
             }
         }
     }
     if (artists.isNotEmpty()) return artists.distinctBy { "${it.id}|${it.name}" }
 
     val singleName = optStringCompat("artistName", "artist")
-    val singleId = optId("artistId")
-    return listOfNotNull(
-        NeteaseArtist(id = singleId, name = singleName)
-            .takeIf { it.id.isNotBlank() || it.name.isNotBlank() }
-    )
+    val names = singleName.splitNeteaseArtistNames().ifEmpty {
+        listOf(singleName).filter { it.isNotBlank() }
+    }
+    val ids = pairedIds.ifEmpty { listOf(optId("artistId")) }
+    return names.mapIndexed { index, name ->
+        NeteaseArtist(id = ids.getOrNull(index).orEmpty(), name = name)
+    }.ifEmpty {
+        ids.filter { it.isNotBlank() }.map { id -> NeteaseArtist(id = id, name = "") }
+    }.distinctBy { "${it.id}|${it.name}" }
+}
+
+private fun JSONObject.optArtistIds(): List<String> {
+    val candidates = listOf("artistIds", "artistId", "artistsId", "artistID")
+    for (key in candidates) {
+        if (!has(key) || isNull(key)) continue
+        val value = opt(key)
+        val ids = when (value) {
+            is JSONArray -> buildList {
+                for (index in 0 until value.length()) {
+                    value.opt(index)?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "0" }?.let(::add)
+                }
+            }
+            else -> value?.toString()
+                ?.split(Regex("""\s*(?:[/,;；|]|&)\s*"""))
+                ?.map { it.trim().trim('(', ')') }
+                ?.filter { it.isNotBlank() && it != "0" && it != "null" }
+                .orEmpty()
+        }
+        if (ids.isNotEmpty()) return ids
+    }
+    return emptyList()
+}
+
+private fun String.extractInlineNeteaseArtist(): NeteaseArtist? {
+    val match = Regex("""^(.+?)\s*[\(（](\d{4,})[\)）]\s*$""").find(trim()) ?: return null
+    val name = match.groupValues.getOrNull(1).orEmpty().trim()
+    val id = match.groupValues.getOrNull(2).orEmpty().trim()
+    return NeteaseArtist(id = id, name = name).takeIf { it.id.isNotBlank() || it.name.isNotBlank() }
 }
 
 private fun parseArtist(array: JSONArray, index: Int): NeteaseArtist? {

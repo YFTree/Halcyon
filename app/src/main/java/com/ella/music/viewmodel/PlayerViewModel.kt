@@ -112,6 +112,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var appliedAudioFocusDisabled: Boolean? = null
     private var appliedLyricSourceMode: Int? = null
     private var previousButtonAction = SettingsManager.PREVIOUS_BUTTON_PREVIOUS
+    private var manualSeekAfterPreviousButton = false
     private var lastBluetoothLyricPayload: Pair<String, String?>? = null
     private var sleepTimerJob: Job? = null
     private var externalLyricResendJob: Job? = null
@@ -612,15 +613,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             playerManager.restartCurrent()
             return
         }
+        manualSeekAfterPreviousButton = false
         if (!playLazyOnlineOffset(-1)) playerManager.skipToPrevious()
     }
 
     private fun shouldReplayCurrentFromPreviousButton(): Boolean {
+        if (manualSeekAfterPreviousButton) {
+            manualSeekAfterPreviousButton = false
+            return false
+        }
         return previousButtonAction == SettingsManager.PREVIOUS_BUTTON_REPLAY_CURRENT &&
             currentPosition.value >= SettingsManager.PREVIOUS_REPLAY_THRESHOLD_MS
     }
 
     fun seekTo(positionMs: Long) {
+        manualSeekAfterPreviousButton = true
         playerManager.seekTo(positionMs)
         lyriconBridge.seekTo(positionMs)
 

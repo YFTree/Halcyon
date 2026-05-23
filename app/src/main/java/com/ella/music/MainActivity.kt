@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -401,10 +402,9 @@ fun EllaApp(
         .layerBackdrop(backdrop)
     val previousContentBlur = if (
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-        showPlayerOverlay &&
-        !isPlaying
+        showPlayerOverlay
     ) {
-        8.dp * playerDismissProgress.coerceIn(0f, 1f)
+        7.dp * playerDismissProgress.coerceIn(0f, 1f)
     } else {
         0.dp
     }
@@ -555,7 +555,8 @@ private fun InitialScanPromptDialog(
             Text(
                 text = "当前没有歌曲，是否现在扫描歌曲？",
                 color = MiuixTheme.colorScheme.onSurface,
-                fontSize = 15.sp
+                fontSize = 15.sp,
+                lineHeight = 22.sp
             )
             Spacer(modifier = Modifier.height(18.dp))
             Row(
@@ -568,7 +569,7 @@ private fun InitialScanPromptDialog(
                         onClick = onDismiss,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            .heightIn(min = 48.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -578,7 +579,7 @@ private fun InitialScanPromptDialog(
                         onClick = onCustomFolderScan,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            .heightIn(min = 48.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -588,7 +589,7 @@ private fun InitialScanPromptDialog(
                         onClick = onMediaLibraryScan,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            .heightIn(min = 48.dp)
                     )
                 }
             }
