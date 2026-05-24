@@ -1663,7 +1663,7 @@ private fun LyricsPlayerPage(
                     topSpacer = 64.dp,
                     bottomSpacer = if (visualizerEnabled) 150.dp else 166.dp,
                     horizontalPadding = 0.dp,
-                    lineHorizontalPadding = 12.dp,
+                    lineHorizontalPadding = 0.dp,
                     onLineClick = onLineClick,
                     onLineDoubleClick = onLineDoubleClick,
                     onLineLongClick = onLineLongClick,
