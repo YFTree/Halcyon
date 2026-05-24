@@ -336,7 +336,7 @@ fun PlaylistScreen(
 
             item {
                 Text(
-                    text = "${displayedCustomPlaylists.size} 个歌单",
+                    text = "${displayedCustomPlaylists.size} 个歌单 · ${playlistSortMode.label}排序",
                     fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp)
@@ -501,7 +501,12 @@ fun PlaylistDetailScreen(
     ) {
         Box {
             SmallTopAppBar(
-                title = playlist?.name ?: "歌单",
+                title = when {
+                    playlist == null -> "歌单"
+                    isFiveStarPlaylist -> playlist.name
+                    listState.firstVisibleItemIndex > 0 -> playlist.name
+                    else -> "自定义歌单"
+                },
                 color = ellaPageBackground(),
                 navigationIcon = {
                     IconButton(onClick = onBack) {

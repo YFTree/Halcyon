@@ -873,7 +873,7 @@ fun SettingsDetailScreen(
                         )
                         WindowSpinnerPreference(
                             title = "歌词打轴软件",
-                            summary = "当前：${lyricTimingEditorOptions[lyricTimingEditorIndex].second}",
+                            summary = "",
                             items = lyricTimingEditorEntries,
                             selectedIndex = lyricTimingEditorIndex,
                             onSelectedIndexChange = { index ->
