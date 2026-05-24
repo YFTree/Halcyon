@@ -456,7 +456,9 @@ fun ArtistScreen(
                 onDismissRequest = { playlistPickerSong = null }
             ) {
                 ArtistAddToPlaylistMenu(
-                    playlists = playlists.filterNot { it.id == FAVORITES_PLAYLIST_ID },
+                    playlists = playlists
+                        .filterNot { it.id == FAVORITES_PLAYLIST_ID }
+                        .sortedByDescending { it.createdAt },
                     onDismiss = { playlistPickerSong = null },
                     onCreatePlaylist = {
                         createPlaylistSong = song

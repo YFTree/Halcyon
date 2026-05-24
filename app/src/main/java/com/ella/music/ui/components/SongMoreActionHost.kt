@@ -274,7 +274,9 @@ fun SongMoreActionHost(
             onDismissRequest = { playlistSong = null }
         ) {
             AddToPlaylistSheet(
-                playlists = playlists.filterNot { it.id == FAVORITES_PLAYLIST_ID },
+                playlists = playlists
+                    .filterNot { it.id == FAVORITES_PLAYLIST_ID }
+                    .sortedByDescending { it.createdAt },
                 onDismiss = { playlistSong = null },
                 onCreatePlaylist = {
                     createPlaylistSong = song

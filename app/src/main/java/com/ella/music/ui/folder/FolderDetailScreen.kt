@@ -484,7 +484,9 @@ fun FolderDetailScreen(
                 onDismissRequest = { playlistPickerSongs = null }
             ) {
                 AddSelectedSongsToPlaylistSheet(
-                    playlists = playlists.filterNot { it.id == FAVORITES_PLAYLIST_ID },
+                    playlists = playlists
+                        .filterNot { it.id == FAVORITES_PLAYLIST_ID }
+                        .sortedByDescending { it.createdAt },
                     songCount = songsToAdd.size,
                     onDismiss = { playlistPickerSongs = null },
                     onCreatePlaylist = {
