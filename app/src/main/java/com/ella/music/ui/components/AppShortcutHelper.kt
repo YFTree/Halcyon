@@ -66,10 +66,9 @@ fun requestPinnedEllaShortcut(
         action = Intent.ACTION_VIEW
         putExtra(EXTRA_SHORTCUT_ROUTE, route)
     }
-    val shortcutLabel = label.shortcutLabelForRoute(route)
     val shortcut = ShortcutInfo.Builder(context, id.toShortcutId())
-        .setShortLabel(shortcutLabel.take(10).ifBlank { "Ella Music" })
-        .setLongLabel(shortcutLabel.ifBlank { "Ella Music" })
+        .setShortLabel(label.take(10).ifBlank { "Ella Music" })
+        .setLongLabel(label.ifBlank { "Ella Music" })
         .setIcon(Icon.createWithResource(context, shortcutIconForRoute(route)))
         .setIntent(intent)
         .build()
@@ -105,36 +104,5 @@ private fun shortcutIconForRoute(route: String): Int = when (route) {
     Screen.Library.route -> R.drawable.ic_shortcut_library
     Screen.Playlists.route -> R.drawable.ic_shortcut_playlist
     Screen.Folder.route -> R.drawable.ic_shortcut_folder
-    Screen.Album.route -> R.drawable.ic_shortcut_album
-    Screen.Artist.route -> R.drawable.ic_shortcut_artist
-    "category/folder" -> R.drawable.ic_shortcut_folder
-    "category/genre" -> R.drawable.ic_shortcut_tag
-    "category/year" -> R.drawable.ic_shortcut_calendar
-    "category/composer",
-    "category/lyricist" -> R.drawable.ic_shortcut_artist
-    else -> shortcutIconForRoutePrefix(route)
-}
-
-private fun shortcutIconForRoutePrefix(route: String): Int = when {
-    route.startsWith("album/") -> R.drawable.ic_shortcut_album
-    route.startsWith("artist/") -> R.drawable.ic_shortcut_artist
-    route.startsWith("folder/") -> R.drawable.ic_shortcut_folder
-    route.startsWith("playlist/") -> R.drawable.ic_shortcut_playlist
-    route.startsWith("category/folder/") -> R.drawable.ic_shortcut_folder
-    route.startsWith("category/genre/") -> R.drawable.ic_shortcut_tag
-    route.startsWith("category/year/") -> R.drawable.ic_shortcut_calendar
-    route.startsWith("category/composer/") || route.startsWith("category/lyricist/") -> R.drawable.ic_shortcut_artist
     else -> R.drawable.ic_music_note
-}
-
-private fun String.shortcutLabelForRoute(route: String): String {
-    return if (route.startsWith("folder/") || route.startsWith("category/folder/")) {
-        trim()
-            .trimEnd('/', '\\')
-            .substringAfterLast('/')
-            .substringAfterLast('\\')
-            .ifBlank { this }
-    } else {
-        this
-    }
 }
