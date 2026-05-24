@@ -55,7 +55,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
@@ -127,7 +127,7 @@ fun AlbumScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Box {
-            SmallTopAppBar(
+            EllaSmallTopAppBar(
                 title = "专辑",
                 color = ellaPageBackground(),
                 navigationIcon = {

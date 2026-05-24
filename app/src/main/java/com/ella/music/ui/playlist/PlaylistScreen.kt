@@ -81,7 +81,7 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -187,7 +187,7 @@ fun PlaylistScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Box {
-            SmallTopAppBar(
+            EllaSmallTopAppBar(
                 title = "歌单",
                 color = ellaPageBackground(),
                 navigationIcon = {
@@ -500,7 +500,7 @@ fun PlaylistDetailScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Box {
-            SmallTopAppBar(
+            EllaSmallTopAppBar(
                 title = when {
                     playlist == null -> "歌单"
                     isFiveStarPlaylist -> playlist.name

@@ -83,7 +83,7 @@ import com.ella.music.ui.navigation.Screen
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -151,7 +151,7 @@ fun MetadataCategoryScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Box {
-            SmallTopAppBar(
+            EllaSmallTopAppBar(
                 title = type.categoryTitle(),
                 color = pageBackground,
                 navigationIcon = {
@@ -369,7 +369,7 @@ fun MetadataCategoryDetailScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Box {
-            SmallTopAppBar(
+            EllaSmallTopAppBar(
                 title = name.ifBlank { type.categoryTitle() },
                 color = pageBackground,
                 navigationIcon = {

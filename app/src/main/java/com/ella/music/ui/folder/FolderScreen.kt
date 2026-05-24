@@ -65,7 +65,7 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import androidx.compose.ui.window.Dialog
@@ -135,7 +135,7 @@ fun FolderScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Box {
-            SmallTopAppBar(
+            EllaSmallTopAppBar(
                 title = "文件夹",
                 color = ellaPageBackground(),
                 navigationIcon = {
@@ -440,7 +440,7 @@ fun ScanSettingsScreen(
             .background(ellaPageBackground())
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(
+        EllaSmallTopAppBar(
             title = "扫描设置",
             color = ellaPageBackground(),
             navigationIcon = {

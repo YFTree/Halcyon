@@ -50,7 +50,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Slider
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
@@ -91,7 +91,7 @@ fun LyricFontScreen(
             .background(pageBackground)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(
+        EllaSmallTopAppBar(
             title = "歌词字体",
             navigationIcon = {
                 IconButton(onClick = onBack) {

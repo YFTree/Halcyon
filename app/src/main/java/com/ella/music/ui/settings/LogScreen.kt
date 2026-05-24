@@ -54,7 +54,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -135,7 +135,7 @@ fun LogScreen(
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
+            EllaSmallTopAppBar(
                 title = "日志分析",
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {

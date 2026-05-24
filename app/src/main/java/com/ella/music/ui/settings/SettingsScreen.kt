@@ -68,7 +68,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.DropdownItem
@@ -102,9 +102,10 @@ fun SettingsScreen(
             .background(pageBackground)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(
+        EllaSmallTopAppBar(
             title = "设置",
-            color = pageBackground
+            color = pageBackground,
+            centeredTitle = true
         )
 
         Column(
@@ -255,7 +256,7 @@ fun AudioSettingsScreen(
             .background(pageBackground)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(
+        EllaSmallTopAppBar(
             title = "音频",
             color = pageBackground,
             navigationIcon = {
@@ -420,7 +421,7 @@ fun BackupSettingsScreen(
             .background(pageBackground)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(
+        EllaSmallTopAppBar(
             title = "备份",
             color = pageBackground,
             navigationIcon = {
@@ -667,7 +668,7 @@ fun SettingsDetailScreen(
             .background(pageBackground)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        SmallTopAppBar(
+        EllaSmallTopAppBar(
             title = when {
                 showHomeDisplayPage -> "首页显示"
                 showOnlyLyrics -> "歌词"

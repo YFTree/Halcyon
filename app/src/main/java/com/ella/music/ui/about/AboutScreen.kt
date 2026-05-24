@@ -52,7 +52,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
@@ -91,7 +91,7 @@ fun AboutScreen(
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
+            EllaSmallTopAppBar(
                 title = "关于",
                 scrollBehavior = scrollBehavior,
                 color = colorScheme.surface.copy(alpha = if (scrollProgress == 1f) 1f else 0f),
