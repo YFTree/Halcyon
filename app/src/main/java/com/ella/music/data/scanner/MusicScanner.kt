@@ -387,6 +387,16 @@ class MusicScanner(private val context: Context) {
                     ).orEmpty(),
                     "track" to tag.safeFirst(file, FieldKey.TRACK),
                     "comment" to tag.safeFirst(file, FieldKey.COMMENT),
+                    "neteaseKey" to firstNonBlank(
+                        tag.safeFirst(file, "163KEY"),
+                        tag.safeFirst(file, "163 KEY"),
+                        tag.safeFirst(file, "NETEASEKEY"),
+                        tag.safeFirst(file, "NETEASE_KEY"),
+                        tag.safeFirst(file, "NETEASE_CLOUD_MUSIC_KEY"),
+                        tag.safeFirst(file, "CLOUDMUSICKEY"),
+                        tag.safeFirst(file, "CLOUDMUSIC_KEY"),
+                        tag.safeFirst(file, "MUSIC163KEY")
+                    ).orEmpty(),
                     "copyright" to firstNonBlank(
                         tag.safeFirst(file, "COPYRIGHT"),
                         tag.safeFirst(file, "COPYRIGHTMESSAGE"),
@@ -452,8 +462,10 @@ class MusicScanner(private val context: Context) {
                     "WCOP"
                 )
             }.cleanTagText(),
-            neteaseKey = tagLibValues.findNeteaseKey()
-                .ifBlank { jaudioValues["comment"].orEmpty().takeIf { it.looksLikeNeteaseKeyValue() }.orEmpty() }
+            neteaseKey = jaudioValues["neteaseKey"].orEmpty()
+                .takeIf { it.looksLikeNeteaseKeyValue() }
+                .orEmpty()
+                .ifBlank { tagLibValues.findNeteaseKey() }
                 .cleanTagText(),
             rating = ratingStarsFromTagValues(
                 jaudioValues["rating"],
@@ -796,20 +808,30 @@ class MusicScanner(private val context: Context) {
 
     private fun Map<String, List<String>>.findNeteaseKey(): String {
         for ((key, values) in this) {
-            val normalizedKey = key.normalizedPropertyKey()
-            if ("163" in normalizedKey || "netease" in normalizedKey || "cloudmusic" in normalizedKey) {
-                values.asSequence()
-                    .firstOrNull { it.looksLikeNeteaseKeyValue() }
-                    ?.cleanTagText()
-                    ?.let { return it }
-            }
-        }
-        for (value in values.flatten()) {
-            val extracted = value.extractNeteaseValue()
-            if (extracted.isNotBlank()) return extracted
+            if (!key.isNeteaseKeyPropertyName()) continue
+            values.asSequence()
+                .map { it.cleanTagText() }
+                .firstOrNull { it.looksLikeNeteaseKeyValue() }
+                ?.let { return it }
         }
         return ""
     }
+
+    private fun String.isNeteaseKeyPropertyName(): Boolean {
+        val normalized = normalizedPropertyKey()
+        return normalized in explicitNeteaseKeyProperties ||
+            normalized.startsWith("163KEY") ||
+            normalized.startsWith("NETEASEKEY") ||
+            normalized.startsWith("CLOUDMUSICKEY")
+    }
+
+    private val explicitNeteaseKeyProperties = setOf(
+        "163KEY",
+        "NETEASEKEY",
+        "NETEASECLOUDMUSICKEY",
+        "CLOUDMUSICKEY",
+        "MUSIC163KEY"
+    )
 
     private fun List<String>.firstNotBlank(): String? =
         firstOrNull { it.trim().isNotBlank() }?.trim()
