@@ -32,10 +32,13 @@ import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaNotification
 import androidx.media3.session.MediaStyleNotificationHelper
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import com.ella.music.R
 import com.ella.music.MainActivity
 import com.ella.music.data.AppLogStore
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.PlaylistStore
 import com.ella.music.data.webdav.WebDavClient
 import com.ella.music.data.webdav.WebDavConfig
 import com.google.common.collect.ImmutableList
@@ -49,6 +52,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import android.os.Bundle
 
 class PlaybackService : MediaLibraryService() {
 
@@ -56,6 +60,8 @@ class PlaybackService : MediaLibraryService() {
         private const val TAG = "PlaybackService"
         private const val LIBRARY_ROOT_ID = "ella_music_root"
         private const val LIBRARY_QUEUE_ID = "ella_music_current_queue"
+        const val ACTION_TOGGLE_FAVORITE = "com.ella.music.action.TOGGLE_FAVORITE"
+        const val ACTION_TOGGLE_SHUFFLE = "com.ella.music.action.TOGGLE_SHUFFLE"
     }
 
     private var mediaSession: MediaLibrarySession? = null
@@ -175,6 +181,37 @@ class PlaybackService : MediaLibraryService() {
         super.onDestroy()
     }
 
+    fun launchServiceJob(block: suspend () -> Unit) {
+        serviceScope.launch { block() }
+    }
+
+    fun handleNotificationCustomAction(action: String): Boolean {
+        return when (action) {
+            ACTION_TOGGLE_SHUFFLE -> {
+                AppLogStore.info(this, TAG, "NotificationAction shuffle clicked")
+                mediaSession?.player?.let { player ->
+                    player.shuffleModeEnabled = !player.shuffleModeEnabled
+                }
+                true
+            }
+
+            ACTION_TOGGLE_FAVORITE -> {
+                AppLogStore.info(this, TAG, "NotificationAction favorite clicked")
+                val song = mediaSession?.player?.currentMediaItem?.toSongFromMediaItemExtras()
+                if (song == null) {
+                    AppLogStore.warn(this, TAG, "NotificationAction currentMediaItem cannot restore Song")
+                    return true
+                }
+                serviceScope.launch {
+                    PlaylistStore.getInstance(this@PlaybackService).toggleFavorite(song)
+                }
+                true
+            }
+
+            else -> false
+        }
+    }
+
     private fun currentWebDavConfig(settingsManager: SettingsManager): WebDavConfig {
         return runBlocking(Dispatchers.IO) {
             WebDavConfig(
@@ -246,6 +283,36 @@ class PlaybackService : MediaLibraryService() {
     private class EllaLibrarySessionCallback(
         private val service: PlaybackService
     ) : MediaLibrarySession.Callback {
+        @OptIn(UnstableApi::class)
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): MediaSession.ConnectionResult {
+            val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
+                .buildUpon()
+                .add(SessionCommand(ACTION_TOGGLE_FAVORITE, Bundle.EMPTY))
+                .add(SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY))
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(sessionCommands)
+                .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle
+        ): ListenableFuture<SessionResult> {
+            val handled = service.handleNotificationCustomAction(customCommand.customAction)
+            val result = if (handled) {
+                SessionResult(SessionResult.RESULT_SUCCESS)
+            } else {
+                SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED)
+            }
+            return Futures.immediateFuture(result)
+        }
+
         override fun onGetLibraryRoot(
             session: MediaLibrarySession,
             browser: MediaSession.ControllerInfo,
@@ -433,20 +500,54 @@ class PlaybackService : MediaLibraryService() {
                 if (compact) compactIndices += index
             }
 
+            fun addCustomAction(action: String, icon: Int, title: String, compact: Boolean = false) {
+                val index = actionCount++
+                builder.addAction(
+                    actionFactory.createCustomAction(
+                        mediaSession,
+                        IconCompat.createWithResource(service, icon),
+                        title,
+                        action,
+                        Bundle.EMPTY
+                    )
+                )
+                if (compact) compactIndices += index
+            }
+
+            addCustomAction(
+                ACTION_TOGGLE_FAVORITE,
+                R.drawable.ic_notification_favorite,
+                "收藏",
+                compact = false
+            )
+
             addAction(
                 Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
                 androidx.media3.session.R.drawable.media3_icon_previous,
                 "上一首"
             )
+
             addAction(
                 Player.COMMAND_PLAY_PAUSE,
-                if (player.isPlaying) androidx.media3.session.R.drawable.media3_icon_pause else androidx.media3.session.R.drawable.media3_icon_play,
+                if (player.isPlaying) {
+                    androidx.media3.session.R.drawable.media3_icon_pause
+                } else {
+                    androidx.media3.session.R.drawable.media3_icon_play
+                },
                 if (player.isPlaying) "暂停" else "播放"
             )
+
             addAction(
                 Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
                 androidx.media3.session.R.drawable.media3_icon_next,
                 "下一首"
+            )
+
+            addCustomAction(
+                ACTION_TOGGLE_SHUFFLE,
+                R.drawable.ic_notification_shuffle,
+                if (player.shuffleModeEnabled) "关闭随机播放" else "随机播放",
+                compact = false
             )
 
             val style = MediaStyleNotificationHelper.MediaStyle(mediaSession)
@@ -530,7 +631,13 @@ class PlaybackService : MediaLibraryService() {
             return Bitmap.createBitmap(this, x, y, size, size)
         }
 
-        override fun handleCustomCommand(session: MediaSession, action: String, extras: android.os.Bundle): Boolean = false
+        override fun handleCustomCommand(
+            session: MediaSession,
+            action: String,
+            extras: Bundle
+        ): Boolean {
+            return service.handleNotificationCustomAction(action)
+        }
 
         override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo {
             return MediaNotification.Provider.NotificationChannelInfo(CHANNEL_ID, CHANNEL_NAME)

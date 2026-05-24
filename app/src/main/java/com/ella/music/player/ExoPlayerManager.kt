@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.LruCache
@@ -600,6 +599,11 @@ class ExoPlayerManager(private val context: Context) {
         artistOverride: CharSequence? = null,
         artworkData: ByteArray? = null
     ): MediaMetadata {
+        val extras = toMediaItemExtras().apply {
+            putString(EXTRA_ONLINE_SOURCE, onlineSource)
+            putString(EXTRA_ONLINE_ID, onlineId)
+            putString(EXTRA_SONG_JSON, this@mediaMetadata.toJson().toString())
+        }
         return MediaMetadata.Builder()
             .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
             .setTitle(titleOverride ?: title)
@@ -612,19 +616,13 @@ class ExoPlayerManager(private val context: Context) {
             .setDurationMs(duration.takeIf { it > 0L } ?: C.TIME_UNSET)
             .setTrackNumber(trackNumber.takeIf { it > 0 })
             .setDiscNumber(discNumber.takeIf { it > 0 })
+            .setExtras(extras)
             .apply {
                 if (artworkData != null) {
                     setArtworkData(artworkData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
                 }
                 artworkUriForMediaCenter()?.let(::setArtworkUri)
             }
-            .setExtras(
-                Bundle().apply {
-                    putString(EXTRA_ONLINE_SOURCE, onlineSource)
-                    putString(EXTRA_ONLINE_ID, onlineId)
-                    putString(EXTRA_SONG_JSON, this@mediaMetadata.toJson().toString())
-                }
-            )
             .build()
     }
 
