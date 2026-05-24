@@ -185,7 +185,10 @@ fun HomeScreen(
                     "composer" to HomeTileSpec("composer", "作曲家", "$composerCount 位", Color(0xFFB5179E), Screen.MetadataCategory.createRoute("composer")) { onNavigateToMetadataCategory("composer") },
                     "lyricist" to HomeTileSpec("lyricist", "作词家", "$lyricistCount 位", Color(0xFFFF6D00), Screen.MetadataCategory.createRoute("lyricist")) { onNavigateToMetadataCategory("lyricist") }
                 )
-                tileOrder.mapNotNull { all[it] }.filterNot { it.id in hiddenTiles }
+                val orderedTiles = tileOrder.mapNotNull { all[it] }.filterNot { it.id in hiddenTiles }
+                orderedTiles.firstOrNull { it.id == "folder_tree" }?.let { folderTreeTile ->
+                    listOf(folderTreeTile) + orderedTiles.filterNot { it.id == "folder_tree" }
+                } ?: orderedTiles
             }
 
             sectionOrder.filterNot { it in hiddenSections }.forEach { section ->
