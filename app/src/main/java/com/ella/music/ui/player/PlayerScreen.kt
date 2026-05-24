@@ -1138,7 +1138,7 @@ private fun CoverPlayerPage(
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(228.dp)
+                                    .height(miniLyricsPreviewHeight(miniLyricLine, showTranslation, showPronunciation))
                                     .padding(vertical = 2.dp)
                             )
                         }
@@ -1251,7 +1251,7 @@ private fun CoverPlayerPage(
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(if (showTranslation || showPronunciation) 226.dp else 184.dp)
+                                    .height(miniLyricsPreviewHeight(miniLyricLine, showTranslation, showPronunciation))
                                     .padding(vertical = 2.dp)
                             )
                         } else {
@@ -1276,7 +1276,7 @@ private fun CoverPlayerPage(
                             palette = palette,
                             onSeek = onSeek
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         PlayerTransportControls(
                             isPlaying = isPlaying,
                             shuffleEnabled = shuffleEnabled,
@@ -1293,8 +1293,9 @@ private fun CoverPlayerPage(
                             onDismissQueue = onDismissQueue,
                             onQueueSongClick = onQueueSongClick,
                             onClearQueue = onClearQueue,
-                            modifier = Modifier.height(74.dp)
+                            modifier = Modifier.height(92.dp)
                         )
+                        Spacer(modifier = Modifier.height(20.dp))
                     }
                 }
             }
@@ -3644,6 +3645,17 @@ private fun PlayerQueueMenu(
     }
 }
 
+private fun miniLyricsPreviewHeight(
+    line: LyricLine?,
+    showTranslation: Boolean,
+    showPronunciation: Boolean
+) = when (line?.miniVisiblePartCount(showTranslation, showPronunciation) ?: 1) {
+    0, 1 -> 126.dp
+    2 -> 154.dp
+    3 -> 184.dp
+    else -> 220.dp
+}
+
 @Composable
 private fun MiniLyricsPreview(
     lyrics: List<com.ella.music.data.model.LyricLine>,
@@ -3681,6 +3693,19 @@ private fun MiniLyricsPreview(
         anchorKey = lyrics.getOrNull(safeIndex)?.miniLyricRenderKey() ?: safeIndex
     )
 
+    val maxVisiblePartCount = previewItems.maxOfOrNull { index ->
+        lyrics[index].miniVisiblePartCount(
+            showTranslation = showTranslation,
+            showPronunciation = showPronunciation
+        )
+    } ?: 1
+
+    val miniLineSpacing = when {
+        maxVisiblePartCount <= 2 -> 5.dp
+        maxVisiblePartCount == 3 -> 7.dp
+        else -> 9.dp
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -3690,8 +3715,8 @@ private fun MiniLyricsPreview(
             .drawWithCache {
                 val fade = Brush.verticalGradient(
                     0f to Color.Transparent,
-                    0.16f to Color.Black,
-                    0.82f to Color.Black,
+                    0.10f to Color.Black,
+                    0.90f to Color.Black,
                     1f to Color.Transparent
                 )
                 onDrawWithContent {
@@ -3699,21 +3724,15 @@ private fun MiniLyricsPreview(
                     drawRect(fade, blendMode = BlendMode.DstIn)
                 }
             },
-        verticalArrangement = if (previewItems.size == 1) Arrangement.Center else Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(
+            space = miniLineSpacing,
+            alignment = Alignment.CenterVertically
+        )
     ) {
         previewItems.forEach { index ->
             val line = lyrics[index]
             val isActive = index == safeIndex
-            val visiblePartCount = line.miniVisiblePartCount(
-                showTranslation = showTranslation,
-                showPronunciation = showPronunciation
-            )
-            val blockWeight = when {
-                visiblePartCount >= 5 -> 1.22f
-                visiblePartCount >= 4 -> 1.12f
-                visiblePartCount >= 3 -> 1.02f
-                else -> 0.92f
-            }
+
             val distance = kotlin.math.abs(index - safeIndex)
             val alpha by animateFloatAsState(
                 targetValue = when {
@@ -3741,7 +3760,6 @@ private fun MiniLyricsPreview(
                 fontWeight = fontWeight,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(blockWeight)
                     .graphicsLayer {
                         this.alpha = alpha
                         scaleX = scale
@@ -3813,7 +3831,7 @@ private fun MiniLyricBlock(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
         horizontalAlignment = line.previewHorizontalAlignment()
     ) {
         if (pronunciation != null) {
