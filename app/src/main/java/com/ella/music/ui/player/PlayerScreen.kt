@@ -252,6 +252,7 @@ fun PlayerScreen(
     val lyricFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
     val lyricFontWeightValue by settingsManager.lyricFontWeight.collectAsState(initial = 800)
     val lyricFontScaleValue by settingsManager.lyricFontScale.collectAsState(initial = 100)
+    val lyricPerspectiveEffect by settingsManager.lyricPerspectiveEffect.collectAsState(initial = false)
     val lyricSourceMode by settingsManager.lyricSourceMode.collectAsState(initial = SettingsManager.LYRIC_SOURCE_AUTO)
     val lyricFontFamily = remember(lyricFontPath, lyricFontWeightValue) {
         lyricFontPath.toPlayerLyricFontFamily(lyricFontWeightValue)
@@ -641,6 +642,7 @@ fun PlayerScreen(
             fontFamily = lyricFontFamily,
             fontWeight = lyricFontWeight,
             fontScale = lyricFontScale,
+            perspectiveEffect = lyricPerspectiveEffect,
             palette = palette,
             flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
             currentPositionMs = currentPosition,
@@ -1577,6 +1579,7 @@ private fun LyricsPlayerPage(
     fontFamily: FontFamily?,
     fontWeight: FontWeight,
     fontScale: Float,
+    perspectiveEffect: Boolean,
     palette: PlayerPalette,
     flowEffectMode: Int,
     currentPositionMs: Long,
@@ -1698,6 +1701,7 @@ private fun LyricsPlayerPage(
                     bottomSpacer = if (visualizerEnabled) 150.dp else 166.dp,
                     horizontalPadding = 0.dp,
                     lineHorizontalPadding = 0.dp,
+                    perspectiveEffect = perspectiveEffect,
                     onLineClick = onLineClick,
                     onLineDoubleClick = onLineDoubleClick,
                     onLineLongClick = onLineLongClick,

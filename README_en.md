@@ -119,15 +119,15 @@ The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming
 
 ## 📱 Requirements
 
-| Item | Requirement |
-|:--|:--|
-| Android Version | Android 10.0 / API 29 or higher |
-| Target SDK | Android API 37 |
-| Default ABI | `arm64-v8a` |
-| Network | Required for WebDAV, LX online sources, and online lyrics |
+| Item | Requirement                                                             |
+|:--|:------------------------------------------------------------------------|
+| Android Version | Android 12 / API 31 or higher                                            |
+| Target SDK | Android 17 / API 37                                                     |
+| Default ABI | `arm64-v8a`                                                             |
+| Network | Required for WebDAV, LX online sources, and online lyrics               |
 | Video Permission | Android 13+ may require video media permission for dynamic video covers |
-| Overlay Permission | Required when using floating lyrics |
-| Notification Permission | Required on Android 13 and above |
+| Overlay Permission | Required when using floating lyrics                                     |
+| Notification Permission | Required on Android 13 and above                                        |
 
 ---
 

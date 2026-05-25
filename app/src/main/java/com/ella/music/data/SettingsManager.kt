@@ -91,6 +91,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_FONT_PATH = stringPreferencesKey("lyric_font_path")
         val KEY_LYRIC_FONT_WEIGHT = intPreferencesKey("lyric_font_weight")
         val KEY_LYRIC_FONT_SCALE = intPreferencesKey("lyric_font_scale")
+        val KEY_LYRIC_PERSPECTIVE_EFFECT = booleanPreferencesKey("lyric_perspective_effect")
         val KEY_SCAN_INCLUDE_FOLDERS = stringPreferencesKey("scan_include_folders")
         val KEY_SCAN_EXCLUDE_FOLDERS = stringPreferencesKey("scan_exclude_folders")
         val KEY_USE_ANDROID_MEDIA_LIBRARY = booleanPreferencesKey("use_android_media_library")
@@ -258,6 +259,7 @@ class SettingsManager(private val context: Context) {
     val lyricFontPath: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_PATH] ?: "" }
     val lyricFontWeight: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_WEIGHT] ?: 800 }
     val lyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_SCALE] ?: 100 }
+    val lyricPerspectiveEffect: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PERSPECTIVE_EFFECT] ?: false }
     val scanIncludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_INCLUDE_FOLDERS] ?: "" }
     val scanExcludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_EXCLUDE_FOLDERS] ?: "" }
     val useAndroidMediaLibrary: Flow<Boolean> =
@@ -372,6 +374,13 @@ class SettingsManager(private val context: Context) {
         }
     }
 
+    suspend fun resetDesktopLyricPosition() {
+        context.dataStore.edit {
+            it.remove(KEY_DESKTOP_LYRIC_X)
+            it.remove(KEY_DESKTOP_LYRIC_Y)
+        }
+    }
+
     suspend fun setSuperLyricEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_SUPER_LYRIC_ENABLED] = enabled }
     }
@@ -424,6 +433,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setLyricPageKeepScreenOn(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] = enabled }
+    }
+
+    suspend fun setLyricPerspectiveEffect(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_LYRIC_PERSPECTIVE_EFFECT] = enabled }
     }
 
     suspend fun setMiniPlayerLyricTranslation(enabled: Boolean) {
@@ -805,6 +818,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_AUDIO_FOCUS_DISABLED)
             setBoolean(KEY_LYRIC_PAGE_TRANSLATION)
             setBoolean(KEY_LYRIC_PAGE_KEEP_SCREEN_ON)
+            setBoolean(KEY_LYRIC_PERSPECTIVE_EFFECT)
             setBoolean(KEY_MINI_PLAYER_LYRIC_TRANSLATION)
             setBoolean(KEY_PLAYER_HDR_GLOW)
             setBoolean(KEY_PLAYER_IMMERSIVE_COVER)
@@ -831,6 +845,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_DESKTOP_LYRIC_TRANSLATION_SCALE)
             setInt(KEY_DESKTOP_LYRIC_OPACITY)
             setInt(KEY_DESKTOP_LYRIC_TEXT_COLOR)
+            setInt(KEY_DESKTOP_LYRIC_SHADOW_STRENGTH)
             setInt(KEY_DESKTOP_LYRIC_X)
             setInt(KEY_DESKTOP_LYRIC_Y)
             setInt(KEY_DECODER_MODE)

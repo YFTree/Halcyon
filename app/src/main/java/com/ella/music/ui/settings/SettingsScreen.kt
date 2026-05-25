@@ -51,6 +51,7 @@ import androidx.core.content.ContextCompat
 import com.ella.music.BuildConfig
 import com.ella.music.data.PlaybackStatsStore
 import com.ella.music.data.SettingsManager
+import com.ella.music.player.DesktopLyricService
 import com.ella.music.ui.components.TagEditorOptionIds
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -506,6 +507,7 @@ fun SettingsDetailScreen(
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
+    val lyricPerspectiveEffect by settingsManager.lyricPerspectiveEffect.collectAsState(initial = false)
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
     val playerImmersiveCover by settingsManager.playerImmersiveCover.collectAsState(initial = true)
@@ -798,6 +800,14 @@ fun SettingsDetailScreen(
                                 scope.launch { settingsManager.setPlayerDynamicFlowEnabled(it) }
                             }
                         )
+                        SwitchPreference(
+                            title = "立体歌词",
+                            summary = "歌词页按距离加入轻微透视和模糊层次，类似 Salt Player 的纵深效果",
+                            checked = lyricPerspectiveEffect,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setLyricPerspectiveEffect(it) }
+                            }
+                        )
                         ArrowPreference(
                             title = "歌词字体",
                             summary = lyricFontName.ifBlank { "系统默认" },
@@ -1084,6 +1094,24 @@ fun SettingsDetailScreen(
                             scope.launch {
                                 settingsManager.setDesktopLyricLocked(enabled)
                                 applyDesktopLyricSettings()
+                            }
+                        }
+                    )
+
+                    ArrowPreference(
+                        title = "重置桌面歌词位置",
+                        summary = "把悬浮歌词移回屏幕中上方，避免卡在状态栏影响下拉",
+                        enabled = desktopLyricEnabled,
+                        onClick = {
+                            scope.launch {
+                                settingsManager.resetDesktopLyricPosition()
+                                withContext(Dispatchers.Main) {
+                                    context.startService(
+                                        Intent(context, DesktopLyricService::class.java)
+                                            .setAction(DesktopLyricService.ACTION_RESET_POSITION)
+                                    )
+                                    Toast.makeText(context, "已重置桌面歌词位置", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     )

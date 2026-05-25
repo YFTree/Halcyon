@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -219,6 +220,7 @@ fun WordLyricView(
     bottomSpacer: androidx.compose.ui.unit.Dp = 420.dp,
     horizontalPadding: androidx.compose.ui.unit.Dp = 22.dp,
     lineHorizontalPadding: androidx.compose.ui.unit.Dp = LYRIC_EDGE_GUARD_DP,
+    perspectiveEffect: Boolean = false,
     onLineClick: (LyricLine) -> Unit = {},
     onLineDoubleClick: () -> Unit = {},
     onLineLongClick: (LyricLine) -> Unit = {}
@@ -236,6 +238,7 @@ fun WordLyricView(
     }
 
     val listState = rememberLazyListState()
+    val density = LocalDensity.current
     var userBrowsing by remember { mutableStateOf(false) }
     var autoScrolling by remember { mutableStateOf(false) }
     var lastUserScrollMs by remember { mutableLongStateOf(0L) }
@@ -345,6 +348,26 @@ fun WordLyricView(
                 animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
                 label = "lyric_line_blur"
             )
+            val perspectiveRotation by animateFloatAsState(
+                targetValue = if (perspectiveEffect && !userBrowsing && !isActive && currentIndex >= 0) {
+                    val direction = if (index < currentIndex) -1f else 1f
+                    direction * (4.5f + distance.coerceAtMost(5) * 1.25f)
+                } else {
+                    0f
+                },
+                animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+                label = "lyric_line_perspective_rotation"
+            )
+            val perspectiveOffsetX by animateFloatAsState(
+                targetValue = if (perspectiveEffect && !userBrowsing && !isActive && currentIndex >= 0) {
+                    val direction = if (index < currentIndex) -1f else 1f
+                    direction * distance.coerceAtMost(5) * 3.2f
+                } else {
+                    0f
+                },
+                animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
+                label = "lyric_line_perspective_offset"
+            )
 
             Column(
                 modifier = Modifier
@@ -353,6 +376,9 @@ fun WordLyricView(
                         alpha = lineAlpha
                         scaleX = scale
                         scaleY = scale
+                        rotationX = perspectiveRotation
+                        translationX = with(density) { perspectiveOffsetX.dp.toPx() }
+                        cameraDistance = 18f * density.density
                         transformOrigin = when (lineAlignment) {
                             Alignment.Start -> TransformOrigin(0f, 0.5f)
                             Alignment.End -> TransformOrigin(1f, 0.5f)

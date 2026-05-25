@@ -21,9 +21,11 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.ella.music.data.SettingsManager
+import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.ella.music.R
@@ -46,6 +48,7 @@ class DesktopLyricService : Service() {
     private var rootView: LinearLayout? = null
     private var lyricView: DesktopLyricView? = null
     private var controlsView: LinearLayout? = null
+    private var playPauseButton: ImageButton? = null
     private var layoutParams: WindowManager.LayoutParams? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
@@ -89,6 +92,12 @@ class DesktopLyricService : Service() {
                     override fun onSuccess(result: MediaController?) {
                         if (controllerFuture !== future) return
                         controller = result
+                        result?.addListener(object : Player.Listener {
+                            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                                updatePlayPauseIcon()
+                            }
+                        })
+                        updatePlayPauseIcon()
                     }
 
                     override fun onFailure(t: Throwable) = Unit
@@ -108,6 +117,7 @@ class DesktopLyricService : Service() {
             ACTION_HIDE -> stopSelf()
             ACTION_UNLOCK -> setLocked(false)
             ACTION_APPLY_SETTINGS -> applySettingsFromStore()
+            ACTION_RESET_POSITION -> resetPosition()
             ACTION_FONT_SMALLER -> updateFontScale(-0.1f)
             ACTION_FONT_LARGER -> updateFontScale(0.1f)
         }
@@ -122,6 +132,7 @@ class DesktopLyricService : Service() {
         rootView = null
         lyricView = null
         controlsView = null
+        playPauseButton = null
         layoutParams = null
         controller = null
         super.onDestroy()
@@ -164,14 +175,19 @@ class DesktopLyricService : Service() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(8), dp(4), dp(8), dp(0))
-            addControl("⏮", "上一首") { controller?.seekToPrevious() }
-            addControl("Ⅱ", "播放/暂停") { controller?.let { if (it.isPlaying) it.pause() else it.play() } }
-            addControl("⏭", "下一首") { controller?.seekToNext() }
+            addIconControl(R.drawable.ic_skip_previous, "上一首") { controller?.seekToPrevious() }
+            playPauseButton = addIconControl(R.drawable.ic_player_pause, "播放/暂停") {
+                controller?.let {
+                    if (it.isPlaying) it.pause() else it.play()
+                    updatePlayPauseIcon()
+                }
+            }
+            addIconControl(R.drawable.ic_skip_next, "下一首") { controller?.seekToNext() }
             addControl("A-", "缩小歌词") { updateFontScale(-0.08f) }
             addControl("A+", "放大歌词") { updateFontScale(0.08f) }
-            addControl("顶", "贴到状态栏") { snapToStatusBar() }
-            addControl("色", "切换颜色") { cycleTextColor() }
-            addControl("🔒", "锁定") { setLocked(true) }
+            addIconControl(R.drawable.ic_desktop_pin_top, "贴到状态栏") { snapToStatusBar() }
+            addIconControl(R.drawable.ic_desktop_palette, "切换颜色") { cycleTextColor() }
+            addIconControl(R.drawable.ic_desktop_lock, "锁定") { setLocked(true) }
             addControl("×", "关闭") { closeByUser() }
             visibility = View.GONE
         }
@@ -257,6 +273,38 @@ class DesktopLyricService : Service() {
         })
     }
 
+    private fun LinearLayout.addIconControl(iconRes: Int, description: String, action: () -> Unit): ImageButton {
+        val button = ImageButton(context).apply {
+            contentDescription = description
+            setImageResource(iconRes)
+            setColorFilter(Color.WHITE)
+            scaleType = android.widget.ImageView.ScaleType.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.argb(72, 255, 255, 255))
+            }
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setOnClickListener {
+                action()
+                if (!locked && rootView != null) scheduleControlsAutoHide()
+            }
+        }
+        addView(button, LinearLayout.LayoutParams(dp(34), dp(34)).apply {
+            leftMargin = dp(4)
+            rightMargin = dp(4)
+        })
+        return button
+    }
+
+    private fun updatePlayPauseIcon() {
+        val iconRes = if (controller?.isPlaying == true) {
+            R.drawable.ic_player_pause
+        } else {
+            R.drawable.ic_player_play
+        }
+        playPauseButton?.setImageResource(iconRes)
+    }
+
     private fun updateFontScale(delta: Float) {
         fontScale = (fontScale + delta).coerceIn(0.8f, 2.2f)
         applyCurrentSettingsToViews()
@@ -271,6 +319,21 @@ class DesktopLyricService : Service() {
         clampToScreen(view, params)
         windowManager.updateViewLayout(view, params)
         persistPosition(params.x, params.y)
+        if (!locked) scheduleControlsAutoHide()
+    }
+
+    private fun resetPosition() {
+        val defaultX = 0
+        val defaultY = dp(96)
+        savedX = defaultX
+        savedY = defaultY
+        serviceScope.launch { settingsManager.resetDesktopLyricPosition() }
+        val view = rootView ?: return
+        val params = layoutParams ?: return
+        params.x = defaultX
+        params.y = defaultY
+        clampToScreen(view, params)
+        windowManager.updateViewLayout(view, params)
         if (!locked) scheduleControlsAutoHide()
     }
 
@@ -943,6 +1006,7 @@ class DesktopLyricService : Service() {
         const val ACTION_HIDE = "com.ella.music.action.HIDE_DESKTOP_LYRIC"
         const val ACTION_UNLOCK = "com.ella.music.action.UNLOCK_DESKTOP_LYRIC"
         const val ACTION_APPLY_SETTINGS = "com.ella.music.action.APPLY_DESKTOP_LYRIC_SETTINGS"
+        const val ACTION_RESET_POSITION = "com.ella.music.action.RESET_DESKTOP_LYRIC_POSITION"
         const val ACTION_FONT_SMALLER = "com.ella.music.action.DESKTOP_LYRIC_FONT_SMALLER"
         const val ACTION_FONT_LARGER = "com.ella.music.action.DESKTOP_LYRIC_FONT_LARGER"
         const val EXTRA_TEXT = "text"
