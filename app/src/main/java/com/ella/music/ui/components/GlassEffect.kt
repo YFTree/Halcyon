@@ -57,13 +57,13 @@ internal fun bottomBarGlassContainerColor(
 internal fun bottomBarGlassHighlightAlpha(isLight: Boolean, glassEffect: BottomBarGlassEffect): Float =
     when (glassEffect) {
         BottomBarGlassEffect.Blur -> if (isLight) 0.22f else 0.14f
-        BottomBarGlassEffect.LiquidGlass -> if (isLight) 0.34f else 0.24f
+        BottomBarGlassEffect.LiquidGlass -> if (isLight) 0.18f else 0.10f
     }
 
 internal fun bottomBarGlassShadowAlpha(isLight: Boolean, glassEffect: BottomBarGlassEffect): Float =
     when (glassEffect) {
         BottomBarGlassEffect.Blur -> if (isLight) 0.12f else 0.30f
-        BottomBarGlassEffect.LiquidGlass -> if (isLight) 0.18f else 0.38f
+        BottomBarGlassEffect.LiquidGlass -> if (isLight) 0.12f else 0.26f
     }
 
 internal fun Color.simpleLuminance(): Float {
