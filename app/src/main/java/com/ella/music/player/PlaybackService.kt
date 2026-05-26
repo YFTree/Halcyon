@@ -66,6 +66,7 @@ class PlaybackService : MediaLibraryService() {
         private const val LIBRARY_QUEUE_ID = "ella_music_current_queue"
         const val ACTION_TOGGLE_FAVORITE = "com.ella.music.action.TOGGLE_FAVORITE"
         const val ACTION_TOGGLE_SHUFFLE = "com.ella.music.action.TOGGLE_SHUFFLE"
+        private const val TIMING_TAG = "EllaPlaybackTiming"
     }
 
     private var mediaSession: MediaLibrarySession? = null
@@ -147,7 +148,16 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                Log.d(TIMING_TAG, "service media transition reason=$reason mediaId=${mediaItem?.mediaId}")
                 updateMediaButtonPreferences()
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> Log.d(TIMING_TAG, "player state BUFFERING mediaId=${player.currentMediaItem?.mediaId}")
+                    Player.STATE_READY -> Log.d(TIMING_TAG, "player state READY mediaId=${player.currentMediaItem?.mediaId}")
+                    Player.STATE_ENDED -> Log.d(TIMING_TAG, "player state ENDED mediaId=${player.currentMediaItem?.mediaId}")
+                }
             }
 
             override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
@@ -520,25 +530,33 @@ class PlaybackService : MediaLibraryService() {
         private val previousButtonActionProvider: () -> Int
     ) : ForwardingPlayer(player) {
         override fun seekToNextMediaItem() {
+            Log.d(TIMING_TAG, "skipNext command received mediaId=${currentMediaItem?.mediaId}")
             if (!seekAdjacentMediaItemInRepeatOne(1)) {
+                Log.d(TIMING_TAG, "seekToNext called")
                 super.seekToNextMediaItem()
             }
         }
 
         override fun seekToNext() {
+            Log.d(TIMING_TAG, "skipNext command received mediaId=${currentMediaItem?.mediaId}")
             if (!seekAdjacentMediaItemInRepeatOne(1)) {
+                Log.d(TIMING_TAG, "seekToNext called")
                 super.seekToNext()
             }
         }
 
         override fun seekToPreviousMediaItem() {
+            Log.d(TIMING_TAG, "skipPrevious command received mediaId=${currentMediaItem?.mediaId}")
             if (!restartCurrentFromPreviousButton() && !seekAdjacentMediaItemInRepeatOne(-1)) {
+                Log.d(TIMING_TAG, "seekToPrevious called")
                 super.seekToPreviousMediaItem()
             }
         }
 
         override fun seekToPrevious() {
+            Log.d(TIMING_TAG, "skipPrevious command received mediaId=${currentMediaItem?.mediaId}")
             if (!restartCurrentFromPreviousButton() && !seekAdjacentMediaItemInRepeatOne(-1)) {
+                Log.d(TIMING_TAG, "seekToPrevious called")
                 super.seekToPrevious()
             }
         }
@@ -716,6 +734,7 @@ class PlaybackService : MediaLibraryService() {
                 builder.foregroundServiceBehavior = NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
             }
             val notification = builder.build()
+            Log.d(TIMING_TAG, "notification update mediaId=${player.currentMediaItem?.mediaId}")
             if (tickerPayload != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     notification.extras.putBoolean("ticker_icon_switch", false)

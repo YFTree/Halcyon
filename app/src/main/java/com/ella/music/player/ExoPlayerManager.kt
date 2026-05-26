@@ -5,7 +5,9 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.MediaStore
+import android.util.Log
 import android.util.LruCache
 import androidx.core.net.toUri
 import androidx.media3.common.C
@@ -39,7 +41,6 @@ import java.io.File
 import kotlin.random.Random
 
 class ExoPlayerManager(private val context: Context) {
-
     private var mediaController: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
@@ -157,9 +158,15 @@ class ExoPlayerManager(private val context: Context) {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 _playbackState.value = playbackState
                 _duration.value = mediaController?.duration?.coerceAtLeast(0) ?: 0L
+                when (playbackState) {
+                    Player.STATE_BUFFERING -> Log.d(TIMING_TAG, "controller state BUFFERING mediaId=${mediaController?.currentMediaItem?.mediaId}")
+                    Player.STATE_READY -> Log.d(TIMING_TAG, "controller state READY mediaId=${mediaController?.currentMediaItem?.mediaId}")
+                    Player.STATE_ENDED -> Log.d(TIMING_TAG, "controller state ENDED mediaId=${mediaController?.currentMediaItem?.mediaId}")
+                }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                Log.d(TIMING_TAG, "controller media transition reason=$reason mediaId=${mediaItem?.mediaId}")
                 if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && shouldUseTrueRandomShuffle()) {
                     if (playTrueRandomItem()) return
                 }
@@ -724,6 +731,7 @@ class ExoPlayerManager(private val context: Context) {
                     .setMediaMetadata(song.mediaMetadata(artworkData = notificationArtworkCache.get(song.notificationArtworkKey())))
                     .build()
             )
+            Log.d(TIMING_TAG, "base metadata updated mediaId=${song.id}")
         }
     }
 
@@ -743,6 +751,7 @@ class ExoPlayerManager(private val context: Context) {
         val artworkKey = song.notificationArtworkKey()
         val cached = notificationArtworkCache.get(artworkKey)
         if (cached != null) {
+            Log.d(TIMING_TAG, "artwork cache hit mediaId=${song.id}")
             replaceCurrentItemArtwork(controller, index, song, cached)
             return
         }
@@ -750,6 +759,8 @@ class ExoPlayerManager(private val context: Context) {
 
         notificationArtworkJob?.cancel()
         notificationArtworkJob = persistenceScope.launch {
+            val startedAt = SystemClock.elapsedRealtime()
+            Log.d(TIMING_TAG, "artwork load start mediaId=${song.id}")
             val data = runCatching {
                 artworkRepository.getCoverArt(song)
             }.getOrElse { error ->
@@ -757,6 +768,7 @@ class ExoPlayerManager(private val context: Context) {
                 null
             }
             if (data == null) {
+                Log.d(TIMING_TAG, "artwork load finish mediaId=${song.id} elapsed=${SystemClock.elapsedRealtime() - startedAt}ms missing")
                 withContext(Dispatchers.Main.immediate) {
                     if (mediaController?.currentMediaItem?.matchesSong(song) == true) {
                         missingNotificationArtworkKeys += artworkKey
@@ -765,6 +777,7 @@ class ExoPlayerManager(private val context: Context) {
                 return@launch
             }
             if (data.size > MAX_NOTIFICATION_ARTWORK_BYTES) {
+                Log.d(TIMING_TAG, "artwork load finish mediaId=${song.id} elapsed=${SystemClock.elapsedRealtime() - startedAt}ms oversized=${data.size}")
                 AppLogStore.warn(context, "PlayerArtwork", "Skip oversized notification artwork for ${song.title}: ${data.size} bytes")
                 withContext(Dispatchers.Main.immediate) {
                     if (mediaController?.currentMediaItem?.matchesSong(song) == true) {
@@ -777,6 +790,7 @@ class ExoPlayerManager(private val context: Context) {
                 val latestController = mediaController ?: return@withContext
                 val latestIndex = latestController.currentMediaItemIndex
                 val latestItem = latestController.currentMediaItem ?: return@withContext
+                Log.d(TIMING_TAG, "artwork load finish mediaId=${song.id} elapsed=${SystemClock.elapsedRealtime() - startedAt}ms")
                 if (_currentSong.value.isSamePlaybackIdentity(song) &&
                     latestItem.matchesSong(song) &&
                     latestIndex >= 0
@@ -805,6 +819,7 @@ class ExoPlayerManager(private val context: Context) {
                     .setMediaMetadata(song.mediaMetadata(artworkData = artworkData))
                     .build()
             )
+            Log.d(TIMING_TAG, "artwork metadata updated mediaId=${song.id}")
         }
     }
 
@@ -1089,6 +1104,7 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     private companion object {
+        const val TIMING_TAG = "EllaPlaybackTiming"
         const val EXTRA_ONLINE_SOURCE = "com.ella.music.extra.ONLINE_SOURCE"
         const val EXTRA_ONLINE_ID = "com.ella.music.extra.ONLINE_ID"
         const val EXTRA_SONG_JSON = "com.ella.music.extra.SONG_JSON"
