@@ -17,12 +17,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -36,9 +41,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.unit.sp
@@ -50,13 +57,24 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -72,9 +90,12 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.ella.music.data.SettingsManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.ella.music.data.model.Song
+import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.LiquidGlassBottomBar
 import com.ella.music.ui.components.LiquidGlassBottomBarItem
 import com.ella.music.ui.components.MiniPlayer
+import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.TagEditorEditTracker
 import com.ella.music.ui.components.updateEllaDynamicShortcuts
 import com.ella.music.ui.navigation.AppNavigation
@@ -89,6 +110,7 @@ import com.ella.music.viewmodel.PlayerViewModel
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -97,6 +119,11 @@ import top.yukonga.miuix.kmp.icon.extended.Playlist
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
+
+private enum class BottomDockMode {
+    Expanded,
+    Compact
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -323,10 +350,15 @@ fun EllaApp(
         Screen.Settings.route
     )
     val showBottomBar = currentRoute in bottomBarScreens
+    var bottomDockMode by rememberSaveable { mutableStateOf(BottomDockMode.Expanded) }
 
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val librarySongs by mainViewModel.songs.collectAsState()
+
+    LaunchedEffect(currentRoute) {
+        bottomDockMode = BottomDockMode.Expanded
+    }
 
     LaunchedEffect(libraryCacheLoaded, initialScanPromptHandled, isScanning, librarySongs) {
         if (!libraryCacheLoaded || initialScanPromptHandled) return@LaunchedEffect
@@ -390,6 +422,22 @@ fun EllaApp(
     val showMiniPlayer = currentSong != null &&
         currentRoute != Screen.Player.route &&
         !showPlayerOverlay
+    LaunchedEffect(showMiniPlayer) {
+        if (!showMiniPlayer) bottomDockMode = BottomDockMode.Expanded
+    }
+
+    val dockScrollConnection = remember(showMiniPlayer) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (!showMiniPlayer || source != NestedScrollSource.UserInput) return Offset.Zero
+                when {
+                    available.y < -12f -> bottomDockMode = BottomDockMode.Compact
+                    available.y > 16f -> bottomDockMode = BottomDockMode.Expanded
+                }
+                return Offset.Zero
+            }
+        }
+    }
 
     val backdrop = rememberLayerBackdrop()
     val useGlass = true
@@ -398,6 +446,8 @@ fun EllaApp(
         Triple(Screen.Library.route, stringResource(R.string.tab_library), MiuixIcons.Regular.Playlist),
         Triple(Screen.Settings.route, stringResource(R.string.tab_settings), MiuixIcons.Regular.Settings),
     )
+    val currentTabRoute = currentRoute.toCurrentTabRoute()
+    val currentTab = tabs.firstOrNull { it.first == currentTabRoute } ?: tabs.first()
 
     val contentModifier = Modifier
         .fillMaxSize()
@@ -432,7 +482,7 @@ fun EllaApp(
                 navController = navController,
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
-                modifier = contentModifier,
+                modifier = contentModifier.nestedScroll(dockScrollConnection),
                 onNavigateToPlayer = {
                     playerDismissProgress = 0f
                     playerOverlayOpenToken++
@@ -450,12 +500,15 @@ fun EllaApp(
                 lyricText = miniPlayerLyricText,
                 lyricTranslation = miniPlayerLyricTranslation,
                 tabs = tabs,
+                currentTab = currentTab,
                 currentRoute = currentRoute,
+                bottomDockMode = bottomDockMode,
                 backdrop = backdrop,
                 lyricProgress = miniPlayerLyricProgress,
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
                 onNavigate = { route ->
+                    bottomDockMode = BottomDockMode.Expanded
                     if (currentRoute != route) {
                         navController.navigate(route) {
                             popUpTo(navController.graph.findStartDestination().id) {
@@ -470,6 +523,9 @@ fun EllaApp(
                     playerDismissProgress = 0f
                     playerOverlayOpenToken++
                     showPlayerOverlay = true
+                },
+                onExpand = {
+                    bottomDockMode = BottomDockMode.Expanded
                 },
                 modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
             )
@@ -605,7 +661,7 @@ private fun InitialScanPromptDialog(
 private fun FloatingBottomControls(
     showMiniPlayer: Boolean,
     showBottomBar: Boolean,
-    currentSong: com.ella.music.data.model.Song?,
+    currentSong: Song?,
     isPlaying: Boolean,
     coverRotationEnabled: Boolean,
     currentPosition: Long,
@@ -613,83 +669,305 @@ private fun FloatingBottomControls(
     lyricText: String?,
     lyricTranslation: String?,
     lyricProgress: Float,
-    tabs: List<Triple<String, String, androidx.compose.ui.graphics.vector.ImageVector>>,
+    tabs: List<Triple<String, String, ImageVector>>,
+    currentTab: Triple<String, String, ImageVector>,
     currentRoute: String?,
+    bottomDockMode: BottomDockMode,
     backdrop: com.kyant.backdrop.Backdrop?,
     mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
     onNavigate: (String) -> Unit,
     onNavigatePlayer: () -> Unit,
+    onExpand: () -> Unit,
     modifier: Modifier = Modifier,
     useGlass: Boolean = true
 ) {
-    Column(
+    val effectiveMode = if (showMiniPlayer) bottomDockMode else BottomDockMode.Expanded
+    AnimatedContent(
+        targetState = effectiveMode,
+        transitionSpec = {
+            fadeIn() + slideInVertically(initialOffsetY = { it / 3 }) togetherWith
+                fadeOut() + slideOutVertically(targetOffsetY = { it / 3 })
+        },
+        label = "BottomDockMode",
         modifier = modifier
             .fillMaxWidth()
             .then(if (useGlass) Modifier.navigationBarsPadding() else Modifier)
-    ) {
-        AnimatedVisibility(
-            visible = showMiniPlayer,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            currentSong?.let { song ->
-                MiniPlayer(
-                    song = song,
-                    isPlaying = isPlaying,
-                    progress = if (duration > 0L) currentPosition.toFloat() / duration.toFloat() else 0f,
-                    coverRotationEnabled = coverRotationEnabled,
-                    lyricText = lyricText,
-                    lyricTranslation = lyricTranslation,
-                    albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
-                    loadCoverArt = mainViewModel::getCoverArtBitmap,
-                    backdrop = if (useGlass) backdrop else null,
-                    liquidGlass = useGlass,
-                    onClick = onNavigatePlayer,
-                    onPlayPause = { playerViewModel.togglePlayPause() },
-                    onSkipNext = { playerViewModel.skipToNext() },
-                    onSkipPrevious = { playerViewModel.skipToPrevious() },
-                    lyricProgress = lyricProgress,
-                )
-            }
-        }
-
-        AnimatedVisibility(visible = showBottomBar) {
-            if (useGlass) {
-                LiquidGlassBottomBar(
-                    backdrop = backdrop,
-                    isBlurEnabled = true
+    ) { mode ->
+        if (mode == BottomDockMode.Compact && currentSong != null) {
+            CompactBottomDock(
+                song = currentSong,
+                isPlaying = isPlaying,
+                lyricText = lyricText,
+                lyricTranslation = lyricTranslation,
+                albumArtUri = mainViewModel.getAlbumArtUri(currentSong.albumId),
+                currentTab = currentTab,
+                onOpenPlayer = onNavigatePlayer,
+                onPlayPause = { playerViewModel.togglePlayPause() },
+                onSkipNext = { playerViewModel.skipToNext() },
+                onExpand = onExpand
+            )
+        } else {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                AnimatedVisibility(
+                    visible = showMiniPlayer,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
                 ) {
-                    tabs.forEach { (route, label, icon) ->
-                        LiquidGlassBottomBarItem(
-                            selected = currentRoute == route,
-                            onClick = { onNavigate(route) },
+                    currentSong?.let { song ->
+                        MiniPlayer(
+                            song = song,
+                            isPlaying = isPlaying,
+                            progress = if (duration > 0L) currentPosition.toFloat() / duration.toFloat() else 0f,
+                            coverRotationEnabled = coverRotationEnabled,
+                            lyricText = lyricText,
+                            lyricTranslation = lyricTranslation,
+                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                            loadCoverArt = mainViewModel::getCoverArtBitmap,
+                            backdrop = if (useGlass) backdrop else null,
+                            liquidGlass = useGlass,
+                            onClick = onNavigatePlayer,
+                            onPlayPause = { playerViewModel.togglePlayPause() },
+                            onSkipNext = { playerViewModel.skipToNext() },
+                            onSkipPrevious = { playerViewModel.skipToPrevious() },
+                            lyricProgress = lyricProgress,
+                        )
+                    }
+                }
+
+                AnimatedVisibility(visible = showBottomBar) {
+                    if (useGlass) {
+                        LiquidGlassBottomBar(
                             backdrop = backdrop,
-                            isBlurEnabled = true,
-                            icon = {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = label,
-                                    tint = if (currentRoute == route) MiuixTheme.colorScheme.primary
-                                    else MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = label,
-                                    fontSize = 11.sp,
-                                    color = if (currentRoute == route) MiuixTheme.colorScheme.primary
-                                    else MiuixTheme.colorScheme.onSurface
+                            isBlurEnabled = true
+                        ) {
+                            tabs.forEach { (route, label, icon) ->
+                                LiquidGlassBottomBarItem(
+                                    selected = currentTab.first == route,
+                                    onClick = { onNavigate(route) },
+                                    backdrop = backdrop,
+                                    isBlurEnabled = true,
+                                    icon = {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = label,
+                                            tint = if (currentTab.first == route) MiuixTheme.colorScheme.primary
+                                            else MiuixTheme.colorScheme.onSurface,
+                                            modifier = Modifier
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = label,
+                                            fontSize = 11.sp,
+                                            color = if (currentTab.first == route) MiuixTheme.colorScheme.primary
+                                            else MiuixTheme.colorScheme.onSurface
+                                        )
+                                    }
                                 )
                             }
-                        )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun CompactBottomDock(
+    song: Song,
+    isPlaying: Boolean,
+    lyricText: String?,
+    lyricTranslation: String?,
+    albumArtUri: Uri?,
+    currentTab: Triple<String, String, ImageVector>,
+    onOpenPlayer: () -> Unit,
+    onPlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
+    onExpand: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .height(64.dp)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onExpand
+            ),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        CompactMiniPlayer(
+            song = song,
+            isPlaying = isPlaying,
+            lyricText = lyricText,
+            lyricTranslation = lyricTranslation,
+            albumArtUri = albumArtUri,
+            onOpenPlayer = onOpenPlayer,
+            onPlayPause = onPlayPause,
+            onSkipNext = onSkipNext,
+            modifier = Modifier.weight(1f)
+        )
+        CurrentTabPill(
+            icon = currentTab.third,
+            label = currentTab.second,
+            onClick = onExpand,
+            modifier = Modifier.width(68.dp)
+        )
+    }
+}
+
+@Composable
+private fun CompactMiniPlayer(
+    song: Song,
+    isPlaying: Boolean,
+    lyricText: String?,
+    lyricTranslation: String?,
+    albumArtUri: Uri?,
+    onOpenPlayer: () -> Unit,
+    onPlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(32.dp)
+    val coverShape = RoundedCornerShape(12.dp)
+    val title = lyricText?.takeIf { it.isNotBlank() } ?: song.title
+    val subtitle = lyricTranslation?.takeIf { it.isNotBlank() }
+        ?: if (lyricText != null) "${song.title} - ${song.artist}" else song.artist
+    val coverModel = song.coverUrl.takeIf { it.isNotBlank() } ?: albumArtUri
+
+    Row(
+        modifier = modifier
+            .height(64.dp)
+            .clip(shape)
+            .background(MiuixTheme.colorScheme.surfaceContainer)
+            .padding(start = 12.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .height(64.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onOpenPlayer
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(coverShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (coverModel != null) {
+                    SafeCoverImage(
+                        model = coverModel,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        sizePx = 128
+                    )
+                } else {
+                    DefaultAlbumCover(modifier = Modifier.fillMaxSize())
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = if (lyricText != null) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = subtitle,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        IconButton(
+            onClick = onPlayPause,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play),
+                contentDescription = if (isPlaying) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
+                tint = MiuixTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        IconButton(
+            onClick = onSkipNext,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_skip_next),
+                contentDescription = stringResource(R.string.common_next),
+                tint = MiuixTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CurrentTabPill(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(64.dp)
+            .clip(RoundedCornerShape(32.dp))
+            .background(MiuixTheme.colorScheme.surfaceContainer)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MiuixTheme.colorScheme.primary,
+            modifier = Modifier.size(26.dp)
+        )
+    }
+}
+
+private fun String?.toCurrentTabRoute(): String {
+    return when (this) {
+        null,
+        Screen.Home.route -> Screen.Home.route
+
+        Screen.Settings.route,
+        Screen.SettingsDetail.route,
+        Screen.LyricSettings.route,
+        Screen.AudioSettings.route,
+        Screen.BackupSettings.route,
+        Screen.LyricFont.route,
+        Screen.Logs.route,
+        Screen.About.route,
+        Screen.Update.route -> Screen.Settings.route
+
+        else -> Screen.Library.route
+    }
+}
+
 private fun String.isMusicSymbolOnly(): Boolean {
     val content = trim()
     if (content.isBlank()) return true
