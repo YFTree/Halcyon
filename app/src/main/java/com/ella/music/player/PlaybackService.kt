@@ -141,6 +141,18 @@ class PlaybackService : MediaLibraryService() {
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
                 notifyLibraryChanged(player.mediaItemCount)
             }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                updateMediaButtonPreferences()
+            }
+
+            override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                updateMediaButtonPreferences()
+            }
+
+            override fun onRepeatModeChanged(repeatMode: Int) {
+                updateMediaButtonPreferences()
+            }
         })
 
         val intent = Intent(this, MainActivity::class.java)
@@ -156,6 +168,8 @@ class PlaybackService : MediaLibraryService() {
         )
             .setSessionActivity(pendingIntent)
             .build()
+
+        updateMediaButtonPreferences()
 
         Log.i(TAG, "PlaybackService created")
         AppLogStore.info(this, TAG, "PlaybackService created")
@@ -194,6 +208,7 @@ class PlaybackService : MediaLibraryService() {
                 mediaSession?.player?.let { player ->
                     player.cycleNotificationPlaybackMode()
                 }
+                updateMediaButtonPreferences()
                 notificationProvider.refresh()
                 true
             }
@@ -212,12 +227,101 @@ class PlaybackService : MediaLibraryService() {
                         TAG,
                         "NotificationAction favorite toggled added=$added"
                     )
+                    updateMediaButtonPreferences()
                     notificationProvider.refresh()
                 }
                 true
             }
 
             else -> false
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun updateMediaButtonPreferences() {
+        val session = mediaSession ?: return
+        val player = session.player
+
+        val currentSong = player.currentMediaItem?.toSongFromMediaItemExtras()
+        val isFavorite = currentSong?.let {
+            PlaylistStore.getInstance(this).isFavorite(it)
+        } == true
+
+        val playbackModeAction = player.notificationPlaybackModeAction()
+
+        session.setMediaButtonPreferences(
+            ImmutableList.of(
+                CommandButton.Builder()
+                    .setDisplayName(if (isFavorite) "取消收藏" else "收藏")
+                    .setIconResId(
+                        if (isFavorite) {
+                            R.drawable.ic_notification_favorite_filled
+                        } else {
+                            R.drawable.ic_notification_favorite
+                        }
+                    )
+                    .setSessionCommand(SessionCommand(ACTION_TOGGLE_FAVORITE, Bundle.EMPTY))
+                    .build(),
+
+                CommandButton.Builder()
+                    .setDisplayName("上一首")
+                    .setIconResId(R.drawable.ic_skip_previous)
+                    .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                    .build(),
+
+                CommandButton.Builder()
+                    .setDisplayName(if (player.isPlaying) "暂停" else "播放")
+                    .setIconResId(
+                        if (player.isPlaying) {
+                            R.drawable.ic_player_pause
+                        } else {
+                            R.drawable.ic_player_play
+                        }
+                    )
+                    .setPlayerCommand(Player.COMMAND_PLAY_PAUSE)
+                    .build(),
+
+                CommandButton.Builder()
+                    .setDisplayName("下一首")
+                    .setIconResId(R.drawable.ic_skip_next)
+                    .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                    .build(),
+
+                CommandButton.Builder()
+                    .setDisplayName(playbackModeAction.title)
+                    .setIconResId(playbackModeAction.icon)
+                    .setSessionCommand(SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY))
+                    .build()
+            )
+        )
+    }
+
+    private data class MediaButtonPlaybackModeAction(
+        val icon: Int,
+        val title: String
+    )
+
+    private fun Player.notificationPlaybackModeAction(): MediaButtonPlaybackModeAction {
+        return when {
+            shuffleModeEnabled -> MediaButtonPlaybackModeAction(
+                icon = R.drawable.ic_notification_shuffle,
+                title = "随机播放"
+            )
+
+            repeatMode == Player.REPEAT_MODE_ONE -> MediaButtonPlaybackModeAction(
+                icon = R.drawable.ic_repeat_one,
+                title = "单曲循环"
+            )
+
+            repeatMode == Player.REPEAT_MODE_ALL -> MediaButtonPlaybackModeAction(
+                icon = R.drawable.ic_repeat,
+                title = "列表循环"
+            )
+
+            else -> MediaButtonPlaybackModeAction(
+                icon = R.drawable.ic_repeat,
+                title = "顺序播放"
+            )
         }
     }
 

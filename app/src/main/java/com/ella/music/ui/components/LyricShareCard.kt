@@ -175,52 +175,170 @@ private fun drawShareBackground(
     cover: Bitmap?,
     colors: List<Int>
 ) {
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
-    if (cover != null) {
-        val blurred = cover.centerCropScaled(54, 54).let {
-            Bitmap.createScaledBitmap(it, width, height, true).also { _ -> it.recycle() }
-        }
-        canvas.drawBitmap(blurred, 0f, 0f, paint)
-        blurred.recycle()
-    }
-    val fallbackColors = listOf(Color.rgb(82, 98, 82), Color.rgb(39, 64, 57), Color.rgb(18, 30, 34))
-    val picked = colors.filter { Color.alpha(it) > 0 }.ifEmpty { fallbackColors }
-    paint.shader = LinearGradient(
-        0f,
-        0f,
-        width.toFloat(),
-        height.toFloat(),
-        intArrayOf(picked.first(), picked.getOrElse(1) { picked.first() }, picked.last()),
-        floatArrayOf(0f, 0.58f, 1f),
-        Shader.TileMode.CLAMP
+    val fallbackColors = listOf(
+        Color.rgb(42, 78, 48),
+        Color.rgb(25, 60, 38),
+        Color.rgb(12, 28, 22)
     )
-    paint.alpha = if (cover == null) 255 else 132
-    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-    paint.shader = null
-    paint.color = Color.argb(if (cover == null) 54 else 24, 0, 0, 0)
-    paint.alpha = 255
-    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+
+    val picked = colors
+        .filter { Color.alpha(it) > 0 }
+        .ifEmpty { fallbackColors }
+
+    val c1 = picked.first()
+    val c2 = picked.getOrElse(1) { c1 }
+    val c3 = picked.last()
+
+    // 1. 基础大渐变：只用封面提取色，不画封面本体
+    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            0f,
+            0f,
+            width.toFloat(),
+            height.toFloat(),
+            intArrayOf(
+                c1.lightenForShare(1.04f),
+                c2.darkenForShare(0.78f),
+                c3.darkenForShare(0.52f)
+            ),
+            floatArrayOf(0f, 0.52f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), this)
+    }
+
+    // 2. 叠几个柔和色块，模拟 Flamingo 那种“糊开的封面氛围”
+    drawShareColorBlob(
+        canvas = canvas,
+        cx = width * 0.18f,
+        cy = height * 0.22f,
+        radius = width * 0.72f,
+        color = c1,
+        alpha = 90
+    )
+
+    drawShareColorBlob(
+        canvas = canvas,
+        cx = width * 0.78f,
+        cy = height * 0.30f,
+        radius = width * 0.62f,
+        color = c2,
+        alpha = 72
+    )
+
+    drawShareColorBlob(
+        canvas = canvas,
+        cx = width * 0.45f,
+        cy = height * 0.74f,
+        radius = width * 0.76f,
+        color = c3,
+        alpha = 86
+    )
+
+    // 3. 顶部和底部暗角，保证白字可读
+    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = LinearGradient(
+            0f,
+            0f,
+            0f,
+            height.toFloat(),
+            intArrayOf(
+                Color.argb(82, 0, 0, 0),
+                Color.argb(18, 0, 0, 0),
+                Color.argb(120, 0, 0, 0)
+            ),
+            floatArrayOf(0f, 0.46f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), this)
+    }
+
+    // 4. 最后一层轻微压暗，统一质感
+    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(26, 0, 0, 0)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), this)
+    }
+}
+
+private fun drawShareColorBlob(
+    canvas: Canvas,
+    cx: Float,
+    cy: Float,
+    radius: Float,
+    color: Int,
+    alpha: Int
+) {
+    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        shader = android.graphics.RadialGradient(
+            cx,
+            cy,
+            radius,
+            intArrayOf(
+                Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color)),
+                Color.argb(0, Color.red(color), Color.green(color), Color.blue(color))
+            ),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(cx, cy, radius, this)
+    }
 }
 
 private fun drawRoundedCover(canvas: Canvas, cover: Bitmap, rect: RectF, radius: Float) {
-    val path = Path().apply { addRoundRect(rect, radius, radius, Path.Direction.CW) }
+    val path = Path().apply {
+        addRoundRect(rect, radius, radius, Path.Direction.CW)
+    }
     val save = canvas.save()
     canvas.clipPath(path)
     val cropped = cover.centerCropScaled(rect.width().toInt(), rect.height().toInt())
-    canvas.drawBitmap(cropped, rect.left, rect.top, Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true })
+    canvas.drawBitmap(
+        cropped,
+        rect.left,
+        rect.top,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            isDither = true
+        }
+    )
     cropped.recycle()
     canvas.restoreToCount(save)
 }
+
+//private fun Bitmap.softResampleBlur(): Bitmap {
+//    // 多级降采样 + 回放大，模拟强模糊。
+//    // 不使用 Android RenderEffect，避免低版本兼容问题。
+//    val level1Width = (width * 0.22f).toInt().coerceAtLeast(16)
+//    val level1Height = (height * 0.22f).toInt().coerceAtLeast(16)
+//    val level2Width = (width * 0.08f).toInt().coerceAtLeast(8)
+//    val level2Height = (height * 0.08f).toInt().coerceAtLeast(8)
+//
+//    val level1 = Bitmap.createScaledBitmap(this, level1Width, level1Height, true)
+//    val level2 = Bitmap.createScaledBitmap(level1, level2Width, level2Height, true)
+//    val level3 = Bitmap.createScaledBitmap(level2, level1Width, level1Height, true)
+//    val result = Bitmap.createScaledBitmap(level3, width, height, true)
+//
+//    level1.recycle()
+//    level2.recycle()
+//    level3.recycle()
+//
+//    return result
+//}
 
 private fun Bitmap.centerCropScaled(width: Int, height: Int): Bitmap {
     val scale = max(width / this.width.toFloat(), height / this.height.toFloat())
     val scaledWidth = (this.width * scale).toInt().coerceAtLeast(width)
     val scaledHeight = (this.height * scale).toInt().coerceAtLeast(height)
     val scaled = Bitmap.createScaledBitmap(this, scaledWidth, scaledHeight, true)
+
     val left = ((scaledWidth - width) / 2).coerceAtLeast(0)
     val top = ((scaledHeight - height) / 2).coerceAtLeast(0)
     val result = Bitmap.createBitmap(scaled, left, top, width, height)
-    if (scaled != this) scaled.recycle()
+
+    // 这里也要防止把 result 自己 recycle 掉。
+    if (scaled !== this && scaled !== result) {
+        scaled.recycle()
+    }
+
     return result
 }
 
