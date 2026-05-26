@@ -107,6 +107,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var bluetoothLyricTranslationEnabled = false
     private var samsungFloatingLyricTranslationEnabled = false
     private var tickerHideNotificationEnabled = false
+    private var tickerHideWhenPausedEnabled = false
+    private var desktopLyricHideWhenPausedEnabled = false
     private var superLyricTranslationEnabled = true
     private var lyricSourceMode = SettingsManager.LYRIC_SOURCE_AUTO
     private var appliedDecoderMode: Int? = null
@@ -157,6 +159,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val enabled = settingsManager.tickerEnabled.first()
             val hideNotification = settingsManager.tickerHideNotification.first()
             tickerHideNotificationEnabled = hideNotification
+            tickerHideWhenPausedEnabled = settingsManager.tickerHideWhenPaused.first()
             samsungFloatingLyricTranslationEnabled = settingsManager.samsungFloatingLyricTranslation.first() && !hideNotification
             tickerBridge.setHideNotification(hideNotification)
             tickerBridge.setEnabled(enabled)
@@ -175,6 +178,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         viewModelScope.launch {
+            settingsManager.tickerHideWhenPaused.distinctUntilChanged().collect { enabled ->
+                tickerHideWhenPausedEnabled = enabled
+                lastTickerPayload = null
+                if (enabled && !isPlaying.value) {
+                    tickerBridge.clearLyric()
+                } else if (tickerBridge.isEnabled()) {
+                    resendTickerLyric(force = true)
+                }
+            }
+        }
+        viewModelScope.launch {
             settingsManager.samsungFloatingLyricTranslation.distinctUntilChanged().collect { enabled ->
                 samsungFloatingLyricTranslationEnabled = enabled && !tickerHideNotificationEnabled
                 lastTickerPayload = null
@@ -186,8 +200,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun initDesktopLyric() {
         viewModelScope.launch {
             val enabled = settingsManager.desktopLyricEnabled.first()
+            desktopLyricHideWhenPausedEnabled = settingsManager.desktopLyricHideWhenPaused.first()
             desktopLyricBridge.setEnabled(enabled)
             if (enabled) resendDesktopLyric()
+        }
+        viewModelScope.launch {
+            settingsManager.desktopLyricHideWhenPaused.distinctUntilChanged().collect { enabled ->
+                desktopLyricHideWhenPausedEnabled = enabled
+                if (enabled && !isPlaying.value) {
+                    desktopLyricBridge.clearLyric()
+                } else {
+                    resendDesktopLyric()
+                }
+            }
         }
     }
 
@@ -387,8 +412,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     lastSentPlayingState = playing
                     lyriconBridge.sendPlaybackState(playing)
                     if (!playing) {
-                        tickerBridge.clearLyric()
-                        resendDesktopLyric()
+                        if (tickerHideWhenPausedEnabled) {
+                            tickerBridge.clearLyric()
+                        }
+                        if (desktopLyricHideWhenPausedEnabled) {
+                            desktopLyricBridge.clearLyric()
+                        } else {
+                            resendDesktopLyric()
+                        }
                         superLyricBridge.sendStop()
                         lyricGetterBridge.clearLyric()
                         playerManager.clearBluetoothLyric()
@@ -504,6 +535,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun resendDesktopLyric() {
         if (!desktopLyricBridge.isEnabled()) return
+        if (desktopLyricHideWhenPausedEnabled && !isPlaying.value) return
         val index = _currentLyricIndex.value
         val currentLyrics = _lyrics.value
         desktopLyricBridge.sendLyric(
@@ -516,6 +548,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun updateDesktopLyricFrame() {
         if (!desktopLyricBridge.isEnabled()) return
+        if (desktopLyricHideWhenPausedEnabled && !isPlaying.value) return
         val index = _currentLyricIndex.value
         val line = _lyrics.value.getOrNull(index) ?: return
         desktopLyricBridge.sendLyric(line, currentPosition.value, _showLyricTranslation.value, _showLyricPronunciation.value)
@@ -928,6 +961,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun setTickerHideWhenPaused(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setTickerHideWhenPaused(enabled)
+            tickerHideWhenPausedEnabled = enabled
+            lastTickerPayload = null
+            if (enabled && !isPlaying.value) {
+                tickerBridge.clearLyric()
+            } else if (tickerBridge.isEnabled()) {
+                resendTickerLyric(force = true)
+            }
+        }
+    }
+
     fun setSamsungFloatingLyricTranslation(enabled: Boolean) {
         viewModelScope.launch {
             val safeEnabled = enabled && !tickerHideNotificationEnabled
@@ -943,6 +989,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             settingsManager.setDesktopLyricEnabled(enabled)
             desktopLyricBridge.setEnabled(enabled)
             if (enabled) resendDesktopLyric()
+        }
+    }
+
+    fun setDesktopLyricHideWhenPaused(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setDesktopLyricHideWhenPaused(enabled)
+            desktopLyricHideWhenPausedEnabled = enabled
+            if (enabled && !isPlaying.value) {
+                desktopLyricBridge.clearLyric()
+            } else {
+                resendDesktopLyric()
+            }
         }
     }
 

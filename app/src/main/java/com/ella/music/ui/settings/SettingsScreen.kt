@@ -493,8 +493,10 @@ fun SettingsDetailScreen(
     val bottomBarGlassEffect by settingsManager.bottomBarGlassEffect.collectAsState(initial = BottomBarGlassEffect.Blur)
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = false)
     val tickerHideNotification by settingsManager.tickerHideNotification.collectAsState(initial = false)
+    val tickerHideWhenPaused by settingsManager.tickerHideWhenPaused.collectAsState(initial = false)
     val samsungFloatingLyricTranslation by settingsManager.samsungFloatingLyricTranslation.collectAsState(initial = false)
     val desktopLyricEnabled by settingsManager.desktopLyricEnabled.collectAsState(initial = false)
+    val desktopLyricHideWhenPaused by settingsManager.desktopLyricHideWhenPaused.collectAsState(initial = false)
     val desktopLyricStatusBarMode by settingsManager.desktopLyricStatusBarMode.collectAsState(initial = false)
     val desktopLyricLocked by settingsManager.desktopLyricLocked.collectAsState(initial = false)
     val desktopLyricFontScale by settingsManager.desktopLyricFontScale.collectAsState(initial = 100)
@@ -1133,6 +1135,17 @@ fun SettingsDetailScreen(
                     )
 
                     SwitchPreference(
+                        title = stringResource(R.string.settings_floating_lyric_hide_when_paused),
+                        summary = stringResource(R.string.settings_floating_lyric_hide_when_paused_summary),
+                        enabled = desktopLyricEnabled,
+                        checked = desktopLyricHideWhenPaused,
+                        onCheckedChange = { enabled ->
+                            playerViewModel?.setDesktopLyricHideWhenPaused(enabled)
+                                ?: scope.launch { settingsManager.setDesktopLyricHideWhenPaused(enabled) }
+                        }
+                    )
+
+                    SwitchPreference(
                         title = "锁定桌面歌词",
                         summary = "锁定后悬浮歌词不可拖动；可在这里或锁定通知中解除",
                         enabled = desktopLyricEnabled,
@@ -1354,6 +1367,17 @@ fun SettingsDetailScreen(
                                     settingsManager.setTickerHideNotification(enabled)
                                     if (enabled) settingsManager.setSamsungFloatingLyricTranslation(false)
                                 }
+                        }
+                    )
+
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_status_lyric_hide_when_paused),
+                        summary = stringResource(R.string.settings_status_lyric_hide_when_paused_summary),
+                        enabled = tickerEnabled,
+                        checked = tickerHideWhenPaused,
+                        onCheckedChange = { enabled ->
+                            playerViewModel?.setTickerHideWhenPaused(enabled)
+                                ?: scope.launch { settingsManager.setTickerHideWhenPaused(enabled) }
                         }
                     )
 

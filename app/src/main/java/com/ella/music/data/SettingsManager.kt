@@ -39,8 +39,10 @@ class SettingsManager(private val context: Context) {
         val KEY_BOTTOM_BAR_GLASS_EFFECT = stringPreferencesKey("bottom_bar_glass_effect")
         val KEY_TICKER_ENABLED = booleanPreferencesKey("ticker_enabled")
         val KEY_TICKER_HIDE_NOTIFICATION = booleanPreferencesKey("ticker_hide_notification")
+        val KEY_TICKER_HIDE_WHEN_PAUSED = booleanPreferencesKey("ticker_hide_when_paused")
         val KEY_SAMSUNG_FLOATING_LYRIC_TRANSLATION = booleanPreferencesKey("samsung_floating_lyric_translation")
         val KEY_DESKTOP_LYRIC_ENABLED = booleanPreferencesKey("desktop_lyric_enabled")
+        val KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED = booleanPreferencesKey("desktop_lyric_hide_when_paused")
         val KEY_DESKTOP_LYRIC_STATUS_BAR_MODE = booleanPreferencesKey("desktop_lyric_status_bar_mode")
         val KEY_DESKTOP_LYRIC_LOCKED = booleanPreferencesKey("desktop_lyric_locked")
         val KEY_DESKTOP_LYRIC_FONT_SCALE = intPreferencesKey("desktop_lyric_font_scale")
@@ -180,9 +182,12 @@ class SettingsManager(private val context: Context) {
     }
     val tickerEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_ENABLED] ?: false }
     val tickerHideNotification: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_HIDE_NOTIFICATION] ?: true }
+    val tickerHideWhenPaused: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_HIDE_WHEN_PAUSED] ?: false }
     val samsungFloatingLyricTranslation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_SAMSUNG_FLOATING_LYRIC_TRANSLATION] ?: false }
     val desktopLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_ENABLED] ?: false }
+    val desktopLyricHideWhenPaused: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED] ?: false }
     val desktopLyricStatusBarMode: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MODE] ?: false }
     val desktopLyricLocked: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_LOCKED] ?: false }
@@ -355,12 +360,20 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_TICKER_HIDE_NOTIFICATION] = enabled }
     }
 
+    suspend fun setTickerHideWhenPaused(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_TICKER_HIDE_WHEN_PAUSED] = enabled }
+    }
+
     suspend fun setSamsungFloatingLyricTranslation(enabled: Boolean) {
         context.dataStore.edit { it[KEY_SAMSUNG_FLOATING_LYRIC_TRANSLATION] = enabled }
     }
 
     suspend fun setDesktopLyricEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_DESKTOP_LYRIC_ENABLED] = enabled }
+    }
+
+    suspend fun setDesktopLyricHideWhenPaused(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED] = enabled }
     }
 
     suspend fun setDesktopLyricStatusBarMode(enabled: Boolean) {
