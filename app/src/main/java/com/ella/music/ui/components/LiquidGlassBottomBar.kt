@@ -46,7 +46,7 @@ fun LiquidGlassBottomBar(
     val glassModifier = if (hasBackdrop) {
         Modifier.drawBackdrop(
             backdrop = backdrop,
-            shape = { RoundedCornerShape(28.dp) },
+            shape = { RoundedCornerShape(32.dp) },
             effects = {
                 blur(26f.dp.toPx())
             },
@@ -68,7 +68,7 @@ fun LiquidGlassBottomBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .clip(RoundedCornerShape(32.dp))
             .then(glassModifier)
             .height(64.dp)
             .padding(horizontal = 4.dp),
@@ -94,20 +94,20 @@ fun RowScope.LiquidGlassBottomBarItem(
     } else {
         MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
     }
-    val pressedColor = if (isLight) Color.Black.copy(alpha = 0.06f) else Color.White.copy(alpha = 0.08f)
+    val pressedColor = if (isLight) {
+        Color.Black.copy(alpha = 0.06f)
+    } else {
+        Color.White.copy(alpha = 0.08f)
+    }
 
     Column(
         modifier = Modifier
             .weight(1f)
             .height(56.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(28.dp))
             .background(
-                color = when {
-                    isPressed -> pressedColor
-                    selected -> selectedColor
-                    else -> Color.Transparent
-                },
-                shape = RoundedCornerShape(16.dp)
+                color = if (isPressed) pressedColor else Color.Transparent,
+                shape = RoundedCornerShape(28.dp)
             )
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -115,19 +115,17 @@ fun RowScope.LiquidGlassBottomBarItem(
                     isPressed = true
                     val up = waitForUpOrCancellation()
                     isPressed = false
-                    if (up != null) {
-                        currentOnClick()
-                    }
+                    if (up != null) currentOnClick()
                 }
             }
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(modifier = Modifier.graphicsLayer { alpha = if (selected) 1f else 0.6f }) {
+        Box(modifier = Modifier.graphicsLayer { alpha = if (selected) 1f else 0.62f }) {
             icon()
         }
-        Box(modifier = Modifier.graphicsLayer { alpha = if (selected) 1f else 0.5f }) {
+        Box(modifier = Modifier.graphicsLayer { alpha = if (selected) 1f else 0.56f }) {
             label()
         }
     }
