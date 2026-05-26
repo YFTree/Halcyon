@@ -503,6 +503,8 @@ fun SettingsDetailScreen(
     val desktopLyricHideWhenPaused by settingsManager.desktopLyricHideWhenPaused.collectSettingsState(initialValue = false)
     val desktopLyricStatusBarMode by settingsManager.desktopLyricStatusBarMode.collectSettingsState(initialValue = false)
     val desktopLyricStatusBarTopOffset by settingsManager.desktopLyricStatusBarTopOffset.collectSettingsState(initialValue = 16)
+    val desktopLyricStatusBarPosition by settingsManager.desktopLyricStatusBarPosition.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_POSITION_CENTER)
+    val desktopLyricStatusBarSecondary by settingsManager.desktopLyricStatusBarSecondary.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF)
     val desktopLyricLocked by settingsManager.desktopLyricLocked.collectSettingsState(initialValue = false)
     val desktopLyricFontScale by settingsManager.desktopLyricFontScale.collectSettingsState(initialValue = 100)
     val desktopLyricTranslationScale by settingsManager.desktopLyricTranslationScale.collectSettingsState(initialValue = 110)
@@ -626,6 +628,14 @@ fun SettingsDetailScreen(
     }
     val selectedDesktopLyricColorIndex =
         desktopLyricColorPresets.indexOfFirst { it.second == desktopLyricTextColor }.takeIf { it >= 0 } ?: 0
+    val statusLyricPositionLabels = remember { listOf("左侧", "居中", "右侧") }
+    val statusLyricPositionEntries = remember(statusLyricPositionLabels) {
+        statusLyricPositionLabels.map { DropdownItem(title = it) }
+    }
+    val statusLyricSecondaryLabels = remember { listOf("关闭", "翻译", "注音") }
+    val statusLyricSecondaryEntries = remember(statusLyricSecondaryLabels) {
+        statusLyricSecondaryLabels.map { DropdownItem(title = it) }
+    }
     val homeSectionItems = remember {
         listOf(
             HomePreferenceItem("library", "音乐库", "首页音乐库入口区块"),
@@ -1180,6 +1190,34 @@ fun SettingsDetailScreen(
                             Text(text = "120dp", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                         }
                     }
+
+                    WindowSpinnerPreference(
+                        title = "状态栏歌词位置",
+                        summary = "当前：${statusLyricPositionLabels[desktopLyricStatusBarPosition.coerceIn(0, 2)]}",
+                        enabled = desktopLyricEnabled && desktopLyricStatusBarMode,
+                        items = statusLyricPositionEntries,
+                        selectedIndex = desktopLyricStatusBarPosition.coerceIn(0, 2),
+                        onSelectedIndexChange = { index ->
+                            scope.launch {
+                                settingsManager.setDesktopLyricStatusBarPosition(index)
+                                applyDesktopLyricSettings()
+                            }
+                        }
+                    )
+
+                    WindowSpinnerPreference(
+                        title = "状态栏歌词副行",
+                        summary = "当前：${statusLyricSecondaryLabels[desktopLyricStatusBarSecondary.coerceIn(0, 2)]}",
+                        enabled = desktopLyricEnabled && desktopLyricStatusBarMode,
+                        items = statusLyricSecondaryEntries,
+                        selectedIndex = desktopLyricStatusBarSecondary.coerceIn(0, 2),
+                        onSelectedIndexChange = { index ->
+                            scope.launch {
+                                settingsManager.setDesktopLyricStatusBarSecondary(index)
+                                applyDesktopLyricSettings()
+                            }
+                        }
+                    )
 
                     SwitchPreference(
                         title = "锁定桌面歌词",
