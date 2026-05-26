@@ -6,6 +6,10 @@ import android.os.Build
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
 import android.net.Uri
 import android.util.Log
 import android.util.LruCache
@@ -769,16 +773,58 @@ class PlaybackService : MediaLibraryService() {
             metadata.artworkData?.takeIf { it.isNotEmpty() }?.let { data ->
                 val key = "data:${data.contentHashCode()}:${data.size}"
                 largeIconCache.get(key)?.let { return it }
-                return decodeArtworkData(data)?.also { largeIconCache.put(key, it) }
+                decodeArtworkData(data)?.also {
+                    largeIconCache.put(key, it)
+                    return it
+                }
             }
 
-            val uri = metadata.artworkUri ?: return null
+            val uri = metadata.artworkUri ?: return defaultLargeIcon()
             if (uri.scheme.equals("http", ignoreCase = true) || uri.scheme.equals("https", ignoreCase = true)) {
-                return null
+                return defaultLargeIcon()
             }
             val key = "uri:$uri"
             largeIconCache.get(key)?.let { return it }
-            return decodeArtworkUri(uri)?.also { largeIconCache.put(key, it) }
+            return decodeArtworkUri(uri)
+                ?.also { largeIconCache.put(key, it) }
+                ?: defaultLargeIcon()
+        }
+
+        private fun defaultLargeIcon(): Bitmap {
+            val key = "default"
+            largeIconCache.get(key)?.let { return it }
+            val size = 256
+            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = LinearGradient(
+                    0f,
+                    0f,
+                    size.toFloat(),
+                    size.toFloat(),
+                    intArrayOf(
+                        android.graphics.Color.rgb(94, 155, 255),
+                        android.graphics.Color.rgb(62, 99, 216),
+                        android.graphics.Color.rgb(32, 42, 104)
+                    ),
+                    null,
+                    Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawRect(0f, 0f, size.toFloat(), size.toFloat(), paint)
+            paint.shader = null
+            paint.style = Paint.Style.FILL
+            paint.color = android.graphics.Color.argb(42, 255, 255, 255)
+            canvas.drawCircle(size * 0.52f, size * 0.50f, size * 0.34f, paint)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = size * 0.035f
+            paint.color = android.graphics.Color.argb(66, 255, 255, 255)
+            canvas.drawCircle(size * 0.52f, size * 0.50f, size * 0.24f, paint)
+            paint.style = Paint.Style.FILL
+            paint.color = android.graphics.Color.argb(36, 0, 0, 0)
+            canvas.drawCircle(size * 0.52f, size * 0.50f, size * 0.06f, paint)
+            largeIconCache.put(key, bitmap)
+            return bitmap
         }
 
         private fun decodeArtworkData(data: ByteArray): Bitmap? {
