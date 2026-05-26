@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -291,7 +292,7 @@ fun EllaApp(
         }
         val folderPath = uri.toPrimaryStoragePath()
         if (folderPath == null) {
-            Toast.makeText(context, "暂不支持该系统目录路径", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.unsupported_system_folder_path), Toast.LENGTH_SHORT).show()
         } else {
             scope.launch {
                 settingsManager.setUseAndroidMediaLibrary(false)
@@ -299,7 +300,7 @@ fun EllaApp(
                 settingsManager.setAutoScan(true)
                 mainViewModel.scanMusic()
             }
-            Toast.makeText(context, "已添加扫描文件夹", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.scan_folder_added), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -393,9 +394,9 @@ fun EllaApp(
     val backdrop = rememberLayerBackdrop()
     val useGlass = true
     val tabs = listOf(
-        Triple(Screen.Home.route, "首页", MiuixIcons.Regular.Music),
-        Triple(Screen.Library.route, "音乐库", MiuixIcons.Regular.Playlist),
-        Triple(Screen.Settings.route, "设置", MiuixIcons.Regular.Settings),
+        Triple(Screen.Home.route, stringResource(R.string.tab_home), MiuixIcons.Regular.Music),
+        Triple(Screen.Library.route, stringResource(R.string.tab_library), MiuixIcons.Regular.Playlist),
+        Triple(Screen.Settings.route, stringResource(R.string.tab_settings), MiuixIcons.Regular.Settings),
     )
 
     val contentModifier = Modifier
@@ -551,12 +552,12 @@ private fun InitialScanPromptDialog(
 ) {
     WindowDialog(
         show = show,
-        title = "无歌曲",
+        title = stringResource(R.string.initial_scan_title),
         onDismissRequest = onDismiss
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "当前没有歌曲，是否现在扫描歌曲？",
+                text = stringResource(R.string.initial_scan_message),
                 color = MiuixTheme.colorScheme.onSurface,
                 fontSize = 15.sp,
                 lineHeight = 22.sp
@@ -568,7 +569,7 @@ private fun InitialScanPromptDialog(
             ) {
                 Box(modifier = Modifier.weight(1f)) {
                     TextButton(
-                        text = "取消",
+                        text = stringResource(R.string.common_cancel),
                         onClick = onDismiss,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -578,7 +579,7 @@ private fun InitialScanPromptDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(modifier = Modifier.weight(1f)) {
                     TextButton(
-                        text = "自定义",
+                        text = stringResource(R.string.common_custom),
                         onClick = onCustomFolderScan,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -588,7 +589,7 @@ private fun InitialScanPromptDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(modifier = Modifier.weight(1f)) {
                     TextButton(
-                        text = "确定",
+                        text = stringResource(R.string.common_confirm),
                         onClick = onMediaLibraryScan,
                         modifier = Modifier
                             .fillMaxWidth()

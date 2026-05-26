@@ -32,10 +32,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.tagIdentityKey
@@ -124,7 +126,7 @@ fun HomeScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         SmallTopAppBar(
-            title = "听音乐",
+            title = stringResource(R.string.home_title),
             color = pageBackground
         )
 
@@ -162,6 +164,7 @@ fun HomeScreen(
                 homeLibraryTileOrder.csvIds(SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
             }
             val libraryTiles = remember(
+                context,
                 tileOrder,
                 hiddenTiles,
                 artistCount,
@@ -174,38 +177,38 @@ fun HomeScreen(
                 lyricistCount
             ) {
                 val all = mapOf(
-                    "artist" to HomeTileSpec("artist", "艺术家", "$artistCount 位", Color(0xFF118AB2), Screen.Artist.route, onNavigateToArtist),
-                    "album" to HomeTileSpec("album", "专辑", "${albums.size} 张", Color(0xFFFF9F1C), Screen.Album.route, onNavigateToAlbum),
-                    "folder" to HomeTileSpec("folder", "文件夹", "$folderCount 个", Color(0xFF5E60CE), Screen.MetadataCategory.createRoute("folder")) { onNavigateToMetadataCategory("folder") },
-                    "folder_tree" to HomeTileSpec("folder_tree", "文件夹层次结构", "按嵌套目录浏览", Color(0xFF8338EC), Screen.Folder.route, onNavigateToFolder),
-                    "playlist" to HomeTileSpec("playlist", "歌单", "${playlists.size} 个", Color(0xFFEF476F), Screen.Playlists.route, onNavigateToPlaylists),
-                    "analytics" to HomeTileSpec("analytics", "听歌统计", "历史和热力图", Color(0xFFE71D36), Screen.Analytics.route, onNavigateToAnalytics),
-                    "genre" to HomeTileSpec("genre", "流派", "$genreCount 种", Color(0xFF06D6A0), Screen.MetadataCategory.createRoute("genre")) { onNavigateToMetadataCategory("genre") },
-                    "year" to HomeTileSpec("year", "年份", "$yearCount 个", Color(0xFF4CC9F0), Screen.MetadataCategory.createRoute("year")) { onNavigateToMetadataCategory("year") },
-                    "composer" to HomeTileSpec("composer", "作曲家", "$composerCount 位", Color(0xFFB5179E), Screen.MetadataCategory.createRoute("composer")) { onNavigateToMetadataCategory("composer") },
-                    "lyricist" to HomeTileSpec("lyricist", "作词家", "$lyricistCount 位", Color(0xFFFF6D00), Screen.MetadataCategory.createRoute("lyricist")) { onNavigateToMetadataCategory("lyricist") }
+                    "artist" to HomeTileSpec("artist", context.getString(R.string.category_artist), context.getString(R.string.home_count_artists, artistCount), Color(0xFF118AB2), Screen.Artist.route, onNavigateToArtist),
+                    "album" to HomeTileSpec("album", context.getString(R.string.category_album), context.getString(R.string.home_count_albums, albums.size), Color(0xFFFF9F1C), Screen.Album.route, onNavigateToAlbum),
+                    "folder" to HomeTileSpec("folder", context.getString(R.string.category_folder), context.getString(R.string.home_count_folders, folderCount), Color(0xFF5E60CE), Screen.MetadataCategory.createRoute("folder")) { onNavigateToMetadataCategory("folder") },
+                    "folder_tree" to HomeTileSpec("folder_tree", context.getString(R.string.category_folder_tree), context.getString(R.string.home_browse_nested_folders), Color(0xFF8338EC), Screen.Folder.route, onNavigateToFolder),
+                    "playlist" to HomeTileSpec("playlist", context.getString(R.string.category_playlist), context.getString(R.string.home_count_playlists, playlists.size), Color(0xFFEF476F), Screen.Playlists.route, onNavigateToPlaylists),
+                    "analytics" to HomeTileSpec("analytics", context.getString(R.string.category_analytics), context.getString(R.string.home_analytics_summary), Color(0xFFE71D36), Screen.Analytics.route, onNavigateToAnalytics),
+                    "genre" to HomeTileSpec("genre", context.getString(R.string.category_genre), context.getString(R.string.home_count_genres, genreCount), Color(0xFF06D6A0), Screen.MetadataCategory.createRoute("genre")) { onNavigateToMetadataCategory("genre") },
+                    "year" to HomeTileSpec("year", context.getString(R.string.category_year), context.getString(R.string.home_count_folders, yearCount), Color(0xFF4CC9F0), Screen.MetadataCategory.createRoute("year")) { onNavigateToMetadataCategory("year") },
+                    "composer" to HomeTileSpec("composer", context.getString(R.string.category_composer), context.getString(R.string.home_count_artists, composerCount), Color(0xFFB5179E), Screen.MetadataCategory.createRoute("composer")) { onNavigateToMetadataCategory("composer") },
+                    "lyricist" to HomeTileSpec("lyricist", context.getString(R.string.category_lyricist), context.getString(R.string.home_count_artists, lyricistCount), Color(0xFFFF6D00), Screen.MetadataCategory.createRoute("lyricist")) { onNavigateToMetadataCategory("lyricist") }
                 )
                 tileOrder.mapNotNull { all[it] }.filterNot { it.id in hiddenTiles }
             }
 
             sectionOrder.filterNot { it in hiddenSections }.forEach { section ->
                 when (section) {
-                    "library" -> HomeTileSection("音乐库", libraryTiles, context)
+                    "library" -> HomeTileSection(stringResource(R.string.home_library), libraryTiles, context)
                     "online" -> {
-                        SectionTitle("在线音乐")
+                        SectionTitle(stringResource(R.string.home_online_music))
                         HomeTileGrid(
                             tiles = listOf(
-                                HomeTileSpec("lx", "LX Music", "导入 API 源", Color(0xFF00A896), Screen.LxOnline.route, onNavigateToLxOnline),
-                                HomeTileSpec("webdav", "WebDAV", "连接云端音乐", Color(0xFF5E60CE), Screen.WebDav.route, onNavigateToWebDav)
+                                HomeTileSpec("lx", "LX Music", stringResource(R.string.home_import_api_source), Color(0xFF00A896), Screen.LxOnline.route, onNavigateToLxOnline),
+                                HomeTileSpec("webdav", "WebDAV", stringResource(R.string.home_connect_cloud_music), Color(0xFF5E60CE), Screen.WebDav.route, onNavigateToWebDav)
                             ),
                             context = context
                         )
                     }
                     "recent" -> {
-                        SectionTitle("最近听过")
+                        SectionTitle(stringResource(R.string.home_recent))
                         if (recentSongs.isEmpty()) {
                             Text(
-                                text = "还没有听歌历史",
+                                text = stringResource(R.string.home_no_history),
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 fontSize = 14.sp,
                                 modifier = Modifier.padding(vertical = 12.dp)
@@ -316,13 +319,14 @@ private fun DailyMixCard(
 
             Column(modifier = Modifier.align(Alignment.CenterStart)) {
                 Text(
-                    text = "每日精选",
+                    text = stringResource(R.string.home_daily_mix),
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF101014)
                 )
                 Text(
-                    text = currentSongTitle?.let { "正在播放：$it" } ?: "${songs.size} 首歌曲随机播放",
+                    text = currentSongTitle?.let { stringResource(R.string.home_now_playing_song, it) }
+                        ?: stringResource(R.string.home_random_song_count, songs.size),
                     fontSize = 14.sp,
                     color = Color(0xFF33333A),
                     lineHeight = 19.sp,
@@ -336,7 +340,7 @@ private fun DailyMixCard(
                 IconButton(onClick = onPlay) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Play,
-                        contentDescription = "播放每日精选",
+                        contentDescription = stringResource(R.string.home_play_daily_mix),
                         tint = Color(0xFF101014),
                         modifier = Modifier.size(32.dp)
                     )

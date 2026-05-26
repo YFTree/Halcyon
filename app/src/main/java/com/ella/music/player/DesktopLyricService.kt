@@ -175,20 +175,20 @@ class DesktopLyricService : Service() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(8), dp(4), dp(8), dp(0))
-            addIconControl(R.drawable.ic_skip_previous, "上一首") { controller?.seekToPrevious() }
-            playPauseButton = addIconControl(R.drawable.ic_player_pause, "播放/暂停") {
+            addIconControl(R.drawable.ic_skip_previous, getString(R.string.desktop_lyric_previous)) { controller?.seekToPrevious() }
+            playPauseButton = addIconControl(R.drawable.ic_player_pause, getString(R.string.desktop_lyric_play_pause)) {
                 controller?.let {
                     if (it.isPlaying) it.pause() else it.play()
                     updatePlayPauseIcon()
                 }
             }
-            addIconControl(R.drawable.ic_skip_next, "下一首") { controller?.seekToNext() }
-            addControl("A-", "缩小歌词") { updateFontScale(-0.08f) }
-            addControl("A+", "放大歌词") { updateFontScale(0.08f) }
-            addIconControl(R.drawable.ic_desktop_pin_top, "贴到状态栏") { snapToStatusBar() }
-            addIconControl(R.drawable.ic_desktop_palette, "切换颜色") { cycleTextColor() }
-            addIconControl(R.drawable.ic_desktop_lock, "锁定") { setLocked(true) }
-            addControl("×", "关闭") { closeByUser() }
+            addIconControl(R.drawable.ic_skip_next, getString(R.string.desktop_lyric_next)) { controller?.seekToNext() }
+            addControl("A-", getString(R.string.desktop_lyric_smaller)) { updateFontScale(-0.08f) }
+            addControl("A+", getString(R.string.desktop_lyric_larger)) { updateFontScale(0.08f) }
+            addIconControl(R.drawable.ic_desktop_pin_top, getString(R.string.desktop_lyric_pin_status_bar)) { snapToStatusBar() }
+            addIconControl(R.drawable.ic_desktop_palette, getString(R.string.desktop_lyric_cycle_color)) { cycleTextColor() }
+            addIconControl(R.drawable.ic_desktop_lock, getString(R.string.desktop_lyric_lock)) { setLocked(true) }
+            addControl("×", getString(R.string.desktop_lyric_close)) { closeByUser() }
             visibility = View.GONE
         }
         val root = LinearLayout(this).apply {
@@ -511,8 +511,8 @@ class DesktopLyricService : Service() {
             NOTIFICATION_ID,
             builder
                 .setSmallIcon(R.drawable.ic_music_note)
-                .setContentTitle("桌面歌词已锁定")
-                .setContentText("点击解除锁定")
+                .setContentTitle(getString(R.string.desktop_lyric_locked_title))
+                .setContentText(getString(R.string.desktop_lyric_locked_text))
                 .setContentIntent(intent)
                 .setOngoing(true)
                 .setShowWhen(false)
@@ -524,7 +524,7 @@ class DesktopLyricService : Service() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         if (notificationManager.getNotificationChannel(CHANNEL_ID) != null) return
         notificationManager.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "桌面歌词", NotificationManager.IMPORTANCE_LOW).apply {
+            NotificationChannel(CHANNEL_ID, getString(R.string.desktop_lyric_channel), NotificationManager.IMPORTANCE_LOW).apply {
                 setSound(null, null)
                 enableVibration(false)
                 setShowBadge(false)

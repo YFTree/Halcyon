@@ -10,6 +10,7 @@ import android.os.StrictMode
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.ella.music.R
 import com.ella.music.data.model.Song
 import java.io.File
 
@@ -18,7 +19,7 @@ private const val ASPECT_PRO_ACTIVITY = "com.andrewkhandr.aspectpro.MainActivity
 
 fun openSongSpectrumWithAspectPro(context: Context, song: Song) {
     if (song.path.startsWith("http://") || song.path.startsWith("https://")) {
-        Toast.makeText(context, "Aspect Pro 需要本地音频文件", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.aspect_pro_requires_local_audio), Toast.LENGTH_SHORT).show()
         return
     }
     val uri = song.aspectProUri(context)
@@ -35,7 +36,7 @@ fun openSongSpectrumWithAspectPro(context: Context, song: Song) {
         allowFileUriForLegacyAudioApp(uri)
         context.startActivity(intent)
     }.onFailure {
-        Toast.makeText(context, "未能打开 Aspect Pro，请确认已安装", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.aspect_pro_open_failed), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -46,9 +47,9 @@ fun shareLocalSong(context: Context, song: Song) {
             putExtra(Intent.EXTRA_TEXT, "${song.title} - ${song.artist}\n${song.path}")
         }
         runCatching {
-            context.startActivity(Intent.createChooser(intent, "分享歌曲"))
+            context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_song)))
         }.onFailure {
-            Toast.makeText(context, "没有可用的分享应用", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.share_no_available_app), Toast.LENGTH_SHORT).show()
         }
         return
     }
@@ -62,9 +63,9 @@ fun shareLocalSong(context: Context, song: Song) {
         clipData = ClipData.newUri(context.contentResolver, song.title, uri)
     }
     runCatching {
-        context.startActivity(Intent.createChooser(intent, "分享歌曲"))
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_song)))
     }.onFailure {
-        Toast.makeText(context, "没有可用的分享应用", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.share_no_available_app), Toast.LENGTH_SHORT).show()
     }
 }
 

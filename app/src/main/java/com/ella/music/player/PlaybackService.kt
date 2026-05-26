@@ -252,7 +252,7 @@ class PlaybackService : MediaLibraryService() {
         session.setMediaButtonPreferences(
             ImmutableList.of(
                 CommandButton.Builder()
-                    .setDisplayName(if (isFavorite) "取消收藏" else "收藏")
+                    .setDisplayName(if (isFavorite) getString(R.string.common_unfavorite) else getString(R.string.common_favorite))
                     .setIconResId(
                         if (isFavorite) {
                             R.drawable.ic_notification_favorite_filled
@@ -264,13 +264,13 @@ class PlaybackService : MediaLibraryService() {
                     .build(),
 
                 CommandButton.Builder()
-                    .setDisplayName("上一首")
+                    .setDisplayName(getString(R.string.common_previous))
                     .setIconResId(R.drawable.ic_skip_previous)
                     .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
                     .build(),
 
                 CommandButton.Builder()
-                    .setDisplayName(if (player.isPlaying) "暂停" else "播放")
+                    .setDisplayName(if (player.isPlaying) getString(R.string.common_pause) else getString(R.string.common_play))
                     .setIconResId(
                         if (player.isPlaying) {
                             R.drawable.ic_player_pause
@@ -282,7 +282,7 @@ class PlaybackService : MediaLibraryService() {
                     .build(),
 
                 CommandButton.Builder()
-                    .setDisplayName("下一首")
+                    .setDisplayName(getString(R.string.common_next))
                     .setIconResId(R.drawable.ic_skip_next)
                     .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
                     .build(),
@@ -305,22 +305,22 @@ class PlaybackService : MediaLibraryService() {
         return when {
             shuffleModeEnabled -> MediaButtonPlaybackModeAction(
                 icon = R.drawable.ic_notification_shuffle,
-                title = "随机播放"
+                title = getString(R.string.notification_action_shuffle)
             )
 
             repeatMode == Player.REPEAT_MODE_ONE -> MediaButtonPlaybackModeAction(
                 icon = R.drawable.ic_repeat_one,
-                title = "单曲循环"
+                title = getString(R.string.notification_action_repeat_one)
             )
 
             repeatMode == Player.REPEAT_MODE_ALL -> MediaButtonPlaybackModeAction(
                 icon = R.drawable.ic_repeat,
-                title = "列表循环"
+                title = getString(R.string.notification_action_repeat_all)
             )
 
             else -> MediaButtonPlaybackModeAction(
                 icon = R.drawable.ic_repeat,
-                title = "顺序播放"
+                title = getString(R.string.notification_action_order)
             )
         }
     }
@@ -387,8 +387,8 @@ class PlaybackService : MediaLibraryService() {
             .setMediaId(LIBRARY_QUEUE_ID)
             .setMediaMetadata(
                 MediaMetadata.Builder()
-                    .setTitle("当前播放")
-                    .setDisplayTitle("当前播放")
+                    .setTitle(getString(R.string.notification_current_queue))
+                    .setDisplayTitle(getString(R.string.notification_current_queue))
                     .setMediaType(MediaMetadata.MEDIA_TYPE_PLAYLIST)
                     .setFolderType(MediaMetadata.FOLDER_TYPE_TITLES)
                     .setIsBrowsable(true)
@@ -579,7 +579,6 @@ class PlaybackService : MediaLibraryService() {
         private companion object {
             const val NOTIFICATION_ID = 1001
             const val CHANNEL_ID = "ella_music_playback"
-            const val CHANNEL_NAME = "播放控制"
             const val FLAG_ALWAYS_SHOW_TICKER_FALLBACK = 0x1000000
             const val FLAG_ONLY_UPDATE_TICKER_FALLBACK = 0x2000000
             const val LARGE_ICON_MAX_SIZE = 512
@@ -673,14 +672,14 @@ class PlaybackService : MediaLibraryService() {
             addCustomAction(
                 ACTION_TOGGLE_FAVORITE,
                 if (isFavorite) R.drawable.ic_notification_favorite_filled else R.drawable.ic_notification_favorite,
-                if (isFavorite) "取消收藏" else "收藏",
+                if (isFavorite) service.getString(R.string.common_unfavorite) else service.getString(R.string.common_favorite),
                 compact = false
             )
 
             addAction(
                 Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
                 R.drawable.ic_skip_previous,
-                "上一首"
+                service.getString(R.string.common_previous)
             )
 
             addAction(
@@ -690,13 +689,13 @@ class PlaybackService : MediaLibraryService() {
                 } else {
                     R.drawable.ic_player_play
                 },
-                if (player.isPlaying) "暂停" else "播放"
+                if (player.isPlaying) service.getString(R.string.common_pause) else service.getString(R.string.common_play)
             )
 
             addAction(
                 Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
                 R.drawable.ic_skip_next,
-                "下一首"
+                service.getString(R.string.common_next)
             )
 
             addCustomAction(
@@ -745,23 +744,23 @@ class PlaybackService : MediaLibraryService() {
         private fun Player.playbackModeAction(): PlaybackModeAction {
             return when {
                 shuffleModeEnabled -> PlaybackModeAction(
-                    icon = R.drawable.ic_notification_shuffle,
-                    title = "随机播放"
+                icon = R.drawable.ic_notification_shuffle,
+                    title = service.getString(R.string.notification_action_shuffle)
                 )
 
                 repeatMode == Player.REPEAT_MODE_ONE -> PlaybackModeAction(
                     icon = R.drawable.ic_repeat_one,
-                    title = "单曲循环"
+                    title = service.getString(R.string.notification_action_repeat_one)
                 )
 
                 repeatMode == Player.REPEAT_MODE_ALL -> PlaybackModeAction(
                     icon = R.drawable.ic_repeat,
-                    title = "列表循环"
+                    title = service.getString(R.string.notification_action_repeat_all)
                 )
 
                 else -> PlaybackModeAction(
                     icon = R.drawable.ic_repeat,
-                    title = "顺序播放"
+                    title = service.getString(R.string.notification_action_order)
                 )
             }
         }
@@ -835,7 +834,10 @@ class PlaybackService : MediaLibraryService() {
         }
 
         override fun getNotificationChannelInfo(): MediaNotification.Provider.NotificationChannelInfo {
-            return MediaNotification.Provider.NotificationChannelInfo(CHANNEL_ID, CHANNEL_NAME)
+            return MediaNotification.Provider.NotificationChannelInfo(
+                CHANNEL_ID,
+                service.getString(R.string.playback_service_notification_channel)
+            )
         }
 
         private fun ensureChannel() {
@@ -845,7 +847,7 @@ class PlaybackService : MediaLibraryService() {
             manager.createNotificationChannel(
                 android.app.NotificationChannel(
                     CHANNEL_ID,
-                    CHANNEL_NAME,
+                    service.getString(R.string.playback_service_notification_channel),
                     NotificationManager.IMPORTANCE_LOW
                 )
             )

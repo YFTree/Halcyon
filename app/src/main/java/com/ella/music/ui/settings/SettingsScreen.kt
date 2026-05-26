@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.ella.music.BuildConfig
+import com.ella.music.R
 import com.ella.music.data.PlaybackStatsStore
 import com.ella.music.data.SettingsManager
 import com.ella.music.player.DesktopLyricService
@@ -104,7 +106,7 @@ fun SettingsScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         EllaSmallTopAppBar(
-            title = "设置",
+            title = stringResource(R.string.settings),
             color = pageBackground,
             centeredTitle = true
         )
@@ -117,55 +119,55 @@ fun SettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            SmallTitle(text = "应用")
+            SmallTitle(text = stringResource(R.string.settings_app))
 
             SettingsCardGroup {
                 Column {
                     ArrowPreference(
-                        title = "应用偏好",
-                        summary = "外观和扫描相关设置",
+                        title = stringResource(R.string.settings_preferences),
+                        summary = stringResource(R.string.settings_preferences_summary),
                         onClick = onNavigateToSettingsDetail
                     )
                     ArrowPreference(
-                        title = "歌词",
-                        summary = "词幕、桌面歌词、状态栏歌词和车载歌词",
+                        title = stringResource(R.string.settings_lyrics),
+                        summary = stringResource(R.string.settings_lyrics_summary),
                         onClick = onNavigateToLyricSettings
                     )
                     ArrowPreference(
-                        title = "音频",
-                        summary = "播放、解码、随机和音频焦点",
+                        title = stringResource(R.string.settings_audio),
+                        summary = stringResource(R.string.settings_audio_summary),
                         onClick = onNavigateToAudioSettings
                     )
                     ArrowPreference(
-                        title = "备份",
-                        summary = "导出和恢复设置、听歌历史与统计数据",
+                        title = stringResource(R.string.settings_backup),
+                        summary = stringResource(R.string.settings_backup_summary),
                         onClick = onNavigateToBackupSettings
                     )
                 }
             }
 
-            SmallTitle(text = "其他")
+            SmallTitle(text = stringResource(R.string.settings_other))
 
             SettingsCardGroup {
                 Column {
                     ArrowPreference(
-                        title = "清除封面歌词缓存",
-                        summary = "清除 WebDAV 和 LX 的封面、歌词与远程元数据缓存",
+                        title = stringResource(R.string.settings_clear_online_cache),
+                        summary = stringResource(R.string.settings_clear_online_cache_summary),
                         onClick = {
                             scope.launch {
                                 mainViewModel?.clearOnlineMetadataCache()
                                 playerViewModel?.clearOnlineMetadataCache()
-                                Toast.makeText(context, "在线封面歌词缓存已清除", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.settings_clear_online_cache_done), Toast.LENGTH_SHORT).show()
                             }
                         }
                     )
                     ArrowPreference(
-                        title = "日志",
-                        summary = "查看详细日志、警告和闪退记录",
+                        title = stringResource(R.string.settings_logs),
+                        summary = stringResource(R.string.settings_logs_summary),
                         onClick = onNavigateToLogs
                     )
                     ArrowPreference(
-                        title = "关于",
+                        title = stringResource(R.string.about),
                         summary = "Ella Music v${BuildConfig.VERSION_NAME}",
                         onClick = onNavigateToAbout
                     )
@@ -801,8 +803,8 @@ fun SettingsDetailScreen(
                             }
                         )
                         SwitchPreference(
-                            title = "立体歌词",
-                            summary = "歌词页按距离加入轻微透视和模糊层次，类似 Salt Player 的纵深效果",
+                            title = stringResource(R.string.settings_lyric_perspective),
+                            summary = stringResource(R.string.settings_lyric_perspective_summary),
                             checked = lyricPerspectiveEffect,
                             onCheckedChange = {
                                 scope.launch { settingsManager.setLyricPerspectiveEffect(it) }
@@ -1012,7 +1014,7 @@ fun SettingsDetailScreen(
             }
 
             if (showOnlyLyrics) {
-                SmallTitle(text = "歌词")
+                SmallTitle(text = stringResource(R.string.settings_lyrics))
 
                 SettingsCardGroup {
                     Column {
@@ -1071,7 +1073,7 @@ fun SettingsDetailScreen(
                         checked = desktopLyricEnabled,
                         onCheckedChange = { enabled ->
                             if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
-                                Toast.makeText(context, "请先授予悬浮窗权限", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.desktop_lyric_overlay_permission_required), Toast.LENGTH_SHORT).show()
                                 context.startActivity(
                                     Intent(
                                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
@@ -1099,8 +1101,8 @@ fun SettingsDetailScreen(
                     )
 
                     ArrowPreference(
-                        title = "重置桌面歌词位置",
-                        summary = "把悬浮歌词移回屏幕中上方，避免卡在状态栏影响下拉",
+                        title = stringResource(R.string.desktop_lyric_reset_position),
+                        summary = stringResource(R.string.desktop_lyric_reset_position_summary),
                         enabled = desktopLyricEnabled,
                         onClick = {
                             scope.launch {
@@ -1110,7 +1112,7 @@ fun SettingsDetailScreen(
                                         Intent(context, DesktopLyricService::class.java)
                                             .setAction(DesktopLyricService.ACTION_RESET_POSITION)
                                     )
-                                    Toast.makeText(context, "已重置桌面歌词位置", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.desktop_lyric_reset_position_done), Toast.LENGTH_SHORT).show()
                                 }
                             }
                         }

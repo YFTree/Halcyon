@@ -47,6 +47,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -304,7 +305,7 @@ fun MiniPlayer(
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_previous),
-                contentDescription = "上一首",
+                contentDescription = stringResource(R.string.common_previous),
                 tint = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.size(20.dp)
             )
@@ -316,7 +317,7 @@ fun MiniPlayer(
         ) {
             Icon(
                 painter = painterResource(id = if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play),
-                contentDescription = if (isPlaying) "暂停" else "播放",
+                contentDescription = if (isPlaying) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
                 tint = MiuixTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp)
             )
@@ -331,7 +332,7 @@ fun MiniPlayer(
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_next),
-                contentDescription = "下一首",
+                contentDescription = stringResource(R.string.common_next),
                 tint = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.size(20.dp)
             )

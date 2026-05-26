@@ -8,6 +8,7 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import com.ella.music.MainActivity
 import com.ella.music.R
+import com.ella.music.data.SettingsManager
 import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ROUTE
 import com.ella.music.ui.navigation.Screen
 
@@ -24,33 +25,50 @@ fun updateEllaDynamicShortcuts(
 ) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return
     val shortcutManager = context.getSystemService(ShortcutManager::class.java) ?: return
+    val resolvedLibraryLabel = libraryLabel.localizedShortcutDefault(
+        SettingsManager.DEFAULT_SHORTCUT_LIBRARY_LABEL,
+        context.getString(R.string.shortcut_library_short)
+    )
+    val resolvedPlaylistsLabel = playlistsLabel.localizedShortcutDefault(
+        SettingsManager.DEFAULT_SHORTCUT_PLAYLISTS_LABEL,
+        context.getString(R.string.shortcut_playlists_short)
+    )
+    val resolvedFolderLabel = folderLabel.localizedShortcutDefault(
+        SettingsManager.DEFAULT_SHORTCUT_FOLDER_LABEL,
+        context.getString(R.string.shortcut_folder_short)
+    )
     val shortcuts = listOf(
         context.buildEllaShortcut(
             id = SHORTCUT_LIBRARY,
-            label = libraryLabel.ifBlank { "音乐库" },
+            label = resolvedLibraryLabel,
             route = Screen.Library.route,
             iconRes = R.drawable.ic_shortcut_library,
             rank = 0
         ),
         context.buildEllaShortcut(
             id = SHORTCUT_PLAYLISTS,
-            label = playlistsLabel.ifBlank { "歌单" },
+            label = resolvedPlaylistsLabel,
             route = Screen.Playlists.route,
             iconRes = R.drawable.ic_shortcut_playlist,
             rank = 1
         ),
         context.buildEllaShortcut(
             id = SHORTCUT_FOLDER,
-            label = folderLabel.ifBlank { "文件夹" },
+            label = resolvedFolderLabel,
             route = Screen.Folder.route,
             iconRes = R.drawable.ic_shortcut_folder,
             rank = 2
         )
     )
     runCatching { shortcutManager.removeDynamicShortcuts(listOf(SHORTCUT_SETTINGS)) }
-    runCatching { shortcutManager.disableShortcuts(listOf(SHORTCUT_SETTINGS), "已移除") }
+    runCatching { shortcutManager.disableShortcuts(listOf(SHORTCUT_SETTINGS), context.getString(R.string.shortcut_playlists_removed)) }
     runCatching { shortcutManager.dynamicShortcuts = shortcuts }
     runCatching { shortcutManager.updateShortcuts(shortcuts) }
+}
+
+private fun String.localizedShortcutDefault(chineseDefault: String, localizedDefault: String): String {
+    val value = trim()
+    return if (value.isBlank() || value == chineseDefault) localizedDefault else value
 }
 
 fun requestPinnedEllaShortcut(

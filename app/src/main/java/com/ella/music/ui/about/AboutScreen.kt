@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -92,7 +93,7 @@ fun AboutScreen(
     Scaffold(
         topBar = {
             EllaSmallTopAppBar(
-                title = "关于",
+                title = stringResource(R.string.about),
                 scrollBehavior = scrollBehavior,
                 color = colorScheme.surface.copy(alpha = if (scrollProgress == 1f) 1f else 0f),
                 titleColor = colorScheme.onSurface.copy(alpha = scrollProgress),
@@ -101,7 +102,7 @@ fun AboutScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = colorScheme.onSurface,
                         )
                     }
@@ -225,7 +226,7 @@ private fun AboutContent(
             Text(
                 modifier = Modifier.fillMaxWidth(),
                 color = colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f),
-                text = "编译于 ${BuildConfig.BUILD_TIME}",
+                text = stringResource(R.string.about_build_time, BuildConfig.BUILD_TIME),
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
             )
@@ -251,15 +252,15 @@ private fun AboutContent(
             }
 
             item {
-                SmallTitle(text = "项目")
+                SmallTitle(text = stringResource(R.string.about_project))
                 FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors) {
                     BasicComponent(
-                        title = "软件更新",
-                        summary = "检查 GitHub Releases 的最新版本",
+                        title = stringResource(R.string.about_update),
+                        summary = stringResource(R.string.about_update_summary),
                         onClick = onNavigateToUpdate,
                     )
                     BasicComponent(
-                        title = "开源许可证",
+                        title = stringResource(R.string.about_open_source),
                         summary = "Apache-2.0",
                         onClick = { uriHandler.openUri("https://www.apache.org/licenses/LICENSE-2.0") },
                     )
@@ -267,7 +268,7 @@ private fun AboutContent(
             }
 
             item {
-                SmallTitle(text = "致谢")
+                SmallTitle(text = stringResource(R.string.about_acknowledgements))
                 FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors) {
                     BasicComponent(
                         title = "Codex (GPT-5.5)",
@@ -301,7 +302,7 @@ private fun AboutContent(
             }
 
             item {
-                SmallTitle(text = "开源项目")
+                SmallTitle(text = stringResource(R.string.about_open_source_projects))
                 FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors) {
                     BasicComponent(
                         title = "Miuix",

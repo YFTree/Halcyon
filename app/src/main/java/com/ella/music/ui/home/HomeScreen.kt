@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
@@ -166,7 +167,7 @@ fun LibraryScreen(
             .filterNot { it.equals("Unknown", ignoreCase = true) }
             .distinctBy { it.tagIdentityKey() }
         when (artists.size) {
-            0 -> Toast.makeText(context, "这首歌没有可跳转的歌手信息", Toast.LENGTH_SHORT).show()
+            0 -> Toast.makeText(context, context.getString(R.string.player_no_artist_jump), Toast.LENGTH_SHORT).show()
             1 -> onNavigateToArtist(artists.first())
             else -> artistChoices = artists
         }
@@ -253,7 +254,7 @@ fun LibraryScreen(
     ) {
         Box {
             SmallTopAppBar(
-                title = "音乐库",
+                title = stringResource(R.string.tab_library),
                 color = ellaPageBackground(),
                 navigationIcon = {
                     if (!selectionMode) {
@@ -264,7 +265,7 @@ fun LibraryScreen(
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Refresh,
-                                contentDescription = "刷新音乐库",
+                                contentDescription = stringResource(R.string.library_refresh),
                                 tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -276,14 +277,14 @@ fun LibraryScreen(
                         IconButton(onClick = {
                             val selectedSongs = sortedSongs.filter { it.id in selectedIds }
                             if (selectedSongs.isEmpty()) {
-                                Toast.makeText(context, "请先选择歌曲", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.library_select_songs_first), Toast.LENGTH_SHORT).show()
                             } else {
                                 playlistPickerSongs = selectedSongs
                             }
                         }) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Add,
-                                contentDescription = "添加到歌单",
+                                contentDescription = stringResource(R.string.category_playlist),
                                 tint = MiuixTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -291,14 +292,14 @@ fun LibraryScreen(
                         IconButton(onClick = {
                             val selectedSongs = sortedSongs.filter { it.id in selectedIds }
                             if (selectedSongs.isEmpty()) {
-                                Toast.makeText(context, "请先选择歌曲", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.library_select_songs_first), Toast.LENGTH_SHORT).show()
                             } else {
                                 pendingConfirmDeleteSongs = selectedSongs
                             }
                         }) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Delete,
-                                contentDescription = "删除",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = Color(0xFFE5484D),
                                 modifier = Modifier.size(24.dp)
                             )
@@ -307,13 +308,13 @@ fun LibraryScreen(
                             selectedIds = emptySet()
                             selectionMode = false
                         }) {
-                            Text(text = "取消", fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
+                            Text(text = stringResource(R.string.common_cancel), fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
                         }
                     } else {
                         IconButton(onClick = { sortExpanded = !sortExpanded }) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Sort,
-                                contentDescription = "排序",
+                                contentDescription = stringResource(R.string.common_sort),
                                 tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -333,7 +334,7 @@ fun LibraryScreen(
                     IconButton(onClick = { searchExpanded = !searchExpanded }) {
                         Icon(
                             imageVector = MiuixIcons.Basic.Search,
-                            contentDescription = "搜索",
+                            contentDescription = stringResource(R.string.common_search),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -401,7 +402,7 @@ fun LibraryScreen(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
                 onSearch = { searchExpanded = false },
-                placeholder = "搜索歌曲、艺术家或专辑",
+                placeholder = stringResource(R.string.library_search_placeholder),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 4.dp)

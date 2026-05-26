@@ -131,6 +131,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -319,11 +320,11 @@ fun PlayerScreen(
         scope.launch {
             settingsManager.setAudioVisualizerEnabled(granted)
         }
-        if (!granted) Toast.makeText(context, "需要录音权限才能开启音频可视化", Toast.LENGTH_SHORT).show()
+        if (!granted) Toast.makeText(context, context.getString(R.string.player_need_record_audio_permission), Toast.LENGTH_SHORT).show()
     }
     fun setAudioVisualizerEnabled(enabled: Boolean) {
         if (enabled && !immersiveAlbumCover) {
-            Toast.makeText(context, "沉浸封面模式下才能使用可视化", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.player_visualizer_immersive_only), Toast.LENGTH_SHORT).show()
             return
         }
         if (enabled && !hasVisualizerPermission) {
@@ -430,14 +431,14 @@ fun PlayerScreen(
             .filterNot { it.equals("Unknown", ignoreCase = true) }
             .distinctBy { it.tagIdentityKey() }
         when (artists.size) {
-            0 -> Toast.makeText(context, "这首歌没有可跳转的歌手信息", Toast.LENGTH_SHORT).show()
+            0 -> Toast.makeText(context, context.getString(R.string.player_no_artist_jump), Toast.LENGTH_SHORT).show()
             1 -> onNavigateToArtist(artists.first())
             else -> artistChoices = artists
         }
     }
     fun openNetease(url: String?) {
         if (url.isNullOrBlank()) {
-            Toast.makeText(context, "没有可跳转的网易云信息", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.player_no_netease_jump), Toast.LENGTH_SHORT).show()
         } else {
             uriHandler.openUri(url)
         }
@@ -536,7 +537,7 @@ fun PlayerScreen(
                 menuExpanded = false
                 val albumId = song?.albumIdentityId() ?: 0L
                 if (albumId > 0L) onNavigateToAlbum(albumId)
-                else Toast.makeText(context, "这首歌没有可跳转的专辑信息", Toast.LENGTH_SHORT).show()
+                else Toast.makeText(context, context.getString(R.string.player_no_album_jump), Toast.LENGTH_SHORT).show()
             },
             onArtist = {
                 menuExpanded = false
@@ -547,7 +548,7 @@ fun PlayerScreen(
                 val current = song
                 if (current != null) {
                     enqueuePlayerDownload(context, current)
-                    Toast.makeText(context, "已开始下载到 Music/Ella", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.player_download_started), Toast.LENGTH_SHORT).show()
                 }
             },
             onLandscape = {
@@ -561,7 +562,7 @@ fun PlayerScreen(
             onShareSong = {
                 val current = song
                 if (current != null) shareLocalSong(context, current)
-                else Toast.makeText(context, "当前没有可分享的歌曲", Toast.LENGTH_SHORT).show()
+                else Toast.makeText(context, context.getString(R.string.player_no_share_song), Toast.LENGTH_SHORT).show()
             },
             onOpenTimer = {
                 actionMenuInitialPage = PlayerActionSheetPage.Timer
@@ -588,7 +589,7 @@ fun PlayerScreen(
                 playerViewModel.setStopAfterCurrentEnabled(it)
                 Toast.makeText(
                     context,
-                    if (it) "当前歌曲播放完后暂停" else "已关闭播完当前暂停",
+                    if (it) context.getString(R.string.player_pause_after_current_on) else context.getString(R.string.player_pause_after_current_off),
                     Toast.LENGTH_SHORT
                 ).show()
             },
@@ -598,14 +599,14 @@ fun PlayerScreen(
                     playerViewModel.setStopAfterCurrentEnabled(true)
                 }
                 playerViewModel.startSleepTimer(minutes)
-                Toast.makeText(context, "${minutes} 分钟后暂停播放", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.player_sleep_timer_minutes, minutes), Toast.LENGTH_SHORT).show()
             },
             onCustomTimerMinutes = { minutes ->
                 scope.launch { settingsManager.setSleepTimerCustomMinutes(minutes) }
             },
             onCancelTimer = {
                 playerViewModel.cancelSleepTimer()
-                Toast.makeText(context, "已取消定时播放", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.player_sleep_timer_cancelled), Toast.LENGTH_SHORT).show()
             },
             onSpeed = { playerViewModel.setPlaybackSpeed(it) },
             onPitch = { playerViewModel.setPlaybackPitch(it) },
@@ -688,7 +689,7 @@ fun PlayerScreen(
             onAlbum = {
                 val albumId = song?.albumIdentityId() ?: 0L
                 if (albumId > 0L) onNavigateToAlbum(albumId)
-                else Toast.makeText(context, "这首歌没有可跳转的专辑信息", Toast.LENGTH_SHORT).show()
+                else Toast.makeText(context, context.getString(R.string.player_no_album_jump), Toast.LENGTH_SHORT).show()
             },
             onComposer = { name -> onNavigateToMetadataCategory("composer", name) },
             onLyricist = { name -> onNavigateToMetadataCategory("lyricist", name) },
@@ -889,7 +890,7 @@ fun PlayerScreen(
                 WindowBottomSheet(
                     show = true,
                     enableNestedScroll = false,
-                    title = "歌曲信息",
+                title = stringResource(R.string.player_song_info),
                     onDismissRequest = { songInfoExpanded = false }
                 ) {
                     SongInfoSheet(
@@ -1345,7 +1346,7 @@ private fun CoverPlayerPage(
             WindowBottomSheet(
                 show = true,
                 enableNestedScroll = false,
-                title = "更多操作",
+                title = stringResource(R.string.player_more_actions),
                 onDismissRequest = onDismissMenu
             ) {
                 PlayerActionMenu(
@@ -1727,7 +1728,7 @@ private fun LyricsPlayerPage(
             WindowBottomSheet(
                 show = true,
                 enableNestedScroll = false,
-                title = "歌词显示",
+                title = stringResource(R.string.player_lyrics_display),
                 onDismissRequest = { lyricMenuExpanded = false }
             ) {
                 LyricActionMenu(
@@ -2569,7 +2570,7 @@ private fun LandscapeTransportControls(
         PlayerTransportIconButton(onClick = onPrevious) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_previous),
-                contentDescription = "上一首",
+                contentDescription = stringResource(R.string.common_previous),
                 tint = Color.White.copy(alpha = 0.92f),
                 modifier = Modifier.size(28.dp)
             )
@@ -2591,7 +2592,7 @@ private fun LandscapeTransportControls(
         PlayerTransportIconButton(onClick = onNext) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_next),
-                contentDescription = "下一首",
+                contentDescription = stringResource(R.string.common_next),
                 tint = Color.White.copy(alpha = 0.92f),
                 modifier = Modifier.size(28.dp)
             )
@@ -2918,7 +2919,7 @@ private fun openSystemOutputSwitcher(context: Context) {
         if (shown) return
     }
 
-    Toast.makeText(context, "当前系统不支持直接打开媒体输出面板，已跳转到蓝牙设置", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, context.getString(R.string.player_media_output_unsupported), Toast.LENGTH_SHORT).show()
     runCatching {
         context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }.onFailure {
@@ -2957,7 +2958,7 @@ private fun PlayerTransportControls(
         PlayerTransportIconButton(onClick = onPrevious) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_previous),
-                contentDescription = "上一首",
+                contentDescription = stringResource(R.string.common_previous),
                 tint = Color.White.copy(alpha = 0.92f),
                 modifier = Modifier.size(38.dp)
             )
@@ -2979,7 +2980,7 @@ private fun PlayerTransportControls(
         PlayerTransportIconButton(onClick = onNext) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_next),
-                contentDescription = "下一首",
+                contentDescription = stringResource(R.string.common_next),
                 tint = Color.White.copy(alpha = 0.92f),
                 modifier = Modifier.size(38.dp)
             )
@@ -3033,7 +3034,7 @@ private fun CenteredPlayPauseGlyph(
 ) {
     Icon(
         painter = painterResource(id = if (isPlaying) R.drawable.ic_player_pause else R.drawable.ic_player_play),
-        contentDescription = if (isPlaying) "暂停" else "播放",
+        contentDescription = if (isPlaying) stringResource(R.string.common_pause) else stringResource(R.string.common_play),
         tint = tint,
         modifier = modifier
     )
@@ -4305,19 +4306,19 @@ private fun PlayerActionMenu(
     ) {
         when (page) {
             PlayerActionSheetPage.Main -> {
-                PlayerActionMenuItem("横屏歌词", onLandscape)
-                PlayerActionMenuItem("查看专辑页", onAlbum)
-                PlayerActionMenuItem("查看歌手页", onArtist)
-                PlayerActionMenuItem("查看歌曲信息", onSongInfo)
-                PlayerActionMenuItem("编辑元数据", { openEditorPage(TagEditorOptionKind.Metadata, metadataEditorId) })
-                PlayerActionMenuItem("歌词打轴", { openEditorPage(TagEditorOptionKind.LyricTiming, lyricTimingEditorId) })
+                PlayerActionMenuItem(stringResource(R.string.player_landscape_lyrics), onLandscape)
+                PlayerActionMenuItem(stringResource(R.string.player_view_album), onAlbum)
+                PlayerActionMenuItem(stringResource(R.string.player_view_artist), onArtist)
+                PlayerActionMenuItem(stringResource(R.string.player_song_info), onSongInfo)
+                PlayerActionMenuItem(stringResource(R.string.player_edit_metadata), { openEditorPage(TagEditorOptionKind.Metadata, metadataEditorId) })
+                PlayerActionMenuItem(stringResource(R.string.player_lyric_timing), { openEditorPage(TagEditorOptionKind.LyricTiming, lyricTimingEditorId) })
                 if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
-                    PlayerActionMenuItem("下载 LX 歌曲", onDownload)
+                    PlayerActionMenuItem(stringResource(R.string.player_download_lx_song), onDownload)
                 }
-                PlayerActionMenuItem("定时关闭", { page = PlayerActionSheetPage.Timer })
-                PlayerActionMenuItem("变速变调", { page = PlayerActionSheetPage.Speed })
+                PlayerActionMenuItem(stringResource(R.string.player_sleep_timer), { page = PlayerActionSheetPage.Timer })
+                PlayerActionMenuItem(stringResource(R.string.player_speed_pitch), { page = PlayerActionSheetPage.Speed })
                 if (visualizerAvailable) {
-                    PlayerActionMenuItem("可视化设置", { page = PlayerActionSheetPage.Visualizer })
+                    PlayerActionMenuItem(stringResource(R.string.player_visualizer_settings), { page = PlayerActionSheetPage.Visualizer })
                 }
             }
             PlayerActionSheetPage.Timer -> {
