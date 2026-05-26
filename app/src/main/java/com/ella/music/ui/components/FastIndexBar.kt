@@ -21,6 +21,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.floor
 import kotlin.math.max
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -117,6 +120,7 @@ fun LazyListScrollIndicator(
     state: LazyListState,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
     val info by remember {
         derivedStateOf {
             val layoutInfo = state.layoutInfo
@@ -126,7 +130,13 @@ fun LazyListScrollIndicator(
             Triple(first, visible, total)
         }
     }
-    ScrollIndicator(firstVisibleIndex = info.first, visibleCount = info.second, totalCount = info.third, modifier = modifier)
+    ScrollIndicator(
+        firstVisibleIndex = info.first,
+        visibleCount = info.second,
+        totalCount = info.third,
+        modifier = modifier,
+        onDragToIndex = { index -> scope.launch { state.scrollToItem(index) } }
+    )
 }
 
 @Composable
@@ -134,6 +144,7 @@ fun LazyGridScrollIndicator(
     state: LazyGridState,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
     val info by remember {
         derivedStateOf {
             val layoutInfo = state.layoutInfo
@@ -143,7 +154,13 @@ fun LazyGridScrollIndicator(
             Triple(first, visible, total)
         }
     }
-    ScrollIndicator(firstVisibleIndex = info.first, visibleCount = info.second, totalCount = info.third, modifier = modifier)
+    ScrollIndicator(
+        firstVisibleIndex = info.first,
+        visibleCount = info.second,
+        totalCount = info.third,
+        modifier = modifier,
+        onDragToIndex = { index -> scope.launch { state.scrollToItem(index) } }
+    )
 }
 
 @Composable
@@ -151,17 +168,45 @@ private fun ScrollIndicator(
     firstVisibleIndex: Int,
     visibleCount: Int,
     totalCount: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDragToIndex: ((Int) -> Unit)? = null
 ) {
     if (totalCount <= 0 || visibleCount <= 0 || totalCount <= visibleCount) return
     val visibleFraction = (visibleCount.toFloat() / totalCount.toFloat()).coerceIn(0.08f, 1f)
     val maxFirst = max(1, totalCount - visibleCount)
     val offsetFraction = (firstVisibleIndex.toFloat() / maxFirst.toFloat()).coerceIn(0f, 1f)
+    var trackHeightPx by remember(totalCount, visibleCount) { mutableStateOf(1) }
+
+    fun dragTo(y: Float) {
+        val targetIndex = ((y.coerceIn(0f, trackHeightPx.toFloat()) / trackHeightPx.toFloat()) * maxFirst)
+            .roundToInt()
+            .coerceIn(0, maxFirst)
+        onDragToIndex?.invoke(targetIndex)
+    }
+
     BoxWithConstraints(
         modifier = modifier
-            .width(12.dp)
+            .width(24.dp)
             .fillMaxHeight()
             .padding(horizontal = 4.dp, vertical = 28.dp)
+            .onSizeChanged { trackHeightPx = it.height.coerceAtLeast(1) }
+            .pointerInput(totalCount, visibleCount, maxFirst, onDragToIndex) {
+                if (onDragToIndex == null) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    dragTo(down.position.y)
+                    down.consume()
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+                        if (change.changedToUpIgnoreConsumed()) break
+                        if (change.pressed) {
+                            dragTo(change.position.y)
+                            change.consume()
+                        }
+                    }
+                }
+            }
     ) {
         val thumbHeight = maxHeight * visibleFraction
         val thumbOffset = (maxHeight - thumbHeight) * offsetFraction
