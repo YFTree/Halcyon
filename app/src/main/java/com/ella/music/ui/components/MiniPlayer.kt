@@ -178,10 +178,18 @@ fun MiniPlayer(
                                 drawRect(glassSurface)
                             }
                         )
+                        .liquidGlassDepthOverlay(
+                            enabled = glassEffect == BottomBarGlassEffect.LiquidGlass,
+                            isLight = isLight
+                        )
                 } else if (useGlassLayout) {
                     Modifier
                         .clip(shape)
                         .background(glassSurface, shape)
+                        .liquidGlassDepthOverlay(
+                            enabled = glassEffect == BottomBarGlassEffect.LiquidGlass,
+                            isLight = isLight
+                        )
                 } else {
                     Modifier.background(surfaceContainer)
                 }

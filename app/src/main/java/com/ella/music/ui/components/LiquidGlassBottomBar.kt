@@ -92,6 +92,10 @@ fun LiquidGlassBottomBar(
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .clip(shape)
             .then(glassModifier)
+            .liquidGlassDepthOverlay(
+                enabled = glassEffect == BottomBarGlassEffect.LiquidGlass,
+                isLight = isLight
+            )
             .height(64.dp)
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

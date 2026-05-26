@@ -66,7 +66,11 @@ fun GlassPill(
     Box(
         modifier = modifier
             .clip(shape)
-            .then(glassModifier),
+            .then(glassModifier)
+            .liquidGlassDepthOverlay(
+                enabled = glassEffect == BottomBarGlassEffect.LiquidGlass,
+                isLight = isLight
+            ),
         content = content
     )
 }
