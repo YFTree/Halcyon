@@ -441,7 +441,13 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     fun toggleShuffle() {
-        mediaController?.shuffleModeEnabled = !(mediaController?.shuffleModeEnabled ?: false)
+        mediaController?.let { controller ->
+            val enableShuffle = !controller.shuffleModeEnabled
+            controller.shuffleModeEnabled = enableShuffle
+            if (enableShuffle && controller.repeatMode != Player.REPEAT_MODE_ALL) {
+                controller.repeatMode = Player.REPEAT_MODE_ALL
+            }
+        }
         savePlaybackQueue(force = true)
     }
 
@@ -459,7 +465,36 @@ class ExoPlayerManager(private val context: Context) {
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
         }
+        if (next != Player.REPEAT_MODE_ALL && mediaController?.shuffleModeEnabled == true) {
+            mediaController?.shuffleModeEnabled = false
+        }
         mediaController?.repeatMode = next
+        savePlaybackQueue(force = true)
+    }
+
+    fun cyclePlaybackMode() {
+        val controller = mediaController ?: return
+        when {
+            controller.shuffleModeEnabled -> {
+                controller.shuffleModeEnabled = false
+                controller.repeatMode = Player.REPEAT_MODE_OFF
+            }
+
+            controller.repeatMode == Player.REPEAT_MODE_OFF -> {
+                controller.shuffleModeEnabled = false
+                controller.repeatMode = Player.REPEAT_MODE_ALL
+            }
+
+            controller.repeatMode == Player.REPEAT_MODE_ALL -> {
+                controller.shuffleModeEnabled = false
+                controller.repeatMode = Player.REPEAT_MODE_ONE
+            }
+
+            else -> {
+                controller.repeatMode = Player.REPEAT_MODE_ALL
+                controller.shuffleModeEnabled = true
+            }
+        }
         savePlaybackQueue(force = true)
     }
 

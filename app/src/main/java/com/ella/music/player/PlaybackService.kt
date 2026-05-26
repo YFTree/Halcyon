@@ -333,21 +333,21 @@ class PlaybackService : MediaLibraryService() {
         when {
             shuffleModeEnabled -> {
                 shuffleModeEnabled = false
-                if (repeatMode != Player.REPEAT_MODE_OFF) {
-                    repeatMode = Player.REPEAT_MODE_OFF
-                }
+                repeatMode = Player.REPEAT_MODE_OFF
             }
 
             repeatMode == Player.REPEAT_MODE_OFF -> {
+                shuffleModeEnabled = false
                 repeatMode = Player.REPEAT_MODE_ALL
             }
 
             repeatMode == Player.REPEAT_MODE_ALL -> {
+                shuffleModeEnabled = false
                 repeatMode = Player.REPEAT_MODE_ONE
             }
 
             else -> {
-                repeatMode = Player.REPEAT_MODE_OFF
+                repeatMode = Player.REPEAT_MODE_ALL
                 shuffleModeEnabled = true
             }
         }

@@ -764,26 +764,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun cyclePlaybackMode() {
-        val shuffle = shuffleEnabled.value
-        val repeat = repeatMode.value
-        when {
-            shuffle -> {
-                playerManager.toggleShuffle()
-                if (repeat != androidx.media3.common.Player.REPEAT_MODE_OFF) {
-                    playerManager.toggleRepeat()
-                }
-            }
-            repeat == androidx.media3.common.Player.REPEAT_MODE_OFF -> {
-                playerManager.toggleRepeat()
-            }
-            repeat == androidx.media3.common.Player.REPEAT_MODE_ALL -> {
-                playerManager.toggleRepeat()
-            }
-            else -> {
-                playerManager.toggleRepeat()
-                playerManager.toggleShuffle()
-            }
-        }
+        playerManager.cyclePlaybackMode()
     }
 
     fun getCoverArtBitmap(song: Song) = repository.getCoverArtBitmap(song, 1200, CoverUsage.Player)
