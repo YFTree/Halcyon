@@ -553,7 +553,13 @@ class ExoPlayerManager(private val context: Context) {
             return
         }
 
-        val metadata = song.mediaMetadata(displayTitle, displayArtist, notificationArtworkCache.get(song.notificationArtworkKey()))
+        val cachedArtwork = notificationArtworkCache.get(song.notificationArtworkKey())
+        val metadata = song.mediaMetadata(
+            titleOverride = displayTitle,
+            artistOverride = displayArtist,
+            artworkData = cachedArtwork,
+            includeArtworkUri = cachedArtwork != null
+        )
 
         val newItem = currentItem.buildUpon()
             .setMediaMetadata(metadata)
@@ -627,10 +633,16 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     private fun songToMediaItem(song: Song): MediaItem {
+        val cachedArtwork = notificationArtworkCache.get(song.notificationArtworkKey())
         val builder = MediaItem.Builder()
             .setUri(song.playbackUri())
             .setMediaId(song.id.toString())
-            .setMediaMetadata(song.mediaMetadata())
+            .setMediaMetadata(
+                song.mediaMetadata(
+                    artworkData = cachedArtwork,
+                    includeArtworkUri = cachedArtwork != null
+                )
+            )
 
         if (song.mimeType.isNotBlank()) {
             builder.setMimeType(song.mimeType)
@@ -656,7 +668,8 @@ class ExoPlayerManager(private val context: Context) {
     private fun Song.mediaMetadata(
         titleOverride: CharSequence? = null,
         artistOverride: CharSequence? = null,
-        artworkData: ByteArray? = null
+        artworkData: ByteArray? = null,
+        includeArtworkUri: Boolean = true
     ): MediaMetadata {
         val extras = toMediaItemExtras().apply {
             putString(EXTRA_ONLINE_SOURCE, onlineSource)
@@ -680,7 +693,9 @@ class ExoPlayerManager(private val context: Context) {
                 if (artworkData != null) {
                     setArtworkData(artworkData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
                 }
-                artworkUriForMediaCenter()?.let(::setArtworkUri)
+                if (includeArtworkUri) {
+                    artworkUriForMediaCenter()?.let(::setArtworkUri)
+                }
             }
             .build()
     }
@@ -724,11 +739,17 @@ class ExoPlayerManager(private val context: Context) {
         if (!currentItem.matchesSong(song)) return
 
         runCatching {
+            val cachedArtwork = notificationArtworkCache.get(song.notificationArtworkKey())
             sessionMetadataSongId = song.id
             controller.replaceMediaItem(
                 index,
                 currentItem.buildUpon()
-                    .setMediaMetadata(song.mediaMetadata(artworkData = notificationArtworkCache.get(song.notificationArtworkKey())))
+                    .setMediaMetadata(
+                        song.mediaMetadata(
+                            artworkData = cachedArtwork,
+                            includeArtworkUri = cachedArtwork != null
+                        )
+                    )
                     .build()
             )
             Log.d(TIMING_TAG, "base metadata updated mediaId=${song.id}")
