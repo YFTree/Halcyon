@@ -274,11 +274,6 @@ fun EllaApp(
     val playerVisibleState = remember { MutableTransitionState(false) }
     playerVisibleState.targetState = showPlayerOverlay
     val isPlayerExitAnimating = !playerVisibleState.targetState && playerVisibleState.currentState
-    LaunchedEffect(isPlayerExitAnimating) {
-        if (isPlayerExitAnimating && playerDismissProgress < 0.01f) {
-            playerDismissProgress = 1f
-        }
-    }
     val isPlayerVisible = showPlayerOverlay || currentRoute == Screen.Player.route
     val libraryCacheLoaded by mainViewModel.libraryCacheLoaded.collectAsState()
     val initialScanPromptHandled by settingsManager.initialScanPromptHandled.collectAsState(initial = true)
