@@ -20,7 +20,6 @@
     <queries>
         <package android:name="com.lonx.lyrico" />
         <package android:name="com.example.LyricBox" />
-        <package android:name="com.example.lyricbox" />
         <package android:name="com.xjcheng.musictageditor" />
         <package android:name="com.andrewkhandr.aspectpro" />
         <intent>

@@ -783,6 +783,7 @@ private fun SimpleBackgroundLyricBlock(
             text = line.backgroundText.orEmpty().lineBreakSafeText(),
             fontSize = if (isActive) 14.sp else 12.sp,
             fontFamily = fontFamily,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
             color = textColor.copy(alpha = 0.56f),
             textAlign = backgroundTextAlign,
             modifier = lineModifier.padding(top = 2.dp)
@@ -834,7 +835,7 @@ private fun WordBackgroundLyricBlock(
                         textAlign = backgroundTextAlign,
                         fontSizeSp = fittedLyricFontSp(line.backgroundText.orEmpty(), scaledLyricFontSp(22, fontScale, minSp = 8), minSp = 8),
                         fontFamily = fontFamily,
-                        fontWeight = fontWeight.softenedLyricWeight(),
+                        fontWeight = fontWeight,
                         currentColor = Color.White.copy(alpha = 0.78f),
                         sungColor = Color.White.copy(alpha = 0.58f),
                         pendingColor = Color.White.copy(alpha = 0.36f),
@@ -846,7 +847,7 @@ private fun WordBackgroundLyricBlock(
                         text = line.backgroundText.orEmpty().lineBreakSafeText(),
                         fontSize = fittedLyricFontSp(line.backgroundText.orEmpty(), scaledLyricFontSp(if (isActive) 22 else 13, fontScale, minSp = 8), minSp = 8).sp,
                         fontFamily = fontFamily,
-                        fontWeight = fontWeight.softenedLyricWeight(),
+                        fontWeight = if (isActive) fontWeight else fontWeight.softenedLyricWeight(),
                         color = backgroundColor,
                         textAlign = backgroundTextAlign,
                         maxLines = if (isActive) 3 else 2,
@@ -1109,4 +1110,3 @@ private fun Char.isCjk(): Boolean {
         block == Character.UnicodeBlock.HANGUL_JAMO ||
         block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
 }
-

@@ -502,8 +502,8 @@ private fun Int.darkenForShare(factor: Float): Int {
 private fun lyricShareFooter(customInfo: String): String {
     val normalized = customInfo.trim().removePrefix("@").trim()
     return if (normalized.isBlank()) {
-        "Via Ella"
+        "via Ella Music"
     } else {
-        "Via @$normalized"
+        "via @$normalized"
     }
 }
