@@ -549,20 +549,24 @@ fun EllaApp(
                 playerViewModel = playerViewModel,
                 onBack = {
                     playerViewModel.setShowLyrics(false)
+                    playerDismissProgress = 1f
                     showPlayerOverlay = false
                 },
                 onNavigateToAlbum = { albumId ->
                     playerViewModel.setShowLyrics(false)
+                    playerDismissProgress = 1f
                     showPlayerOverlay = false
                     navController.navigate(Screen.AlbumDetail.createRoute(albumId))
                 },
                 onNavigateToArtist = { artistName ->
                     playerViewModel.setShowLyrics(false)
+                    playerDismissProgress = 1f
                     showPlayerOverlay = false
                     navController.navigate(Screen.ArtistDetail.createRoute(artistName))
                 },
                 onNavigateToMetadataCategory = { type, name ->
                     playerViewModel.setShowLyrics(false)
+                    playerDismissProgress = 1f
                     showPlayerOverlay = false
                     navController.navigate(Screen.MetadataCategoryDetail.createRoute(type, name))
                 },
