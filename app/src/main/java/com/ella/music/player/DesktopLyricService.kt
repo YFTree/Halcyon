@@ -209,7 +209,6 @@ class DesktopLyricService : Service() {
             addIconControl(R.drawable.ic_skip_next, getString(R.string.desktop_lyric_next)) { controller?.seekToNext() }
             addControl("A-", getString(R.string.desktop_lyric_smaller)) { updateFontScale(-0.08f) }
             addControl("A+", getString(R.string.desktop_lyric_larger)) { updateFontScale(0.08f) }
-            addIconControl(R.drawable.ic_desktop_pin_top, getString(R.string.desktop_lyric_pin_status_bar)) { snapToStatusBar() }
             addIconControl(R.drawable.ic_desktop_palette, getString(R.string.desktop_lyric_cycle_color)) { cycleTextColor() }
             addIconControl(R.drawable.ic_desktop_lock, getString(R.string.desktop_lyric_lock)) { setLocked(true) }
             addControl("×", getString(R.string.desktop_lyric_close)) { closeByUser() }
@@ -1118,17 +1117,11 @@ class DesktopLyricService : Service() {
             )
 
         private fun ttmlAlignForPrimary(): AnchorAlign {
-            if (agent.isBlank()) {
-                return if (isTtml && backgroundText.isBlank() && backgroundWords.isEmpty()) AnchorAlign.Center else AnchorAlign.Left
-            }
-            return if (agent.equals("v2", ignoreCase = true)) AnchorAlign.Right else AnchorAlign.Left
+            return AnchorAlign.Center
         }
 
         private fun ttmlAlignForBackground(): AnchorAlign {
-            if (agent.isBlank()) {
-                return if (isTtml && backgroundText.isBlank() && backgroundWords.isEmpty()) AnchorAlign.Center else AnchorAlign.Left
-            }
-            return if (agent.equals("v2", ignoreCase = true)) AnchorAlign.Right else AnchorAlign.Left
+            return AnchorAlign.Center
         }
     }
 

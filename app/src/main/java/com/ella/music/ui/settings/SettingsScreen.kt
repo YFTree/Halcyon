@@ -519,6 +519,7 @@ fun SettingsDetailScreen(
     val lyricGetterEnabled by settingsManager.lyricGetterEnabled.collectAsState(initial = false)
     val bluetoothLyricEnabled by settingsManager.bluetoothLyricEnabled.collectAsState(initial = false)
     val bluetoothLyricTranslation by settingsManager.bluetoothLyricTranslation.collectAsState(initial = false)
+    val bluetoothLyricPronunciation by settingsManager.bluetoothLyricPronunciation.collectAsState(initial = false)
     val miniPlayerLyricTranslation by settingsManager.miniPlayerLyricTranslation.collectAsState(initial = true)
     val miniPlayerCoverRotation by settingsManager.miniPlayerCoverRotation.collectAsState(initial = true)
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
@@ -1114,7 +1115,10 @@ fun SettingsDetailScreen(
                         checked = lyriconTranslation,
                         onCheckedChange = { enabled ->
                             playerViewModel?.setLyriconTranslation(enabled)
-                                ?: scope.launch { settingsManager.setLyriconTranslation(enabled) }
+                                ?: scope.launch {
+                                    settingsManager.setLyriconTranslation(enabled)
+                                    if (enabled) settingsManager.setLyriconPronunciation(false)
+                                }
                         }
                     )
 
@@ -1125,7 +1129,10 @@ fun SettingsDetailScreen(
                         checked = lyriconPronunciation,
                         onCheckedChange = { enabled ->
                             playerViewModel?.setLyriconPronunciation(enabled)
-                                ?: scope.launch { settingsManager.setLyriconPronunciation(enabled) }
+                                ?: scope.launch {
+                                    settingsManager.setLyriconPronunciation(enabled)
+                                    if (enabled) settingsManager.setLyriconTranslation(false)
+                                }
                         }
                     )
 
@@ -1420,7 +1427,10 @@ fun SettingsDetailScreen(
                         checked = superLyricTranslation,
                         onCheckedChange = { enabled ->
                             playerViewModel?.setSuperLyricTranslation(enabled)
-                                ?: scope.launch { settingsManager.setSuperLyricTranslation(enabled) }
+                                ?: scope.launch {
+                                    settingsManager.setSuperLyricTranslation(enabled)
+                                    if (enabled) settingsManager.setSuperLyricPronunciation(false)
+                                }
                         }
                     )
 
@@ -1431,7 +1441,10 @@ fun SettingsDetailScreen(
                         checked = superLyricPronunciation,
                         onCheckedChange = { enabled ->
                             playerViewModel?.setSuperLyricPronunciation(enabled)
-                                ?: scope.launch { settingsManager.setSuperLyricPronunciation(enabled) }
+                                ?: scope.launch {
+                                    settingsManager.setSuperLyricPronunciation(enabled)
+                                    if (enabled) settingsManager.setSuperLyricTranslation(false)
+                                }
                         }
                     )
 
@@ -1491,7 +1504,10 @@ fun SettingsDetailScreen(
                         checked = samsungFloatingLyricTranslation && !tickerHideNotification,
                         onCheckedChange = { enabled ->
                             playerViewModel?.setSamsungFloatingLyricTranslation(enabled)
-                                ?: scope.launch { settingsManager.setSamsungFloatingLyricTranslation(enabled) }
+                                ?: scope.launch {
+                                    settingsManager.setSamsungFloatingLyricTranslation(enabled)
+                                    if (enabled) settingsManager.setStatusBarAllowPhonetic(false)
+                                }
                         }
                     )
 
@@ -1502,7 +1518,10 @@ fun SettingsDetailScreen(
                         checked = statusBarAllowPhonetic,
                         onCheckedChange = { enabled ->
                             playerViewModel?.setStatusBarAllowPhonetic(enabled)
-                                ?: scope.launch { settingsManager.setStatusBarAllowPhonetic(enabled) }
+                                ?: scope.launch {
+                                    settingsManager.setStatusBarAllowPhonetic(enabled)
+                                    if (enabled) settingsManager.setSamsungFloatingLyricTranslation(false)
+                                }
                         }
                     )
 
@@ -1523,7 +1542,24 @@ fun SettingsDetailScreen(
                         checked = bluetoothLyricTranslation,
                         onCheckedChange = { enabled ->
                             playerViewModel?.setBluetoothLyricTranslation(enabled)
-                                ?: scope.launch { settingsManager.setBluetoothLyricTranslation(enabled) }
+                                ?: scope.launch {
+                                    settingsManager.setBluetoothLyricTranslation(enabled)
+                                    if (enabled) settingsManager.setBluetoothLyricPronunciation(false)
+                                }
+                        }
+                    )
+
+                    SwitchPreference(
+                        title = "车载歌词传递注音",
+                        summary = "开启后用当前歌词注音/罗马音替换媒体歌手行。",
+                        enabled = bluetoothLyricEnabled,
+                        checked = bluetoothLyricPronunciation,
+                        onCheckedChange = { enabled ->
+                            playerViewModel?.setBluetoothLyricPronunciation(enabled)
+                                ?: scope.launch {
+                                    settingsManager.setBluetoothLyricPronunciation(enabled)
+                                    if (enabled) settingsManager.setBluetoothLyricTranslation(false)
+                                }
                         }
                     )
                     }

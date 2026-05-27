@@ -704,7 +704,7 @@ fun PlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(palette.middle)
+            .background(Color.Transparent)
             .pointerInput(showLyrics, dismissingPlayer, dismissTargetPx, dismissThresholdPx) {
                 var closeGesture = false
                 var gestureOffset = 0f
@@ -775,13 +775,11 @@ fun PlayerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    val progress = (dragDismissOffset.value / dismissThresholdPx).coerceIn(0f, 1f)
                     translationY = dragDismissOffset.value
-                    val pageScale = if (immersiveAlbumCover) 1f - progress * 0.06f else 1f
-                    scaleX = pageScale
-                    scaleY = pageScale
+                    scaleX = 1f
+                    scaleY = 1f
                     transformOrigin = TransformOrigin(0.5f, 0f)
-                    alpha = (1f - progress * 0.18f).coerceIn(0.82f, 1f)
+                    alpha = 1f
                 }
                 .clip(
                     RoundedCornerShape(

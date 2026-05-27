@@ -93,7 +93,6 @@
     <string name="desktop_lyric_next">Next</string>
     <string name="desktop_lyric_smaller">Decrease lyric size</string>
     <string name="desktop_lyric_larger">Increase lyric size</string>
-    <string name="desktop_lyric_pin_status_bar">Pin to status bar</string>
     <string name="desktop_lyric_cycle_color">Change color</string>
     <string name="desktop_lyric_lock">Lock</string>
     <string name="desktop_lyric_close">Close</string>

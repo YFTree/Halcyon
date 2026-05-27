@@ -105,11 +105,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private var bluetoothLyricEnabled = false
     private var bluetoothLyricTranslationEnabled = false
+    private var bluetoothLyricPronunciationEnabled = false
+    private var lyriconTranslationEnabled = true
+    private var lyriconPronunciationEnabled = false
     private var samsungFloatingLyricTranslationEnabled = false
     private var statusBarAllowPhoneticEnabled = false
     private var tickerHideNotificationEnabled = false
     private var desktopLyricHideWhenPausedEnabled = false
     private var superLyricTranslationEnabled = true
+    private var superLyricPronunciationEnabled = false
     private var lyricSourceMode = SettingsManager.LYRIC_SOURCE_AUTO
     private var appliedDecoderMode: Int? = null
     private var appliedAudioFocusDisabled: Boolean? = null
@@ -147,15 +151,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun initLyricon() {
         viewModelScope.launch {
             val enabled = settingsManager.lyriconEnabled.first()
-            val translation = settingsManager.lyriconTranslation.first()
-            lyriconBridge.setDisplayTranslation(translation)
-            lyriconBridge.setAllowPhonetic(settingsManager.lyriconPronunciation.first())
+            lyriconTranslationEnabled = settingsManager.lyriconTranslation.first()
+            lyriconPronunciationEnabled = settingsManager.lyriconPronunciation.first()
+            if (lyriconTranslationEnabled && lyriconPronunciationEnabled) {
+                lyriconTranslationEnabled = false
+                settingsManager.setLyriconTranslation(false)
+            }
+            lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
             lyriconBridge.setEnabled(enabled)
             if (enabled) resendExternalLyrics()
         }
         viewModelScope.launch {
+            settingsManager.lyriconTranslation.distinctUntilChanged().collect { enabled ->
+                lyriconTranslationEnabled = enabled
+                if (enabled && lyriconPronunciationEnabled) {
+                    lyriconPronunciationEnabled = false
+                    settingsManager.setLyriconPronunciation(false)
+                }
+                lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
+                if (lyriconBridge.isEnabled()) resendExternalLyrics(force = true)
+            }
+        }
+        viewModelScope.launch {
             settingsManager.lyriconPronunciation.distinctUntilChanged().collect { enabled ->
-                lyriconBridge.setAllowPhonetic(enabled)
+                lyriconPronunciationEnabled = enabled
+                if (enabled && lyriconTranslationEnabled) {
+                    lyriconTranslationEnabled = false
+                    settingsManager.setLyriconTranslation(false)
+                }
+                lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
                 if (lyriconBridge.isEnabled()) resendExternalLyrics(force = true)
             }
         }
@@ -195,6 +219,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.samsungFloatingLyricTranslation.distinctUntilChanged().collect { enabled ->
                 samsungFloatingLyricTranslationEnabled = enabled && !tickerHideNotificationEnabled
+                if (samsungFloatingLyricTranslationEnabled && statusBarAllowPhoneticEnabled) {
+                    statusBarAllowPhoneticEnabled = false
+                    settingsManager.setStatusBarAllowPhonetic(false)
+                }
                 lastTickerPayload = null
                 if (tickerBridge.isEnabled()) resendTickerLyric()
             }
@@ -202,6 +230,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.statusBarAllowPhonetic.distinctUntilChanged().collect { enabled ->
                 statusBarAllowPhoneticEnabled = enabled
+                if (enabled && samsungFloatingLyricTranslationEnabled) {
+                    samsungFloatingLyricTranslationEnabled = false
+                    settingsManager.setSamsungFloatingLyricTranslation(false)
+                }
                 lastTickerPayload = null
                 if (tickerBridge.isEnabled()) resendTickerLyric(force = true)
             }
@@ -230,19 +262,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun initSuperLyric() {
         viewModelScope.launch {
             val enabled = settingsManager.superLyricEnabled.first()
-            superLyricBridge.setAllowPhonetic(settingsManager.superLyricPronunciation.first())
+            superLyricTranslationEnabled = settingsManager.superLyricTranslation.first()
+            superLyricPronunciationEnabled = settingsManager.superLyricPronunciation.first()
+            if (superLyricTranslationEnabled && superLyricPronunciationEnabled) {
+                superLyricTranslationEnabled = false
+                settingsManager.setSuperLyricTranslation(false)
+            }
+            superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
             superLyricBridge.setEnabled(enabled)
             if (enabled) resendSuperLyric()
         }
         viewModelScope.launch {
             settingsManager.superLyricTranslation.distinctUntilChanged().collect { enabled ->
                 superLyricTranslationEnabled = enabled
-                if (superLyricBridge.isEnabled()) resendSuperLyric()
+                if (enabled && superLyricPronunciationEnabled) {
+                    superLyricPronunciationEnabled = false
+                    settingsManager.setSuperLyricPronunciation(false)
+                }
+                superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
+                if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
             }
         }
         viewModelScope.launch {
             settingsManager.superLyricPronunciation.distinctUntilChanged().collect { enabled ->
-                superLyricBridge.setAllowPhonetic(enabled)
+                superLyricPronunciationEnabled = enabled
+                if (enabled && superLyricTranslationEnabled) {
+                    superLyricTranslationEnabled = false
+                    settingsManager.setSuperLyricTranslation(false)
+                }
+                superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
                 if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
             }
         }
@@ -257,7 +305,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun lyriconSecondaryMode(): LyriconBridge.SecondaryMode {
+        return when {
+            lyriconPronunciationEnabled -> LyriconBridge.SecondaryMode.Pronunciation
+            lyriconTranslationEnabled -> LyriconBridge.SecondaryMode.Translation
+            else -> LyriconBridge.SecondaryMode.Off
+        }
+    }
+
+    private fun superLyricSecondaryMode(): SuperLyricBridge.SecondaryMode {
+        return when {
+            superLyricPronunciationEnabled -> SuperLyricBridge.SecondaryMode.Pronunciation
+            superLyricTranslationEnabled -> SuperLyricBridge.SecondaryMode.Translation
+            else -> SuperLyricBridge.SecondaryMode.Off
+        }
+    }
+
     private fun initBluetoothLyric() {
+        viewModelScope.launch {
+            bluetoothLyricTranslationEnabled = settingsManager.bluetoothLyricTranslation.first()
+            bluetoothLyricPronunciationEnabled = settingsManager.bluetoothLyricPronunciation.first()
+            if (bluetoothLyricTranslationEnabled && bluetoothLyricPronunciationEnabled) {
+                bluetoothLyricTranslationEnabled = false
+                settingsManager.setBluetoothLyricTranslation(false)
+            }
+        }
         viewModelScope.launch {
             settingsManager.bluetoothLyricEnabled.distinctUntilChanged().collect { enabled ->
                 bluetoothLyricEnabled = enabled
@@ -273,8 +345,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.bluetoothLyricTranslation.distinctUntilChanged().collect { enabled ->
                 bluetoothLyricTranslationEnabled = enabled
+                if (enabled && bluetoothLyricPronunciationEnabled) {
+                    bluetoothLyricPronunciationEnabled = false
+                    settingsManager.setBluetoothLyricPronunciation(false)
+                }
                 lastBluetoothLyricPayload = null
-                if (bluetoothLyricEnabled) resendBluetoothLyric()
+                if (bluetoothLyricEnabled) resendBluetoothLyric(force = true)
+            }
+        }
+        viewModelScope.launch {
+            settingsManager.bluetoothLyricPronunciation.distinctUntilChanged().collect { enabled ->
+                bluetoothLyricPronunciationEnabled = enabled
+                if (enabled && bluetoothLyricTranslationEnabled) {
+                    bluetoothLyricTranslationEnabled = false
+                    settingsManager.setBluetoothLyricTranslation(false)
+                }
+                lastBluetoothLyricPayload = null
+                if (bluetoothLyricEnabled) resendBluetoothLyric(force = true)
             }
         }
     }
@@ -930,7 +1017,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun setLyriconTranslation(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setLyriconTranslation(enabled)
-            lyriconBridge.setDisplayTranslation(enabled)
+            lyriconTranslationEnabled = enabled
+            if (enabled && lyriconPronunciationEnabled) {
+                lyriconPronunciationEnabled = false
+                settingsManager.setLyriconPronunciation(false)
+            }
+            lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
+            if (lyriconBridge.isEnabled()) resendExternalLyrics(force = true)
         }
     }
 
@@ -973,6 +1066,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val safeEnabled = enabled && !tickerHideNotificationEnabled
             settingsManager.setSamsungFloatingLyricTranslation(safeEnabled)
             samsungFloatingLyricTranslationEnabled = safeEnabled
+            if (safeEnabled && statusBarAllowPhoneticEnabled) {
+                statusBarAllowPhoneticEnabled = false
+                settingsManager.setStatusBarAllowPhonetic(false)
+            }
             lastTickerPayload = null
             if (tickerBridge.isEnabled()) resendTickerLyric()
         }
@@ -982,6 +1079,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.setStatusBarAllowPhonetic(enabled)
             statusBarAllowPhoneticEnabled = enabled
+            if (enabled && samsungFloatingLyricTranslationEnabled) {
+                samsungFloatingLyricTranslationEnabled = false
+                settingsManager.setSamsungFloatingLyricTranslation(false)
+            }
             lastTickerPayload = null
             if (tickerBridge.isEnabled()) resendTickerLyric(force = true)
         }
@@ -990,7 +1091,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun setLyriconPronunciation(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setLyriconPronunciation(enabled)
-            lyriconBridge.setAllowPhonetic(enabled)
+            lyriconPronunciationEnabled = enabled
+            if (enabled && lyriconTranslationEnabled) {
+                lyriconTranslationEnabled = false
+                settingsManager.setLyriconTranslation(false)
+            }
+            lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
             if (lyriconBridge.isEnabled()) resendExternalLyrics(force = true)
         }
     }
@@ -1043,14 +1149,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.setSuperLyricTranslation(enabled)
             superLyricTranslationEnabled = enabled
-            if (superLyricBridge.isEnabled()) resendSuperLyric()
+            if (enabled && superLyricPronunciationEnabled) {
+                superLyricPronunciationEnabled = false
+                settingsManager.setSuperLyricPronunciation(false)
+            }
+            superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
+            if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
         }
     }
 
     fun setSuperLyricPronunciation(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setSuperLyricPronunciation(enabled)
-            superLyricBridge.setAllowPhonetic(enabled)
+            superLyricPronunciationEnabled = enabled
+            if (enabled && superLyricTranslationEnabled) {
+                superLyricTranslationEnabled = false
+                settingsManager.setSuperLyricTranslation(false)
+            }
+            superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
             if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
         }
     }
@@ -1073,8 +1189,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.setBluetoothLyricTranslation(enabled)
             bluetoothLyricTranslationEnabled = enabled
+            if (enabled && bluetoothLyricPronunciationEnabled) {
+                bluetoothLyricPronunciationEnabled = false
+                settingsManager.setBluetoothLyricPronunciation(false)
+            }
             lastBluetoothLyricPayload = null
-            if (bluetoothLyricEnabled) resendBluetoothLyric()
+            if (bluetoothLyricEnabled) resendBluetoothLyric(force = true)
+        }
+    }
+
+    fun setBluetoothLyricPronunciation(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsManager.setBluetoothLyricPronunciation(enabled)
+            bluetoothLyricPronunciationEnabled = enabled
+            if (enabled && bluetoothLyricTranslationEnabled) {
+                bluetoothLyricTranslationEnabled = false
+                settingsManager.setBluetoothLyricTranslation(false)
+            }
+            lastBluetoothLyricPayload = null
+            if (bluetoothLyricEnabled) resendBluetoothLyric(force = true)
         }
     }
 
@@ -1101,18 +1234,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun List<LyricLine>.bluetoothPayloadAt(index: Int): Pair<String, String?>? {
-        return lyricPayloadAt(index, bluetoothLyricTranslationEnabled)
+        return lyricPayloadAt(
+            index = index,
+            includeTranslation = bluetoothLyricTranslationEnabled,
+            includePronunciation = bluetoothLyricPronunciationEnabled
+        )
     }
 
     private fun List<LyricLine>.lyricPayloadAt(
         index: Int,
-        includeTranslation: Boolean
+        includeTranslation: Boolean,
+        includePronunciation: Boolean = false
     ): Pair<String, String?>? {
         val line = getOrNull(index) ?: return null
         val text = line.text.cleanBluetoothLyricText() ?: return null
-        val directTranslation = line.secondaryLyricText(includeTranslation)?.cleanBluetoothLyricText()
+        val directTranslation = when {
+            includePronunciation -> line.pronunciation?.cleanBluetoothLyricText()
+            else -> line.secondaryLyricText(includeTranslation)?.cleanBluetoothLyricText()
+        }
 
-        if (!includeTranslation) return text to null
+        if (!includeTranslation && !includePronunciation) return text to null
+
+        if (includePronunciation && directTranslation != null) {
+            return text to directTranslation
+        }
 
         if (directTranslation != null) {
             return orderBluetoothLyricPair(text, directTranslation, preferFirstAsPrimary = true)

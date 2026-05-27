@@ -18,6 +18,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -61,7 +62,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -450,15 +450,6 @@ fun EllaApp(
         .fillMaxSize()
         .background(MiuixTheme.colorScheme.background)
         .layerBackdrop(backdrop)
-    val previousContentBlur = if (
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-        showPlayerOverlay
-    ) {
-        7.dp * playerDismissProgress.coerceIn(0f, 1f)
-    } else {
-        0.dp
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -467,13 +458,6 @@ fun EllaApp(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(
-                    if (previousContentBlur.value > 0f) {
-                        Modifier.blur(radius = previousContentBlur)
-                    } else {
-                        Modifier
-                    }
-                )
         ) {
             AppNavigation(
                 navController = navController,
@@ -532,7 +516,7 @@ fun EllaApp(
         AnimatedVisibility(
             visible = showPlayerOverlay,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = fadeOut(),
+            exit = ExitTransition.None,
             modifier = Modifier.fillMaxSize()
         ) {
             PlayerScreen(

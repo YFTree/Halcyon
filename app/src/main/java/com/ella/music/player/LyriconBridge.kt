@@ -20,8 +20,7 @@ class LyriconBridge(private val context: Context) {
 
     private var provider: LyriconProvider? = null
     private var enabled = false
-    private var displayTranslation = true
-    private var allowPhonetic = false
+    private var secondaryMode = SecondaryMode.Translation
 
     private var lastSongId: String? = null
     private var lastSong: Song? = null
@@ -83,14 +82,10 @@ class LyriconBridge(private val context: Context) {
 
     fun isEnabled() = enabled
 
-    fun setDisplayTranslation(display: Boolean) {
-        displayTranslation = display
-        provider?.player?.setDisplayTranslation(display)
-        resendLastSong()
-    }
-
-    fun setAllowPhonetic(allow: Boolean) {
-        allowPhonetic = allow
+    fun setSecondaryMode(mode: SecondaryMode) {
+        if (secondaryMode == mode) return
+        secondaryMode = mode
+        provider?.player?.setDisplayTranslation(mode.displayTranslation)
         resendLastSong()
     }
 
@@ -103,7 +98,7 @@ class LyriconBridge(private val context: Context) {
         lastLyrics = lyrics
         val signature = song.lyriconSignature(lyrics)
         if (!force && signature == lastSentSignature) {
-            p.player.setDisplayTranslation(displayTranslation)
+            p.player.setDisplayTranslation(secondaryMode.displayTranslation)
             Log.d(TAG, "Skipped duplicate Lyricon song: ${song.title} (${lyrics.size} lines)")
             return
         }
@@ -140,8 +135,8 @@ class LyriconBridge(private val context: Context) {
                     words = words.ifEmpty { null },
                     secondary = line.backgroundText,
                     secondaryWords = backgroundWords.ifEmpty { null },
-                    translation = line.translationForLyricon(),
-                    roma = line.pronunciationForLyricon()
+                    translation = line.secondaryTranslationForLyricon(),
+                    roma = line.romaForLyricon()
                 )
             }
 
@@ -154,7 +149,7 @@ class LyriconBridge(private val context: Context) {
             )
 
             p.player.setSong(lyriconSong)
-            p.player.setDisplayTranslation(displayTranslation)
+            p.player.setDisplayTranslation(secondaryMode.displayTranslation)
             lastSentSignature = signature
             Log.d(TAG, "Sent song to Lyricon: ${song.title} (${richLyrics.size} lines)")
         } catch (e: Exception) {
@@ -198,12 +193,8 @@ class LyriconBridge(private val context: Context) {
                     words = words.ifEmpty { null },
                     secondary = line.backgroundText,
                     secondaryWords = backgroundWords.ifEmpty { null },
-                    translation = if (displayTranslation) {
-                        translationMap[line.timeMs] ?: line.backgroundTranslation
-                    } else {
-                        null
-                    },
-                    roma = line.pronunciationForLyricon()
+                    translation = line.secondaryTranslationForLyricon(translationMap[line.timeMs]),
+                    roma = line.romaForLyricon()
                 )
             }
 
@@ -216,7 +207,7 @@ class LyriconBridge(private val context: Context) {
             )
 
             p.player.setSong(lyriconSong)
-            p.player.setDisplayTranslation(displayTranslation)
+            p.player.setDisplayTranslation(secondaryMode.displayTranslation)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send translation to Lyricon", e)
         }
@@ -296,19 +287,29 @@ class LyriconBridge(private val context: Context) {
             path,
             lyrics.size,
             lyricHash,
-            displayTranslation,
-            allowPhonetic
+            secondaryMode
         ).joinToString("|")
     }
 
-    private fun LyricLine.translationForLyricon(): String? {
-        if (!displayTranslation) return null
-        return translation ?: backgroundTranslation
+    private fun LyricLine.secondaryTranslationForLyricon(overrideTranslation: String? = null): String? {
+        return when (secondaryMode) {
+            SecondaryMode.Off -> null
+            SecondaryMode.Translation -> overrideTranslation ?: translation ?: backgroundTranslation
+            SecondaryMode.Pronunciation -> pronunciation?.takeIf { it.isNotBlank() }
+        }
     }
 
-    private fun LyricLine.pronunciationForLyricon(): String? {
-        if (!allowPhonetic) return null
-        return pronunciation?.takeIf { it.isNotBlank() }
+    private fun LyricLine.romaForLyricon(): String? {
+        return when (secondaryMode) {
+            SecondaryMode.Pronunciation -> pronunciation?.takeIf { it.isNotBlank() }
+            else -> null
+        }
+    }
+
+    enum class SecondaryMode(val displayTranslation: Boolean) {
+        Off(false),
+        Translation(true),
+        Pronunciation(true)
     }
 
     private fun List<com.ella.music.data.model.LyricWord>.withLineSpacing(

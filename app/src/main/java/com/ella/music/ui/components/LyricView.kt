@@ -369,7 +369,13 @@ fun WordLyricView(
                         else -> 5f
                     }
                 } else {
-                    0f
+                    when {
+                        userBrowsing -> 0f
+                        isActive -> 0f
+                        distance == 1 -> 0.45f
+                        distance == 2 -> 0.9f
+                        else -> 1.35f
+                    }
                 },
                 animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing),
                 label = "lyric_line_blur"

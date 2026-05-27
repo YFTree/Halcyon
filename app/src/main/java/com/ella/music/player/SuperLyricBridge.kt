@@ -12,7 +12,7 @@ import com.hchen.superlyricapi.SuperLyricWord
 class SuperLyricBridge {
     private var enabled = false
     private var registered = false
-    private var allowPhonetic = false
+    private var secondaryMode = SecondaryMode.Translation
     private var lastKey: String? = null
     private var lastSongKey: String? = null
     private var lastSong: Song? = null
@@ -34,8 +34,10 @@ class SuperLyricBridge {
 
     fun isEnabled(): Boolean = enabled
 
-    fun setAllowPhonetic(allow: Boolean) {
-        allowPhonetic = allow
+    fun setSecondaryMode(mode: SecondaryMode) {
+        if (secondaryMode == mode) return
+        secondaryMode = mode
+        lastKey = null
     }
 
     fun sendSong(song: Song) {
@@ -51,14 +53,9 @@ class SuperLyricBridge {
     fun sendLyric(line: LyricLine?, positionMs: Long, showTranslation: Boolean, force: Boolean = false) {
         if (!enabled || line == null) return
         val song = lastSong
-        val effectiveTranslation = line.translation ?: line.backgroundTranslation
-        val pronunciation = line.pronunciation?.takeIf { allowPhonetic && it.isNotBlank() }
-        val translationKey = if (showTranslation) {
-            effectiveTranslation.orEmpty()
-        } else {
-            ""
-        }
-        val key = "${song?.id}:${line.timeMs}:${line.endMs}:$showTranslation:$translationKey:$pronunciation"
+        val secondary = line.secondaryForSuperLyric(showTranslation)
+        val pronunciation = line.pronunciation?.takeIf { secondaryMode == SecondaryMode.Pronunciation && it.isNotBlank() }
+        val key = "${song?.id}:${line.timeMs}:${line.endMs}:$secondaryMode:$showTranslation:${secondary.orEmpty()}"
         if (force && !registered) lastKey = null
         if (key == lastKey) return
         lastKey = key
@@ -82,12 +79,8 @@ class SuperLyricBridge {
                         SuperLyricLine(it, line.backgroundWords.toSuperWords(it), line.timeMs, end)
                     })
                     .setTranslation(
-                        if (showTranslation) {
-                            effectiveTranslation?.takeIf { it.isNotBlank() }?.let {
-                                SuperLyricLine(it, line.timeMs, end)
-                            }
-                        } else {
-                            null
+                        secondary?.takeIf { it.isNotBlank() }?.let {
+                            SuperLyricLine(it, line.timeMs, end)
                         }
                     )
                     .setExtra(pronunciation?.let {
@@ -127,6 +120,22 @@ class SuperLyricBridge {
 
     private fun Song.superLyricSongKey(): String =
         listOf(id, title, artist, album, duration, path).joinToString("|")
+
+    private fun LyricLine.secondaryForSuperLyric(showTranslation: Boolean): String? {
+        return when (secondaryMode) {
+            SecondaryMode.Off -> null
+            SecondaryMode.Translation -> {
+                if (showTranslation) translation ?: backgroundTranslation else null
+            }
+            SecondaryMode.Pronunciation -> pronunciation?.takeIf { it.isNotBlank() }
+        }
+    }
+
+    enum class SecondaryMode {
+        Off,
+        Translation,
+        Pronunciation
+    }
 
     private fun register() {
         if (registered || !SuperLyricHelper.isAvailable()) return

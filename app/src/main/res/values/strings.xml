@@ -93,7 +93,6 @@
     <string name="desktop_lyric_next">下一首</string>
     <string name="desktop_lyric_smaller">缩小歌词</string>
     <string name="desktop_lyric_larger">放大歌词</string>
-    <string name="desktop_lyric_pin_status_bar">贴到状态栏</string>
     <string name="desktop_lyric_cycle_color">切换颜色</string>
     <string name="desktop_lyric_lock">锁定</string>
     <string name="desktop_lyric_close">关闭</string>
