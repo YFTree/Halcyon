@@ -91,6 +91,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -211,7 +212,7 @@ private fun rememberThrottledPlayerPosition(
     isPlaying: Boolean,
     anchorKey: Any?,
     intervalMs: Long = 250L
-): Long {
+): State<Long> {
     val latestPlaying by rememberUpdatedState(isPlaying)
     return produceState(initialValue = positionFlow.value, positionFlow, anchorKey) {
         var lastUiTickMs = 0L
@@ -231,7 +232,7 @@ private fun rememberThrottledPlayerPosition(
                 lastLoggedTickMs = now
             }
         }
-    }.value
+    }
 }
 
 @Composable
@@ -262,11 +263,12 @@ fun PlayerScreen(
     val lyricFontScale = remember(lyricFontScaleValue) { lyricFontScaleValue.coerceIn(75, 130) / 100f }
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
-    val currentPosition = rememberThrottledPlayerPosition(
+    val currentPositionState = rememberThrottledPlayerPosition(
         positionFlow = playerViewModel.currentPosition,
         isPlaying = isPlaying,
         anchorKey = currentSong?.id
     )
+    val currentPositionProvider = remember(currentPositionState) { { currentPositionState.value } }
     val duration by playerViewModel.duration.collectAsState()
     val shuffleEnabled by playerViewModel.shuffleEnabled.collectAsState()
     val repeatMode by playerViewModel.repeatMode.collectAsState()
@@ -487,7 +489,7 @@ fun PlayerScreen(
             dynamicCoverEnabled = dynamicCoverEnabled,
             immersiveAlbumCover = immersiveAlbumCover,
             isPlaying = isPlaying,
-            currentPosition = currentPosition,
+            currentPositionProvider = currentPositionProvider,
             duration = duration,
             shuffleEnabled = shuffleEnabled,
             repeatMode = repeatMode,
@@ -636,7 +638,7 @@ fun PlayerScreen(
             annotation = songAnnotation,
             lyrics = lyrics,
             currentLyricIndex = currentLyricIndex,
-            currentPosition = currentPosition,
+            currentPositionProvider = currentPositionProvider,
             showTranslation = showLyricTranslation,
             showPronunciation = showLyricPronunciation,
             keepScreenOn = lyricPageKeepScreenOn,
@@ -647,7 +649,6 @@ fun PlayerScreen(
             perspectiveEffect = lyricPerspectiveEffect,
             palette = palette,
             flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
-            currentPositionMs = currentPosition,
             isPlaying = isPlaying,
             isFavorite = isCurrentSongFavorite,
             audioSessionId = audioSessionId,
@@ -908,7 +909,7 @@ fun PlayerScreen(
                     annotation = songAnnotation,
                     lyrics = lyrics,
                     currentLyricIndex = currentLyricIndex,
-                    currentPosition = currentPosition,
+                    currentPositionProvider = currentPositionProvider,
                     duration = duration,
                     shuffleEnabled = shuffleEnabled,
                     repeatMode = repeatMode,
@@ -961,7 +962,7 @@ private fun CoverPlayerPage(
     dynamicCoverEnabled: Boolean,
     immersiveAlbumCover: Boolean,
     isPlaying: Boolean,
-    currentPosition: Long,
+    currentPositionProvider: () -> Long,
     duration: Long,
     shuffleEnabled: Boolean,
     repeatMode: Int,
@@ -1042,7 +1043,7 @@ private fun CoverPlayerPage(
                 annotation = annotation,
                 dynamicCoverFile = dynamicCoverFile,
                 isPlaying = isPlaying,
-                currentPosition = currentPosition,
+                currentPositionProvider = currentPositionProvider,
                 duration = duration,
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
@@ -1172,7 +1173,7 @@ private fun CoverPlayerPage(
                                 currentIndex = currentLyricIndex,
                                 showTranslation = showTranslation,
                                 showPronunciation = showPronunciation,
-                                currentPositionMs = currentPosition,
+                                currentPositionProvider = currentPositionProvider,
                                 isPlaying = isPlaying,
                                 fontFamily = fontFamily,
                                 fontWeight = fontWeight,
@@ -1186,7 +1187,7 @@ private fun CoverPlayerPage(
 
                         Spacer(modifier = Modifier.weight(1f))
                         PlayerProgressBlock(
-                            currentPosition = currentPosition,
+                            currentPositionProvider = currentPositionProvider,
                             duration = duration,
                             audioInfo = audioInfo,
                             bluetoothDeviceName = bluetoothDeviceName,
@@ -1212,11 +1213,11 @@ private fun CoverPlayerPage(
                             onClearQueue = onClearQueue,
                             modifier = Modifier.height(76.dp)
                         )
-                        AudioVisualizer(
+                        PositionedAudioVisualizer(
                             enabled = visualizerEnabled,
                             audioSessionId = audioSessionId,
                             isPlaying = isPlaying,
-                            positionMs = currentPosition,
+                            currentPositionProvider = currentPositionProvider,
                             accent = Color.White.copy(alpha = 0.86f),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1285,7 +1286,7 @@ private fun CoverPlayerPage(
                                 currentIndex = currentLyricIndex,
                                 showTranslation = showTranslation,
                                 showPronunciation = showPronunciation,
-                                currentPositionMs = currentPosition,
+                                currentPositionProvider = currentPositionProvider,
                                 isPlaying = isPlaying,
                                 fontFamily = fontFamily,
                                 fontWeight = fontWeight,
@@ -1310,7 +1311,7 @@ private fun CoverPlayerPage(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         PlayerProgressBlock(
-                            currentPosition = currentPosition,
+                            currentPositionProvider = currentPositionProvider,
                             duration = duration,
                             audioInfo = audioInfo,
                             bluetoothDeviceName = bluetoothDeviceName,
@@ -1389,7 +1390,7 @@ private fun LandscapeCoverPlayerPage(
     annotation: String,
     dynamicCoverFile: File?,
     isPlaying: Boolean,
-    currentPosition: Long,
+    currentPositionProvider: () -> Long,
     duration: Long,
     shuffleEnabled: Boolean,
     repeatMode: Int,
@@ -1436,7 +1437,6 @@ private fun LandscapeCoverPlayerPage(
         if (dynamicFlowEnabled) {
             FluidLyricBackground(
                 palette = palette,
-                positionMs = currentPosition,
                 isPlaying = isPlaying,
                 flowEffectMode = flowEffectMode,
                 animate = dynamicFlowEnabled && !isPlaying && !visualizerEnabled,
@@ -1506,7 +1506,7 @@ private fun LandscapeCoverPlayerPage(
                 WordLyricView(
                     lyrics = lyrics,
                     currentIndex = currentLyricIndex,
-                    currentPositionMs = currentPosition,
+                    currentPositionMs = currentPositionProvider(),
                     isPlaying = isPlaying,
                     showTranslation = showTranslation,
                     showPronunciation = showPronunciation,
@@ -1523,7 +1523,7 @@ private fun LandscapeCoverPlayerPage(
                         .weight(1f)
                 )
                 PlayerProgressBlock(
-                    currentPosition = currentPosition,
+                    currentPositionProvider = currentPositionProvider,
                     duration = duration,
                     audioInfo = audioInfo,
                     bluetoothDeviceName = bluetoothDeviceName,
@@ -1550,11 +1550,11 @@ private fun LandscapeCoverPlayerPage(
                 )
             }
         }
-        AudioVisualizer(
+        PositionedAudioVisualizer(
             enabled = visualizerEnabled,
             audioSessionId = audioSessionId,
             isPlaying = isPlaying,
-            positionMs = currentPosition,
+            currentPositionProvider = currentPositionProvider,
             accent = Color.White.copy(alpha = 0.72f),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -1572,7 +1572,6 @@ private fun LyricsPlayerPage(
     annotation: String,
     lyrics: List<com.ella.music.data.model.LyricLine>,
     currentLyricIndex: Int,
-    currentPosition: Long,
     showTranslation: Boolean,
     showPronunciation: Boolean,
     keepScreenOn: Boolean,
@@ -1583,7 +1582,7 @@ private fun LyricsPlayerPage(
     perspectiveEffect: Boolean,
     palette: PlayerPalette,
     flowEffectMode: Int,
-    currentPositionMs: Long,
+    currentPositionProvider: () -> Long,
     isPlaying: Boolean,
     isFavorite: Boolean,
     audioSessionId: Int,
@@ -1691,7 +1690,7 @@ private fun LyricsPlayerPage(
                 WordLyricView(
                     lyrics = lyrics,
                     currentIndex = currentLyricIndex,
-                    currentPositionMs = currentPositionMs,
+                    currentPositionMs = currentPositionProvider(),
                     isPlaying = isPlaying,
                     showTranslation = showTranslation,
                     showPronunciation = showPronunciation,
@@ -1711,11 +1710,11 @@ private fun LyricsPlayerPage(
             }
         }
 
-        AudioVisualizer(
+        PositionedAudioVisualizer(
             enabled = visualizerEnabled,
             audioSessionId = audioSessionId,
             isPlaying = isPlaying,
-            positionMs = currentPositionMs,
+            currentPositionProvider = currentPositionProvider,
             accent = Color.White.copy(alpha = 0.86f),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -2012,7 +2011,7 @@ private fun LandscapeLyricsOverlay(
     annotation: String,
     lyrics: List<com.ella.music.data.model.LyricLine>,
     currentLyricIndex: Int,
-    currentPosition: Long,
+    currentPositionProvider: () -> Long,
     duration: Long,
     shuffleEnabled: Boolean,
     repeatMode: Int,
@@ -2053,7 +2052,6 @@ private fun LandscapeLyricsOverlay(
     Box(modifier = modifier.background(palette.middle)) {
         FluidLyricBackground(
             palette = palette,
-            positionMs = currentPosition,
             isPlaying = isPlaying,
             flowEffectMode = flowEffectMode,
             modifier = Modifier.fillMaxSize()
@@ -2097,7 +2095,7 @@ private fun LandscapeLyricsOverlay(
                     LandscapeLyricShowcase(
                         lyrics = lyrics,
                         currentIndex = currentLyricIndex,
-                        currentPositionMs = currentPosition,
+                        currentPositionProvider = currentPositionProvider,
                         showTranslation = showTranslation,
                         showPronunciation = showPronunciation,
                         fontFamily = fontFamily,
@@ -2109,7 +2107,7 @@ private fun LandscapeLyricsOverlay(
                             .weight(1f)
                     )
                     LandscapeProgressRow(
-                        currentPosition = currentPosition,
+                        currentPositionProvider = currentPositionProvider,
                         duration = duration,
                         palette = palette,
                         onSeek = onSeek
@@ -2362,7 +2360,7 @@ private fun lyriconMarqueeOffsetPx(
 private fun LandscapeLyricShowcase(
     lyrics: List<com.ella.music.data.model.LyricLine>,
     currentIndex: Int,
-    currentPositionMs: Long,
+    currentPositionProvider: () -> Long,
     showTranslation: Boolean,
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
@@ -2378,7 +2376,7 @@ private fun LandscapeLyricShowcase(
         ) {
             LandscapeLyricLine(
                 line = null,
-                currentPositionMs = currentPositionMs,
+                currentPositionProvider = currentPositionProvider,
                 showTranslation = showTranslation,
                 showPronunciation = showPronunciation,
                 fontFamily = fontFamily,
@@ -2412,7 +2410,7 @@ private fun LandscapeLyricShowcase(
             val distance = abs(index - safeIndex)
             LandscapeLyricLine(
                 line = line,
-                currentPositionMs = currentPositionMs,
+                currentPositionProvider = currentPositionProvider,
                 showTranslation = showTranslation,
                 showPronunciation = showPronunciation,
                 fontFamily = fontFamily,
@@ -2440,7 +2438,7 @@ private fun LandscapeLyricShowcase(
 @Composable
 private fun LandscapeLyricLine(
     line: com.ella.music.data.model.LyricLine?,
-    currentPositionMs: Long,
+    currentPositionProvider: () -> Long,
     showTranslation: Boolean,
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
@@ -2451,6 +2449,7 @@ private fun LandscapeLyricLine(
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
     onLineLongClick: (com.ella.music.data.model.LyricLine) -> Unit
 ) {
+    val currentPositionMs = currentPositionProvider()
     if (line == null) {
         Text(
             text = "暂无歌词",
@@ -2512,11 +2511,12 @@ private fun LandscapeLyricLine(
 
 @Composable
 private fun LandscapeProgressRow(
-    currentPosition: Long,
+    currentPositionProvider: () -> Long,
     duration: Long,
     palette: PlayerPalette,
     onSeek: (Float) -> Unit
 ) {
+    val currentPosition = currentPositionProvider()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2843,7 +2843,7 @@ private fun CloseIcon(
 
 @Composable
 private fun PlayerProgressBlock(
-    currentPosition: Long,
+    currentPositionProvider: () -> Long,
     duration: Long,
     audioInfo: AudioInfo?,
     bluetoothDeviceName: String?,
@@ -2851,6 +2851,7 @@ private fun PlayerProgressBlock(
     onSeek: (Float) -> Unit
 ) {
     val context = LocalContext.current
+    val currentPosition = currentPositionProvider()
     var infoMode by remember(audioInfo, bluetoothDeviceName) { mutableStateOf(0) }
     val infoLabels = remember(audioInfo, bluetoothDeviceName) {
         buildList {
@@ -3408,7 +3409,6 @@ private fun Bitmap.scaledForPalette(): Bitmap {
 @Composable
 private fun FluidLyricBackground(
     palette: PlayerPalette,
-    positionMs: Long,
     isPlaying: Boolean,
     flowEffectMode: Int = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
     animate: Boolean = false,
@@ -3433,7 +3433,17 @@ private fun FluidLyricBackground(
         0.36f
     }
     val pulse = if (animate && isPlaying) {
-        0.5f + 0.5f * kotlin.math.sin(positionMs / 900.0).toFloat()
+        val transition = rememberInfiniteTransition(label = "fluid_lyric_background_pulse")
+        val value by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1_800, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "fluid_lyric_background_pulse"
+        )
+        0.5f + 0.5f * kotlin.math.sin(value * kotlin.math.PI.toFloat() * 2f)
     } else {
         0.28f
     }
@@ -3685,13 +3695,14 @@ private fun MiniLyricsPreview(
     currentIndex: Int,
     showTranslation: Boolean,
     showPronunciation: Boolean,
-    currentPositionMs: Long,
+    currentPositionProvider: () -> Long,
     isPlaying: Boolean,
     fontFamily: FontFamily? = null,
     fontWeight: FontWeight = FontWeight.ExtraBold,
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val currentPositionMs = currentPositionProvider()
     val safeIndex = currentIndex.takeIf { it in lyrics.indices }
         ?: lyrics.indexOfFirst { it.hasMiniLyric() }.takeIf { it >= 0 }
         ?: return
@@ -4924,6 +4935,25 @@ private fun PlayerActionMenuItem(
 }
 
 @Composable
+private fun PositionedAudioVisualizer(
+    enabled: Boolean,
+    audioSessionId: Int,
+    isPlaying: Boolean,
+    currentPositionProvider: () -> Long,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    AudioVisualizer(
+        enabled = enabled,
+        audioSessionId = audioSessionId,
+        isPlaying = isPlaying,
+        positionMs = currentPositionProvider(),
+        accent = accent,
+        modifier = modifier
+    )
+}
+
+@Composable
 private fun AudioVisualizer(
     enabled: Boolean,
     audioSessionId: Int,
@@ -5182,8 +5212,13 @@ private fun GlowSeekBar(
                 }
             },
             update = { view ->
-                view.progressFraction = displayProgress
-                view.fallbackProgressColor = accent.copy(alpha = 0.82f).toArgb()
+                if (view.progressFraction != displayProgress) {
+                    view.progressFraction = displayProgress
+                }
+                val progressColor = accent.copy(alpha = 0.82f).toArgb()
+                if (view.fallbackProgressColor != progressColor) {
+                    view.fallbackProgressColor = progressColor
+                }
             },
             modifier = Modifier.fillMaxSize()
         )
