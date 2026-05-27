@@ -615,7 +615,7 @@ fun PlayerScreen(
             playbackPitch = playbackPitch,
             isFavorite = isCurrentSongFavorite,
             audioSessionId = audioSessionId,
-            visualizerEnabled = effectiveAudioVisualizerEnabled,
+            visualizerEnabled = audioVisualizerEnabled,
             metadataEditorId = metadataEditorId,
             lyricTimingEditorId = lyricTimingEditorId,
             onVisualizerEnabled = ::setAudioVisualizerEnabled,
