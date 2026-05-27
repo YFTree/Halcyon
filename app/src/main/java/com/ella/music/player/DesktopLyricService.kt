@@ -796,14 +796,14 @@ class DesktopLyricService : Service() {
                     canvas = canvas,
                     fallbackText = pronunciation,
                     lineWords = pronunciationWords,
-                    anchorX = width / 2f,
+                    anchorX = primaryAlign.anchorX(width),
                     baseline = baselines.pronunciation,
-                    maxWidth = width * 0.88f,
-                    align = AnchorAlign.Center
+                    maxWidth = primaryMaxWidth,
+                    align = primaryAlign
                 )
-                drawLine(canvas, lyricText, words, width / 2f, baselines.primary, width * 0.9f, AnchorAlign.Center, true)
+                drawLine(canvas, lyricText, words, primaryAlign.anchorX(width), baselines.primary, primaryMaxWidth, primaryAlign, true)
                 if (hasTranslation) {
-                    drawTranslationText(canvas, translation, width / 2f, baselines.translation, width * 0.88f, AnchorAlign.Center)
+                    drawTranslationText(canvas, translation, primaryAlign.anchorX(width), baselines.translation, primaryMaxWidth, primaryAlign)
                 }
             } else if (hasBackground) {
                 val hasTranslation = translation.isNotBlank() || backgroundTranslation.isNotBlank()
@@ -828,7 +828,7 @@ class DesktopLyricService : Service() {
                     baseline = backgroundBaseline,
                     maxWidth = backgroundMaxWidth,
                     align = backgroundAlign,
-                    primary = false
+                    primary = true
                 )
                 if (backgroundTranslation.isNotBlank()) {
                     drawTranslationText(
@@ -1212,11 +1212,20 @@ class DesktopLyricService : Service() {
         private fun Paint.FontMetrics.height(): Float = descent - ascent
 
         private fun ttmlAlignForPrimary(): AnchorAlign {
-            return AnchorAlign.Center
+            return agentAlignOrCenter()
         }
 
         private fun ttmlAlignForBackground(): AnchorAlign {
-            return AnchorAlign.Center
+            return agentAlignOrCenter()
+        }
+
+        private fun agentAlignOrCenter(): AnchorAlign {
+            return when (agent.trim().lowercase()) {
+                "v2" -> AnchorAlign.Right
+                "v1" -> AnchorAlign.Left
+                "" -> AnchorAlign.Center
+                else -> AnchorAlign.Left
+            }
         }
     }
 
