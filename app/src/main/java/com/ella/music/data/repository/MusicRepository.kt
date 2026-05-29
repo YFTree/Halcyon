@@ -397,7 +397,8 @@ class MusicRepository(private val context: Context) {
             }
         }
 
-        val effectivePath = song.effectiveLocalPathForMetadata()
+        val effectivePath = song.effectiveLocalPathForMetadata(requireFullDownload = true)
+            ?: return@withContext emptyList()
         if (safeMode != SettingsManager.LYRIC_SOURCE_EXTERNAL) {
             loadEmbeddedLyrics(song, effectivePath)?.let { embeddedLyrics ->
                 lyricsCache[cacheKey] = embeddedLyrics
@@ -486,14 +487,18 @@ class MusicRepository(private val context: Context) {
 
     fun getReplayGain(song: Song): Float? {
         replayGainCache[song.id]?.let { return it }
-        val gain = scanner.extractReplayGain(song.effectiveLocalPathForMetadata())
+        val metadataPath = song.effectiveLocalPathForMetadata(allowPartialCache = true)
+        val gain = metadataPath?.let(scanner::extractReplayGain)
         replayGainCache[song.id] = gain
         return gain
     }
 
     fun getAudioInfo(song: Song): AudioInfo {
         audioInfoCache[song.id]?.let { return it }
-        audioTagRepository.readQualityInfoBlocking(song.effectiveLocalPathForMetadata())?.let { quality ->
+        val metadataPath = song.effectiveLocalPathForMetadata(allowPartialCache = true)
+        runCatching {
+            metadataPath?.let(audioTagRepository::readQualityInfoBlocking)
+        }.getOrNull()?.let { quality ->
             val info = AudioInfo(
                 format = song.audioFormatLabel(quality.mimeType),
                 bitRate = quality.bitRate.takeIf { it > 0 } ?: song.estimatedBitRate(),
@@ -505,9 +510,10 @@ class MusicRepository(private val context: Context) {
             return info
         }
         val info = runCatching {
+            val extractorPath = metadataPath ?: return@runCatching AudioInfo(format = song.audioFormatLabel(null))
             val extractor = MediaExtractor()
             try {
-                extractor.setDataSource(song.effectiveLocalPathForMetadata())
+                extractor.setDataSource(extractorPath)
                 var audioFormat: MediaFormat? = null
                 for (index in 0 until extractor.trackCount) {
                     val format = extractor.getTrackFormat(index)
@@ -544,7 +550,10 @@ class MusicRepository(private val context: Context) {
         val cacheKey = "${song.id}:${song.dateModified}:${song.fileSize}"
         tagInfoCache[cacheKey]?.let { return it }
         val info = runCatching {
-            audioTagRepository.readTagsBlocking(song.effectiveLocalPathForMetadata())?.toSongTagInfo() ?: SongTagInfo()
+            song.effectiveLocalPathForMetadata(allowPartialCache = true)
+                ?.let(audioTagRepository::readTagsBlocking)
+                ?.toSongTagInfo()
+                ?: SongTagInfo()
         }.getOrElse {
             Log.w("MusicRepo", "Failed to read tag info for ${song.path}", it)
             SongTagInfo()
@@ -574,7 +583,8 @@ class MusicRepository(private val context: Context) {
         synchronized(coverArtLock) {
             coverArtCache.get(cacheKey)?.let { return it }
             val art = try {
-                audioTagRepository.readEmbeddedCoverDataBlocking(song.effectiveLocalPathForMetadata())
+                song.effectiveLocalPathForMetadata(requireFullDownload = true)
+                    ?.let(audioTagRepository::readEmbeddedCoverDataBlocking)
             } catch (error: Throwable) {
                 if (error is OutOfMemoryError) {
                     coverArtCache.evictAll()
@@ -707,7 +717,7 @@ class MusicRepository(private val context: Context) {
         audioInfoCache.remove(song.id)
         tagInfoCache.keys.removeAll { it.startsWith("${song.id}:") }
         replayGainCache.remove(song.id)
-        audioTagRepository.clear(song.effectiveLocalPathForMetadata())
+        song.cachedMetadataPathCandidates().forEach(audioTagRepository::clear)
         val keyPrefix = song.coverCacheKey()
         coverDataStates.keys.removeAll { it.startsWith(keyPrefix) }
         coverArtCache.remove(song.coverDataCacheKey())
@@ -732,22 +742,52 @@ class MusicRepository(private val context: Context) {
         }
     }
 
-    private fun Song.effectiveLocalPathForMetadata(): String {
-        if (!path.startsWith("http://") && !path.startsWith("https://")) return path
-        val target = File(remoteAudioCacheDir, "${path.sha256()}.${fileName.substringAfterLast('.', "audio")}")
-        if (target.exists() && target.length() > 0L) return target.absolutePath
-        return runCatching {
-            val config = runBlocking(Dispatchers.IO) {
-                WebDavConfig(
-                    url = settingsManager.webDavUrl.first(),
-                    username = settingsManager.webDavUsername.first(),
-                    password = settingsManager.webDavPassword.first()
-                )
+    fun prefetchRemoteMetadata(song: Song) {
+        if (!song.shouldUseRemoteMetadataCache()) return
+        repositoryScope.launch {
+            val metadataPath = song.effectiveLocalPathForMetadata(allowPartialCache = true)
+                ?: return@launch
+            runCatching { audioTagRepository.readQualityInfoBlocking(metadataPath) }
+                .onFailure { Log.w("MusicRepo", "Failed to prefetch quality info for ${song.path}", it) }
+            runCatching { audioTagRepository.readTagsBlocking(metadataPath) }
+                .onFailure { Log.w("MusicRepo", "Failed to prefetch tag info for ${song.path}", it) }
+        }
+    }
+
+    private fun Song.effectiveLocalPathForMetadata(
+        allowPartialCache: Boolean = false,
+        requireFullDownload: Boolean = false
+    ): String? {
+        if (!shouldUseRemoteMetadataCache()) return path.takeIf { it.isNotBlank() }
+        val remoteTargets = remoteMetadataTargets()
+        remoteTargets.full.takeIf { it.exists() && it.length() > 0L }?.let { return it.absolutePath }
+        if (!requireFullDownload && allowPartialCache) {
+            remoteTargets.partial.takeIf { it.exists() && it.length() > 0L }?.let { return it.absolutePath }
+        }
+        val config = currentWebDavConfigFor(path) ?: return null
+        if (!requireFullDownload && allowPartialCache) {
+            val partialBytes = runCatching {
+                WebDavClient.downloadHeaderBytes(path, config)
+            }.getOrElse {
+                Log.w("MusicRepo", "Failed to prefetch remote metadata bytes for $path", it)
+                null
             }
-            WebDavClient.downloadToFile(path, config, target).absolutePath
+            if (partialBytes != null && partialBytes.isNotEmpty()) {
+                runCatching {
+                    remoteTargets.partial.parentFile?.mkdirs()
+                    remoteTargets.partial.writeBytes(partialBytes)
+                    remoteTargets.partial.absolutePath
+                }.onFailure {
+                    Log.w("MusicRepo", "Failed to persist remote metadata header for $path", it)
+                }.getOrNull()?.let { return it }
+            }
+        }
+        return runCatching {
+            remoteTargets.full.parentFile?.mkdirs()
+            WebDavClient.downloadToFile(path, config, remoteTargets.full).absolutePath
         }.getOrElse {
             Log.w("MusicRepo", "Failed to cache remote metadata file for $path", it)
-            path
+            null
         }
     }
 
@@ -815,8 +855,9 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun Song.withRepositoryTags(): Song {
+        val metadataPath = effectiveLocalPathForMetadata(allowPartialCache = true)
         val tagInfo = runCatching {
-            audioTagRepository.readTagsBlocking(effectiveLocalPathForMetadata())
+            metadataPath?.let(audioTagRepository::readTagsBlocking)
         }.getOrElse { error ->
             Log.w("MusicRepo", "Failed to refresh library tags for $path", error)
             null
@@ -1056,8 +1097,9 @@ class MusicRepository(private val context: Context) {
 
         return context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null
+            val metadataPath = song.effectiveLocalPathForMetadata(allowPartialCache = true)
             val tagInfo = runCatching {
-                audioTagRepository.readTagsBlocking(song.effectiveLocalPathForMetadata())?.toSongTagInfo()
+                metadataPath?.let(audioTagRepository::readTagsBlocking)?.toSongTagInfo()
             }.getOrNull() ?: SongTagInfo()
             Song(
                 id = cursor.getLong(0),
@@ -1105,6 +1147,40 @@ class MusicRepository(private val context: Context) {
 
     private fun Song.coverDataCacheKey(): String =
         "${coverCacheKey()}:$dateModified:$fileSize"
+
+    private fun Song.shouldUseRemoteMetadataCache(): Boolean =
+        onlineSource.isBlank() && (path.startsWith("http://") || path.startsWith("https://"))
+
+    private fun Song.cachedMetadataPathCandidates(): List<String> =
+        if (!shouldUseRemoteMetadataCache()) {
+            listOfNotNull(path.takeIf { it.isNotBlank() })
+        } else {
+            remoteMetadataTargets().let { targets ->
+                listOf(targets.full, targets.partial)
+                    .filter { it.exists() && it.length() > 0L }
+                    .map(File::getAbsolutePath)
+            }
+        }
+
+    private fun Song.remoteMetadataTargets(): RemoteMetadataTargets {
+        val extension = fileName.substringAfterLast('.', "audio").lowercase()
+        val hash = path.sha256()
+        return RemoteMetadataTargets(
+            full = File(remoteAudioCacheDir, "${hash}.${extension}"),
+            partial = File(remoteAudioCacheDir, "${hash}.header.${extension}")
+        )
+    }
+
+    private fun currentWebDavConfigFor(url: String): WebDavConfig? {
+        val config = runBlocking(Dispatchers.IO) {
+            WebDavConfig(
+                url = settingsManager.webDavUrl.first(),
+                username = settingsManager.webDavUsername.first(),
+                password = settingsManager.webDavPassword.first()
+            )
+        }
+        return config.takeIf { it.url.isNotBlank() && url.startsWith(it.url.trimEnd('/'), ignoreCase = true) }
+    }
 
     private fun Song.librarySyncKey(): String =
         if (id > 0L) {
@@ -1193,5 +1269,10 @@ class MusicRepository(private val context: Context) {
         val path: String,
         val fileSize: Long,
         val dateModified: Long
+    )
+
+    private data class RemoteMetadataTargets(
+        val full: File,
+        val partial: File
     )
 }
