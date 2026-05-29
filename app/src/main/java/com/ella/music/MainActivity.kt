@@ -16,6 +16,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExitTransition
@@ -73,6 +74,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -85,6 +87,8 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.ella.music.data.BottomBarGlassEffect
 import com.ella.music.data.SettingsManager
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.CompactMiniPlayer
@@ -142,6 +146,7 @@ class MainActivity : ComponentActivity() {
     private var mainViewModel: MainViewModel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        applySavedAppLanguage()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
@@ -156,11 +161,16 @@ class MainActivity : ComponentActivity() {
 
             val settingsManager = remember { SettingsManager(this@MainActivity) }
             val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
+            val appLanguage by settingsManager.appLanguage.collectAsState(initial = SettingsManager.APP_LANGUAGE_SYSTEM)
 
             val isDark = when (themeMode) {
                 THEME_DARK -> true
                 THEME_FOLLOW_SYSTEM -> isSystemInDarkTheme()
                 else -> false
+            }
+
+            LaunchedEffect(appLanguage) {
+                applyAppLanguage(appLanguage)
             }
 
             val view = LocalView.current
@@ -233,6 +243,24 @@ class MainActivity : ComponentActivity() {
         } else {
             requestNotificationPermissionIfNeeded()
             true
+        }
+    }
+
+    private fun applySavedAppLanguage() {
+        val language = runBlocking(Dispatchers.IO) {
+            SettingsManager(this@MainActivity).appLanguage.first()
+        }
+        applyAppLanguage(language)
+    }
+
+    private fun applyAppLanguage(languageTag: String) {
+        val locales = when (languageTag) {
+            SettingsManager.APP_LANGUAGE_ZH_CN -> LocaleListCompat.forLanguageTags("zh-CN")
+            SettingsManager.APP_LANGUAGE_EN -> LocaleListCompat.forLanguageTags("en")
+            else -> LocaleListCompat.getEmptyLocaleList()
+        }
+        if (AppCompatDelegate.getApplicationLocales() != locales) {
+            AppCompatDelegate.setApplicationLocales(locales)
         }
     }
 

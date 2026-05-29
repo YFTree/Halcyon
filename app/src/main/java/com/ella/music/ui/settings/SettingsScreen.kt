@@ -103,6 +103,31 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
+    val settingsManager = remember { SettingsManager(context) }
+    val appLanguage by settingsManager.appLanguage.collectAsState(initial = SettingsManager.APP_LANGUAGE_SYSTEM)
+    val languageOptions = remember {
+        listOf(
+            SettingsManager.APP_LANGUAGE_SYSTEM,
+            SettingsManager.APP_LANGUAGE_ZH_CN,
+            SettingsManager.APP_LANGUAGE_EN
+        )
+    }
+    val languageSystemLabel = stringResource(R.string.settings_language_system)
+    val languageChineseLabel = stringResource(R.string.settings_language_simplified_chinese)
+    val languageEnglishLabel = stringResource(R.string.settings_language_english)
+    val languageEntries = remember(languageSystemLabel, languageChineseLabel, languageEnglishLabel) {
+        listOf(
+            DropdownItem(title = languageSystemLabel),
+            DropdownItem(title = languageChineseLabel),
+            DropdownItem(title = languageEnglishLabel)
+        )
+    }
+    val selectedLanguageIndex = languageOptions.indexOf(appLanguage).takeIf { it >= 0 } ?: 0
+    val languageSummary = when (appLanguage) {
+        SettingsManager.APP_LANGUAGE_ZH_CN -> stringResource(R.string.settings_language_summary_simplified_chinese)
+        SettingsManager.APP_LANGUAGE_EN -> stringResource(R.string.settings_language_summary_english)
+        else -> stringResource(R.string.settings_language_summary_system)
+    }
 
     Column(
         modifier = Modifier
@@ -128,6 +153,17 @@ fun SettingsScreen(
 
             SettingsCardGroup {
                 Column {
+                    WindowSpinnerPreference(
+                        title = stringResource(R.string.settings_language),
+                        summary = languageSummary,
+                        items = languageEntries,
+                        selectedIndex = selectedLanguageIndex,
+                        onSelectedIndexChange = { index ->
+                            languageOptions.getOrNull(index)?.let { language ->
+                                scope.launch { settingsManager.setAppLanguage(language) }
+                            }
+                        }
+                    )
                     ArrowPreference(
                         title = stringResource(R.string.settings_preferences),
                         summary = stringResource(R.string.settings_preferences_summary),
@@ -552,7 +588,11 @@ fun SettingsDetailScreen(
     val homeHiddenSections by settingsManager.homeHiddenSections.collectAsState(initial = "")
     val homeLibraryTileOrder by settingsManager.homeLibraryTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
     val homeHiddenLibraryTiles by settingsManager.homeHiddenLibraryTiles.collectAsState(initial = "")
-    val themeLabels = listOf("跟随系统", "浅色", "深色")
+    val themeLabels = listOf(
+        stringResource(R.string.theme_follow_system),
+        stringResource(R.string.theme_light),
+        stringResource(R.string.theme_dark)
+    )
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
     val themeEntries = remember { themeLabels.map { DropdownItem(title = it) } }
     val bottomBarGlassEffects = remember {
@@ -572,14 +612,14 @@ fun SettingsDetailScreen(
         BottomBarGlassEffect.Blur -> stringResource(R.string.settings_bottom_bar_glass_effect_summary_blur)
         BottomBarGlassEffect.LiquidGlass -> stringResource(R.string.settings_bottom_bar_glass_effect_summary_liquid)
     }
-    val categoryGridEntries = remember {
+    val categoryGridEntries = remember(context) {
         (1..4).map { columns ->
             DropdownItem(
-                title = "${columns}列",
+                title = context.getString(R.string.settings_category_grid_columns_option, columns),
                 summary = when (columns) {
-                    1 -> "列表式大卡片"
-                    4 -> "最紧凑的网格"
-                    else -> "适合多数屏幕"
+                    1 -> context.getString(R.string.settings_category_grid_columns_option_summary_single)
+                    4 -> context.getString(R.string.settings_category_grid_columns_option_summary_dense)
+                    else -> context.getString(R.string.settings_category_grid_columns_option_summary_default)
                 }
             )
         }
@@ -775,13 +815,13 @@ fun SettingsDetailScreen(
             }
 
             if (!showOnlyLyrics) {
-                SmallTitle(text = "外观")
+                SmallTitle(text = stringResource(R.string.settings_appearance))
 
                 SettingsCardGroup {
                     Column {
                         WindowSpinnerPreference(
-                            title = "主题模式",
-                            summary = "选择应用明暗外观",
+                            title = stringResource(R.string.settings_theme_mode),
+                            summary = stringResource(R.string.settings_theme_mode_summary),
                             items = themeEntries,
                             selectedIndex = selectedThemeMode,
                             onSelectedIndexChange = { index ->
@@ -800,8 +840,11 @@ fun SettingsDetailScreen(
                             }
                         )
                         WindowSpinnerPreference(
-                            title = "分类网格列数",
-                            summary = "专辑、流派、年份等页面显示为 ${categoryGridColumns.coerceIn(1, 4)} 列",
+                            title = stringResource(R.string.settings_category_grid_columns),
+                            summary = stringResource(
+                                R.string.settings_category_grid_columns_summary,
+                                categoryGridColumns.coerceIn(1, 4)
+                            ),
                             items = categoryGridEntries,
                             selectedIndex = (categoryGridColumns - 1).coerceIn(categoryGridEntries.indices),
                             onSelectedIndexChange = { index ->
@@ -809,24 +852,24 @@ fun SettingsDetailScreen(
                             }
                         )
                         SwitchPreference(
-                            title = "显示专辑艺术家",
-                            summary = "开启后将专辑艺术家并入艺术家列表，并在艺术家页显示发行专辑Tab",
+                            title = stringResource(R.string.settings_show_album_artists),
+                            summary = stringResource(R.string.settings_show_album_artists_summary),
                             checked = showAlbumArtists,
                             onCheckedChange = {
                                 scope.launch { settingsManager.setShowAlbumArtists(it) }
                             }
                         )
                         SwitchPreference(
-                            title = "播放后进入播放页",
-                            summary = "本地、WebDAV 和在线歌曲点播放后自动打开播放界面",
+                            title = stringResource(R.string.settings_open_player_on_play),
+                            summary = stringResource(R.string.settings_open_player_on_play_summary),
                             checked = openPlayerOnPlay,
                             onCheckedChange = {
                                 scope.launch { settingsManager.setOpenPlayerOnPlay(it) }
                             }
                         )
                         SwitchPreference(
-                            title = "列表中显示下一首播放",
-                            summary = "在歌曲列表的时长左侧显示快捷按钮；关闭后仍可从歌曲菜单操作",
+                            title = stringResource(R.string.settings_show_play_next_in_lists),
+                            summary = stringResource(R.string.settings_show_play_next_in_lists_summary),
                             checked = showPlayNextInLists,
                             onCheckedChange = {
                                 scope.launch { settingsManager.setShowPlayNextInLists(it) }

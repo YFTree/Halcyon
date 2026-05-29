@@ -112,6 +112,14 @@
     <string name="settings_status_lyric_top_offset_summary">Reserve extra vertical space for cutouts and the status bar</string>
 
     <string name="settings_app">App</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_language">App language</string>
+    <string name="settings_language_system">Follow system</string>
+    <string name="settings_language_simplified_chinese">Simplified Chinese</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_language_summary_system">Use the system language</string>
+    <string name="settings_language_summary_simplified_chinese">Force Simplified Chinese for the app UI</string>
+    <string name="settings_language_summary_english">Force English for the app UI</string>
     <string name="settings_preferences">App preferences</string>
     <string name="settings_preferences_summary">Appearance and scanning settings</string>
     <string name="settings_lyrics">Lyrics</string>
@@ -131,6 +139,20 @@
     <string name="settings_bottom_bar_glass_effect_summary_liquid">Liquid Glass: blur with refraction for more depth</string>
     <string name="bottom_bar_glass_effect_blur">Gaussian Blur</string>
     <string name="bottom_bar_glass_effect_liquid">Liquid Glass</string>
+    <string name="settings_theme_mode">Theme mode</string>
+    <string name="settings_theme_mode_summary">Choose the app light or dark appearance</string>
+    <string name="settings_category_grid_columns">Category grid columns</string>
+    <string name="settings_category_grid_columns_summary">Show albums, genres, years, and similar pages in %1$d columns</string>
+    <string name="settings_category_grid_columns_option">%1$d columns</string>
+    <string name="settings_category_grid_columns_option_summary_single">Large card list layout</string>
+    <string name="settings_category_grid_columns_option_summary_dense">Most compact grid</string>
+    <string name="settings_category_grid_columns_option_summary_default">Fits most screens</string>
+    <string name="settings_show_album_artists">Show album artists</string>
+    <string name="settings_show_album_artists_summary">Merge album artists into the artist list and show a release albums tab on artist pages</string>
+    <string name="settings_open_player_on_play">Open player after tapping play</string>
+    <string name="settings_open_player_on_play_summary">Automatically open the player after starting local, WebDAV, or online songs</string>
+    <string name="settings_show_play_next_in_lists">Show Play Next in song lists</string>
+    <string name="settings_show_play_next_in_lists_summary">Show the quick action beside duration in song lists; turning it off keeps the action in the song menu</string>
     <string name="settings_lyric_perspective">Lyric depth effect</string>
     <string name="settings_lyric_perspective_summary">Keep the current line clear while distant lines shrink, fade, and blur slightly</string>
 

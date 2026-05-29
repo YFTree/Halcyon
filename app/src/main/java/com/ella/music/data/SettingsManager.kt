@@ -37,6 +37,7 @@ class SettingsManager(private val context: Context) {
         val KEY_AUTO_SCAN = booleanPreferencesKey("auto_scan")
         val KEY_GAPLESS = booleanPreferencesKey("gapless_playback")
         val KEY_THEME_MODE = intPreferencesKey("theme_mode")
+        val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
         val KEY_BOTTOM_BAR_GLASS_EFFECT = stringPreferencesKey("bottom_bar_glass_effect")
         val KEY_TICKER_ENABLED = booleanPreferencesKey("ticker_enabled")
         val KEY_TICKER_HIDE_NOTIFICATION = booleanPreferencesKey("ticker_hide_notification")
@@ -153,6 +154,9 @@ class SettingsManager(private val context: Context) {
         const val LYRIC_SOURCE_EMBEDDED = 2
 
         const val PLAYER_FLOW_EFFECT_DARK = 0
+        const val APP_LANGUAGE_SYSTEM = "system"
+        const val APP_LANGUAGE_ZH_CN = "zh-CN"
+        const val APP_LANGUAGE_EN = "en"
         const val DESKTOP_LYRIC_STATUS_POSITION_LEFT = 0
         const val DESKTOP_LYRIC_STATUS_POSITION_CENTER = 1
         const val DESKTOP_LYRIC_STATUS_POSITION_RIGHT = 2
@@ -187,6 +191,8 @@ class SettingsManager(private val context: Context) {
     val autoScan: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_SCAN] ?: true }
     val gaplessPlayback: Flow<Boolean> = context.dataStore.data.map { it[KEY_GAPLESS] ?: true }
     val themeMode: Flow<Int> = context.dataStore.data.map { it[KEY_THEME_MODE] ?: 0 }
+    val appLanguage: Flow<String> =
+        context.dataStore.data.map { it[KEY_APP_LANGUAGE] ?: APP_LANGUAGE_SYSTEM }
     val bottomBarGlassEffect: Flow<BottomBarGlassEffect> = context.dataStore.data.map { preferences ->
         runCatching {
             BottomBarGlassEffect.valueOf(
@@ -375,6 +381,15 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setThemeMode(mode: Int) {
         context.dataStore.edit { it[KEY_THEME_MODE] = mode }
+    }
+
+    suspend fun setAppLanguage(languageTag: String) {
+        val normalized = when (languageTag) {
+            APP_LANGUAGE_ZH_CN -> APP_LANGUAGE_ZH_CN
+            APP_LANGUAGE_EN -> APP_LANGUAGE_EN
+            else -> APP_LANGUAGE_SYSTEM
+        }
+        context.dataStore.edit { it[KEY_APP_LANGUAGE] = normalized }
     }
 
     suspend fun setBottomBarGlassEffect(effect: BottomBarGlassEffect) {
