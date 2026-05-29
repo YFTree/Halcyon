@@ -650,7 +650,13 @@ class ExoPlayerManager(private val context: Context) {
             )
 
         if (song.mimeType.isNotBlank()) {
-            builder.setMimeType(song.mimeType)
+            val cleanMime = song.mimeType
+                .substringBefore(';')  // 去掉 "; charset=utf-8" 这类参数
+                .trim()
+                .lowercase()
+            if (cleanMime.isNotBlank()) {
+                builder.setMimeType(cleanMime)
+            }
         }
 
         return builder.build()
