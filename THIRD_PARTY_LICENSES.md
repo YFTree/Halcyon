@@ -10,7 +10,6 @@ Ella Music main project is licensed under Apache-2.0. Third-party components kee
 | LyriCo | External tag-editor and log-page interaction reference | Apache-2.0 | https://github.com/Replica0110/Lyrico | Referenced integration target / UI reference |
 | LX Music Mobile | LX Music API compatibility reference | Apache-2.0 | https://github.com/lyswhut/lx-music-mobile | Reference for LX online source compatibility |
 | Kyant Backdrop | Liquid glass and background blur effects | Apache-2.0 | https://github.com/Kyant0/AndroidLiquidGlass | Gradle artifact: `io.github.kyant0:backdrop` |
-| Kyant TagLib | Android / Kotlin TagLib binding | Apache-2.0 | https://github.com/Kyant0/TagLib | Gradle artifact: `io.github.kyant0:taglib` |
 | Coil | Compose image loading | Apache-2.0 | https://github.com/coil-kt/coil | Gradle artifacts: `io.coil-kt.coil3:*` |
 | quickjs-wrapper Android | JavaScript runtime wrapper used for LX Music API sources | Apache-2.0 | https://github.com/HarlonWang/quickjs-wrapper | Gradle artifact: `wang.harlon.quickjs:wrapper-android`; this is the traceable upstream repository for the Android wrapper artifact |
 | accompanist-lyrics-core | Lyric parsing and TTML / LRC structure reference | Apache-2.0 | https://github.com/6xingyv/accompanist-lyrics-core | Referenced lyric parsing and model behavior |

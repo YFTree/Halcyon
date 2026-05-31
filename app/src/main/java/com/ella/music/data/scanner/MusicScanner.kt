@@ -4,7 +4,6 @@ import android.content.ContentUris
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Log
 import com.ella.music.data.model.Album
@@ -12,7 +11,6 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.looksLikeNeteaseKeyValue
 import com.ella.music.data.parser.LrcParser
-import com.kyant.taglib.TagLib
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jaudiotagger.audio.AudioFile
@@ -163,49 +161,6 @@ class MusicScanner(private val context: Context) {
                 tag.safeFirst(file, "TPOS")
             ).orEmpty().normalizedDiscNumberFromTag()
             if (duration <= 0) duration = (audioFile.audioHeader?.trackLength ?: 0) * 1000L
-        }
-
-        if (shouldReadTagsWithTagLib(file, title, artist, album, duration, deepMetadata)) {
-            try {
-                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                    val audioProps = TagLib.getAudioProperties(fd.dup().detachFd())
-                    val metadata = TagLib.getMetadata(fd.dup().detachFd(), false)
-                    val props = metadata?.propertyMap
-
-                    if (isMissingTag(title, file.name)) {
-                        title = props.firstValue("TITLE", "INAM", "NAME", "TIT2")
-                    }
-                    if (isMissingTag(artist)) {
-                        artist = props.firstValue("ARTIST", "ALBUMARTIST", "ALBUM ARTIST", "IART", "PERFORMER", "TPE1")
-                    }
-                    if (isMissingTag(album)) {
-                        album = props.firstValue("ALBUM", "IPRD", "PRODUCT", "WM/ALBUMTITLE", "TALB")
-                    }
-                    if (albumArtist.isBlank()) {
-                        albumArtist = props.firstValue("ALBUMARTIST", "ALBUM ARTIST", "ALBUM_ARTIST", "WM/ALBUMARTIST", "TPE2")
-                    }
-                    if (genre.isBlank()) {
-                        genre = props.firstValue("GENRE", "TCON")
-                    }
-                    if (year.isBlank()) {
-                        year = props.firstValue("DATE", "YEAR", "TYER", "TDRC").normalizeYear()
-                    }
-                    if (composer.isBlank()) {
-                        composer = props.firstValue("COMPOSER", "TCOM", "WM/COMPOSER")
-                    }
-                    if (lyricist.isBlank()) {
-                        lyricist = props.firstValue("LYRICIST", "TEXT", "WRITER", "AUTHOR", "WM/WRITER")
-                    }
-                    if (discNumber <= 0) {
-                        discNumber = props.firstValue("DISCNUMBER", "DISC", "TPOS").normalizedDiscNumberFromTag()
-                    }
-                    if (duration <= 0) {
-                        duration = ((audioProps?.length ?: 0) * 1000L)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "TagLib metadata extraction failed for ${item.path}", e)
-            }
         }
 
         if (shouldDeepRead || deepMetadata) file.readWavInfoTags()?.let { wavInfo ->
@@ -365,49 +320,6 @@ class MusicScanner(private val context: Context) {
                     if (duration <= 0) duration = (audioFile.audioHeader?.trackLength ?: 0) * 1000L
                 }
 
-                if (shouldReadTagsWithTagLib(file, title, artist, album, duration, deepMetadata)) {
-                    try {
-                        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                            val audioProps = TagLib.getAudioProperties(fd.dup().detachFd())
-                            val metadata = TagLib.getMetadata(fd.dup().detachFd(), false)
-                            val props = metadata?.propertyMap
-
-                            if (isMissingTag(title, file.name)) {
-                                title = props.firstValue("TITLE", "INAM", "NAME", "TIT2")
-                            }
-                            if (isMissingTag(artist)) {
-                                artist = props.firstValue("ARTIST", "ALBUMARTIST", "ALBUM ARTIST", "IART", "PERFORMER", "TPE1")
-                            }
-                            if (isMissingTag(album)) {
-                                album = props.firstValue("ALBUM", "IPRD", "PRODUCT", "WM/ALBUMTITLE", "TALB")
-                            }
-                            if (albumArtist.isBlank()) {
-                                albumArtist = props.firstValue("ALBUMARTIST", "ALBUM ARTIST", "ALBUM_ARTIST", "WM/ALBUMARTIST", "TPE2")
-                            }
-                            if (genre.isBlank()) {
-                                genre = props.firstValue("GENRE", "TCON")
-                            }
-                            if (year.isBlank()) {
-                                year = props.firstValue("DATE", "YEAR", "TYER", "TDRC").normalizeYear()
-                            }
-                            if (composer.isBlank()) {
-                                composer = props.firstValue("COMPOSER", "TCOM", "WM/COMPOSER")
-                            }
-                            if (lyricist.isBlank()) {
-                                lyricist = props.firstValue("LYRICIST", "TEXT", "WRITER", "AUTHOR", "WM/WRITER")
-                            }
-                            if (discNumber <= 0) {
-                                discNumber = props.firstValue("DISCNUMBER", "DISC", "TPOS").normalizedDiscNumberFromTag()
-                            }
-                            if (duration <= 0) {
-                                duration = ((audioProps?.length ?: 0) * 1000L)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "TagLib metadata extraction failed for $path", e)
-                    }
-                }
-
                 if (shouldDeepRead || deepMetadata) file.readWavInfoTags()?.let { wavInfo ->
                     if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
                     if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
@@ -496,11 +408,6 @@ class MusicScanner(private val context: Context) {
         val file = File(path)
         if (!file.exists()) return null
 
-        val preferTagLib = prefersTagLibEmbeddedMetadata(file)
-        if (preferTagLib) {
-            readTagLibEmbeddedLyrics(file)?.let { return it }
-        }
-
         val audioFileLyrics = readAudioFile(file)
             ?.safeTag(file)
             ?.safeFirst(file, FieldKey.LYRICS)
@@ -508,10 +415,6 @@ class MusicScanner(private val context: Context) {
         if (!audioFileLyrics.isNullOrBlank()) {
             Log.d(TAG, "Found jaudiotagger lyrics (${audioFileLyrics.length} chars) for ${file.name}")
             return audioFileLyrics
-        }
-
-        if (!preferTagLib) {
-            readTagLibEmbeddedLyrics(file)?.let { return it }
         }
 
         return runCatching {
@@ -532,19 +435,10 @@ class MusicScanner(private val context: Context) {
         val file = File(path)
         if (!file.exists()) return null
 
-        val preferTagLib = prefersTagLibEmbeddedMetadata(file)
-        if (preferTagLib) {
-            readTagLibCoverArt(file)?.let { return it }
-        }
-
         val audioFileArt = readAudioFile(file)
             ?.safeTag(file)
             ?.safeFirstArtworkData(file)
         if (audioFileArt != null) return audioFileArt
-
-        if (!preferTagLib) {
-            readTagLibCoverArt(file)?.let { return it }
-        }
 
         return runCatching {
             MediaMetadataRetriever().useCompat { retriever ->
@@ -553,46 +447,6 @@ class MusicScanner(private val context: Context) {
             }
         }.onFailure {
             Log.w(TAG, "Retriever cover art extraction failed for $path", it)
-        }.getOrNull()
-    }
-
-    private fun prefersTagLibEmbeddedMetadata(file: File): Boolean =
-        file.extension.lowercase() in setOf("wav", "wave", "flac", "m4a", "mp4", "alac", "aif", "aiff")
-
-    private fun readTagLibEmbeddedLyrics(file: File): String? {
-        return runCatching {
-            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                selectBestLyrics(
-                    collectMetadataValues(
-                        fd,
-                        "SYNCEDLYRICS",
-                        "UNSYNCEDLYRICS",
-                        "UNSYNCED LYRICS",
-                        "LYRICS",
-                        "USLT",
-                        "SYLT",
-                        "©lyr",
-                        "\u00a9lyr",
-                        "LYRIC"
-                    )
-                )
-            }?.also {
-                Log.d(TAG, "Found TagLib lyrics (${it.length} chars) for ${file.name}")
-            }
-        }.onFailure {
-            Log.w(TAG, "TagLib lyrics extraction failed for ${file.path}", it)
-        }.getOrNull()
-    }
-
-    private fun readTagLibCoverArt(file: File): ByteArray? {
-        return runCatching {
-            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                val pictures = TagLib.getPictures(fd.dup().detachFd())
-                val frontCover = pictures.firstOrNull { it.pictureType == "Front Cover" } ?: pictures.firstOrNull()
-                frontCover?.data
-            }
-        }.onFailure {
-            Log.w(TAG, "TagLib cover art extraction failed for ${file.path}", it)
         }.getOrNull()
     }
 
@@ -610,11 +464,7 @@ class MusicScanner(private val context: Context) {
                 }
                 ?.parseReplayGain()
                 ?.let { return it }
-
-            val gainStr = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                firstMetadataValue(fd, "REPLAYGAIN_TRACK_GAIN", "R128_TRACK_GAIN")
-            }
-            gainStr?.parseReplayGain()
+            null
         } catch (e: Exception) {
             Log.w(TAG, "ReplayGain extraction failed for $path", e)
             null
@@ -675,69 +525,24 @@ class MusicScanner(private val context: Context) {
             emptyMap()
         }
 
-        val tagLibValues: Map<String, List<String>> = runCatching {
-            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
-                TagLib.getMetadata(fd.dup().detachFd(), false)
-                    ?.propertyMap
-                    .orEmpty()
-                    .mapValues { (_, values) -> values.toList() }
-            }
-        }.getOrElse {
-            Log.d(TAG, "TagLib details unavailable for ${file.path}", it)
-            emptyMap()
-        }
-
         return SongTagInfo(
-            title = jaudioValues["title"].orEmpty().ifBlank { tagLibValues.firstTagValue("TITLE") },
-            artist = jaudioValues["artist"].orEmpty().ifBlank { tagLibValues.firstTagValue("ARTIST") },
-            album = jaudioValues["album"].orEmpty().ifBlank { tagLibValues.firstTagValue("ALBUM") },
-            albumArtist = jaudioValues["albumArtist"].orEmpty().ifBlank {
-                tagLibValues.firstTagValue("ALBUMARTIST", "ALBUM ARTIST", "ALBUM_ARTIST")
-            },
-            genre = jaudioValues["genre"].orEmpty().ifBlank { tagLibValues.firstTagValue("GENRE") },
-            year = jaudioValues["year"].orEmpty().ifBlank { tagLibValues.firstTagValue("DATE", "YEAR") },
-            composer = jaudioValues["composer"].orEmpty().ifBlank {
-                tagLibValues.firstTagValue("COMPOSER", "TCOM", "WM/COMPOSER")
-            },
-            lyricist = jaudioValues["lyricist"].orEmpty().ifBlank {
-                tagLibValues.firstTagValue("LYRICIST", "TEXT", "WRITER", "AUTHOR", "WM/WRITER")
-            },
-            track = jaudioValues["track"].orEmpty().ifBlank { tagLibValues.firstTagValue("TRACKNUMBER", "TRACK") },
-            comment = jaudioValues["comment"].orEmpty().ifBlank {
-                tagLibValues.firstTagValue("COMMENT", "DESCRIPTION", "SUBTITLE")
-            }.cleanTagText(),
-            copyright = jaudioValues["copyright"].orEmpty().ifBlank {
-                tagLibValues.firstTagValue(
-                    "COPYRIGHT",
-                    "COPYRIGHTMESSAGE",
-                    "COPYRIGHT MESSAGE",
-                    "TCOP",
-                    "\u00a9cpy",
-                    "©cpy",
-                    "WCOP"
-                )
-            }.cleanTagText(),
+            title = jaudioValues["title"].orEmpty().cleanTagText(),
+            artist = jaudioValues["artist"].orEmpty().cleanTagText(),
+            album = jaudioValues["album"].orEmpty().cleanTagText(),
+            albumArtist = jaudioValues["albumArtist"].orEmpty().cleanTagText(),
+            genre = jaudioValues["genre"].orEmpty().cleanTagText(),
+            year = jaudioValues["year"].orEmpty().cleanTagText(),
+            composer = jaudioValues["composer"].orEmpty().cleanTagText(),
+            lyricist = jaudioValues["lyricist"].orEmpty().cleanTagText(),
+            track = jaudioValues["track"].orEmpty().cleanTagText(),
+            comment = jaudioValues["comment"].orEmpty().cleanTagText(),
+            copyright = jaudioValues["copyright"].orEmpty().cleanTagText(),
             neteaseKey = jaudioValues["neteaseKey"].orEmpty()
                 .takeIf { it.looksLikeNeteaseKeyValue() }
                 .orEmpty()
                 .ifBlank { jaudioValues["comment"].orEmpty().extractPrefixedNeteaseCommentKey() }
-                .ifBlank { tagLibValues.findNeteaseKey() }
-                .ifBlank { tagLibValues.findPrefixedNeteaseCommentKey() }
                 .cleanTagText(),
-            rating = ratingStarsFromTagValues(
-                jaudioValues["rating"],
-                tagLibValues.allTagValues(
-                    "RATING",
-                    "RATE",
-                    "POPM",
-                    "POPULARIMETER",
-                    "POPULARITY",
-                    "WM/RATING",
-                    "WM/POPULARITY",
-                    "RATING WMP",
-                    "FMPS_RATING"
-                )
-            )
+            rating = ratingStarsFromTagValues(jaudioValues["rating"])
         )
     }
 
@@ -753,21 +558,6 @@ class MusicScanner(private val context: Context) {
         if (normalized.equals("unknown album", ignoreCase = true)) return true
         if (normalized.looksLikeMojibake()) return true
         return fileName != null && normalized == fileName.substringBeforeLast('.')
-    }
-
-    private fun shouldReadTagsWithTagLib(
-        file: File,
-        title: String,
-        artist: String,
-        album: String,
-        duration: Long,
-        deepMetadata: Boolean
-    ): Boolean {
-        return deepMetadata ||
-            isMissingTag(title, file.name) ||
-            isMissingTag(artist) ||
-            isMissingTag(album) ||
-            duration <= 0
     }
 
     private fun readAudioFile(file: File): AudioFile? {
@@ -855,25 +645,7 @@ class MusicScanner(private val context: Context) {
 
     private fun String.isUsableSynchronizedLyrics(): Boolean {
         if (isBlank()) return false
-        return LrcParser.parse(this).lyrics.any { !it.text.isMusicSymbolOnly() }
-    }
-
-    private fun Map<String, Array<String>>?.firstValue(vararg keys: String): String {
-        if (this == null) return ""
-
-        for (key in keys) {
-            val value = this[key]?.firstOrNull()?.trim()
-            if (!value.isNullOrBlank()) return value
-        }
-
-        val normalizedKeys = keys.map { it.normalizedPropertyKey() }.toSet()
-        for ((propertyKey, values) in this) {
-            if (propertyKey.normalizedPropertyKey() in normalizedKeys) {
-                val value = values.firstOrNull()?.trim()
-                if (!value.isNullOrBlank()) return value
-            }
-        }
-        return ""
+        return LrcParser.parse(this).lyrics.any { it.text.trim().isNotBlank() }
     }
 
     private data class WavInfoTags(
@@ -989,102 +761,6 @@ class MusicScanner(private val context: Context) {
         return null
     }
 
-    private fun firstMetadataValue(fd: ParcelFileDescriptor, vararg keys: String): String? {
-        for (key in keys) {
-            val value = TagLib.getMetadataPropertyValues(fd.dup().detachFd(), key)
-                ?.firstOrNull()
-                ?.trim()
-            if (!value.isNullOrBlank()) return value
-        }
-
-        val props = TagLib.getMetadata(fd.dup().detachFd(), false)?.propertyMap
-        return props.firstValue(*keys).ifBlank { null }
-    }
-
-    private fun collectMetadataValues(fd: ParcelFileDescriptor, vararg keys: String): List<String> {
-        val values = linkedSetOf<String>()
-        for (key in keys) {
-            TagLib.getMetadataPropertyValues(fd.dup().detachFd(), key)
-                ?.map { it.trim() }
-                ?.filter { it.isNotBlank() }
-                ?.forEach { values.add(it) }
-        }
-
-        val props = TagLib.getMetadata(fd.dup().detachFd(), false)?.propertyMap
-        for (key in keys) {
-            props?.get(key)
-                ?.map { it.trim() }
-                ?.filter { it.isNotBlank() }
-                ?.forEach { values.add(it) }
-        }
-
-        val normalizedKeys = keys.map { it.normalizedPropertyKey() }.toSet()
-        props?.forEach { (propertyKey, propertyValues) ->
-            if (propertyKey.normalizedPropertyKey() in normalizedKeys) {
-                propertyValues
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-                    .forEach { values.add(it) }
-            }
-        }
-        return values.toList()
-    }
-
-    private fun Map<String, List<String>>.firstTagValue(vararg keys: String): String {
-        val normalizedKeys = keys.map { it.normalizedPropertyKey() }.toSet()
-        for (key in keys) {
-            get(key)?.firstNotBlank()?.let { return it.cleanTagText() }
-        }
-        for ((key, values) in this) {
-            if (key.normalizedPropertyKey() in normalizedKeys) {
-                values.firstNotBlank()?.let { return it.cleanTagText() }
-            }
-        }
-        return ""
-    }
-
-    private fun Map<String, List<String>>.allTagValues(vararg keys: String): String {
-        val normalizedKeys = keys.map { it.normalizedPropertyKey() }.toSet()
-        val values = linkedSetOf<String>()
-        for (key in keys) {
-            get(key)
-                ?.map { it.cleanTagText() }
-                ?.filter { it.isNotBlank() }
-                ?.forEach(values::add)
-        }
-        for ((key, propertyValues) in this) {
-            if (key.normalizedPropertyKey() in normalizedKeys) {
-                propertyValues
-                    .map { it.cleanTagText() }
-                    .filter { it.isNotBlank() }
-                    .forEach(values::add)
-            }
-        }
-        return values.joinToString(";")
-    }
-
-    private fun Map<String, List<String>>.findNeteaseKey(): String {
-        for ((key, values) in this) {
-            if (!key.isNeteaseKeyPropertyName()) continue
-            values.asSequence()
-                .map { it.cleanTagText() }
-                .firstOrNull { it.looksLikeNeteaseKeyValue() }
-                ?.let { return it }
-        }
-        return ""
-    }
-
-    private fun Map<String, List<String>>.findPrefixedNeteaseCommentKey(): String {
-        for ((key, values) in this) {
-            if (key.normalizedPropertyKey() != "comment") continue
-            values.asSequence()
-                .map { it.extractPrefixedNeteaseCommentKey() }
-                .firstOrNull { it.isNotBlank() }
-                ?.let { return it }
-        }
-        return ""
-    }
-
     private fun String.extractPrefixedNeteaseCommentKey(): String {
         val text = cleanTagText()
         return text.takeIf {
@@ -1093,62 +769,10 @@ class MusicScanner(private val context: Context) {
         }.orEmpty()
     }
 
-    private fun String.isNeteaseKeyPropertyName(): Boolean {
-        val normalized = normalizedPropertyKey()
-        return normalized in explicitNeteaseKeyProperties ||
-            normalized.startsWith("163KEY") ||
-            normalized.startsWith("NETEASEKEY") ||
-            normalized.startsWith("CLOUDMUSICKEY")
-    }
-
-    private val explicitNeteaseKeyProperties = setOf(
-        "163KEY",
-        "NETEASEKEY",
-        "NETEASECLOUDMUSICKEY",
-        "CLOUDMUSICKEY",
-        "MUSIC163KEY"
-    )
-
     private val neteaseCommentPrefixRegex = Regex(
         """^\s*163\s+key\s*\(\s*don't\s+modify\s*\)\s*:""",
         RegexOption.IGNORE_CASE
     )
-
-    private fun List<String>.firstNotBlank(): String? =
-        firstOrNull { it.trim().isNotBlank() }?.trim()
-
-    private fun String.cleanTagText(): String =
-        trim('\uFEFF', '\u0000', ' ', '\t', '\r', '\n')
-            .replace(Regex("""\s+"""), " ")
-
-    private fun selectBestLyrics(candidates: List<String>): String? {
-        return candidates
-            .map { it to scoreLyrics(it) }
-            .filter { (_, score) -> score > 0 }
-            .maxByOrNull { (_, score) -> score }
-            ?.first
-    }
-
-    private fun scoreLyrics(candidate: String): Int {
-        val parsed = LrcParser.parse(candidate).lyrics
-        val usefulLines = parsed.count { !it.text.isMusicSymbolOnly() }
-        if (usefulLines == 0) return 0
-
-        val timedScore = usefulLines * 10
-        val translationBonus = parsed.count { !it.translation.isNullOrBlank() }
-        val plainTextPenalty = if (parsed.isEmpty() && candidate.lines().size > 1) -5 else 0
-        return timedScore + translationBonus + plainTextPenalty
-    }
-
-    private fun String.isMusicSymbolOnly(): Boolean {
-        val content = trim()
-        if (content.isBlank()) return true
-        return content.all { char ->
-            char.isWhitespace() ||
-                char in setOf('♪', '♫', '♬', '♩', '♭', '♯', '♮') ||
-                Character.UnicodeBlock.of(char) == Character.UnicodeBlock.MUSICAL_SYMBOLS
-        }
-    }
 
     private fun String.normalizedPropertyKey(): String =
         lowercase().replace(" ", "").replace("_", "")
@@ -1199,4 +823,8 @@ class MusicScanner(private val context: Context) {
             release()
         }
     }
+
+    private fun String.cleanTagText(): String =
+        trim('\uFEFF', '\u0000', ' ', '\t', '\r', '\n')
+            .replace(Regex("""\s+"""), " ")
 }

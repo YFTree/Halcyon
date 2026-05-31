@@ -110,7 +110,7 @@ The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming
 
 ### 🎚 Playback, Decoding & Audio Quality
 
-- Local audio tags now use lyrico-audiotag as the primary path, with Kyant TagLib as fallback. Jaudiotagger is retained only in the legacy fallback chain and is no longer the primary path.
+- Local audio tags now use lyrico-audiotag as the primary path. If Jaudiotagger is still present, it remains legacy fallback only and is no longer the primary path.
 - Supports reading covers, basic tags, and embedded lyrics from WAV, FLAC, M4A, ALAC, MP3, OGG, OPUS, and related formats, with fallback fixes for garbled tags.
 - Provides system decoding, FFmpeg decoding, and automatic decoding modes. Automatic decoding is used by default; switch to the FFmpeg decoder if a file cannot be decoded.
 - The FFmpeg extended decoder improves compatibility with ALAC / AAC and other M4A formats.
@@ -271,7 +271,7 @@ Normal `assembleDebug` builds do not rebuild native code by default. Before rele
 | Lyrics | LRC, Enhanced LRC, ELRC, TTML, Lyricify, word-by-word lyrics, translation, romanization, background vocals, duet tags                         |
 | System Lyrics | Floating lyrics, lyric barrage, SuperLyricApi, Lyric Getter API, Flyme status bar lyrics (Ticker notification), Bluetooth lyrics               |
 | Decoding | Media3, system decoder, FFmpeg extended decoder                                                                                                |
-| Audio Metadata | lyrico-audiotag primary path, Kyant TagLib fallback, Jaudiotagger legacy fallback, embedded and external lyrics, 163 key decryption, alias / comment, quality label display |
+| Audio Metadata | lyrico-audiotag primary path, Jaudiotagger legacy fallback, embedded and external lyrics, 163 key decryption, alias / comment, quality label display |
 | Analytics | Format distribution, quality distribution, play count ranking, listening duration ranking, listening history                                   |
 | UI | Jetpack Compose, Miuix, floating bottom navigation, home dashboard, update page, immersive playback page, landscape lyrics, lyric card sharing |
 
@@ -290,7 +290,6 @@ Normal `assembleDebug` builds do not rebuild native code by default. Before rele
 | [lyrico-audiotag / Lyrico](https://github.com/Replica0110/Lyrico) | Primary local tag read/write path and external tag editor adaptation reference |
 | [TagLib](https://taglib.org/) | Underlying tag read/write capability for lyrico-audiotag (LGPL/MPL)             |
 | [163KeyDecrypter](https://github.com/lycode404/163KeyDecrypter) | NetEase Cloud Music 163 key decryption flow reference (MIT)                     |
-| [Kyant TagLib](https://github.com/Kyant0/TagLib) | Android / Kotlin TagLib bindings used as a tag-reading fallback                 |
 | [Kyant Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) | Liquid glass and background blur effects                                        |
 | [Coil](https://github.com/coil-kt/coil) | Compose image loading                                                           |
 | [QuickJS wrapper Android](https://github.com/HarlonWang/quickjs-wrapper) | Runtime for LX Music API JavaScript sources                                     |
@@ -316,7 +315,7 @@ The Ella Music main project is open-sourced under **Apache-2.0**. Third-party co
 - **Lyrico** — Reference for external tag editor adaptation and log page interaction.
 - **LX Music Mobile** — Provides LX Music API compatibility implementation and testing reference.
 - **Light Cone Music** — Interface design and feature implementation reference.
-- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, LyricGetter-API, lyrico-audiotag / Lyrico, TagLib, 163KeyDecrypter, Jaudiotagger legacy fallback, Kyant TagLib, Backdrop, Coil, accompanist-lyrics-core, and other open source projects used by Ella Music.
+- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, LyricGetter-API, lyrico-audiotag / Lyrico, TagLib, 163KeyDecrypter, Jaudiotagger legacy fallback, Backdrop, Coil, accompanist-lyrics-core, and other open source projects used by Ella Music.
 
 ---
 

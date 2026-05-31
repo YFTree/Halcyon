@@ -320,11 +320,6 @@ private fun AboutContent(
                         onClick = { uriHandler.openUri("https://ffmpeg.org") },
                     )
                     BasicComponent(
-                        title = "Kyant TagLib",
-                        summary = "Android/Kotlin TagLib 绑定（Apache-2.0）",
-                        onClick = { uriHandler.openUri("https://github.com/Kyant0/TagLib") },
-                    )
-                    BasicComponent(
                         title = "Lyricon",
                         summary = "词幕 Provider API 与状态栏歌词（Apache-2.0）",
                         onClick = { uriHandler.openUri("https://github.com/proify/lyricon") },
