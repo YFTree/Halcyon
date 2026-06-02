@@ -69,6 +69,8 @@ interface AudioTagReader {
 
 interface AudioTagWriter {
     suspend fun writeTags(path: String, tags: AudioTagInfo): Result<Unit>
+    suspend fun writeTags(pfd: ParcelFileDescriptor, tags: AudioTagInfo): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Writing tags through a file descriptor is not supported"))
     suspend fun writeEmbeddedCover(path: String, cover: AudioCoverInfo): Result<Unit>
     suspend fun removeEmbeddedCover(path: String): Result<Unit>
 }
@@ -110,6 +112,9 @@ class AudioTagRepository(
 
     suspend fun writeTags(path: String, tags: AudioTagInfo): Result<Unit> =
         writer?.writeTags(path, tags)?.onSuccess { clear(path) } ?: Result.failure(UnsupportedOperationException("No audio tag writer"))
+
+    suspend fun writeTags(pfd: ParcelFileDescriptor, tags: AudioTagInfo): Result<Unit> =
+        writer?.writeTags(pfd, tags) ?: Result.failure(UnsupportedOperationException("No audio tag writer"))
 
     suspend fun writeEmbeddedCover(path: String, cover: AudioCoverInfo): Result<Unit> =
         writer?.writeEmbeddedCover(path, cover)?.onSuccess { clear(path) } ?: Result.failure(UnsupportedOperationException("No audio tag writer"))
@@ -283,13 +288,33 @@ class LyricoAudioTagReaderWriter : AudioTagReader, AudioTagWriter {
     override suspend fun readEmbeddedLyrics(path: String): String? =
         readTags(path)?.lyrics?.takeIf { it.isNotBlank() }
 
-    override suspend fun writeTags(path: String, tags: AudioTagInfo): Result<Unit> = runCatching {
-        val updates = tags.toWritableMap()
-        if (updates.isEmpty()) return@runCatching
-        val ok = withPfd(path, ParcelFileDescriptor.MODE_READ_WRITE) { pfd ->
-            LyricoWriter.writeTags(pfd, updates, preserveOldTags = true)
-        } ?: false
-        check(ok) { "lyrico-audiotag writeTags returned false" }
+    override suspend fun writeTags(path: String, tags: AudioTagInfo): Result<Unit> {
+        return try {
+            val ok = withPfd(path, ParcelFileDescriptor.MODE_READ_WRITE) { pfd ->
+                writeTags(pfd, tags).getOrThrow()
+                true
+            } ?: false
+            check(ok) { "lyrico-audiotag writeTags returned false" }
+            Result.success(Unit)
+        } catch (e: SecurityException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun writeTags(pfd: ParcelFileDescriptor, tags: AudioTagInfo): Result<Unit> {
+        return try {
+            val updates = tags.toWritableMap()
+            if (updates.isEmpty()) return Result.success(Unit)
+            val ok = LyricoWriter.writeTags(pfd, updates, preserveOldTags = true)
+            check(ok) { "lyrico-audiotag writeTags returned false" }
+            Result.success(Unit)
+        } catch (e: SecurityException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     override suspend fun writeEmbeddedCover(path: String, cover: AudioCoverInfo): Result<Unit> = runCatching {

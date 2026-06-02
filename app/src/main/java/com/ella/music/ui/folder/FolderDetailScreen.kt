@@ -375,16 +375,17 @@ fun FolderDetailScreen(
             LaunchedEffect(scrollToTopRequest) {
                 if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
             }
-            val currentSongItemIndex = remember(sortedSongs, currentSong?.id, selectionMode) {
+            val currentSongItemIndex = remember(sortedSongs, childFolders, searchQuery, currentSong?.id, selectionMode) {
                 if (selectionMode) return@remember -1
                 sortedSongs.indexOfFirst { it.id == currentSong?.id }
                     .takeIf { it >= 0 }
-                    ?.plus(1)
+                    ?.plus(if (searchQuery.isBlank()) childFolders.size else 0)
                     ?: -1
             }
-            val fastIndexTargets = remember(sortedSongs) {
+            val fastIndexTargets = remember(sortedSongs, childFolders, searchQuery) {
+                val offset = if (searchQuery.isBlank()) childFolders.size else 0
                 sortedSongs
-                    .mapIndexed { index, song -> song.indexLetter() to index }
+                    .mapIndexed { index, song -> song.indexLetter() to (index + offset) }
                     .distinctBy { it.first }
                     .toMap()
             }
@@ -405,6 +406,15 @@ fun FolderDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(bottom = 120.dp)
                     ) {
+                        if (searchQuery.isBlank()) {
+                            items(childFolders, key = { it.path }) { folder ->
+                                ChildFolderRow(
+                                    folder = folder,
+                                    onClick = { onFolderClick(folder.path) },
+                                    onLongClick = { folderToBlock = folder.path }
+                                )
+                            }
+                        }
                         itemsIndexed(
                             items = sortedSongs,
                             key = { _, song -> song.id }
@@ -436,15 +446,6 @@ fun FolderDetailScreen(
                                 onMore = { actionSong = song }
                             )
                         }
-                        if (searchQuery.isBlank()) {
-                            items(childFolders, key = { it.path }) { folder ->
-                                ChildFolderRow(
-                                    folder = folder,
-                                    onClick = { onFolderClick(folder.path) },
-                                    onLongClick = { folderToBlock = folder.path }
-                                )
-                            }
-                        }
                     }
                 }
                 if (sortMode == FolderSongSortMode.Title && sortedSongs.size > 30) {
@@ -458,7 +459,7 @@ fun FolderDetailScreen(
                             val index = fastIndexTargets[letter]
                             if (index != null) {
                                 fastScrollJob?.cancel()
-                                fastScrollJob = scope.launch { listState.scrollToItem(index + 1) }
+                                fastScrollJob = scope.launch { listState.scrollToItem(index) }
                             }
                         }
                     )

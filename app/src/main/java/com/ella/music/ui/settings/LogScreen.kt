@@ -35,12 +35,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import com.ella.music.R
 import com.ella.music.data.AppLogEntry
 import com.ella.music.data.AppLogStore
 import kotlinx.coroutines.Dispatchers
@@ -101,6 +103,13 @@ fun LogScreen(
                 (keyword.isBlank() || entry.matchesKeyword(keyword))
         }
     }
+    val allLabel = stringResource(R.string.common_all)
+    val shareSubject = stringResource(R.string.logs_share_subject)
+    val shareText = stringResource(R.string.logs_share_text, AppLogStore.formatTime(System.currentTimeMillis()))
+    val shareChooserTitle = stringResource(R.string.logs_share_chooser_title)
+    val noShareApp = stringResource(R.string.share_no_available_app)
+    val logClipLabel = stringResource(R.string.logs_clip_label)
+    val copiedToast = stringResource(R.string.logs_copied)
 
     fun showToast(text: String) {
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
@@ -112,37 +121,37 @@ fun LogScreen(
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
-                putExtra(Intent.EXTRA_SUBJECT, "Ella Music 运行日志")
-                putExtra(Intent.EXTRA_TEXT, "Ella Music 运行日志，生成时间：${AppLogStore.formatTime(System.currentTimeMillis())}")
+                putExtra(Intent.EXTRA_SUBJECT, shareSubject)
+                putExtra(Intent.EXTRA_TEXT, shareText)
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                clipData = ClipData.newUri(context.contentResolver, "Ella Music 运行日志", uri)
+                clipData = ClipData.newUri(context.contentResolver, shareSubject, uri)
             }
             runCatching {
-                context.startActivity(Intent.createChooser(intent, "分享运行日志"))
+                context.startActivity(Intent.createChooser(intent, shareChooserTitle))
             }.onFailure {
-                showToast("没有可用的分享应用")
+                showToast(noShareApp)
             }
         }
     }
 
     fun copyEntry(entry: AppLogEntry) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText("Ella Music 日志", entry.formatForCopy()))
-        showToast("日志已复制")
+        clipboard.setPrimaryClip(ClipData.newPlainText(logClipLabel, entry.formatForCopy()))
+        showToast(copiedToast)
         showDetailSheet = false
     }
 
     Scaffold(
         topBar = {
             EllaSmallTopAppBar(
-                title = "日志分析",
+                title = stringResource(R.string.logs_title),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Back,
-                            contentDescription = "返回"
+                            contentDescription = stringResource(R.string.common_back)
                         )
                     }
                 },
@@ -153,7 +162,7 @@ fun LogScreen(
                     ) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Share,
-                            contentDescription = "分享日志"
+                            contentDescription = stringResource(R.string.logs_share_action)
                         )
                     }
                     IconButton(
@@ -162,7 +171,7 @@ fun LogScreen(
                     ) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Delete,
-                            contentDescription = "清空日志",
+                            contentDescription = stringResource(R.string.logs_clear_action),
                             tint = MiuixTheme.colorScheme.error
                         )
                     }
@@ -185,24 +194,24 @@ fun LogScreen(
             item("filters") {
                 Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                     WindowDropdownPreference(
-                        title = "日志级别",
-                        items = listOf("全部") + EllaLogLevelFilter.entries.map { it.label },
+                        title = stringResource(R.string.logs_level_filter),
+                        items = listOf(allLabel) + EllaLogLevelFilter.entries.map { stringResource(it.labelRes) },
                         selectedIndex = selectedLevel?.let { EllaLogLevelFilter.entries.indexOf(it) + 1 } ?: 0,
                         onSelectedIndexChange = { index ->
                             selectedLevel = if (index == 0) null else EllaLogLevelFilter.entries[index - 1]
                         }
                     )
                     WindowDropdownPreference(
-                        title = "日志类型",
-                        items = listOf("全部") + EllaLogTypeFilter.entries.map { it.label },
+                        title = stringResource(R.string.logs_type_filter),
+                        items = listOf(allLabel) + EllaLogTypeFilter.entries.map { stringResource(it.labelRes) },
                         selectedIndex = selectedType?.let { EllaLogTypeFilter.entries.indexOf(it) + 1 } ?: 0,
                         onSelectedIndexChange = { index ->
                             selectedType = if (index == 0) null else EllaLogTypeFilter.entries[index - 1]
                         }
                     )
                     WindowDropdownPreference(
-                        title = "自动保留",
-                        items = retentionOptions.map { "$it 天" },
+                        title = stringResource(R.string.logs_retention_filter),
+                        items = retentionOptions.map { stringResource(R.string.logs_retention_days, it) },
                         selectedIndex = retentionOptions.indexOf(retentionDays).takeIf { it >= 0 } ?: 2,
                         onSelectedIndexChange = { index ->
                             val days = retentionOptions[index]
@@ -210,7 +219,13 @@ fun LogScreen(
                                 val removed = withContext(Dispatchers.IO) { AppLogStore.setRetentionDays(context, days) }
                                 retentionDays = days
                                 refreshKey++
-                                showToast(if (removed > 0) "已清理 $removed 条旧日志" else "已设为保留 $days 天")
+                                showToast(
+                                    if (removed > 0) {
+                                        context.getString(R.string.logs_retention_removed, removed)
+                                    } else {
+                                        context.getString(R.string.logs_retention_set, days)
+                                    }
+                                )
                             }
                         }
                     )
@@ -224,7 +239,7 @@ fun LogScreen(
                     onSearch = {},
                     expanded = true,
                     onExpandedChange = {},
-                    label = "搜索日志、Tag、错误信息",
+                    label = stringResource(R.string.logs_search_label),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp)
@@ -234,8 +249,15 @@ fun LogScreen(
             item("summary") {
                 Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                     BasicComponent(
-                        title = "运行日志",
-                        summary = "共 ${entries.size} 条，当前显示 ${filteredEntries.size} 条；错误 ${entries.count { it.level.equals("ERROR", true) }} 条，警告 ${entries.count { it.level.equals("WARNING", true) || it.level.equals("WARN", true) }} 条；自动抓取本进程 logcat、网络失败和关键播放/歌词/扫描日志，最多保留最近 $retentionDays 天和 3000 条记录"
+                        title = stringResource(R.string.logs_summary_title),
+                        summary = stringResource(
+                            R.string.logs_summary,
+                            entries.size,
+                            filteredEntries.size,
+                            entries.count { it.level.equals("ERROR", true) },
+                            entries.count { it.level.equals("WARNING", true) || it.level.equals("WARN", true) },
+                            retentionDays
+                        )
                     )
                 }
             }
@@ -243,7 +265,7 @@ fun LogScreen(
             if (filteredEntries.isEmpty()) {
                 item("empty") {
                     Card(modifier = Modifier.padding(horizontal = 12.dp)) {
-                        BasicComponent(title = if (entries.isEmpty()) "暂无日志" else "没有匹配的日志")
+                        BasicComponent(title = if (entries.isEmpty()) stringResource(R.string.logs_empty) else stringResource(R.string.logs_empty_filtered))
                     }
                 }
             } else {
@@ -276,30 +298,30 @@ fun LogScreen(
 
     WindowDialog(
         show = showClearDialog,
-        title = "清空日志",
+        title = stringResource(R.string.logs_clear_action),
         onDismissRequest = { showClearDialog = false }
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "将清空全部 ${entries.size} 条持久化日志，此操作不可恢复。",
+                text = stringResource(R.string.logs_clear_message, entries.size),
                 color = MiuixTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.SpaceBetween) {
                 TextButton(
-                    text = "取消",
+                    text = stringResource(R.string.common_cancel),
                     onClick = { showClearDialog = false },
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(20.dp))
                 TextButton(
-                    text = "清空",
+                    text = stringResource(R.string.common_clear),
                     onClick = {
                         scope.launch {
                             withContext(Dispatchers.IO) { AppLogStore.clear(context) }
                             refreshKey++
                             showClearDialog = false
-                            showToast("日志已清空")
+                            showToast(context.getString(R.string.logs_cleared))
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -331,7 +353,7 @@ private fun AppLogItem(
                 ) {
                     SeverityBadge(entry.level)
                     Text(
-                        text = entry.detectType().label,
+                    text = stringResource(entry.detectType().labelRes),
                         fontWeight = FontWeight.Bold,
                         color = MiuixTheme.colorScheme.onSurface
                     )
@@ -401,13 +423,13 @@ private fun AppLogDetailSheet(
     WindowBottomSheet(
         show = show,
         enableNestedScroll = false,
-        title = "日志详情",
+        title = stringResource(R.string.logs_detail_title),
         endAction = {
             entry?.let {
                 IconButton(onClick = { onCopy(it) }) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Copy,
-                        contentDescription = "复制日志"
+                        contentDescription = stringResource(R.string.logs_copy_action)
                     )
                 }
             }
@@ -422,16 +444,16 @@ private fun AppLogDetailSheet(
                 .padding(bottom = 32.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            DetailRow(label = "时间", value = AppLogStore.formatTime(entry.time))
-            DetailRow(label = "级别", value = entry.level)
-            DetailRow(label = "类型", value = entry.detectType().label)
+            DetailRow(label = stringResource(R.string.logs_field_time), value = AppLogStore.formatTime(entry.time))
+            DetailRow(label = stringResource(R.string.logs_field_level), value = entry.level)
+            DetailRow(label = stringResource(R.string.logs_field_type), value = stringResource(entry.detectType().labelRes))
             DetailRow(label = "Tag", value = entry.tag)
             entry.relatedId?.takeIf { it.isNotBlank() }?.let {
-                DetailRow(label = "关联对象", value = it)
+                DetailRow(label = stringResource(R.string.logs_field_related), value = it)
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "消息",
+                text = stringResource(R.string.logs_field_message),
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 fontWeight = FontWeight.Bold
             )
@@ -445,7 +467,7 @@ private fun AppLogDetailSheet(
             entry.throwable?.takeIf { it.isNotBlank() }?.let { detail ->
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "详情",
+                    text = stringResource(R.string.logs_field_detail),
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     fontWeight = FontWeight.Bold
                 )
@@ -486,12 +508,12 @@ private fun DetailRow(
     }
 }
 
-private enum class EllaLogLevelFilter(val label: String, private val aliases: Set<String>) {
-    DEBUG("调试", setOf("DEBUG")),
-    INFO("信息", setOf("INFO")),
-    WARNING("警告", setOf("WARN", "WARNING")),
-    ERROR("错误", setOf("ERROR")),
-    CRASH("闪退", setOf("CRASH"));
+private enum class EllaLogLevelFilter(val labelRes: Int, private val aliases: Set<String>) {
+    DEBUG(R.string.logs_level_debug, setOf("DEBUG")),
+    INFO(R.string.logs_level_info, setOf("INFO")),
+    WARNING(R.string.logs_level_warning, setOf("WARN", "WARNING")),
+    ERROR(R.string.logs_level_error, setOf("ERROR")),
+    CRASH(R.string.logs_level_crash, setOf("CRASH"));
 
     fun matches(entry: AppLogEntry): Boolean = entry.level.uppercase(Locale.ROOT) in aliases
 }
@@ -506,6 +528,19 @@ private enum class EllaLogTypeFilter(val label: String, val storageNames: Set<St
     NETWORK("网络", setOf("NETWORK"), setOf("network", "http", "okhttp", "webdav", "request", "response", "网络")),
     DATABASE("数据", setOf("DATABASE"), setOf("database", "db", "room", "dao", "backup", "restore", "playlist", "stats", "数据库", "备份", "恢复")),
     CRASH("崩溃", setOf("CRASH"), setOf("crash", "exception", "fatal", "崩溃", "闪退"));
+
+    val labelRes: Int
+        get() = when (this) {
+            APP -> R.string.logs_type_app
+            PLAYBACK -> R.string.logs_type_playback
+            LYRICS -> R.string.logs_type_lyrics
+            LIBRARY -> R.string.logs_type_library
+            METADATA -> R.string.logs_type_metadata
+            ONLINE -> R.string.logs_type_online
+            NETWORK -> R.string.logs_type_network
+            DATABASE -> R.string.logs_type_database
+            CRASH -> R.string.logs_type_crash
+        }
 
     fun matches(entry: AppLogEntry): Boolean = entry.detectType() == this
 }

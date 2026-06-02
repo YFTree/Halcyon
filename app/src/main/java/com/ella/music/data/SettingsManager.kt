@@ -71,6 +71,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_PAGE_TRANSLATION = booleanPreferencesKey("lyric_page_translation")
         val KEY_LYRIC_PAGE_KEEP_SCREEN_ON = booleanPreferencesKey("lyric_page_keep_screen_on")
         val KEY_MINI_PLAYER_LYRIC_TRANSLATION = booleanPreferencesKey("mini_player_lyric_translation")
+        val KEY_MINI_PLAYER_LYRIC_SECONDARY = intPreferencesKey("mini_player_lyric_secondary")
         val KEY_MINI_PLAYER_COVER_ROTATION = booleanPreferencesKey("mini_player_cover_rotation")
         val KEY_MINI_PLAYER_LYRICS_ENABLED = booleanPreferencesKey("mini_player_lyrics_enabled")
         val KEY_PLAYER_HDR_GLOW = booleanPreferencesKey("player_hdr_glow")
@@ -103,6 +104,7 @@ class SettingsManager(private val context: Context) {
         val KEY_OPEN_PLAYER_ON_PLAY = booleanPreferencesKey("online_auto_open_player")
         val KEY_STARTUP_AUTO_PLAY = booleanPreferencesKey("startup_auto_play")
         val KEY_STARTUP_PLAY_MODE = intPreferencesKey("startup_play_mode")
+        val KEY_BLUETOOTH_AUTO_PLAY = booleanPreferencesKey("bluetooth_auto_play")
         val KEY_LYRIC_FONT_NAME = stringPreferencesKey("lyric_font_name")
         val KEY_LYRIC_FONT_PATH = stringPreferencesKey("lyric_font_path")
         val KEY_LYRIC_FONT_WEIGHT = intPreferencesKey("lyric_font_weight")
@@ -163,6 +165,9 @@ class SettingsManager(private val context: Context) {
         const val DESKTOP_LYRIC_STATUS_SECONDARY_OFF = 0
         const val DESKTOP_LYRIC_STATUS_SECONDARY_TRANSLATION = 1
         const val DESKTOP_LYRIC_STATUS_SECONDARY_PRONUNCIATION = 2
+        const val LYRIC_SECONDARY_OFF = 0
+        const val LYRIC_SECONDARY_TRANSLATION = 1
+        const val LYRIC_SECONDARY_PRONUNCIATION = 2
 
         const val DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
         const val DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
@@ -246,6 +251,14 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] ?: false }
     val miniPlayerLyricTranslation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] ?: true }
+    val miniPlayerLyricSecondary: Flow<Int> = context.dataStore.data.map {
+        (it[KEY_MINI_PLAYER_LYRIC_SECONDARY]
+            ?: if (it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] == false) {
+                LYRIC_SECONDARY_OFF
+            } else {
+                LYRIC_SECONDARY_TRANSLATION
+            }).coerceIn(LYRIC_SECONDARY_OFF, LYRIC_SECONDARY_PRONUNCIATION)
+    }
     val miniPlayerCoverRotation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_MINI_PLAYER_COVER_ROTATION] ?: true }
 
@@ -261,7 +274,7 @@ class SettingsManager(private val context: Context) {
     val dynamicCoverEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_DYNAMIC_COVER_ENABLED] ?: false }
     val showPlayNextInLists: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_SHOW_PLAY_NEXT_IN_LISTS] ?: true }
+        context.dataStore.data.map { it[KEY_SHOW_PLAY_NEXT_IN_LISTS] ?: false }
     val lyricShareCustomInfo: Flow<String> =
         context.dataStore.data.map { it[KEY_LYRIC_SHARE_CUSTOM_INFO] ?: "" }
     val showAlbumArtists: Flow<Boolean> =
@@ -301,6 +314,7 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_OPENAI_MODEL] ?: DEFAULT_OPENAI_MODEL }
     val openPlayerOnPlay: Flow<Boolean> = context.dataStore.data.map { it[KEY_OPEN_PLAYER_ON_PLAY] ?: true }
     val startupAutoPlay: Flow<Boolean> = context.dataStore.data.map { it[KEY_STARTUP_AUTO_PLAY] ?: false }
+    val bluetoothAutoPlay: Flow<Boolean> = context.dataStore.data.map { it[KEY_BLUETOOTH_AUTO_PLAY] ?: false }
     val startupPlayMode: Flow<Int> = context.dataStore.data.map {
         it[KEY_STARTUP_PLAY_MODE]
             ?: if (it[KEY_STARTUP_AUTO_PLAY] == true) STARTUP_PLAY_RANDOM else STARTUP_PLAY_OFF
@@ -332,7 +346,12 @@ class SettingsManager(private val context: Context) {
     val playlistListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_PLAYLIST_LIST] ?: 2 }
     val playlistDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_PLAYLIST_DETAIL_SONG] ?: 2 }
     val categoryGridColumns: Flow<Int> = context.dataStore.data.map {
-        (it[KEY_CATEGORY_GRID_COLUMNS] ?: 2).coerceIn(1, 4)
+        val tablet = context.resources.configuration.smallestScreenWidthDp >= 600
+        if (tablet) {
+            (it[KEY_CATEGORY_GRID_COLUMNS] ?: 5).coerceIn(5, 8)
+        } else {
+            (it[KEY_CATEGORY_GRID_COLUMNS] ?: 2).coerceIn(1, 4)
+        }
     }
     val homeDailyMixVisible: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_HOME_DAILY_MIX_VISIBLE] ?: true }
@@ -356,7 +375,7 @@ class SettingsManager(private val context: Context) {
     val bluetoothLyricEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_ENABLED] ?: false }
     val bluetoothLyricTranslation: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_TRANSLATION] ?: false }
+        context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_TRANSLATION] ?: true }
     val bluetoothLyricPronunciation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_PRONUNCIATION] ?: false }
     suspend fun setLyriconEnabled(enabled: Boolean) {
@@ -546,6 +565,14 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setMiniPlayerLyricTranslation(enabled: Boolean) {
         context.dataStore.edit { it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] = enabled }
+    }
+
+    suspend fun setMiniPlayerLyricSecondary(mode: Int) {
+        context.dataStore.edit {
+            val safeMode = mode.coerceIn(LYRIC_SECONDARY_OFF, LYRIC_SECONDARY_PRONUNCIATION)
+            it[KEY_MINI_PLAYER_LYRIC_SECONDARY] = safeMode
+            it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] = safeMode == LYRIC_SECONDARY_TRANSLATION
+        }
     }
 
     suspend fun setMiniPlayerCoverRotation(enabled: Boolean) {
@@ -748,6 +775,10 @@ class SettingsManager(private val context: Context) {
         setStartupPlayMode(if (enabled) STARTUP_PLAY_RANDOM else STARTUP_PLAY_OFF)
     }
 
+    suspend fun setBluetoothAutoPlay(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_BLUETOOTH_AUTO_PLAY] = enabled }
+    }
+
     suspend fun setStartupPlayMode(mode: Int) {
         val safeMode = mode.coerceIn(STARTUP_PLAY_OFF, STARTUP_PLAY_RESUME)
         context.dataStore.edit {
@@ -815,7 +846,8 @@ class SettingsManager(private val context: Context) {
     }
 
     suspend fun setCategoryGridColumns(columns: Int) {
-        context.dataStore.edit { it[KEY_CATEGORY_GRID_COLUMNS] = columns.coerceIn(1, 4) }
+        val tablet = context.resources.configuration.smallestScreenWidthDp >= 600
+        context.dataStore.edit { it[KEY_CATEGORY_GRID_COLUMNS] = columns.coerceIn(if (tablet) 5 else 1, if (tablet) 8 else 4) }
     }
 
     suspend fun setHomeDailyMixVisible(visible: Boolean) {
@@ -940,6 +972,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_BLUETOOTH_LYRIC_ENABLED)
             setBoolean(KEY_BLUETOOTH_LYRIC_TRANSLATION)
             setBoolean(KEY_BLUETOOTH_LYRIC_PRONUNCIATION)
+            setBoolean(KEY_BLUETOOTH_AUTO_PLAY)
             setBoolean(KEY_OPEN_PLAYER_ON_PLAY)
             setBoolean(KEY_STARTUP_AUTO_PLAY)
             setBoolean(KEY_HOME_DAILY_MIX_VISIBLE)

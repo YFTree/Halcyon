@@ -84,7 +84,7 @@ The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming
 - Word-by-word lyrics keep the current character clearly highlighted; short characters avoid wide feathered sweep effects that can cause blurring.
 - Improves TTML / Lyricify recognition for word-by-word endings, spaces, translations, original text, and annotations, reducing missing words and line-position mismatches.
 - ELRC V1/V2 duet information is passed to Lyricon / lyric barrage for left-right display.
-- Supports long-press lyric selection for generating lyric cards, with customizable Via information in app preferences.
+- Supports long-press lyric selection for generating lyric cards, with customizable by information in app preferences.
 - The lyrics page font can be selected from system font previews or imported from TTF / OTF / TTC font files.
 
 ### 🪟 Floating Lyrics & System Lyrics

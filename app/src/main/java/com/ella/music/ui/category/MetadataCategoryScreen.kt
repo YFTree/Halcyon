@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
@@ -136,7 +137,14 @@ fun MetadataCategoryScreen(
         }
     }
     val gridColumns by mainViewModel.settingsManager.categoryGridColumns.collectAsState(initial = 2)
-    val safeGridColumns = if (type.usesSingleColumnCategory()) 1 else gridColumns.coerceIn(1, 4)
+    val configuration = LocalConfiguration.current
+    val safeGridColumns = if (type.usesSingleColumnCategory()) {
+        1
+    } else if (configuration.smallestScreenWidthDp >= 600) {
+        gridColumns.coerceIn(5, 8)
+    } else {
+        gridColumns.coerceIn(1, 4)
+    }
     val pageBackground = ellaPageBackground()
     val gridState = rememberLazyGridState()
     val scope = rememberCoroutineScope()

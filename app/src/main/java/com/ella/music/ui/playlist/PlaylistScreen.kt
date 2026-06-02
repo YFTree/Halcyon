@@ -120,6 +120,7 @@ fun PlaylistScreen(
     val context = LocalContext.current
     val playlists by mainViewModel.playlists.collectAsState()
     val librarySongs by mainViewModel.songs.collectAsState()
+    val ratingRevision by mainViewModel.ratingRevision.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -153,7 +154,7 @@ fun PlaylistScreen(
     val showFiveStar = remember(searchQuery, fiveStarName) {
         searchQuery.isBlank() || fiveStarName.contains(searchQuery.trim(), ignoreCase = true)
     }
-    val fiveStarSongs by produceState(initialValue = emptyList(), librarySongs) {
+    val fiveStarSongs by produceState(initialValue = emptyList(), librarySongs, ratingRevision) {
         value = mainViewModel.getFiveStarSongs()
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -482,10 +483,11 @@ fun PlaylistDetailScreen(
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val librarySongs by mainViewModel.songs.collectAsState()
+    val ratingRevision by mainViewModel.ratingRevision.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val isFiveStarPlaylist = playlistId == FIVE_STAR_PLAYLIST_ID
     val storedPlaylist = playlists.firstOrNull { it.id == playlistId }
-    val fiveStarSongs by produceState(initialValue = emptyList(), isFiveStarPlaylist, librarySongs) {
+    val fiveStarSongs by produceState(initialValue = emptyList(), isFiveStarPlaylist, librarySongs, ratingRevision) {
         value = if (isFiveStarPlaylist) mainViewModel.getFiveStarSongs() else emptyList()
     }
     val playlist = if (isFiveStarPlaylist) {
@@ -764,6 +766,7 @@ fun PlaylistDetailScreen(
                         loadAudioInfo = mainViewModel::getAudioInfo,
                         isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                         loadSongRating = mainViewModel::getSongRating,
+                        ratingRevision = ratingRevision,
                         onClick = {
                             playerViewModel.setPlaylist(displayedSongs, index)
                             if (openPlayerOnPlay) onNavigateToPlayer()

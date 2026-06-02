@@ -19,6 +19,7 @@ import com.ella.music.player.DesktopLyricBridge
 import com.ella.music.player.ExoPlayerManager
 import com.ella.music.player.LyricGetterBridge
 import com.ella.music.player.LyriconBridge
+import com.ella.music.player.PlaybackService
 import com.ella.music.player.SuperLyricBridge
 import com.ella.music.player.TickerBridge
 import kotlinx.coroutines.Job
@@ -104,7 +105,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var lastStatsTickMs = 0L
 
     private var bluetoothLyricEnabled = false
-    private var bluetoothLyricTranslationEnabled = false
+    private var bluetoothLyricTranslationEnabled = true
     private var bluetoothLyricPronunciationEnabled = false
     private var lyriconTranslationEnabled = true
     private var lyriconPronunciationEnabled = false
@@ -145,6 +146,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         initDecoderMode()
         initAudioFocusMode()
         initLyricSourceMode()
+        initBluetoothAutoPlay()
         observeLazyOnlineQueue()
     }
 
@@ -428,6 +430,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 appliedLyricSourceMode = safeMode
                 lyricSourceMode = safeMode
                 currentSong.value?.let { reloadLyrics(it, force = true) }
+            }
+        }
+    }
+
+    private fun initBluetoothAutoPlay() {
+        viewModelScope.launch {
+            PlaybackService.bluetoothConnectEvent.collect {
+                if (currentSong.value != null && !isPlaying.value) {
+                    playerManager.play()
+                    AppLogStore.info(getApplication(), "BtAutoPlay", "Resumed existing queue on Bluetooth connect")
+                } else if (currentSong.value == null && playerManager.hasSavedQueue()) {
+                    playerManager.play()
+                    AppLogStore.info(getApplication(), "BtAutoPlay", "Restored saved queue on Bluetooth connect")
+                }
             }
         }
     }

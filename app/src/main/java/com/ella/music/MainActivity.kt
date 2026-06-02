@@ -420,7 +420,7 @@ fun EllaApp(
     val duration by playerViewModel.duration.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
-    val miniPlayerShowTranslation by settingsManager.miniPlayerLyricTranslation.collectAsState(initial = true)
+    val miniPlayerLyricSecondary by settingsManager.miniPlayerLyricSecondary.collectAsState(initial = SettingsManager.LYRIC_SECONDARY_TRANSLATION)
     val miniPlayerCoverRotation by settingsManager.miniPlayerCoverRotation.collectAsState(initial = true)
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
     val bottomBarGlassEffect by settingsManager.bottomBarGlassEffect.collectAsState(initial = BottomBarGlassEffect.LiquidGlass)
@@ -431,8 +431,12 @@ fun EllaApp(
     } else {
         null
     }
-    val miniPlayerLyricTranslation = if (isPlaying && miniPlayerLyricsEnabled && miniPlayerShowTranslation) {
-        currentLyricLine?.translation?.takeIf { it.isNotBlank() }
+    val miniPlayerLyricSecondaryText = if (isPlaying && miniPlayerLyricsEnabled) {
+        when (miniPlayerLyricSecondary) {
+            SettingsManager.LYRIC_SECONDARY_TRANSLATION -> currentLyricLine?.translation?.takeIf { it.isNotBlank() }
+            SettingsManager.LYRIC_SECONDARY_PRONUNCIATION -> currentLyricLine?.pronunciation?.takeIf { it.isNotBlank() }
+            else -> null
+        }
     } else {
         null
     }
@@ -514,7 +518,7 @@ fun EllaApp(
                 currentPosition = currentPosition,
                 duration = duration,
                 lyricText = miniPlayerLyricText,
-                lyricTranslation = miniPlayerLyricTranslation,
+                lyricTranslation = miniPlayerLyricSecondaryText,
                 tabs = tabs,
                 currentTab = currentTab,
                 currentRoute = currentRoute,

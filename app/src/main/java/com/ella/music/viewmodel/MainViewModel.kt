@@ -28,6 +28,7 @@ import com.ella.music.data.model.Artist
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
+import com.ella.music.data.metadata.AudioTagInfo
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.model.toSong
@@ -71,6 +72,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val playlists: StateFlow<List<UserPlaylist>> = playlistStore.playlists
     private val _libraryCacheLoaded = MutableStateFlow(false)
     val libraryCacheLoaded: StateFlow<Boolean> = _libraryCacheLoaded.asStateFlow()
+    private val _ratingRevision = MutableStateFlow(0)
+    val ratingRevision: StateFlow<Int> = _ratingRevision.asStateFlow()
 
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
@@ -344,11 +347,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getSongRating(song: Song): Int = repository.getSongRating(song)
 
-    suspend fun writeSongRating(song: Song, rating: Int): Result<Song?> =
-        repository.writeSongRating(song, rating)
+    suspend fun writeSongRating(song: Song, rating: Int): Result<Song?> {
+        val result = repository.writeSongRating(song, rating)
+        if (result.isSuccess) {
+            _ratingRevision.value += 1
+        }
+        return result
+    }
 
     suspend fun writeSongCustomTag(song: Song, key: String, value: String): Result<Song?> =
         repository.writeSongCustomTag(song, key, value)
+
+    suspend fun writeSongMetadata(song: Song, tags: AudioTagInfo): Result<Song?> {
+        val result = repository.writeSongMetadata(song, tags)
+        if (result.isSuccess && tags.rating != null) {
+            _ratingRevision.value += 1
+        }
+        return result
+    }
+
+    fun getFullAudioTagInfo(song: Song): AudioTagInfo? =
+        repository.getFullAudioTagInfo(song)
 
     suspend fun interpretSongWithOpenAi(song: Song): String = withContext(Dispatchers.IO) {
         val lyricSourceMode = settingsManager.lyricSourceMode.first()

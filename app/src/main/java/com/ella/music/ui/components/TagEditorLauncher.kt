@@ -35,6 +35,7 @@ object TagEditorOptionIds {
     const val ASK_EACH_TIME = ""
     const val LYRICO = "lyrico"
     const val BUILTIN_CUSTOM_TAG = "builtin_custom_tag"
+    const val BUILTIN_METADATA_EDITOR = BUILTIN_CUSTOM_TAG
     const val LUNABEAT_METADATA = "lunabeat_metadata"
     const val LUNABEAT_LYRIC_TIMING = "lunabeat_lyric_timing"
     const val MUSIC_TAG = "music_tag"

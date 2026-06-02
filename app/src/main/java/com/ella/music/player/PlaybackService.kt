@@ -52,6 +52,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -67,11 +68,14 @@ class PlaybackService : MediaLibraryService() {
         const val ACTION_TOGGLE_FAVORITE = "com.ella.music.action.TOGGLE_FAVORITE"
         const val ACTION_TOGGLE_SHUFFLE = "com.ella.music.action.TOGGLE_SHUFFLE"
         private const val TIMING_TAG = "EllaPlaybackTiming"
+
+        val bluetoothConnectEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     }
 
     private var mediaSession: MediaLibrarySession? = null
     private lateinit var notificationProvider: NoArtworkMediaNotificationProvider
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var bluetoothReceiver: BluetoothAutoPlayReceiver? = null
     @Volatile
     private var previousButtonAction = SettingsManager.PREVIOUS_BUTTON_PREVIOUS
 
@@ -186,6 +190,20 @@ class PlaybackService : MediaLibraryService() {
 
         updateMediaButtonPreferences()
 
+        // Register Bluetooth auto-play receiver
+        bluetoothReceiver = BluetoothAutoPlayReceiver {
+            val player = mediaSession?.player ?: return@BluetoothAutoPlayReceiver
+            if (player.mediaItemCount > 0 && !player.isPlaying && player.playWhenReady) {
+                player.play()
+            } else if (player.mediaItemCount > 0 && !player.isPlaying) {
+                player.play()
+            }
+            bluetoothConnectEvent.tryEmit(Unit)
+        }
+        if (BluetoothAutoPlayReceiver.hasBluetoothConnectPermission(this)) {
+            registerReceiver(bluetoothReceiver, BluetoothAutoPlayReceiver.createIntentFilter())
+        }
+
         Log.i(TAG, "PlaybackService created")
         AppLogStore.info(this, TAG, "PlaybackService created")
     }
@@ -202,6 +220,10 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
+        bluetoothReceiver?.let {
+            runCatching { unregisterReceiver(it) }
+            bluetoothReceiver = null
+        }
         mediaSession?.run {
             player.release()
             release()

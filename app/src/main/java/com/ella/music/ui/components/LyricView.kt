@@ -48,8 +48,10 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -594,7 +596,16 @@ private fun WordTimedText(
             fontSize = fontSizeSp.sp,
             fontFamily = fontFamily,
             fontWeight = fontWeight,
-            textAlign = textAlign
+            textAlign = textAlign,
+            shadow = if (isActive) {
+                Shadow(
+                    color = Color.White.copy(alpha = 0.42f),
+                    offset = Offset.Zero,
+                    blurRadius = 18f
+                )
+            } else {
+                null
+            }
         ),
         maxLines = maxLines,
         softWrap = true,
@@ -635,9 +646,26 @@ private fun buildWordTimedAnnotatedString(
                     fontWeight = activeFontWeight
                 )
             }
-            pushStyle(style)
-            append(wordText)
-            pop()
+            if (positionMs in word.startMs..word.endMs && wordText.length > 1) {
+                val duration = (word.endMs - word.startMs).coerceAtLeast(1L)
+                val progress = ((positionMs - word.startMs).toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+                val activeCharCount = (wordText.length * progress).toInt().coerceIn(0, wordText.length)
+                val leadCount = if (progress > 0f) activeCharCount.coerceAtLeast(1) else activeCharCount
+                if (leadCount > 0) {
+                    pushStyle(SpanStyle(color = currentWordColor, fontWeight = activeFontWeight))
+                    append(wordText.take(leadCount))
+                    pop()
+                }
+                if (leadCount < wordText.length) {
+                    pushStyle(SpanStyle(color = inactiveFutureColor, fontWeight = fontWeight))
+                    append(wordText.drop(leadCount))
+                    pop()
+                }
+            } else {
+                pushStyle(style)
+                append(wordText)
+                pop()
+            }
         }
     }
 }

@@ -21,12 +21,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -38,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -46,7 +49,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.Album
+import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.model.playlistIdentityKey
@@ -59,7 +64,6 @@ import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SafeCoverImage
-import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
@@ -72,7 +76,6 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,6 +98,7 @@ fun AlbumDetailScreen(
     val currentSong by playerViewModel.currentSong.collectAsState()
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
+    val ratingRevision by mainViewModel.ratingRevision.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val sortIndex by mainViewModel.settingsManager.albumDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.albumDetailSongSortIndex)
     val sortMode = AlbumDetailSongSortMode.entries.getOrElse(sortIndex) { AlbumDetailSongSortMode.Track }
@@ -247,7 +251,7 @@ fun AlbumDetailScreen(
             if (useDiscSections) {
                 discGroups.forEach { group ->
                     item(key = "disc-${group.discNumber}") {
-                        DiscHeader(group.discNumber)
+                        DiscHeader(group)
                     }
                     items(
                         items = group.songs,
@@ -258,11 +262,11 @@ fun AlbumDetailScreen(
                             song = song,
                             index = index,
                             sortedAlbumSongs = sortedAlbumSongs,
-                            albumArtUri = albumArtUri,
                             currentSongId = currentSong?.id,
                             isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                             showTrackNumber = true,
                             mainViewModel = mainViewModel,
+                            ratingRevision = ratingRevision,
                             playerViewModel = playerViewModel,
                             openPlayerOnPlay = openPlayerOnPlay,
                             onNavigateToPlayer = onNavigateToPlayer,
@@ -276,11 +280,11 @@ fun AlbumDetailScreen(
                         song = song,
                         index = index,
                         sortedAlbumSongs = sortedAlbumSongs,
-                        albumArtUri = albumArtUri,
                         currentSongId = currentSong?.id,
                         isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                         showTrackNumber = sortMode == AlbumDetailSongSortMode.Track,
                         mainViewModel = mainViewModel,
+                        ratingRevision = ratingRevision,
                         playerViewModel = playerViewModel,
                         openPlayerOnPlay = openPlayerOnPlay,
                         onNavigateToPlayer = onNavigateToPlayer,
@@ -322,7 +326,7 @@ fun AlbumDetailScreen(
             Icon(
                 imageVector = MiuixIcons.Regular.Back,
                 contentDescription = stringResource(R.string.common_back),
-                tint = Color.White,
+                tint = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.size(26.dp)
             )
         }
@@ -338,7 +342,7 @@ fun AlbumDetailScreen(
             Icon(
                 imageVector = MiuixIcons.Regular.Sort,
                 contentDescription = stringResource(R.string.common_sort),
-                tint = Color.White,
+                tint = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -506,61 +510,18 @@ private fun AlbumInfoSection(
 }
 
 @Composable
-private fun AlbumReleaseSummary(
-    albumArtist: String?,
-    songCount: Int,
-    year: Int,
-    duration: Long,
-    onAlbumArtistClick: () -> Unit,
-    onReleaseYearClick: () -> Unit
-) {
-    val context = LocalContext.current
-    Row(
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        val baseText = listOfNotNull(
-            albumArtist,
-            stringResource(R.string.song_count, songCount)
-        ).joinToString(" · ")
-        Text(
-            text = baseText,
-            fontSize = 14.sp,
-            color = Color.White.copy(alpha = 0.78f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable(enabled = albumArtist != null, onClick = onAlbumArtistClick)
-        )
-        if (year > 0) {
-            Text(text = " · ", fontSize = 14.sp, color = Color.White.copy(alpha = 0.78f))
-            Text(
-                text = "${stringResource(R.string.album_release_date)} $year",
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.78f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.clickable(onClick = onReleaseYearClick)
-            )
-        }
-        Text(
-            text = " · ${duration.formatAlbumDetailDuration(context)}",
-            fontSize = 14.sp,
-            color = Color.White.copy(alpha = 0.78f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun DiscHeader(discNumber: Int) {
+private fun DiscHeader(group: AlbumDiscGroup) {
     Text(
-        text = "Disc $discNumber",
-        fontSize = 15.sp,
+        text = stringResource(
+            R.string.album_disc_header,
+            group.discNumber,
+            group.songs.size,
+            group.songs.sumOf { it.duration }.formatPlaybackDuration()
+        ),
+        fontSize = 13.sp,
         fontWeight = FontWeight.Bold,
-        color = MiuixTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 6.dp)
+        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        modifier = Modifier.padding(start = 26.dp, end = 26.dp, top = 22.dp, bottom = 8.dp)
     )
 }
 
@@ -569,27 +530,24 @@ private fun AlbumSongRow(
     song: Song,
     index: Int,
     sortedAlbumSongs: List<Song>,
-    albumArtUri: Uri?,
     currentSongId: Long?,
     isFavorite: Boolean,
     showTrackNumber: Boolean,
     mainViewModel: MainViewModel,
+    ratingRevision: Int,
     playerViewModel: PlayerViewModel,
     openPlayerOnPlay: Boolean,
     onNavigateToPlayer: () -> Unit,
     onMore: () -> Unit
 ) {
-    SongItem(
+    AlbumTrackRow(
         song = song,
         isCurrent = currentSongId == song.id,
-        albumArtUri = albumArtUri,
-        loadCoverArt = mainViewModel::getAlbumCoverArtBitmap,
         loadAudioInfo = mainViewModel::getAudioInfo,
         isFavorite = isFavorite,
         loadSongRating = mainViewModel::getSongRating,
+        ratingRevision = ratingRevision,
         leadingLabel = if (showTrackNumber) song.displayTrackNumber() else null,
-        leadingLabelBeforeCover = showTrackNumber,
-        showAlbumInSubtitle = false,
         onClick = {
             val safeIndex = index.coerceAtLeast(0)
             playerViewModel.setPlaylist(sortedAlbumSongs, safeIndex)
@@ -598,6 +556,105 @@ private fun AlbumSongRow(
         onAddToQueue = { playerViewModel.addToPlaylist(song) },
         onMore = onMore
     )
+}
+
+@Composable
+private fun AlbumTrackRow(
+    song: Song,
+    isCurrent: Boolean,
+    loadAudioInfo: (Song) -> AudioInfo,
+    isFavorite: Boolean,
+    loadSongRating: (Song) -> Int,
+    ratingRevision: Int,
+    leadingLabel: String?,
+    onClick: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onMore: () -> Unit
+) {
+    val audioInfo by produceState<AudioInfo?>(initialValue = null, song.id, song.dateModified, loadAudioInfo) {
+        value = withContext(Dispatchers.IO) { loadAudioInfo(song) }
+    }
+    val rating by produceState(initialValue = 0, song.id, song.dateModified, ratingRevision, loadSongRating) {
+        value = withContext(Dispatchers.IO) { loadSongRating(song) }
+    }
+    val qualityTag = audioInfo?.let { audioQualitySummary(it).listTag }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = 26.dp, end = 16.dp, top = 15.dp, bottom = 15.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = leadingLabel.orEmpty(),
+            fontSize = 16.sp,
+            color = if (isCurrent) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.width(46.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = song.title,
+                    fontSize = 18.sp,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isCurrent) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isFavorite) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "♥", fontSize = 12.sp, color = Color(0xFFFF4D6D))
+                }
+                if (rating > 0) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "★$rating", fontSize = 11.sp, color = Color(0xFFFFB703))
+                }
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!qualityTag.isNullOrBlank()) {
+                    Text(
+                        text = qualityTag,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(3.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                Text(
+                    text = song.artist.ifBlank { stringResource(R.string.player_unknown_artist) },
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "+",
+            fontSize = 18.sp,
+            color = MiuixTheme.colorScheme.primary,
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(onClick = onAddToQueue)
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        )
+        Text(
+            text = "⋮",
+            fontSize = 24.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(onClick = onMore)
+                .padding(horizontal = 10.dp, vertical = 2.dp)
+        )
+    }
 }
 
 @Composable
@@ -612,99 +669,140 @@ private fun AlbumHeader(
     onReleaseYearClick: () -> Unit,
     onPlayAll: () -> Unit
 ) {
-    val pageBackground = ellaPageBackground()
-    Box(
+    val albumArtist = album?.albumArtist?.takeIf { it.isNotBlank() }
+        ?.takeIf { !it.equals("Unknown", ignoreCase = true) }
+        ?: album?.artist?.takeIf { it.isNotBlank() && !it.equals("Unknown", ignoreCase = true) }
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(448.dp)
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(start = 26.dp, end = 26.dp, top = 86.dp, bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(22.dp)
     ) {
-        if (albumCoverModel != null) {
-            SafeCoverImage(
-                model = albumCoverModel,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                sizePx = 3000
-            )
-        } else {
-            DefaultAlbumCover(modifier = Modifier.fillMaxSize())
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(124.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MiuixTheme.colorScheme.surfaceContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (albumCoverModel != null) {
+                    SafeCoverImage(
+                        model = albumCoverModel,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        sizePx = 512
+                    )
+                } else {
+                    DefaultAlbumCover(modifier = Modifier.fillMaxSize())
+                }
+            }
+            Spacer(modifier = Modifier.width(22.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = album?.name ?: stringResource(R.string.player_unknown_album),
+                    fontSize = 24.sp,
+                    lineHeight = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!albumArtist.isNullOrBlank()) {
+                    Text(
+                        text = albumArtist,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MiuixTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(onClick = onAlbumArtistClick)
+                    )
+                }
+                Text(
+                    text = if ((album?.year ?: 0) > 0) {
+                        album?.year.toString()
+                    } else {
+                        stringResource(R.string.album_unknown_year)
+                    },
+                    fontSize = 14.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.clickable(enabled = (album?.year ?: 0) > 0, onClick = onReleaseYearClick)
+                )
+            }
         }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.00f to Color.Black.copy(alpha = 0.05f),
-                            0.42f to Color.Black.copy(alpha = 0.16f),
-                            0.74f to pageBackground.copy(alpha = 0.78f),
-                            1.00f to pageBackground
-                        )
-                    )
-                )
-        )
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 38.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = album?.name ?: stringResource(R.string.player_unknown_album),
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+            AlbumStatItem(value = songCount.toString(), label = stringResource(R.string.album_stat_songs))
+            AlbumStatItem(value = duration.formatPlaybackDuration(), label = stringResource(R.string.album_stat_duration))
+            AlbumStatItem(
+                value = (album?.year ?: 0).takeIf { it > 0 }?.toString() ?: stringResource(R.string.album_unknown_year),
+                label = stringResource(R.string.album_stat_year)
             )
+        }
 
-            val albumArtist = album?.albumArtist?.takeIf { it.isNotBlank() }
-                ?.takeIf { it.isNotBlank() && !it.equals("Unknown", ignoreCase = true) }
-            AlbumReleaseSummary(
-                albumArtist = albumArtist,
-                songCount = songCount,
-                year = album?.year ?: 0,
-                duration = duration,
-                onAlbumArtistClick = onAlbumArtistClick,
-                onReleaseYearClick = onReleaseYearClick
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AppleStylePlayButton(
+                text = stringResource(R.string.play_all),
+                onClick = onPlayAll,
+                modifier = Modifier.weight(1f)
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
             if (hasNeteaseAlbum) {
                 Text(
                     text = stringResource(R.string.player_netease_album_page),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MiuixTheme.colorScheme.primary,
                     modifier = Modifier
-                        .background(Color.White.copy(alpha = 0.18f), androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.10f))
                         .clickable(onClick = onNeteaseAlbumClick)
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .padding(horizontal = 12.dp, vertical = 9.dp)
                 )
             }
-
-            AppleStylePlayButton(
-                text = stringResource(R.string.play_all),
-                onClick = onPlayAll,
-                modifier = Modifier
-                    .padding(top = 12.dp)
-            )
         }
+    }
+}
+
+@Composable
+private fun AlbumStatItem(value: String, label: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = value,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.onSurface
+        )
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+        )
     }
 }
 
 private fun openUrl(context: Context, url: String) {
     if (url.isBlank()) return
     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-}
-
-private fun Long.formatAlbumDetailDuration(context: Context): String {
-    return formatPlaybackDuration()
 }
 
 private enum class AlbumDetailSongSortMode(val labelRes: Int) {

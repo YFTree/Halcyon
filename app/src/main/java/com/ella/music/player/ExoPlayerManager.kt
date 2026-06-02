@@ -81,6 +81,7 @@ class ExoPlayerManager(private val context: Context) {
     private var virtualPlaylistCurrentIndex: Int? = null
     private var playWhenConnected = false
     private var pendingPlaylist: PendingPlaylist? = null
+    private var reorderingPlaylistForShuffle = false
 
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val artworkRepository = MusicRepository(context)
@@ -174,6 +175,7 @@ class ExoPlayerManager(private val context: Context) {
             }
 
             override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                if (reorderingPlaylistForShuffle) return
                 refreshStateFromController()
             }
 
@@ -779,6 +781,7 @@ class ExoPlayerManager(private val context: Context) {
 
     private fun shufflePlaylistKeepingCurrent() {
         val controller = mediaController ?: return
+        if (reorderingPlaylistForShuffle) return
         if (virtualPlaylistCurrentIndex != null || playlist.size <= 1) return
 
         val currentIndex = controller.currentMediaItemIndex
@@ -793,38 +796,19 @@ class ExoPlayerManager(private val context: Context) {
         val newPlaylist = listOf(current) + shuffled
         val positionMs = controller.currentPosition.coerceAtLeast(0L)
         val wasPlaying = controller.isPlaying
-        val oldPlaylist = playlist.toList()
 
-        playlist.clear()
-        playlist.addAll(newPlaylist)
-        _playlist.value = newPlaylist
-        if (!moveControllerQueue(controller, oldPlaylist, newPlaylist)) {
+        reorderingPlaylistForShuffle = true
+        try {
+            playlist.clear()
+            playlist.addAll(newPlaylist)
+            _playlist.value = newPlaylist
             controller.setMediaItems(newPlaylist.map(::songToMediaItem), 0, positionMs)
             controller.prepare()
             if (wasPlaying) controller.play()
+            updateCurrentSong()
+        } finally {
+            reorderingPlaylistForShuffle = false
         }
-        updateCurrentSong()
-    }
-
-    private fun moveControllerQueue(
-        controller: MediaController,
-        oldPlaylist: List<Song>,
-        newPlaylist: List<Song>
-    ): Boolean {
-        if (controller.mediaItemCount != newPlaylist.size) return false
-        val currentOrder = oldPlaylist.toMutableList()
-        if (currentOrder.size != newPlaylist.size) return false
-
-        newPlaylist.forEachIndexed { targetIndex, targetSong ->
-            val currentIndex = currentOrder.indexOfFirst { it.isSamePlaybackIdentity(targetSong) }
-            if (currentIndex < 0) return false
-            if (currentIndex != targetIndex) {
-                controller.moveMediaItem(currentIndex, targetIndex)
-                val moved = currentOrder.removeAt(currentIndex)
-                currentOrder.add(targetIndex, moved)
-            }
-        }
-        return true
     }
 
     private fun refreshCurrentSessionMetadata(controller: MediaController, song: Song) {
@@ -968,7 +952,14 @@ class ExoPlayerManager(private val context: Context) {
         val itemCount = controller.mediaItemCount
         if (itemCount <= 0) return false
 
-        val randomIndex = Random.nextInt(itemCount)
+        val currentIndex = controller.currentMediaItemIndex
+        val randomIndex = if (itemCount > 1 && currentIndex in 0 until itemCount) {
+            var nextIndex = Random.nextInt(itemCount - 1)
+            if (nextIndex >= currentIndex) nextIndex += 1
+            nextIndex
+        } else {
+            Random.nextInt(itemCount)
+        }
         controller.seekToDefaultPosition(randomIndex)
         controller.play()
         updateCurrentSong()

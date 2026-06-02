@@ -1,9 +1,14 @@
 package com.ella.music.ui.components
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.decodeNeteaseKey
+import com.ella.music.data.exception.WritePermissionRequiredException
+import com.ella.music.data.metadata.AudioTagInfo
+import com.lonx.audiotag.model.AudioTagKeys
 import com.ella.music.data.detailedAudioInfo
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
@@ -90,9 +98,11 @@ fun SongMoreActionHost(
     val defaultDangerText = stringResource(R.string.common_delete)
     val actionSheetTitle = stringResource(R.string.song_more_actions_title)
     val addToPlaylistFailed = stringResource(R.string.song_more_add_to_playlist_failed)
+    val addToQueueFailed = stringResource(R.string.song_more_add_to_queue_failed)
     val playNextFailed = stringResource(R.string.song_more_play_next_failed)
     val shareFailed = stringResource(R.string.song_more_share_failed)
     val addedToPlayNext = stringResource(R.string.song_more_added_to_play_next)
+    val addedToQueue = stringResource(R.string.song_more_added_to_queue)
     val noArtistJump = stringResource(R.string.song_more_no_artist_jump)
     val noAlbumJump = stringResource(R.string.song_more_no_album_jump)
     val selectArtistTitle = stringResource(R.string.song_more_select_artist)
@@ -108,7 +118,7 @@ fun SongMoreActionHost(
     var createPlaylistSong by remember { mutableStateOf<Song?>(null) }
     var tagEditorSong by remember { mutableStateOf<Song?>(null) }
     var tagEditorKind by remember { mutableStateOf(TagEditorOptionKind.Metadata) }
-    var customTagSong by remember { mutableStateOf<Song?>(null) }
+    var metadataEditorSong by remember { mutableStateOf<Song?>(null) }
     var ratingSong by remember { mutableStateOf<Song?>(null) }
     var infoSong by remember { mutableStateOf<Song?>(null) }
     var aiSong by remember { mutableStateOf<Song?>(null) }
@@ -117,6 +127,22 @@ fun SongMoreActionHost(
     var dangerConfirmMessage by remember { mutableStateOf("") }
     var dangerConfirmText by remember { mutableStateOf("") }
     var dangerConfirmAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingWriteRetry by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
+    val writePermissionNeeded = stringResource(R.string.song_more_metadata_write_permission_needed)
+
+    val writePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            pendingWriteRetry?.let { retry ->
+                scope.launch { retry() }
+                pendingWriteRetry = null
+            }
+        } else {
+            pendingWriteRetry = null
+            Toast.makeText(context, writePermissionNeeded, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     fun closeAction() = onDismissAction()
 
@@ -162,6 +188,13 @@ fun SongMoreActionHost(
                     closeAction()
                     runResolvedSongAction(song, addToPlaylistFailed) { resolvedSong ->
                         playlistSong = resolvedSong
+                    }
+                },
+                onAddToQueue = {
+                    closeAction()
+                    runResolvedSongAction(song, addToQueueFailed) { resolvedSong ->
+                        playerViewModel.addToPlaylist(resolvedSong)
+                        Toast.makeText(context, addedToQueue, Toast.LENGTH_SHORT).show()
                     }
                 },
                 onPlayNext = {
@@ -391,7 +424,7 @@ fun SongMoreActionHost(
         LaunchedEffect(song.id, preferredEditorId, preferredOption, tagEditorKind) {
             if (preferredEditorId.isNotBlank() && preferredOption != null) {
                 if (preferredOption.id == TagEditorOptionIds.BUILTIN_CUSTOM_TAG) {
-                    customTagSong = song
+                    metadataEditorSong = song
                 } else {
                     launchTagEditorOption(context, preferredOption)
                 }
@@ -410,7 +443,7 @@ fun SongMoreActionHost(
                 onDismiss = { tagEditorSong = null },
                 onOptionClick = { option ->
                     if (option.id == TagEditorOptionIds.BUILTIN_CUSTOM_TAG) {
-                        customTagSong = song
+                        metadataEditorSong = song
                     } else {
                         launchTagEditorOption(context, option)
                     }
@@ -420,26 +453,42 @@ fun SongMoreActionHost(
         }
     }
 
-    customTagSong?.let { song ->
+    metadataEditorSong?.let { song ->
         WindowBottomSheet(
             show = true,
             enableNestedScroll = false,
-            title = stringResource(R.string.song_more_builtin_custom_tag_title),
-            onDismissRequest = { customTagSong = null }
+            title = stringResource(R.string.song_more_metadata_editor_title),
+            onDismissRequest = { metadataEditorSong = null }
         ) {
-            BuiltInCustomTagSheet(
-                onDismiss = { customTagSong = null },
-                onSave = { key, value ->
+            SongMetadataEditorSheet(
+                song = song,
+                mainViewModel = mainViewModel,
+                onDismiss = { metadataEditorSong = null },
+                onSave = { tags ->
                     scope.launch {
-                        val result = mainViewModel.writeSongCustomTag(song, key, value)
-                        Toast.makeText(
-                            context,
-                            if (result.isSuccess) context.getString(R.string.song_more_custom_tag_saved)
-                            else result.exceptionOrNull()?.localizedMessage
-                                ?: context.getString(R.string.song_more_custom_tag_failed),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        customTagSong = null
+                        val result = mainViewModel.writeSongMetadata(song, tags)
+                        if (result.isSuccess) {
+                            Toast.makeText(context, context.getString(R.string.song_more_metadata_saved), Toast.LENGTH_SHORT).show()
+                            metadataEditorSong = null
+                        } else {
+                            val error = result.exceptionOrNull()
+                            if (error is WritePermissionRequiredException) {
+                                pendingWriteRetry = {
+                                    val retryResult = mainViewModel.writeSongMetadata(song, tags)
+                                    if (retryResult.isSuccess) {
+                                        Toast.makeText(context, context.getString(R.string.song_more_metadata_saved), Toast.LENGTH_SHORT).show()
+                                        metadataEditorSong = null
+                                    } else {
+                                        Toast.makeText(context, retryResult.exceptionOrNull()?.localizedMessage ?: context.getString(R.string.song_more_metadata_save_failed), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                writePermissionLauncher.launch(
+                                    IntentSenderRequest.Builder(error.intentSender).build()
+                                )
+                            } else {
+                                Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_metadata_save_failed), Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 }
             )
@@ -459,14 +508,28 @@ fun SongMoreActionHost(
                 onRatingSelected = { rating ->
                     scope.launch {
                         val result = mainViewModel.writeSongRating(song, rating)
-                        Toast.makeText(
-                            context,
-                            if (result.isSuccess) context.getString(R.string.song_more_rating_saved)
-                            else result.exceptionOrNull()?.localizedMessage
-                                ?: context.getString(R.string.song_more_rating_failed),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        ratingSong = null
+                        if (result.isSuccess) {
+                            Toast.makeText(context, context.getString(R.string.song_more_rating_saved), Toast.LENGTH_SHORT).show()
+                            ratingSong = null
+                        } else {
+                            val error = result.exceptionOrNull()
+                            if (error is WritePermissionRequiredException) {
+                                pendingWriteRetry = {
+                                    val retryResult = mainViewModel.writeSongRating(song, rating)
+                                    if (retryResult.isSuccess) {
+                                        Toast.makeText(context, context.getString(R.string.song_more_rating_saved), Toast.LENGTH_SHORT).show()
+                                        ratingSong = null
+                                    } else {
+                                        Toast.makeText(context, retryResult.exceptionOrNull()?.localizedMessage ?: context.getString(R.string.song_more_rating_failed), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                writePermissionLauncher.launch(
+                                    IntentSenderRequest.Builder(error.intentSender).build()
+                                )
+                            } else {
+                                Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_rating_failed), Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 }
             )
@@ -510,6 +573,7 @@ private fun SongMoreActionSheet(
     song: Song,
     onDismiss: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    onAddToQueue: () -> Unit,
     onPlayNext: () -> Unit,
     onShare: () -> Unit,
     onSpectrum: () -> Unit,
@@ -526,6 +590,7 @@ private fun SongMoreActionSheet(
 ) {
     SongSheetColumn {
         SongMenuItem(stringResource(R.string.song_more_add_to_playlist), onAddToPlaylist)
+        SongMenuItem(stringResource(R.string.common_add_to_queue), onAddToQueue)
         SongMenuItem(stringResource(R.string.song_more_play_next), onPlayNext)
         SongMenuItem(stringResource(R.string.common_share), onShare)
         if (showSpectrum) {
@@ -777,6 +842,273 @@ private fun BuiltInCustomTagSheet(
             Button(onClick = { onSave(key, value) }) { Text(stringResource(R.string.common_save)) }
         }
     }
+}
+
+@Composable
+private fun SongMetadataEditorSheet(
+    song: Song,
+    mainViewModel: MainViewModel,
+    onDismiss: () -> Unit,
+    onSave: (AudioTagInfo) -> Unit
+) {
+    val tagInfo by produceState<SongTagInfo?>(initialValue = null, song.id, song.dateModified, song.fileSize) {
+        value = withContext(Dispatchers.IO) { mainViewModel.getSongTagInfo(song) }
+    }
+    val fullTagInfo by produceState<AudioTagInfo?>(initialValue = null, song.id, song.dateModified, song.fileSize) {
+        value = withContext(Dispatchers.IO) { mainViewModel.getFullAudioTagInfo(song) }
+    }
+
+    var title by remember(tagInfo) { mutableStateOf(tagInfo?.title.orEmpty()) }
+    var artist by remember(tagInfo) { mutableStateOf(tagInfo?.artist.orEmpty()) }
+    var album by remember(tagInfo) { mutableStateOf(tagInfo?.album.orEmpty()) }
+    var albumArtist by remember(tagInfo) { mutableStateOf(tagInfo?.albumArtist.orEmpty()) }
+    var genre by remember(tagInfo) { mutableStateOf(tagInfo?.genre.orEmpty()) }
+    var year by remember(tagInfo) { mutableStateOf(tagInfo?.year.orEmpty()) }
+    var trackNumber by remember(tagInfo) { mutableStateOf(tagInfo?.track.orEmpty()) }
+    var discNumber by remember(fullTagInfo) { mutableStateOf(fullTagInfo?.discNumber?.toString().orEmpty()) }
+    var composer by remember(tagInfo) { mutableStateOf(tagInfo?.composer.orEmpty()) }
+    var lyricist by remember(tagInfo) { mutableStateOf(tagInfo?.lyricist.orEmpty()) }
+    var copyright by remember(tagInfo) { mutableStateOf(tagInfo?.copyright.orEmpty()) }
+    var comment by remember(tagInfo) { mutableStateOf(tagInfo?.comment.orEmpty()) }
+    var rating by remember(tagInfo) { mutableStateOf(tagInfo?.rating ?: 0) }
+    var customTags: MutableList<Pair<String, String>> by remember(fullTagInfo) {
+        val initial: MutableList<Pair<String, String>> = fullTagInfo?.customTags
+            ?.filter { entry -> !AudioTagKeys.isReserved(entry.key) }
+            ?.map { entry -> entry.key to entry.value.joinToString("; ") }
+            ?.toMutableList()
+            ?: mutableListOf()
+        mutableStateOf(initial)
+    }
+    var showAddTag by remember { mutableStateOf(false) }
+
+    SongSheetColumn {
+        // Basic Info section
+        SectionHeader(stringResource(R.string.song_more_metadata_section_basic))
+        MetadataField(stringResource(R.string.song_more_metadata_title), title) { title = it }
+        MetadataField(stringResource(R.string.song_more_metadata_artist), artist) { artist = it }
+        MetadataField(stringResource(R.string.song_more_metadata_album), album) { album = it }
+        MetadataField(stringResource(R.string.song_more_metadata_album_artist), albumArtist) { albumArtist = it }
+        MetadataField(stringResource(R.string.song_more_metadata_genre), genre) { genre = it }
+        MetadataField(stringResource(R.string.song_more_metadata_year), year) { year = it }
+
+        // Track Details section
+        SectionHeader(stringResource(R.string.song_more_metadata_section_track))
+        MetadataField(stringResource(R.string.song_more_metadata_track_number), trackNumber) { trackNumber = it }
+        MetadataField(stringResource(R.string.song_more_metadata_disc_number), discNumber) { discNumber = it }
+
+        // Credits section
+        SectionHeader(stringResource(R.string.song_more_metadata_section_credits))
+        MetadataField(stringResource(R.string.song_more_metadata_composer), composer) { composer = it }
+        MetadataField(stringResource(R.string.song_more_metadata_lyricist), lyricist) { lyricist = it }
+        MetadataField(stringResource(R.string.song_more_metadata_copyright), copyright) { copyright = it }
+        MetadataField(stringResource(R.string.song_more_metadata_comment), comment) { comment = it }
+
+        // Rating section
+        SectionHeader(stringResource(R.string.song_more_metadata_section_rating))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            (1..5).forEach { star ->
+                val starChar = if (star <= rating) "★" else "☆"
+                Text(
+                    text = starChar,
+                    fontSize = 28.sp,
+                    color = if (star <= rating) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { rating = if (rating == star) 0 else star }
+                        .padding(4.dp)
+                )
+            }
+            if (rating > 0) {
+                Text(
+                    text = "✕",
+                    fontSize = 16.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier
+                        .padding(start = 8.dp, top = 8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { rating = 0 }
+                        .padding(4.dp)
+                )
+            }
+        }
+
+        // Custom Tags section
+        SectionHeader(stringResource(R.string.song_more_metadata_section_custom_tags))
+        for (index in customTags.indices) {
+            val pair = customTags[index]
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextField(
+                    value = pair.first,
+                    onValueChange = { newKey -> customTags = customTags.toMutableList().apply { set(index, newKey to pair.second) } },
+                    label = stringResource(R.string.song_more_custom_tag_name),
+                    singleLine = true,
+                    insideMargin = DpSize(12.dp, 10.dp),
+                    backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+                    cornerRadius = 12.dp,
+                    textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp),
+                    modifier = Modifier.weight(1f)
+                )
+                TextField(
+                    value = pair.second,
+                    onValueChange = { newValue -> customTags = customTags.toMutableList().apply { set(index, pair.first to newValue) } },
+                    label = stringResource(R.string.song_more_custom_tag_value),
+                    singleLine = true,
+                    insideMargin = DpSize(12.dp, 10.dp),
+                    backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+                    cornerRadius = 12.dp,
+                    textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp),
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "✕",
+                    fontSize = 16.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier
+                        .padding(top = 14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { customTags = customTags.toMutableList().apply { removeAt(index) } }
+                        .padding(4.dp)
+                )
+            }
+        }
+        if (showAddTag) {
+            var newKey by remember { mutableStateOf("") }
+            var newValue by remember { mutableStateOf("") }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextField(
+                    value = newKey,
+                    onValueChange = { newKey = it },
+                    label = stringResource(R.string.song_more_custom_tag_name),
+                    singleLine = true,
+                    insideMargin = DpSize(12.dp, 10.dp),
+                    backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+                    cornerRadius = 12.dp,
+                    textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp),
+                    modifier = Modifier.weight(1f)
+                )
+                TextField(
+                    value = newValue,
+                    onValueChange = { newValue = it },
+                    label = stringResource(R.string.song_more_custom_tag_value),
+                    singleLine = true,
+                    insideMargin = DpSize(12.dp, 10.dp),
+                    backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+                    cornerRadius = 12.dp,
+                    textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp),
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "✓",
+                    fontSize = 16.sp,
+                    color = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .padding(top = 14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable {
+                            if (newKey.isNotBlank()) {
+                                customTags = customTags.toMutableList().apply { add(newKey to newValue) }
+                                newKey = ""
+                                newValue = ""
+                                showAddTag = false
+                            }
+                        }
+                        .padding(4.dp)
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 4.dp)
+        ) {
+            Button(onClick = { showAddTag = !showAddTag }) {
+                Text(stringResource(R.string.song_more_metadata_add_custom_tag))
+            }
+        }
+
+        // Save / Cancel buttons
+        Spacer(modifier = Modifier.padding(vertical = 8.dp))
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), horizontalArrangement = Arrangement.End) {
+            Button(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = {
+                val ctMap: MutableMap<String, MutableList<String>> = mutableMapOf()
+                for (pair in customTags) {
+                    if (pair.first.isNotBlank()) {
+                        ctMap.getOrPut(pair.first) { mutableListOf() }.add(pair.second)
+                    }
+                }
+                val tags = AudioTagInfo(
+                    title = title.takeIf { v -> v != tagInfo?.title },
+                    artist = artist.takeIf { v -> v != tagInfo?.artist },
+                    album = album.takeIf { v -> v != tagInfo?.album },
+                    albumArtist = albumArtist.takeIf { v -> v != tagInfo?.albumArtist },
+                    genre = genre.takeIf { v -> v != tagInfo?.genre },
+                    year = year.takeIf { v -> v != tagInfo?.year },
+                    trackNumber = trackNumber.toIntOrNull()?.takeIf { v -> v.toString() != tagInfo?.track },
+                    discNumber = discNumber.toIntOrNull()?.takeIf { v -> v != fullTagInfo?.discNumber },
+                    composer = composer.takeIf { v -> v != tagInfo?.composer },
+                    lyricist = lyricist.takeIf { v -> v != tagInfo?.lyricist },
+                    copyright = copyright.takeIf { v -> v != tagInfo?.copyright },
+                    comment = comment.takeIf { v -> v != tagInfo?.comment },
+                    rating = rating.takeIf { v -> v != tagInfo?.rating },
+                    customTags = ctMap
+                )
+                onSave(tags)
+            }) {
+                Text(stringResource(R.string.common_save))
+            }
+        }
+        Spacer(modifier = Modifier.padding(bottom = 16.dp))
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun MetadataField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label,
+        useLabelAsPlaceholder = true,
+        singleLine = true,
+        insideMargin = DpSize(12.dp, 10.dp),
+        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+        cornerRadius = 12.dp,
+        textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 15.sp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 2.dp)
+    )
 }
 
 @Composable

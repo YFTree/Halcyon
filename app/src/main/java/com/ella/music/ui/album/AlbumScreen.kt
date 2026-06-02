@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -85,7 +86,12 @@ fun AlbumScreen(
     val sortIndex by mainViewModel.settingsManager.albumListSortIndex.collectAsState(initial = LibrarySortUiState.albumListSortIndex)
     val sortMode = AlbumSortMode.entries.getOrElse(sortIndex) { AlbumSortMode.Name }
     val gridColumns by mainViewModel.settingsManager.categoryGridColumns.collectAsState(initial = 2)
-    val safeGridColumns = gridColumns.coerceIn(1, 4)
+    val configuration = LocalConfiguration.current
+    val safeGridColumns = if (configuration.smallestScreenWidthDp >= 600) {
+        gridColumns.coerceIn(5, 8)
+    } else {
+        gridColumns.coerceIn(1, 4)
+    }
     val scope = rememberCoroutineScope()
     var scrollToTopRequest by remember { mutableStateOf(0) }
     val albumDurations = remember(songs) {

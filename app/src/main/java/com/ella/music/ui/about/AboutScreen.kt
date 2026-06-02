@@ -253,7 +253,7 @@ private fun AboutContent(
 
             item {
                 SmallTitle(text = stringResource(R.string.about_project))
-                FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors) {
+                FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors, scrollProgress = scrollProgress) {
                     BasicComponent(
                         title = stringResource(R.string.about_update),
                         summary = stringResource(R.string.about_update_summary),
@@ -269,7 +269,7 @@ private fun AboutContent(
 
             item {
                 SmallTitle(text = stringResource(R.string.about_acknowledgements))
-                FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors) {
+                FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors, scrollProgress = scrollProgress) {
                     BasicComponent(
                         title = "Codex",
                         summary = "1.0.2 至今主要开发与代码协作",
@@ -298,7 +298,7 @@ private fun AboutContent(
 
             item {
                 SmallTitle(text = stringResource(R.string.about_open_source_projects))
-                FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors) {
+                FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors, scrollProgress = scrollProgress) {
                     BasicComponent(
                         title = "Miuix",
                         summary = "MIUI/HyperOS 风格 Compose UI 组件库（Apache-2.0）",
@@ -383,6 +383,7 @@ private fun FrostedCard(
     backdrop: top.yukonga.miuix.kmp.blur.LayerBackdrop,
     blurEnable: Boolean,
     cardBlendColors: List<BlendColorEntry>,
+    scrollProgress: Float,
     content: @Composable () -> Unit,
 ) {
     val isDark = colorScheme.background.luminance() < 0.5f
@@ -403,7 +404,7 @@ private fun FrostedCard(
             ),
         colors = CardDefaults.defaultColors(
             if (isDark) {
-                colorScheme.surfaceContainer
+                colorScheme.surfaceContainer.copy(alpha = 0.08f + 0.84f * scrollProgress.coerceIn(0f, 1f))
             } else if (blurEnable) {
                 Color.Transparent
             } else {

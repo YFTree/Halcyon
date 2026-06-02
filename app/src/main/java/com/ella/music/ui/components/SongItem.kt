@@ -66,6 +66,7 @@ fun SongItem(
     showAlbumInSubtitle: Boolean = true,
     isFavorite: Boolean = false,
     loadSongRating: ((Song) -> Int)? = null,
+    ratingRevision: Int = 0,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -73,7 +74,7 @@ fun SongItem(
     val unknown = stringResource(R.string.common_unknown)
     val unknownArtist = stringResource(R.string.player_unknown_artist)
     val settingsManager = remember { SettingsManager(context) }
-    val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = true)
+    val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song.id, loadAudioInfo) {
         value = withContext(Dispatchers.IO) { loadAudioInfo?.invoke(song) }
     }
@@ -90,7 +91,7 @@ fun SongItem(
         }
     }
     val qualityTag = audioInfo?.let { audioQualitySummary(it).listTag }
-    val rating by produceState(initialValue = 0, song.id, song.dateModified, loadSongRating) {
+    val rating by produceState(initialValue = 0, song.id, song.dateModified, ratingRevision, loadSongRating) {
         value = withContext(Dispatchers.IO) { loadSongRating?.invoke(song) ?: 0 }
     }
     val coverModel = song.coverUrl.takeIf { it.isNotBlank() }

@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,9 +41,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -104,31 +109,6 @@ fun SettingsScreen(
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
     val settingsManager = remember { SettingsManager(context) }
-    val appLanguage by settingsManager.appLanguage.collectAsState(initial = SettingsManager.APP_LANGUAGE_SYSTEM)
-    val languageOptions = remember {
-        listOf(
-            SettingsManager.APP_LANGUAGE_SYSTEM,
-            SettingsManager.APP_LANGUAGE_ZH_CN,
-            SettingsManager.APP_LANGUAGE_EN
-        )
-    }
-    val languageSystemLabel = stringResource(R.string.settings_language_system)
-    val languageChineseLabel = stringResource(R.string.settings_language_simplified_chinese)
-    val languageEnglishLabel = stringResource(R.string.settings_language_english)
-    val languageEntries = remember(languageSystemLabel, languageChineseLabel, languageEnglishLabel) {
-        listOf(
-            DropdownItem(title = languageSystemLabel),
-            DropdownItem(title = languageChineseLabel),
-            DropdownItem(title = languageEnglishLabel)
-        )
-    }
-    val selectedLanguageIndex = languageOptions.indexOf(appLanguage).takeIf { it >= 0 } ?: 0
-    val languageSummary = when (appLanguage) {
-        SettingsManager.APP_LANGUAGE_ZH_CN -> stringResource(R.string.settings_language_summary_simplified_chinese)
-        SettingsManager.APP_LANGUAGE_EN -> stringResource(R.string.settings_language_summary_english)
-        else -> stringResource(R.string.settings_language_summary_system)
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -153,19 +133,6 @@ fun SettingsScreen(
 
             SettingsCardGroup {
                 Column {
-                    WindowSpinnerPreference(
-                        title = stringResource(R.string.settings_language),
-                        summary = languageSummary,
-                        items = languageEntries,
-                        selectedIndex = selectedLanguageIndex,
-                        onSelectedIndexChange = { index ->
-                            languageOptions.getOrNull(index)?.let { language ->
-                                scope.launch {
-                                    settingsManager.setAppLanguage(language)
-                                }
-                            }
-                        }
-                    )
                     ArrowPreference(
                         title = stringResource(R.string.settings_preferences),
                         summary = stringResource(R.string.settings_preferences_summary),
@@ -240,6 +207,7 @@ fun AudioSettingsScreen(
     val previousButtonAction by settingsManager.previousButtonAction.collectAsState(initial = SettingsManager.PREVIOUS_BUTTON_PREVIOUS)
     val decoderMode by settingsManager.decoderMode.collectAsState(initial = 2)
     val startupPlayMode by settingsManager.startupPlayMode.collectAsState(initial = SettingsManager.STARTUP_PLAY_OFF)
+    val bluetoothAutoPlay by settingsManager.bluetoothAutoPlay.collectAsState(initial = false)
     val decoderLabels = listOf(
         stringResource(R.string.settings_audio_decoder_system),
         stringResource(R.string.settings_audio_decoder_ffmpeg),
@@ -366,6 +334,14 @@ fun AudioSettingsScreen(
                         selectedIndex = selectedStartupPlayMode,
                         onSelectedIndexChange = { index ->
                             scope.launch { settingsManager.setStartupPlayMode(index) }
+                        }
+                    )
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_bluetooth_auto_play),
+                        summary = stringResource(R.string.settings_bluetooth_auto_play_summary),
+                        checked = bluetoothAutoPlay,
+                        onCheckedChange = {
+                            scope.launch { settingsManager.setBluetoothAutoPlay(it) }
                         }
                     )
                     WindowSpinnerPreference(
@@ -571,9 +547,9 @@ fun SettingsDetailScreen(
     val superLyricPronunciation by settingsManager.superLyricPronunciation.collectAsState(initial = false)
     val lyricGetterEnabled by settingsManager.lyricGetterEnabled.collectAsState(initial = false)
     val bluetoothLyricEnabled by settingsManager.bluetoothLyricEnabled.collectAsState(initial = false)
-    val bluetoothLyricTranslation by settingsManager.bluetoothLyricTranslation.collectAsState(initial = false)
+    val bluetoothLyricTranslation by settingsManager.bluetoothLyricTranslation.collectAsState(initial = true)
     val bluetoothLyricPronunciation by settingsManager.bluetoothLyricPronunciation.collectAsState(initial = false)
-    val miniPlayerLyricTranslation by settingsManager.miniPlayerLyricTranslation.collectAsState(initial = true)
+    val miniPlayerLyricSecondary by settingsManager.miniPlayerLyricSecondary.collectAsState(initial = SettingsManager.LYRIC_SECONDARY_TRANSLATION)
     val miniPlayerCoverRotation by settingsManager.miniPlayerCoverRotation.collectAsState(initial = true)
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
@@ -581,7 +557,7 @@ fun SettingsDetailScreen(
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
     val playerImmersiveCover by settingsManager.playerImmersiveCover.collectAsState(initial = true)
-    val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = true)
+    val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val lyricShareCustomInfo by settingsManager.lyricShareCustomInfo.collectAsState(initial = "")
     val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = false)
     val metadataEditorId by settingsManager.metadataEditorId.collectAsState(initial = TagEditorOptionIds.ASK_EACH_TIME)
@@ -627,13 +603,15 @@ fun SettingsDetailScreen(
         BottomBarGlassEffect.Blur -> stringResource(R.string.settings_bottom_bar_glass_effect_summary_blur)
         BottomBarGlassEffect.LiquidGlass -> stringResource(R.string.settings_bottom_bar_glass_effect_summary_liquid)
     }
-    val categoryGridEntries = remember(context) {
-        (1..4).map { columns ->
+    val isTabletDevice = context.resources.configuration.smallestScreenWidthDp >= 600
+    val categoryGridRange = if (isTabletDevice) 5..8 else 1..4
+    val categoryGridEntries = remember(context, isTabletDevice) {
+        categoryGridRange.map { columns ->
             DropdownItem(
                 title = context.getString(R.string.settings_category_grid_columns_option, columns),
                 summary = when (columns) {
                     1 -> context.getString(R.string.settings_category_grid_columns_option_summary_single)
-                    4 -> context.getString(R.string.settings_category_grid_columns_option_summary_dense)
+                    4, 8 -> context.getString(R.string.settings_category_grid_columns_option_summary_dense)
                     else -> context.getString(R.string.settings_category_grid_columns_option_summary_default)
                 }
             )
@@ -712,6 +690,11 @@ fun SettingsDetailScreen(
     }
     val statusLyricSecondaryEntries = remember(statusLyricSecondaryLabels) {
         statusLyricSecondaryLabels.map { DropdownItem(title = it) }
+    }
+    fun lyricSecondaryIndex(translation: Boolean, pronunciation: Boolean): Int = when {
+        pronunciation -> SettingsManager.LYRIC_SECONDARY_PRONUNCIATION
+        translation -> SettingsManager.LYRIC_SECONDARY_TRANSLATION
+        else -> SettingsManager.LYRIC_SECONDARY_OFF
     }
     val homeSectionItems = listOf(
         HomePreferenceItem("library", stringResource(R.string.settings_home_section_library), stringResource(R.string.settings_home_section_library_summary)),
@@ -872,12 +855,12 @@ fun SettingsDetailScreen(
                             title = stringResource(R.string.settings_category_grid_columns),
                             summary = stringResource(
                                 R.string.settings_category_grid_columns_summary,
-                                categoryGridColumns.coerceIn(1, 4)
+                                categoryGridColumns.coerceIn(categoryGridRange.first, categoryGridRange.last)
                             ),
                             items = categoryGridEntries,
-                            selectedIndex = (categoryGridColumns - 1).coerceIn(categoryGridEntries.indices),
+                            selectedIndex = (categoryGridColumns - categoryGridRange.first).coerceIn(categoryGridEntries.indices),
                             onSelectedIndexChange = { index ->
-                                scope.launch { settingsManager.setCategoryGridColumns(index + 1) }
+                                scope.launch { settingsManager.setCategoryGridColumns(categoryGridRange.first + index) }
                             }
                         )
                         SwitchPreference(
@@ -1135,13 +1118,17 @@ fun SettingsDetailScreen(
                         }
                     )
 
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_mini_player_translation),
-                        summary = stringResource(R.string.settings_mini_player_translation_summary),
+                    WindowSpinnerPreference(
+                        title = stringResource(R.string.settings_mini_player_secondary),
+                        summary = stringResource(
+                            R.string.settings_current_value,
+                            statusLyricSecondaryLabels[miniPlayerLyricSecondary.coerceIn(0, 2)]
+                        ),
                         enabled = miniPlayerLyricsEnabled,
-                        checked = miniPlayerLyricTranslation,
-                        onCheckedChange = { enabled ->
-                            scope.launch { settingsManager.setMiniPlayerLyricTranslation(enabled) }
+                        items = statusLyricSecondaryEntries,
+                        selectedIndex = miniPlayerLyricSecondary.coerceIn(0, 2),
+                        onSelectedIndexChange = { index ->
+                            scope.launch { settingsManager.setMiniPlayerLyricSecondary(index) }
                         }
                     )
 
@@ -1164,31 +1151,41 @@ fun SettingsDetailScreen(
                         }
                     )
 
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_lyricon_translation),
-                        summary = stringResource(R.string.settings_lyricon_translation_summary),
+                    WindowSpinnerPreference(
+                        title = stringResource(R.string.settings_secondary_delivery_content),
+                        summary = stringResource(
+                            R.string.settings_current_value,
+                            statusLyricSecondaryLabels[lyricSecondaryIndex(lyriconTranslation, lyriconPronunciation)]
+                        ),
                         enabled = lyriconEnabled,
-                        checked = lyriconTranslation,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setLyriconTranslation(enabled)
-                                ?: scope.launch {
-                                    settingsManager.setLyriconTranslation(enabled)
-                                    if (enabled) settingsManager.setLyriconPronunciation(false)
+                        items = statusLyricSecondaryEntries,
+                        selectedIndex = lyricSecondaryIndex(lyriconTranslation, lyriconPronunciation),
+                        onSelectedIndexChange = { index ->
+                            when (index) {
+                                SettingsManager.LYRIC_SECONDARY_TRANSLATION -> {
+                                    playerViewModel?.setLyriconTranslation(true)
+                                        ?: scope.launch {
+                                            settingsManager.setLyriconTranslation(true)
+                                            settingsManager.setLyriconPronunciation(false)
+                                        }
                                 }
-                        }
-                    )
-
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_lyricon_pronunciation),
-                        summary = stringResource(R.string.settings_lyricon_pronunciation_summary),
-                        enabled = lyriconEnabled,
-                        checked = lyriconPronunciation,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setLyriconPronunciation(enabled)
-                                ?: scope.launch {
-                                    settingsManager.setLyriconPronunciation(enabled)
-                                    if (enabled) settingsManager.setLyriconTranslation(false)
+                                SettingsManager.LYRIC_SECONDARY_PRONUNCIATION -> {
+                                    playerViewModel?.setLyriconPronunciation(true)
+                                        ?: scope.launch {
+                                            settingsManager.setLyriconPronunciation(true)
+                                            settingsManager.setLyriconTranslation(false)
+                                        }
                                 }
+                                else -> {
+                                    playerViewModel?.let {
+                                        it.setLyriconTranslation(false)
+                                        it.setLyriconPronunciation(false)
+                                    } ?: scope.launch {
+                                        settingsManager.setLyriconTranslation(false)
+                                        settingsManager.setLyriconPronunciation(false)
+                                    }
+                                }
+                            }
                         }
                     )
 
@@ -1485,31 +1482,41 @@ fun SettingsDetailScreen(
                         }
                     )
 
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_super_lyric_translation),
-                        summary = stringResource(R.string.settings_super_lyric_translation_summary),
+                    WindowSpinnerPreference(
+                        title = stringResource(R.string.settings_secondary_delivery_content),
+                        summary = stringResource(
+                            R.string.settings_current_value,
+                            statusLyricSecondaryLabels[lyricSecondaryIndex(superLyricTranslation, superLyricPronunciation)]
+                        ),
                         enabled = superLyricEnabled,
-                        checked = superLyricTranslation,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setSuperLyricTranslation(enabled)
-                                ?: scope.launch {
-                                    settingsManager.setSuperLyricTranslation(enabled)
-                                    if (enabled) settingsManager.setSuperLyricPronunciation(false)
+                        items = statusLyricSecondaryEntries,
+                        selectedIndex = lyricSecondaryIndex(superLyricTranslation, superLyricPronunciation),
+                        onSelectedIndexChange = { index ->
+                            when (index) {
+                                SettingsManager.LYRIC_SECONDARY_TRANSLATION -> {
+                                    playerViewModel?.setSuperLyricTranslation(true)
+                                        ?: scope.launch {
+                                            settingsManager.setSuperLyricTranslation(true)
+                                            settingsManager.setSuperLyricPronunciation(false)
+                                        }
                                 }
-                        }
-                    )
-
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_super_lyric_pronunciation),
-                        summary = stringResource(R.string.settings_super_lyric_pronunciation_summary),
-                        enabled = superLyricEnabled,
-                        checked = superLyricPronunciation,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setSuperLyricPronunciation(enabled)
-                                ?: scope.launch {
-                                    settingsManager.setSuperLyricPronunciation(enabled)
-                                    if (enabled) settingsManager.setSuperLyricTranslation(false)
+                                SettingsManager.LYRIC_SECONDARY_PRONUNCIATION -> {
+                                    playerViewModel?.setSuperLyricPronunciation(true)
+                                        ?: scope.launch {
+                                            settingsManager.setSuperLyricPronunciation(true)
+                                            settingsManager.setSuperLyricTranslation(false)
+                                        }
                                 }
+                                else -> {
+                                    playerViewModel?.let {
+                                        it.setSuperLyricTranslation(false)
+                                        it.setSuperLyricPronunciation(false)
+                                    } ?: scope.launch {
+                                        settingsManager.setSuperLyricTranslation(false)
+                                        settingsManager.setSuperLyricPronunciation(false)
+                                    }
+                                }
+                            }
                         }
                     )
 
@@ -1600,31 +1607,41 @@ fun SettingsDetailScreen(
                         }
                     )
 
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_bluetooth_lyric_translation),
-                        summary = stringResource(R.string.settings_bluetooth_lyric_translation_summary),
+                    WindowSpinnerPreference(
+                        title = stringResource(R.string.settings_secondary_delivery_content),
+                        summary = stringResource(
+                            R.string.settings_current_value,
+                            statusLyricSecondaryLabels[lyricSecondaryIndex(bluetoothLyricTranslation, bluetoothLyricPronunciation)]
+                        ),
                         enabled = bluetoothLyricEnabled,
-                        checked = bluetoothLyricTranslation,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setBluetoothLyricTranslation(enabled)
-                                ?: scope.launch {
-                                    settingsManager.setBluetoothLyricTranslation(enabled)
-                                    if (enabled) settingsManager.setBluetoothLyricPronunciation(false)
+                        items = statusLyricSecondaryEntries,
+                        selectedIndex = lyricSecondaryIndex(bluetoothLyricTranslation, bluetoothLyricPronunciation),
+                        onSelectedIndexChange = { index ->
+                            when (index) {
+                                SettingsManager.LYRIC_SECONDARY_TRANSLATION -> {
+                                    playerViewModel?.setBluetoothLyricTranslation(true)
+                                        ?: scope.launch {
+                                            settingsManager.setBluetoothLyricTranslation(true)
+                                            settingsManager.setBluetoothLyricPronunciation(false)
+                                        }
                                 }
-                        }
-                    )
-
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_bluetooth_lyric_pronunciation),
-                        summary = stringResource(R.string.settings_bluetooth_lyric_pronunciation_summary),
-                        enabled = bluetoothLyricEnabled,
-                        checked = bluetoothLyricPronunciation,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setBluetoothLyricPronunciation(enabled)
-                                ?: scope.launch {
-                                    settingsManager.setBluetoothLyricPronunciation(enabled)
-                                    if (enabled) settingsManager.setBluetoothLyricTranslation(false)
+                                SettingsManager.LYRIC_SECONDARY_PRONUNCIATION -> {
+                                    playerViewModel?.setBluetoothLyricPronunciation(true)
+                                        ?: scope.launch {
+                                            settingsManager.setBluetoothLyricPronunciation(true)
+                                            settingsManager.setBluetoothLyricTranslation(false)
+                                        }
                                 }
+                                else -> {
+                                    playerViewModel?.let {
+                                        it.setBluetoothLyricTranslation(false)
+                                        it.setBluetoothLyricPronunciation(false)
+                                    } ?: scope.launch {
+                                        settingsManager.setBluetoothLyricTranslation(false)
+                                        settingsManager.setBluetoothLyricPronunciation(false)
+                                    }
+                                }
+                            }
                         }
                     )
                     }
@@ -1737,33 +1754,17 @@ private fun HomeDisplaySettingsPage(
         title = stringResource(R.string.settings_home_sections_title),
         items = orderedSections,
         hiddenIds = hiddenSectionIds,
-        onHiddenIdsChange = onHiddenSectionsChange
+        onHiddenIdsChange = onHiddenSectionsChange,
+        onOrderChange = onSectionOrderChange
     )
     SmallTitle(text = stringResource(R.string.settings_home_library_grid_title))
     HomeDisplayGroup(
         title = null,
         items = orderedTiles,
         hiddenIds = hiddenTileIds,
-        onHiddenIdsChange = onHiddenTilesChange
+        onHiddenIdsChange = onHiddenTilesChange,
+        onOrderChange = onTileOrderChange
     )
-    SmallTitle(text = stringResource(R.string.settings_display_order_title))
-    SettingsCardGroup {
-        Column {
-            SplitSettingTextField(
-                label = stringResource(R.string.settings_home_sections_order),
-                value = sectionOrder,
-                summary = stringResource(R.string.settings_home_sections_order_summary),
-                singleLine = true,
-                onValueChange = onSectionOrderChange
-            )
-            SplitSettingTextField(
-                label = stringResource(R.string.settings_home_library_grid_order),
-                value = tileOrder,
-                summary = stringResource(R.string.settings_home_library_grid_order_summary),
-                onValueChange = onTileOrderChange
-            )
-        }
-    }
 }
 
 @Composable
@@ -1771,8 +1772,15 @@ private fun HomeDisplayGroup(
     title: String?,
     items: List<HomePreferenceItem>,
     hiddenIds: Set<String>,
-    onHiddenIdsChange: (String) -> Unit
+    onHiddenIdsChange: (String) -> Unit,
+    onOrderChange: (String) -> Unit
 ) {
+    val density = LocalDensity.current
+    var manualItems by remember(items.map { it.id }.joinToString(",")) { mutableStateOf(items) }
+    var dragAnchorId by remember { mutableStateOf<String?>(null) }
+    var dragAccumulatedPx by remember { mutableFloatStateOf(0f) }
+    val estimatedRowHeightPx = with(density) { 64.dp.toPx() }
+
     if (title != null) {
         SmallTitle(text = title)
     }
@@ -1799,11 +1807,43 @@ private fun HomeDisplayGroup(
                     }
                 )
             }
-            items.forEach { item ->
+            manualItems.forEach { item ->
                 val checked = item.id !in hiddenIds
                 HomeDisplayCheckRow(
                     item = item,
                     checked = checked,
+                    dragging = dragAnchorId == item.id,
+                    modifier = Modifier.pointerInput(manualItems, item.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                dragAnchorId = item.id
+                                dragAccumulatedPx = 0f
+                            },
+                            onDragCancel = {
+                                dragAnchorId = null
+                                dragAccumulatedPx = 0f
+                            },
+                            onDragEnd = {
+                                dragAnchorId = null
+                                dragAccumulatedPx = 0f
+                                onOrderChange(manualItems.joinToString(",") { it.id })
+                            }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            dragAccumulatedPx += dragAmount.y
+                            val activeId = dragAnchorId ?: return@detectDragGesturesAfterLongPress
+                            val steps = (dragAccumulatedPx / estimatedRowHeightPx.coerceAtLeast(1f)).toInt()
+                            if (steps == 0) return@detectDragGesturesAfterLongPress
+                            val fromIndex = manualItems.indexOfFirst { it.id == activeId }
+                            if (fromIndex < 0) return@detectDragGesturesAfterLongPress
+                            val targetIndex = (fromIndex + steps).coerceIn(0, manualItems.lastIndex)
+                            if (targetIndex == fromIndex) return@detectDragGesturesAfterLongPress
+                            manualItems = manualItems.toMutableList().apply {
+                                add(targetIndex, removeAt(fromIndex))
+                            }
+                            dragAccumulatedPx -= (targetIndex - fromIndex) * estimatedRowHeightPx
+                        }
+                    },
                     onClick = {
                         val nextHidden = if (checked) {
                             hiddenIds + item.id
@@ -1840,16 +1880,23 @@ private fun HomeDisplayCommand(
 private fun HomeDisplayCheckRow(
     item: HomePreferenceItem,
     checked: Boolean,
+    dragging: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     BasicComponent(
         title = item.title,
         summary = item.summary,
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = modifier
+            .background(
+                if (dragging) MiuixTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent,
+                RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick),
         endActions = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = item.id,
+                    text = "☰",
                     fontSize = 11.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )

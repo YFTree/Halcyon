@@ -8,9 +8,11 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 import android.util.LruCache
+import com.ella.music.data.exception.WritePermissionRequiredException
 import com.ella.music.data.AppLogStore
 import com.ella.music.data.AppLogType
 import com.ella.music.data.AppNetworkLoggingInterceptor
@@ -478,11 +480,17 @@ class MusicRepository(private val context: Context) {
     }
 
     suspend fun writeSongRating(song: Song, rating: Int): Result<Song?> = withContext(Dispatchers.IO) {
-        val path = song.effectiveLocalPathForMetadata()
-        val result = audioTagRepository.writeTags(
-            path,
-            AudioTagInfo(rating = rating.coerceIn(0, 5))
-        )
+        val result = try {
+            writeSongTags(
+                song,
+                AudioTagInfo(rating = rating.coerceIn(0, 5))
+            )
+        } catch (e: SecurityException) {
+            val sender = createWritePermissionIntentSender(song)
+                ?: return@withContext Result.failure(e)
+            return@withContext Result.failure(WritePermissionRequiredException(sender))
+        }
+        result.writePermissionRequestIfNeeded(song)?.let { return@withContext it }
         result.map {
             refreshSongAfterExternalEdit(song)
         }
@@ -493,13 +501,105 @@ class MusicRepository(private val context: Context) {
         if (tagKey.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("Tag name is blank"))
         }
-        val result = audioTagRepository.writeTags(
-            song.effectiveLocalPathForMetadata(),
-            AudioTagInfo(customTags = mapOf(tagKey to listOf(value)))
-        )
+        val result = try {
+            writeSongTags(
+                song,
+                AudioTagInfo(customTags = mapOf(tagKey to listOf(value)))
+            )
+        } catch (e: SecurityException) {
+            val sender = createWritePermissionIntentSender(song)
+                ?: return@withContext Result.failure(e)
+            return@withContext Result.failure(WritePermissionRequiredException(sender))
+        }
+        result.writePermissionRequestIfNeeded(song)?.let { return@withContext it }
         result.map {
             refreshSongAfterExternalEdit(song)
         }
+    }
+
+    suspend fun writeSongMetadata(song: Song, tags: AudioTagInfo): Result<Song?> = withContext(Dispatchers.IO) {
+        val result = try {
+            writeSongTags(song, tags)
+        } catch (e: SecurityException) {
+            val sender = createWritePermissionIntentSender(song)
+                ?: return@withContext Result.failure(e)
+            return@withContext Result.failure(WritePermissionRequiredException(sender))
+        }
+        result.writePermissionRequestIfNeeded(song)?.let { return@withContext it }
+        result.map {
+            refreshSongAfterExternalEdit(song)
+        }
+    }
+
+    private suspend fun writeSongTags(song: Song, tags: AudioTagInfo): Result<Unit> {
+        val path = song.effectiveLocalPathForMetadata()
+        val writableUri = song.writableAudioUri()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && writableUri != null) {
+            val uriResult = runCatching {
+                val pfd = context.contentResolver.openFileDescriptor(writableUri, "rw")
+                    ?: error("Unable to open audio file for editing")
+                pfd.use { descriptor ->
+                    audioTagRepository.writeTags(descriptor, tags).getOrThrow()
+                }
+            }
+            if (uriResult.isSuccess) {
+                audioTagRepository.clear(path)
+                return Result.success(Unit)
+            }
+
+            val error = uriResult.exceptionOrNull()
+            if (error is SecurityException || error?.isWritePermissionError() == true) {
+                return Result.failure(error)
+            }
+            Log.w("MusicRepo", "MediaStore tag write failed for ${song.path}, falling back to file path", error)
+        }
+        return audioTagRepository.writeTags(path, tags)
+    }
+
+    fun getFullAudioTagInfo(song: Song): AudioTagInfo? {
+        return runCatching {
+            audioTagRepository.readTagsBlocking(song.effectiveLocalPathForMetadata())
+        }.getOrNull()
+    }
+
+    private fun createWritePermissionIntentSender(song: Song): android.content.IntentSender? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        val uri = song.writableAudioUri() ?: return null
+        return runCatching {
+            MediaStore.createWriteRequest(context.contentResolver, listOf(uri)).intentSender
+        }.getOrNull()
+    }
+
+    private fun Song.writableAudioUri(): Uri? {
+        if (path.startsWith("content://", ignoreCase = true)) return Uri.parse(path)
+        if (id > 0L) return ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+        return null
+    }
+
+    private fun Result<Unit>.writePermissionRequestIfNeeded(song: Song): Result<Song?>? {
+        val error = exceptionOrNull() ?: return null
+        if (!error.isWritePermissionError()) return null
+        val sender = createWritePermissionIntentSender(song) ?: return null
+        return Result.failure(WritePermissionRequiredException(sender))
+    }
+
+    private fun Throwable.isWritePermissionError(): Boolean {
+        var current: Throwable? = this
+        while (current != null) {
+            if (current is SecurityException) return true
+            val message = current.message.orEmpty()
+            if (
+                message.contains("permission", ignoreCase = true) ||
+                message.contains("denied", ignoreCase = true) ||
+                message.contains("EACCES", ignoreCase = true) ||
+                message.contains("EPERM", ignoreCase = true) ||
+                message.contains("Operation not permitted", ignoreCase = true)
+            ) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
     }
 
     private fun Song.estimatedBitRate(): Int {
