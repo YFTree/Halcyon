@@ -1,6 +1,8 @@
 package com.ella.music.ui.components
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -11,6 +13,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -631,6 +634,7 @@ private fun SongMoreActionSheet(
 @Composable
 fun AddToPlaylistSheet(
     playlists: List<UserPlaylist>,
+    songCount: Int? = null,
     onDismiss: () -> Unit,
     onCreatePlaylist: () -> Unit,
     onPlaylistsConfirm: (List<UserPlaylist>) -> Unit
@@ -638,6 +642,14 @@ fun AddToPlaylistSheet(
     var selectedIds by remember(playlists) { mutableStateOf(emptySet<String>()) }
     val selectedPlaylists = playlists.filter { it.id in selectedIds }
     SongSheetColumn {
+        songCount?.let { count ->
+            Text(
+                text = stringResource(R.string.library_selected_count, count),
+                fontSize = 13.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            )
+        }
         SongMenuItem(stringResource(R.string.song_more_create_playlist), onCreatePlaylist)
         if (playlists.isEmpty()) {
             Text(
@@ -718,7 +730,14 @@ fun CreatePlaylistAndAddSheet(
         title = stringResource(R.string.playlist_create_title),
         onDismissRequest = onDismiss
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                .background(MiuixTheme.colorScheme.background)
+                .padding(horizontal = 18.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             TextField(
                 value = name,
                 onValueChange = { name = it },
@@ -806,6 +825,8 @@ private fun BuiltInCustomTagSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .background(MiuixTheme.colorScheme.background)
             .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1259,6 +1280,8 @@ private fun SongSheetColumn(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .background(MiuixTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -1289,11 +1312,16 @@ private fun SongMenuItem(
 @Composable
 private fun SongInfoRow(label: String, value: String) {
     if (value.isBlank()) return
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.38f))
+            .combinedClickable(
+                onClick = {},
+                onLongClick = { copySongInfoValue(context, label, value) }
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
@@ -1313,12 +1341,16 @@ private fun SongInfoRow(label: String, value: String) {
 
 @Composable
 private fun SongInfoActionRow(label: String, value: String, onClick: () -> Unit) {
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.18f))
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = { copySongInfoValue(context, label, value) }
+            )
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Text(
@@ -1334,6 +1366,12 @@ private fun SongInfoActionRow(label: String, value: String, onClick: () -> Unit)
             color = MiuixTheme.colorScheme.onSurface
         )
     }
+}
+
+private fun copySongInfoValue(context: Context, label: String, value: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
+    Toast.makeText(context, "已复制 $label", Toast.LENGTH_SHORT).show()
 }
 
 private fun openUrl(context: Context, url: String) {

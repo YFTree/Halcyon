@@ -38,7 +38,7 @@ To restore or refresh native outputs, run these scripts manually:
 
 **Ella Music** is an Android music player built with **Jetpack Compose, Miuix, and AndroidX Media3**.
 
-It focuses on local music playback while integrating basic i18n, local playlists, WebDAV remote libraries, LX Music API online sources, LRC / Enhanced LRC / ELRC / TTML / Lyricify lyric parsing, dynamic playback pages, immersive player UI, floating desktop lyrics, Lyricon integration, SuperLyricApi lyric publishing, Lyric Getter API raw-lyric transmission, Flyme / AOSP ticker lyrics, Bluetooth lyrics, lyric card sharing, AI song interpretation, FFmpeg extended decoding, application logs, backup and restore, and music library analytics.
+It focuses on local music playback while integrating basic i18n, local playlists, WebDAV remote libraries, LX Music API online sources, LRC / Enhanced LRC / ELRC / TTML / Lyricify lyric parsing, dynamic playback pages, immersive player UI, floating desktop lyrics, Lyricon integration, SuperLyricApi lyric publishing, Lyric Getter API raw-lyric transmission, Flyme / AOSP ticker lyrics, media notification lyrics, lyric card sharing, AI song interpretation, FFmpeg extended decoding, application logs, backup and restore, and music library analytics.
 
 The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming to provide a lightweight, modern, lyric-focused music playback experience on Android.
 
@@ -49,6 +49,7 @@ The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming
 ### 🎵 Local Music Playback
 
 - Supports local music scanning, searching, playback, and folder browsing, with switching between Android media library scanning and custom folder scanning.
+- Provides a dedicated library search page with song / album / artist filters, saved and removable search history, and one-tap duplicate song lookup by matching title and album.
 - The home dashboard, albums, folders, and artists pages support searching, sorting, fast indexing, and multi-selection management.
 - Supports album pages, artist pages, song lists, the current playback queue, mini player, and immersive playback page.
 - Supports local playlist import / export and is compatible with Salt Player playlists, M3U, and M3U8, with TXT / M3U export support.
@@ -72,6 +73,7 @@ The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming
 - Provides a cover page, lyrics page, and landscape lyrics page.
 - Mini lyrics show the previous, current, and next lines to reduce cases where lyrics are incorrectly treated as having no following line.
 - Supports bottom action menus, playback queue panels, playback mode switching, and progress control.
+- In small-window playback layouts, mini lyrics are hidden to keep the bottom playback controls from being compressed; normal playback pages still show mini lyrics.
 - The lyrics page supports a safe depth effect: distant lines scale down, fade, and blur slightly without strong per-line 3D rotation that can clip text.
 
 ### 🎤 Lyric Experience
@@ -97,8 +99,8 @@ The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming
 - Supports lyric barrage.
 - Supports publishing lyric data to the SuperLyric ecosystem through SuperLyricApi.
 - Supports passing raw lyric text through the Lyric Getter API.
-- Supports Flyme / AOSP ticker lyrics notifications and Bluetooth lyrics.
-- Supports passing translations to Samsung floating lyrics while preserving word-by-word spacing, trailing words, and dual-line display structure as much as possible.
+- Supports Flyme / AOSP ticker lyrics and media notification lyrics; Flyme status-bar lyrics hide the extra lyric notification by default, while non-Flyme devices can use heads-up lyric notifications.
+- Supports secondary-line configuration for heads-up lyric notifications and media notification lyrics, with off / translation / pronunciation modes while preserving word-by-word spacing, trailing words, and dual-line display structure as much as possible.
 
 ### 🌐 WebDAV & LX Online Music
 
@@ -117,6 +119,7 @@ The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming
 - The FFmpeg extended decoder improves compatibility with ALAC / AAC and other M4A formats.
 - Supports ReplayGain volume normalization.
 - Supports sleep timer, stop after current track, playback speed, pitch control, queue clearing, disabling audio focus, and shuffle settings.
+- Shuffle playback preserves the original queue order and restores it after leaving shuffle; switching from repeat-one to shuffle now reorders the queue in place to reduce stutter.
 - Supports audio output switching, an option for the previous button to replay the current song, and listening history grouped by date.
 - Supports displaying Dolby Atmos, Master, Apple Lossless, Hi-Res, Lossless, HQ, LQ, and other quality labels.
 - *Specifications such as 24-bit / 96 kHz in music library lists are unified into the Hi-Res (MQ) system.*
@@ -132,7 +135,8 @@ The overall UI and interaction design are inspired by **MIUI / HyperOS**, aiming
 - The bottom dock and MiniPlayer can switch between Gaussian blur and Liquid Glass effects.
 - Music library search, sorting, and multi-selection states prioritize closing the current state when the Back button is pressed.
 - All major song lists use a unified more menu, song information, add to playlist, play next, share, edit tags, and delete actions.
-- MiniPlayer covers automatically rotate during playback and support a cover-rotation toggle, lyric-display toggle, circular progress, and song / lyric switching animations.
+- Multi-selection and single-song "Add to playlist" sheets now share one visual style; song information rows support long-press copy, and the built-in metadata editor can write common audio tags.
+- MiniPlayer covers automatically rotate during playback and support a cover-rotation toggle, lyric-display toggle, configurable right-side button, circular progress, outlined transport controls, and song / lyric switching animations.
 - Album and artist detail pages provide large titles, gradient backgrounds, and unified information layouts.
 - Supports theme switching and common playback, lyrics, scanning, decoder, external music tag scraping software, and lyric timing software settings.
 - Supports a GitHub software update page, app log viewer, Logcat / network log collection, copying / sending detailed logs, automatic log retention, and app data backup; the update page no longer opens APK downloads when already up to date.
@@ -286,7 +290,7 @@ Normal `assembleDebug` builds do not rebuild native code by default. Before rele
 | Online Music | LX Music API source import, search, streaming playback, downloads                                                                              |
 | Dynamic Covers | Album folder videos, album videos, song videos, fallback videos                                                                                |
 | Lyrics | LRC, Enhanced LRC, ELRC, TTML, Lyricify, word-by-word lyrics, translation, romanization, background vocals, duet tags                         |
-| System Lyrics | Floating lyrics, lyric barrage, SuperLyricApi, Lyric Getter API, Flyme status bar lyrics (Ticker notification), Bluetooth lyrics               |
+| System Lyrics | Floating lyrics, lyric barrage, SuperLyricApi, Lyric Getter API, Flyme status bar lyrics (Ticker notification), media notification lyrics       |
 | Decoding | Media3, system decoder, FFmpeg extended decoder                                                                                                |
 | Audio Metadata | lyrico-audiotag primary path, embedded and external lyrics, 163 key decryption, alias / comment, quality label display |
 | Analytics | Format distribution, quality distribution, play count ranking, listening duration ranking, listening history                                   |

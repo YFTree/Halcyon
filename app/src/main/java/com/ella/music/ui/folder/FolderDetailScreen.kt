@@ -62,6 +62,7 @@ import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.ConfirmDangerDialog
+import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
@@ -517,7 +518,7 @@ fun FolderDetailScreen(
                 title = stringResource(R.string.song_more_add_to_playlist_title),
                 onDismissRequest = { playlistPickerSongs = null }
             ) {
-                AddSelectedSongsToPlaylistSheet(
+                AddToPlaylistSheet(
                     playlists = playlists
                         .sortedWith(compareByDescending<com.ella.music.data.model.UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }.thenByDescending { it.createdAt }),
                     songCount = songsToAdd.size,

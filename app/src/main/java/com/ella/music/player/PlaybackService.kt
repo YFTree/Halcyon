@@ -65,6 +65,8 @@ class PlaybackService : MediaLibraryService() {
         private const val TAG = "PlaybackService"
         private const val LIBRARY_ROOT_ID = "ella_music_root"
         private const val LIBRARY_QUEUE_ID = "ella_music_current_queue"
+        private const val PLAYBACK_PREFS = "ella_playback_state"
+        private const val KEY_APP_SHUFFLE = "app_shuffle_enabled"
         const val ACTION_TOGGLE_FAVORITE = "com.ella.music.action.TOGGLE_FAVORITE"
         const val ACTION_TOGGLE_SHUFFLE = "com.ella.music.action.TOGGLE_SHUFFLE"
         private const val TIMING_TAG = "EllaPlaybackTiming"
@@ -78,6 +80,8 @@ class PlaybackService : MediaLibraryService() {
     private var bluetoothReceiver: BluetoothAutoPlayReceiver? = null
     @Volatile
     private var previousButtonAction = SettingsManager.PREVIOUS_BUTTON_PREVIOUS
+    @Volatile
+    private var appShuffleEnabled = false
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -284,6 +288,7 @@ class PlaybackService : MediaLibraryService() {
             PlaylistStore.getInstance(this).isFavorite(it)
         } == true
 
+        appShuffleEnabled = loadAppShuffleEnabled()
         val playbackModeAction = player.notificationPlaybackModeAction()
 
         session.setMediaButtonPreferences(
@@ -340,7 +345,7 @@ class PlaybackService : MediaLibraryService() {
 
     private fun Player.notificationPlaybackModeAction(): MediaButtonPlaybackModeAction {
         return when {
-            shuffleModeEnabled -> MediaButtonPlaybackModeAction(
+            appShuffleEnabled -> MediaButtonPlaybackModeAction(
                 icon = R.drawable.ic_notification_shuffle,
                 title = getString(R.string.notification_action_shuffle)
             )
@@ -364,27 +369,46 @@ class PlaybackService : MediaLibraryService() {
 
     private fun Player.cycleNotificationPlaybackMode() {
         when {
-            shuffleModeEnabled -> {
+            appShuffleEnabled -> {
+                appShuffleEnabled = false
+                persistAppShuffleEnabled(false)
                 shuffleModeEnabled = false
                 repeatMode = Player.REPEAT_MODE_OFF
             }
 
             repeatMode == Player.REPEAT_MODE_OFF -> {
+                appShuffleEnabled = false
+                persistAppShuffleEnabled(false)
                 shuffleModeEnabled = false
                 repeatMode = Player.REPEAT_MODE_ALL
             }
 
             repeatMode == Player.REPEAT_MODE_ALL -> {
+                appShuffleEnabled = false
+                persistAppShuffleEnabled(false)
                 shuffleModeEnabled = false
                 repeatMode = Player.REPEAT_MODE_ONE
             }
 
             else -> {
+                appShuffleEnabled = true
+                persistAppShuffleEnabled(true)
                 repeatMode = Player.REPEAT_MODE_ALL
-                shuffleModeEnabled = true
+                shuffleModeEnabled = false
             }
         }
     }
+
+    private fun persistAppShuffleEnabled(enabled: Boolean) {
+        getSharedPreferences(PLAYBACK_PREFS, MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_APP_SHUFFLE, enabled)
+            .apply()
+    }
+
+    private fun loadAppShuffleEnabled(): Boolean =
+        getSharedPreferences(PLAYBACK_PREFS, MODE_PRIVATE)
+            .getBoolean(KEY_APP_SHUFFLE, appShuffleEnabled)
 
     private fun currentWebDavConfig(settingsManager: SettingsManager): WebDavConfig {
         return runBlocking(Dispatchers.IO) {
@@ -788,9 +812,10 @@ class PlaybackService : MediaLibraryService() {
         }
 
         private fun Player.playbackModeAction(): PlaybackModeAction {
+            service.appShuffleEnabled = service.loadAppShuffleEnabled()
             return when {
-                shuffleModeEnabled -> PlaybackModeAction(
-                icon = R.drawable.ic_notification_shuffle,
+                service.appShuffleEnabled -> PlaybackModeAction(
+                    icon = R.drawable.ic_notification_shuffle,
                     title = service.getString(R.string.notification_action_shuffle)
                 )
 

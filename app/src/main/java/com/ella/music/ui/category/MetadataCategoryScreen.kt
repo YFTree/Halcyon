@@ -77,6 +77,7 @@ import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.MetadataCategoryItem
 import com.ella.music.viewmodel.PlayerViewModel
 import com.ella.music.ui.components.ConfirmDangerDialog
+import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FolderOutlineIcon
@@ -661,7 +662,7 @@ fun MetadataCategoryDetailScreen(
                     title = "添加到歌单",
                     onDismissRequest = { playlistPickerSongs = null }
                 ) {
-                    CategoryAddSelectedSongsToPlaylistSheet(
+                    AddToPlaylistSheet(
                         playlists = playlists
                             .sortedWith(compareByDescending<com.ella.music.data.model.UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }.thenByDescending { it.createdAt }),
                         songCount = songsToAdd.size,
@@ -919,6 +920,7 @@ private fun MetadataCategoryCard(
     val cardColor = remember(item.name) { item.name.categoryCardColor() }
     val hasCover = coverModel != null
     val isGenreCard = type == "genre"
+    val useSmallCover = type == "genre" || type == "year"
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -948,11 +950,11 @@ private fun MetadataCategoryCard(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 2.dp)
-                    .size(if (isGenreCard) 54.dp else 78.dp)
+                    .size(if (useSmallCover) 54.dp else 78.dp)
                     .graphicsLayer {
                         rotationZ = 13f
-                        translationX = if (isGenreCard) 9.dp.toPx() else 16.dp.toPx()
-                        translationY = if (isGenreCard) 3.dp.toPx() else 6.dp.toPx()
+                        translationX = if (useSmallCover) 9.dp.toPx() else 16.dp.toPx()
+                        translationY = if (useSmallCover) 3.dp.toPx() else 6.dp.toPx()
                     }
                     .clip(RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
@@ -961,7 +963,7 @@ private fun MetadataCategoryCard(
                     model = coverModel,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    sizePx = 220
+                    sizePx = if (useSmallCover) 128 else 220
                 )
             }
             Box(
@@ -981,7 +983,7 @@ private fun MetadataCategoryCard(
                     start = 14.dp,
                     top = if (isGenreCard) 12.dp else 13.dp,
                     end = if (hasCover) {
-                        if (isGenreCard) 54.dp else 72.dp
+                        if (useSmallCover) 54.dp else 72.dp
                     } else {
                         14.dp
                     },

@@ -542,6 +542,18 @@
     <string name="home_connect_cloud_music">连接云端音乐</string>
     <string name="library_refresh">刷新音乐库</string>
     <string name="library_search_placeholder">搜索歌曲、艺术家或专辑</string>
+    <string name="library_search_page_placeholder">搜索歌曲、专辑、歌手</string>
+    <string name="library_search_duplicates">重复歌曲</string>
+    <string name="library_search_clear_history">清空历史</string>
+    <string name="library_search_history">搜索历史</string>
+    <string name="library_search_all">所有</string>
+    <string name="library_search_songs">歌曲</string>
+    <string name="library_search_albums">专辑</string>
+    <string name="library_search_artists">歌手</string>
+    <string name="library_search_empty_hint">搜索音乐库，或快速查找重复歌曲</string>
+    <string name="library_search_no_results">没有匹配结果</string>
+    <string name="library_search_no_duplicates">没有找到同歌曲名、同专辑的重复歌曲</string>
+    <string name="library_search_song_unit">首</string>
     <string name="library_select_songs_first">请先选择歌曲</string>
 
     <string name="settings_home_display">首页显示</string>
@@ -635,11 +647,12 @@
     <string name="settings_samsung_floating_translation_summary_blocked">隐藏 FLYme 歌词通知时复用播放通知，无法同时写入三星浮动通知正文。</string>
     <string name="settings_status_bar_phonetic_secondary">状态栏显示注音/副行</string>
     <string name="settings_status_bar_phonetic_secondary_summary">开启后将注音或翻译副行作为状态栏歌词的第二行传递。</string>
-    <string name="settings_enable_bluetooth_lyric">启用蓝牙车载歌词</string>
-    <string name="settings_enable_bluetooth_lyric_summary">将当前歌词写入媒体标题，供蓝牙设备或车机显示。</string>
-    <string name="settings_bluetooth_lyric_translation">车载歌词传递翻译</string>
+    <string name="settings_heads_up_lyric_secondary">浮动通知歌词副行内容</string>
+    <string name="settings_enable_bluetooth_lyric">启用媒体通知歌词</string>
+    <string name="settings_enable_bluetooth_lyric_summary">将当前歌词写入媒体通知标题，供蓝牙设备、车机或媒体中心显示。</string>
+    <string name="settings_bluetooth_lyric_translation">媒体通知歌词传递翻译</string>
     <string name="settings_bluetooth_lyric_translation_summary">开启后用当前歌词翻译替换媒体歌手行。</string>
-    <string name="settings_bluetooth_lyric_pronunciation">车载歌词传递注音</string>
+    <string name="settings_bluetooth_lyric_pronunciation">媒体通知歌词传递注音</string>
     <string name="settings_bluetooth_lyric_pronunciation_summary">开启后用当前歌词注音/罗马音替换媒体歌手行。</string>
     <string name="analytics_listen_duration_ranking">听歌时长排行</string>
     <string name="analytics_listen_duration_empty">开始播放后会自动累计听歌时长</string>

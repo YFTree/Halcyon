@@ -1094,6 +1094,8 @@ private fun CoverPlayerPage(
 
     BoxWithConstraints(modifier = modifier) {
         val useWidePlayer = maxWidth > maxHeight && maxWidth >= 700.dp
+        val isSmallWindow = maxWidth < 300.dp || (maxWidth < 420.dp && maxHeight < 560.dp)
+        val effectiveMiniLyricLine = miniLyricLine.takeUnless { isSmallWindow }
         if (useWidePlayer) {
             LandscapeCoverPlayerPage(
                 song = song,
@@ -1227,7 +1229,7 @@ private fun CoverPlayerPage(
                             PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
                         }
 
-                        if (miniLyricLine != null) {
+                        if (effectiveMiniLyricLine != null) {
                             Spacer(modifier = Modifier.height(8.dp))
                             MiniLyricsPreview(
                                 lyrics = lyrics,
@@ -1241,7 +1243,7 @@ private fun CoverPlayerPage(
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(miniLyricsPreviewHeight(miniLyricLine, showTranslation, showPronunciation))
+                                    .height(miniLyricsPreviewHeight(effectiveMiniLyricLine, showTranslation, showPronunciation))
                                     .padding(vertical = 2.dp)
                             )
                         }
@@ -1341,7 +1343,7 @@ private fun CoverPlayerPage(
                             )
                         }
 
-                        if (miniLyricLine != null) {
+                        if (effectiveMiniLyricLine != null) {
                             Spacer(modifier = Modifier.height(10.dp))
                             MiniLyricsPreview(
                                 lyrics = lyrics,
@@ -1355,7 +1357,7 @@ private fun CoverPlayerPage(
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(miniLyricsPreviewHeight(miniLyricLine, showTranslation, showPronunciation))
+                                    .height(miniLyricsPreviewHeight(effectiveMiniLyricLine, showTranslation, showPronunciation))
                                     .padding(vertical = 2.dp)
                             )
                         } else {

@@ -526,10 +526,14 @@ fun SettingsDetailScreen(
     val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
     val bottomBarGlassEffect by settingsManager.bottomBarGlassEffect.collectAsState(initial = BottomBarGlassEffect.LiquidGlass)
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = false)
-    val tickerHideNotification by settingsManager.tickerHideNotification.collectAsState(initial = false)
     val tickerHeadsUpLyrics by settingsManager.tickerHeadsUpLyrics.collectAsState(initial = false)
     val samsungFloatingLyricTranslation by settingsManager.samsungFloatingLyricTranslation.collectAsState(initial = false)
     val statusBarAllowPhonetic by settingsManager.statusBarAllowPhonetic.collectAsState(initial = false)
+    val isFlymeDevice = remember {
+        Build.MANUFACTURER.orEmpty().contains("meizu", ignoreCase = true) ||
+            Build.BRAND.orEmpty().contains("meizu", ignoreCase = true) ||
+            Build.DISPLAY.orEmpty().contains("flyme", ignoreCase = true)
+    }
     val desktopLyricEnabled by settingsManager.desktopLyricEnabled.collectSettingsState(initialValue = false)
     val desktopLyricHideWhenPaused by settingsManager.desktopLyricHideWhenPaused.collectSettingsState(initialValue = false)
     val desktopLyricStatusBarMode by settingsManager.desktopLyricStatusBarMode.collectSettingsState(initialValue = false)
@@ -1560,20 +1564,9 @@ fun SettingsDetailScreen(
                         checked = tickerEnabled,
                         onCheckedChange = { enabled ->
                             playerViewModel?.setTickerEnabled(enabled)
-                                ?: scope.launch { settingsManager.setTickerEnabled(enabled) }
-                        }
-                    )
-
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_hide_flyme_ticker_notification),
-                        summary = stringResource(R.string.settings_hide_flyme_ticker_notification_summary),
-                        enabled = tickerEnabled,
-                        checked = tickerHideNotification,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setTickerHideNotification(enabled)
                                 ?: scope.launch {
-                                    settingsManager.setTickerHideNotification(enabled)
-                                    if (enabled) settingsManager.setSamsungFloatingLyricTranslation(false)
+                                    settingsManager.setTickerEnabled(enabled)
+                                    if (enabled) settingsManager.setTickerHideNotification(true)
                                 }
                         }
                     )
@@ -1581,43 +1574,51 @@ fun SettingsDetailScreen(
                     SwitchPreference(
                         title = stringResource(R.string.settings_heads_up_lyric_notifications),
                         summary = stringResource(R.string.settings_heads_up_lyric_notifications_summary),
-                        enabled = tickerEnabled,
-                        checked = tickerHeadsUpLyrics,
+                        enabled = tickerEnabled && !isFlymeDevice,
+                        checked = tickerHeadsUpLyrics && !isFlymeDevice,
                         onCheckedChange = { enabled ->
-                            playerViewModel?.setTickerHeadsUpLyrics(enabled)
-                                ?: scope.launch { settingsManager.setTickerHeadsUpLyrics(enabled) }
+                            if (!isFlymeDevice) {
+                                playerViewModel?.setTickerHeadsUpLyrics(enabled)
+                                    ?: scope.launch { settingsManager.setTickerHeadsUpLyrics(enabled) }
+                            }
                         }
                     )
 
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_samsung_floating_translation),
-                        summary = if (tickerHideNotification) {
-                            stringResource(R.string.settings_samsung_floating_translation_summary_blocked)
-                        } else {
-                            stringResource(R.string.settings_samsung_floating_translation_summary)
-                        },
-                        enabled = tickerEnabled && !tickerHideNotification,
-                        checked = samsungFloatingLyricTranslation && !tickerHideNotification,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setSamsungFloatingLyricTranslation(enabled)
-                                ?: scope.launch {
-                                    settingsManager.setSamsungFloatingLyricTranslation(enabled)
-                                    if (enabled) settingsManager.setStatusBarAllowPhonetic(false)
+                    WindowSpinnerPreference(
+                        title = stringResource(R.string.settings_heads_up_lyric_secondary),
+                        summary = stringResource(
+                            R.string.settings_current_value,
+                            statusLyricSecondaryLabels[lyricSecondaryIndex(samsungFloatingLyricTranslation, statusBarAllowPhonetic)]
+                        ),
+                        enabled = tickerEnabled && tickerHeadsUpLyrics && !isFlymeDevice,
+                        items = statusLyricSecondaryEntries,
+                        selectedIndex = lyricSecondaryIndex(samsungFloatingLyricTranslation, statusBarAllowPhonetic),
+                        onSelectedIndexChange = { index ->
+                            when (index) {
+                                SettingsManager.LYRIC_SECONDARY_TRANSLATION -> {
+                                    playerViewModel?.setSamsungFloatingLyricTranslation(true)
+                                        ?: scope.launch {
+                                            settingsManager.setSamsungFloatingLyricTranslation(true)
+                                            settingsManager.setStatusBarAllowPhonetic(false)
+                                        }
                                 }
-                        }
-                    )
-
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_status_bar_phonetic_secondary),
-                        summary = stringResource(R.string.settings_status_bar_phonetic_secondary_summary),
-                        enabled = tickerEnabled,
-                        checked = statusBarAllowPhonetic,
-                        onCheckedChange = { enabled ->
-                            playerViewModel?.setStatusBarAllowPhonetic(enabled)
-                                ?: scope.launch {
-                                    settingsManager.setStatusBarAllowPhonetic(enabled)
-                                    if (enabled) settingsManager.setSamsungFloatingLyricTranslation(false)
+                                SettingsManager.LYRIC_SECONDARY_PRONUNCIATION -> {
+                                    playerViewModel?.setStatusBarAllowPhonetic(true)
+                                        ?: scope.launch {
+                                            settingsManager.setStatusBarAllowPhonetic(true)
+                                            settingsManager.setSamsungFloatingLyricTranslation(false)
+                                        }
                                 }
+                                else -> {
+                                    playerViewModel?.let {
+                                        it.setSamsungFloatingLyricTranslation(false)
+                                        it.setStatusBarAllowPhonetic(false)
+                                    } ?: scope.launch {
+                                        settingsManager.setSamsungFloatingLyricTranslation(false)
+                                        settingsManager.setStatusBarAllowPhonetic(false)
+                                    }
+                                }
+                            }
                         }
                     )
 

@@ -78,6 +78,7 @@ fun AboutScreen(
     val scrollBehavior = MiuixScrollBehavior()
     val lazyListState = rememberLazyListState()
     var logoHeightPx by remember { mutableIntStateOf(0) }
+    val isDark = colorScheme.background.luminance() < 0.5f
 
     val scrollProgress by remember {
         derivedStateOf {
@@ -95,7 +96,11 @@ fun AboutScreen(
             EllaSmallTopAppBar(
                 title = stringResource(R.string.about),
                 scrollBehavior = scrollBehavior,
-                color = colorScheme.surface.copy(alpha = if (scrollProgress == 1f) 1f else 0f),
+                color = if (isDark) {
+                    Color.Black.copy(alpha = scrollProgress.coerceIn(0f, 1f))
+                } else {
+                    colorScheme.surface.copy(alpha = scrollProgress.coerceIn(0f, 1f))
+                },
                 titleColor = colorScheme.onSurface.copy(alpha = scrollProgress),
                 defaultWindowInsetsPadding = false,
                 navigationIcon = {
@@ -405,7 +410,7 @@ private fun FrostedCard(
             ),
         colors = CardDefaults.defaultColors(
             if (isDark) {
-                colorScheme.surfaceContainer.copy(alpha = 0.08f + 0.84f * scrollProgress.coerceIn(0f, 1f))
+                colorScheme.surfaceContainer.copy(alpha = 0.66f + 0.26f * scrollProgress.coerceIn(0f, 1f))
             } else if (blurEnable) {
                 Color.Transparent
             } else {

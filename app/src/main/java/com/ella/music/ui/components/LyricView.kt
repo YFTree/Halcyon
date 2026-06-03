@@ -646,7 +646,7 @@ private fun buildWordTimedAnnotatedString(
                     fontWeight = activeFontWeight
                 )
             }
-            if (positionMs in word.startMs..word.endMs && wordText.length > 1) {
+            if (positionMs in word.startMs..word.endMs && wordText.length > 1 && wordText.hasCjkKanaOrHangul()) {
                 val duration = (word.endMs - word.startMs).coerceAtLeast(1L)
                 val progress = ((positionMs - word.startMs).toFloat() / duration.toFloat()).coerceIn(0f, 1f)
                 val activeCharCount = (wordText.length * progress).toInt().coerceIn(0, wordText.length)

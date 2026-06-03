@@ -33,6 +33,7 @@ import com.ella.music.ui.online.LxOnlineScreen
 import com.ella.music.ui.online.LxSourceSettingsScreen
 import com.ella.music.ui.playlist.PlaylistDetailScreen
 import com.ella.music.ui.playlist.PlaylistScreen
+import com.ella.music.ui.search.LibrarySearchScreen
 import com.ella.music.ui.settings.AudioSettingsScreen
 import com.ella.music.ui.settings.BackupSettingsScreen
 import com.ella.music.ui.settings.LyricFontScreen
@@ -45,6 +46,7 @@ import com.ella.music.viewmodel.PlayerViewModel
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object Library : Screen("library")
+    data object LibrarySearch : Screen("library_search")
     data object Album : Screen("album")
     data object Artist : Screen("artist")
     data object AlbumDetail : Screen("album/{albumId}") {
@@ -145,8 +147,20 @@ fun AppNavigation(
                 playerViewModel = playerViewModel,
                 onNavigateToPlayer = onNavigateToPlayer,
                 onNavigateToAbout = { navController.navigate(Screen.About.route) },
+                onNavigateToSearch = { navController.navigate(Screen.LibrarySearch.route) },
                 onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
                 onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) }
+            )
+        }
+
+        composable(Screen.LibrarySearch.route) {
+            LibrarySearchScreen(
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
+                onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) },
+                onNavigateToPlayer = onNavigateToPlayer
             )
         }
 

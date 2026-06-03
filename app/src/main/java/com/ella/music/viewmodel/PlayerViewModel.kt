@@ -190,9 +190,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun initTicker() {
         viewModelScope.launch {
             val enabled = settingsManager.tickerEnabled.first()
-            val hideNotification = settingsManager.tickerHideNotification.first()
+            val hideNotification = true
+            if (settingsManager.tickerHideNotification.first() != hideNotification) {
+                settingsManager.setTickerHideNotification(hideNotification)
+            }
             tickerHideNotificationEnabled = hideNotification
-            samsungFloatingLyricTranslationEnabled = settingsManager.samsungFloatingLyricTranslation.first() && !hideNotification
+            samsungFloatingLyricTranslationEnabled = settingsManager.samsungFloatingLyricTranslation.first()
             statusBarAllowPhoneticEnabled = settingsManager.statusBarAllowPhonetic.first()
             tickerBridge.setHideNotification(hideNotification)
             tickerBridge.setHeadsUpLyricsEnabled(settingsManager.tickerHeadsUpLyrics.first())
@@ -201,12 +204,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             settingsManager.tickerHideNotification.distinctUntilChanged().collect { enabled ->
-                tickerHideNotificationEnabled = enabled
-                tickerBridge.setHideNotification(enabled)
-                if (enabled && samsungFloatingLyricTranslationEnabled) {
-                    samsungFloatingLyricTranslationEnabled = false
-                    settingsManager.setSamsungFloatingLyricTranslation(false)
+                if (!enabled) {
+                    settingsManager.setTickerHideNotification(true)
+                    return@collect
                 }
+                tickerHideNotificationEnabled = true
+                tickerBridge.setHideNotification(true)
                 lastTickerPayload = null
                 if (tickerBridge.isEnabled()) resendTickerLyric(force = true)
             }
@@ -220,7 +223,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         viewModelScope.launch {
             settingsManager.samsungFloatingLyricTranslation.distinctUntilChanged().collect { enabled ->
-                samsungFloatingLyricTranslationEnabled = enabled && !tickerHideNotificationEnabled
+                samsungFloatingLyricTranslationEnabled = enabled
                 if (samsungFloatingLyricTranslationEnabled && statusBarAllowPhoneticEnabled) {
                     statusBarAllowPhoneticEnabled = false
                     settingsManager.setStatusBarAllowPhonetic(false)
@@ -1052,7 +1055,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun setTickerEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsManager.setTickerEnabled(enabled)
-            tickerBridge.setHideNotification(settingsManager.tickerHideNotification.first())
+            if (enabled) {
+                settingsManager.setTickerHideNotification(true)
+                tickerHideNotificationEnabled = true
+            }
+            tickerBridge.setHideNotification(true)
             tickerBridge.setHeadsUpLyricsEnabled(settingsManager.tickerHeadsUpLyrics.first())
             tickerBridge.setEnabled(enabled)
             lastTickerPayload = null
@@ -1062,13 +1069,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setTickerHideNotification(enabled: Boolean) {
         viewModelScope.launch {
-            settingsManager.setTickerHideNotification(enabled)
-            tickerHideNotificationEnabled = enabled
-            tickerBridge.setHideNotification(enabled)
-            if (enabled && samsungFloatingLyricTranslationEnabled) {
-                settingsManager.setSamsungFloatingLyricTranslation(false)
-                samsungFloatingLyricTranslationEnabled = false
-            }
+            settingsManager.setTickerHideNotification(true)
+            tickerHideNotificationEnabled = true
+            tickerBridge.setHideNotification(true)
             lastTickerPayload = null
             if (tickerBridge.isEnabled()) resendTickerLyric(force = true)
         }
@@ -1085,7 +1088,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setSamsungFloatingLyricTranslation(enabled: Boolean) {
         viewModelScope.launch {
-            val safeEnabled = enabled && !tickerHideNotificationEnabled
+            val safeEnabled = enabled
             settingsManager.setSamsungFloatingLyricTranslation(safeEnabled)
             samsungFloatingLyricTranslationEnabled = safeEnabled
             if (safeEnabled && statusBarAllowPhoneticEnabled) {

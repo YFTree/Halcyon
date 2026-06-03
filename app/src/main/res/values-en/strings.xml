@@ -542,6 +542,18 @@
     <string name="home_connect_cloud_music">Connect cloud music</string>
     <string name="library_refresh">Refresh library</string>
     <string name="library_search_placeholder">Search songs, artists, or albums</string>
+    <string name="library_search_page_placeholder">Search songs, albums, artists</string>
+    <string name="library_search_duplicates">Duplicate songs</string>
+    <string name="library_search_clear_history">Clear history</string>
+    <string name="library_search_history">Search history</string>
+    <string name="library_search_all">All</string>
+    <string name="library_search_songs">Songs</string>
+    <string name="library_search_albums">Albums</string>
+    <string name="library_search_artists">Artists</string>
+    <string name="library_search_empty_hint">Search the music library, or quickly find duplicate songs</string>
+    <string name="library_search_no_results">No matching results</string>
+    <string name="library_search_no_duplicates">No duplicate songs with the same title and album were found</string>
+    <string name="library_search_song_unit">songs</string>
     <string name="library_select_songs_first">Select songs first</string>
 
     <string name="settings_home_display">Home display</string>
@@ -635,11 +647,12 @@
     <string name="settings_samsung_floating_translation_summary_blocked">When the FLYme lyric notification is hidden, Ella reuses the playback notification and cannot also write into the Samsung floating notification body.</string>
     <string name="settings_status_bar_phonetic_secondary">Show pronunciation or secondary line in status bar</string>
     <string name="settings_status_bar_phonetic_secondary_summary">Send the pronunciation or translation secondary line as the second line of the status bar lyric.</string>
-    <string name="settings_enable_bluetooth_lyric">Enable Bluetooth car lyrics</string>
-    <string name="settings_enable_bluetooth_lyric_summary">Write the current lyric into the media title for Bluetooth devices or car head units.</string>
-    <string name="settings_bluetooth_lyric_translation">Send translation to car lyrics</string>
+    <string name="settings_heads_up_lyric_secondary">Heads-up lyric secondary line</string>
+    <string name="settings_enable_bluetooth_lyric">Enable media notification lyrics</string>
+    <string name="settings_enable_bluetooth_lyric_summary">Write the current lyric into the media notification title for Bluetooth devices, car head units, or media centers.</string>
+    <string name="settings_bluetooth_lyric_translation">Send translation to media notification lyrics</string>
     <string name="settings_bluetooth_lyric_translation_summary">Replace the media artist line with the current lyric translation.</string>
-    <string name="settings_bluetooth_lyric_pronunciation">Send pronunciation to car lyrics</string>
+    <string name="settings_bluetooth_lyric_pronunciation">Send pronunciation to media notification lyrics</string>
     <string name="settings_bluetooth_lyric_pronunciation_summary">Replace the media artist line with the current pronunciation or romanization.</string>
     <string name="analytics_listen_duration_ranking">Listening time ranking</string>
     <string name="analytics_listen_duration_empty">Listening time starts accumulating after you play music</string>

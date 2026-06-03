@@ -87,6 +87,7 @@ import com.ella.music.data.splitArtistNames
 import com.ella.music.data.tagIdentityKey
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.ConfirmDangerDialog
+import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.ArtistPickerSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
@@ -132,6 +133,7 @@ fun LibraryScreen(
     playerViewModel: PlayerViewModel,
     onNavigateToPlayer: () -> Unit,
     onNavigateToAbout: () -> Unit,
+    onNavigateToSearch: () -> Unit,
     onNavigateToAlbum: (Long) -> Unit = {},
     onNavigateToArtist: (String) -> Unit = {}
 ) {
@@ -346,7 +348,7 @@ fun LibraryScreen(
                             )
                         }
                     }
-                    IconButton(onClick = { searchExpanded = !searchExpanded }) {
+                    IconButton(onClick = onNavigateToSearch) {
                         Icon(
                             imageVector = MiuixIcons.Basic.Search,
                             contentDescription = stringResource(R.string.common_search),
@@ -633,7 +635,7 @@ fun LibraryScreen(
                 title = stringResource(R.string.song_more_add_to_playlist_title),
                 onDismissRequest = { playlistPickerSongs = null }
             ) {
-                AddToPlaylistMenu(
+                AddToPlaylistSheet(
                     playlists = playlists
                         .sortedWith(compareByDescending<com.ella.music.data.model.UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }.thenByDescending { it.createdAt }),
                     songCount = songsToAdd.size,
