@@ -48,9 +48,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -82,8 +80,8 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import com.ella.music.ui.components.EllaSmallTopAppBar
+import com.ella.music.ui.components.EllaMiuixTextField
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
@@ -561,6 +559,12 @@ fun SettingsDetailScreen(
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
     val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
+    val startupPosterEnabled by settingsManager.startupPosterEnabled.collectAsState(initial = false)
+    val startupPosterUri by settingsManager.startupPosterUri.collectAsState(initial = "")
+    val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
+    val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
+    val hiResLogoEnabled by settingsManager.hiResLogoEnabled.collectAsState(initial = false)
+    val hiResLogoUri by settingsManager.hiResLogoUri.collectAsState(initial = "")
     val playerImmersiveCover by settingsManager.playerImmersiveCover.collectAsState(initial = true)
     val transportButtonOutlines by settingsManager.transportButtonOutlines.collectAsState(initial = false)
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
@@ -720,6 +724,27 @@ fun SettingsDetailScreen(
         HomePreferenceItem("lyricist", stringResource(R.string.settings_library_tile_lyricist), stringResource(R.string.settings_library_tile_lyricist_summary))
     )
     var showHomeDisplayPage by remember { mutableStateOf(false) }
+    val startupPosterPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        context.persistImageReadPermission(uri)
+        scope.launch { settingsManager.setStartupPosterUri(uri.toString()) }
+    }
+    val appWallpaperPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        context.persistImageReadPermission(uri)
+        scope.launch { settingsManager.setAppWallpaperUri(uri.toString()) }
+    }
+    val hiResLogoPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        context.persistImageReadPermission(uri)
+        scope.launch { settingsManager.setHiResLogoUri(uri.toString()) }
+    }
     val dynamicCoverPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -857,6 +882,40 @@ fun SettingsDetailScreen(
                                 }
                             }
                         )
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_startup_poster),
+                            summary = stringResource(R.string.settings_startup_poster_summary),
+                            checked = startupPosterEnabled,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setStartupPosterEnabled(it) }
+                            }
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_startup_poster_image),
+                            summary = if (startupPosterUri.isBlank()) {
+                                stringResource(R.string.settings_custom_image_not_selected)
+                            } else {
+                                stringResource(R.string.settings_custom_image_selected)
+                            },
+                            onClick = { startupPosterPicker.launch(arrayOf("image/*")) }
+                        )
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_app_wallpaper),
+                            summary = stringResource(R.string.settings_app_wallpaper_summary),
+                            checked = appWallpaperEnabled,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setAppWallpaperEnabled(it) }
+                            }
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_app_wallpaper_image),
+                            summary = if (appWallpaperUri.isBlank()) {
+                                stringResource(R.string.settings_custom_image_not_selected)
+                            } else {
+                                stringResource(R.string.settings_custom_image_selected)
+                            },
+                            onClick = { appWallpaperPicker.launch(arrayOf("image/*")) }
+                        )
                         WindowSpinnerPreference(
                             title = stringResource(R.string.settings_category_grid_columns),
                             summary = stringResource(
@@ -898,6 +957,23 @@ fun SettingsDetailScreen(
                             summary = stringResource(R.string.settings_dynamic_cover_summary),
                             checked = dynamicCoverEnabled,
                             onCheckedChange = ::setDynamicCoverEnabled
+                        )
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_hi_res_logo),
+                            summary = stringResource(R.string.settings_hi_res_logo_summary),
+                            checked = hiResLogoEnabled,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setHiResLogoEnabled(it) }
+                            }
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_hi_res_logo_image),
+                            summary = if (hiResLogoUri.isBlank()) {
+                                stringResource(R.string.settings_hi_res_logo_default)
+                            } else {
+                                stringResource(R.string.settings_custom_image_selected)
+                            },
+                            onClick = { hiResLogoPicker.launch(arrayOf("image/*")) }
                         )
                         SwitchPreference(
                             title = stringResource(R.string.settings_player_immersive_cover),
@@ -1716,22 +1792,14 @@ private fun SplitSettingTextField(
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
         )
-        TextField(
+        EllaMiuixTextField(
             value = localValue,
             onValueChange = {
                 localValue = it
                 hasPendingEdit = true
             },
             label = label,
-            useLabelAsPlaceholder = true,
             singleLine = singleLine,
-            insideMargin = DpSize(12.dp, 10.dp),
-            backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-            cornerRadius = 12.dp,
-            textStyle = TextStyle(
-                color = MiuixTheme.colorScheme.onSurface,
-                fontSize = 14.sp
-            ),
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -1958,6 +2026,12 @@ private fun String.csvIds(defaultValue: String): List<String> {
 }
 
 private fun Set<String>.toCsv(): String = sorted().joinToString(",")
+
+private fun android.content.Context.persistImageReadPermission(uri: Uri) {
+    runCatching {
+        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+}
 
 @Composable
 private fun SettingsCardGroup(content: @Composable () -> Unit) {

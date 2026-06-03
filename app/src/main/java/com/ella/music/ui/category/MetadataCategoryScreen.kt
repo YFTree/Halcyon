@@ -52,7 +52,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -60,12 +59,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
@@ -80,6 +79,9 @@ import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
+import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixSheetActions
+import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.FolderOutlineIcon
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.DefaultAlbumCover
@@ -94,7 +96,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
@@ -788,9 +789,9 @@ private fun CategoryCreatePlaylistAndAddSelectedSheet(
         focusRequester.requestFocus()
         keyboardController?.show()
     }
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
-        title = "新建歌单",
+        title = stringResource(R.string.playlist_create_title),
         onDismissRequest = onDismiss
     ) {
         Column(
@@ -798,32 +799,22 @@ private fun CategoryCreatePlaylistAndAddSelectedSheet(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "将添加 $songCount 首歌曲",
+                text = stringResource(R.string.library_create_playlist_add_count, songCount),
                 fontSize = 13.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
-            TextField(
+            EllaMiuixTextField(
                 value = playlistName,
                 onValueChange = { playlistName = it },
-                label = "歌单名称",
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                insideMargin = DpSize(12.dp, 10.dp),
-                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                cornerRadius = 12.dp,
-                textStyle = TextStyle(
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
+                label = stringResource(R.string.playlist_name_label),
+                focusRequester = focusRequester
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = onDismiss) { Text("取消") }
-                Spacer(modifier = Modifier.size(8.dp))
-                Button(onClick = { onCreate(playlistName) }) { Text("创建") }
-            }
+            EllaMiuixSheetActions(
+                cancelText = stringResource(R.string.common_cancel),
+                confirmText = stringResource(R.string.common_create),
+                onCancel = onDismiss,
+                onConfirm = { onCreate(playlistName) }
+            )
         }
     }
 }

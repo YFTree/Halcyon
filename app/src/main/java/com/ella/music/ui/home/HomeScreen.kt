@@ -18,6 +18,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
@@ -56,17 +57,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
@@ -79,6 +77,7 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.albumIdentityId
+import com.ella.music.data.model.matchesFullTagSearch
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.neteaseAlbumUrl
 import com.ella.music.data.neteaseArtistUrl
@@ -89,6 +88,9 @@ import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.EllaSearchBar
+import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixSheetActions
+import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.ArtistPickerSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.FastIndexBar
@@ -114,7 +116,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
@@ -144,12 +145,14 @@ fun LibraryScreen(
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val isScanning by mainViewModel.isScanning.collectAsState()
     val scanProgress by mainViewModel.scanProgress.collectAsState()
+    val ratingRevision by mainViewModel.ratingRevision.collectAsState()
     val context = LocalContext.current
     val settingsManager = remember(context) { SettingsManager(context) }
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
 
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
+    var ratingFilter by remember { mutableStateOf(0) }
     var sortExpanded by remember { mutableStateOf(false) }
     val sortIndex by settingsManager.librarySongSortIndex.collectAsState(initial = LibrarySortUiState.librarySongSortIndex)
     val sortMode = HomeSortMode.entries.getOrElse(sortIndex) { HomeSortMode.Title }
@@ -234,12 +237,20 @@ fun LibraryScreen(
         listCoversEnabled = true
     }
 
-    val filteredSongs = remember(songs, searchQuery) {
-        if (searchQuery.isBlank()) songs
-        else songs.filter {
-            it.title.contains(searchQuery, ignoreCase = true) ||
-                it.artist.contains(searchQuery, ignoreCase = true) ||
-                it.album.contains(searchQuery, ignoreCase = true)
+    val filteredSongs by produceState(
+        initialValue = songs,
+        songs,
+        searchQuery,
+        ratingFilter,
+        ratingRevision
+    ) {
+        val query = searchQuery.trim()
+        value = withContext(Dispatchers.IO) {
+            songs.filter { song ->
+                val ratingMatched = ratingFilter <= 0 || mainViewModel.getSongRating(song) == ratingFilter
+                if (!ratingMatched) return@filter false
+                query.isBlank() || song.matchesFullTagSearch(query, mainViewModel.getSongTagInfo(song))
+            }
         }
     }
     val sortedResult by produceState<HomeSortedSongs?>(
@@ -423,6 +434,13 @@ fun LibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+        }
+
+        if (songs.isNotEmpty() && !selectionMode) {
+            StarRatingFilterRow(
+                selectedRating = ratingFilter,
+                onRatingSelected = { ratingFilter = it }
             )
         }
 
@@ -1211,7 +1229,7 @@ private fun CreatePlaylistAndAddSheet(
         focusRequester.requestFocus()
         keyboardController?.show()
     }
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
         title = stringResource(R.string.playlist_create_title),
         onDismissRequest = onDismiss
@@ -1226,30 +1244,67 @@ private fun CreatePlaylistAndAddSheet(
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
-            TextField(
+            EllaMiuixTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = stringResource(R.string.playlist_name_label),
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                insideMargin = DpSize(12.dp, 10.dp),
-                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                cornerRadius = 12.dp,
-                textStyle = TextStyle(
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
+                focusRequester = focusRequester
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { onCreate(name) }) { Text(stringResource(R.string.common_create)) }
-            }
+            EllaMiuixSheetActions(
+                cancelText = stringResource(R.string.common_cancel),
+                confirmText = stringResource(R.string.common_create),
+                onCancel = onDismiss,
+                onConfirm = { onCreate(name) }
+            )
+        }
+
+    }
+}
+
+@Composable
+private fun StarRatingFilterRow(
+    selectedRating: Int,
+    onRatingSelected: (Int) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        StarRatingPill(
+            text = stringResource(R.string.rating_filter_all),
+            selected = selectedRating <= 0,
+            onClick = { onRatingSelected(0) }
+        )
+        (1..5).forEach { rating ->
+            StarRatingPill(
+                text = stringResource(R.string.rating_filter_star, rating),
+                selected = selectedRating == rating,
+                onClick = { onRatingSelected(rating) }
+            )
         }
     }
+}
+
+@Composable
+private fun StarRatingPill(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Text(
+        text = text,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    )
 }
 
 @Composable

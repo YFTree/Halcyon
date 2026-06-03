@@ -17,7 +17,8 @@ fun SafeCoverImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    sizePx: Int = 1200
+    sizePx: Int = 1200,
+    showDefaultPlaceholder: Boolean = true
 ) {
     val context = LocalContext.current
     val request = remember(context, model, sizePx) {
@@ -32,7 +33,9 @@ fun SafeCoverImage(
     }
 
     Box(modifier = modifier) {
-        DefaultAlbumCover(modifier = Modifier.fillMaxSize())
+        if (showDefaultPlaceholder) {
+            DefaultAlbumCover(modifier = Modifier.fillMaxSize())
+        }
         if (request != null) {
             AsyncImage(
                 model = request,

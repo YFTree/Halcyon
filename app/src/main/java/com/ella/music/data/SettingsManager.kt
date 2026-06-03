@@ -81,6 +81,12 @@ class SettingsManager(private val context: Context) {
         val KEY_PLAYER_DYNAMIC_FLOW_ENABLED = booleanPreferencesKey("player_dynamic_flow_enabled")
         val KEY_AUDIO_VISUALIZER_ENABLED = booleanPreferencesKey("audio_visualizer_enabled")
         val KEY_DYNAMIC_COVER_ENABLED = booleanPreferencesKey("dynamic_cover_enabled")
+        val KEY_STARTUP_POSTER_ENABLED = booleanPreferencesKey("startup_poster_enabled")
+        val KEY_STARTUP_POSTER_URI = stringPreferencesKey("startup_poster_uri")
+        val KEY_APP_WALLPAPER_ENABLED = booleanPreferencesKey("app_wallpaper_enabled")
+        val KEY_APP_WALLPAPER_URI = stringPreferencesKey("app_wallpaper_uri")
+        val KEY_HI_RES_LOGO_ENABLED = booleanPreferencesKey("hi_res_logo_enabled")
+        val KEY_HI_RES_LOGO_URI = stringPreferencesKey("hi_res_logo_uri")
         val KEY_SHOW_PLAY_NEXT_IN_LISTS = booleanPreferencesKey("show_play_next_in_lists")
         val KEY_LYRIC_SHARE_CUSTOM_INFO = stringPreferencesKey("lyric_share_custom_info")
         val KEY_SHOW_ALBUM_ARTISTS = booleanPreferencesKey("show_album_artists")
@@ -281,6 +287,18 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_AUDIO_VISUALIZER_ENABLED] ?: false }
     val dynamicCoverEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_DYNAMIC_COVER_ENABLED] ?: false }
+    val startupPosterEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_STARTUP_POSTER_ENABLED] ?: false }
+    val startupPosterUri: Flow<String> =
+        context.dataStore.data.map { it[KEY_STARTUP_POSTER_URI] ?: "" }
+    val appWallpaperEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_APP_WALLPAPER_ENABLED] ?: false }
+    val appWallpaperUri: Flow<String> =
+        context.dataStore.data.map { it[KEY_APP_WALLPAPER_URI] ?: "" }
+    val hiResLogoEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_HI_RES_LOGO_ENABLED] ?: false }
+    val hiResLogoUri: Flow<String> =
+        context.dataStore.data.map { it[KEY_HI_RES_LOGO_URI] ?: "" }
     val showPlayNextInLists: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_SHOW_PLAY_NEXT_IN_LISTS] ?: false }
     val lyricShareCustomInfo: Flow<String> =
@@ -617,6 +635,39 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setDynamicCoverEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_DYNAMIC_COVER_ENABLED] = enabled }
+    }
+
+    suspend fun setStartupPosterEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_STARTUP_POSTER_ENABLED] = enabled }
+    }
+
+    suspend fun setStartupPosterUri(uri: String) {
+        context.dataStore.edit {
+            val safeUri = uri.trim()
+            if (safeUri.isBlank()) it.remove(KEY_STARTUP_POSTER_URI) else it[KEY_STARTUP_POSTER_URI] = safeUri
+        }
+    }
+
+    suspend fun setAppWallpaperEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_APP_WALLPAPER_ENABLED] = enabled }
+    }
+
+    suspend fun setAppWallpaperUri(uri: String) {
+        context.dataStore.edit {
+            val safeUri = uri.trim()
+            if (safeUri.isBlank()) it.remove(KEY_APP_WALLPAPER_URI) else it[KEY_APP_WALLPAPER_URI] = safeUri
+        }
+    }
+
+    suspend fun setHiResLogoEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_HI_RES_LOGO_ENABLED] = enabled }
+    }
+
+    suspend fun setHiResLogoUri(uri: String) {
+        context.dataStore.edit {
+            val safeUri = uri.trim()
+            if (safeUri.isBlank()) it.remove(KEY_HI_RES_LOGO_URI) else it[KEY_HI_RES_LOGO_URI] = safeUri
+        }
     }
 
     suspend fun setShowPlayNextInLists(enabled: Boolean) {
@@ -981,6 +1032,9 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_PLAYER_IMMERSIVE_COVER)
             setBoolean(KEY_AUDIO_VISUALIZER_ENABLED)
             setBoolean(KEY_DYNAMIC_COVER_ENABLED)
+            setBoolean(KEY_STARTUP_POSTER_ENABLED)
+            setBoolean(KEY_APP_WALLPAPER_ENABLED)
+            setBoolean(KEY_HI_RES_LOGO_ENABLED)
             setBoolean(KEY_SHOW_PLAY_NEXT_IN_LISTS)
             setBoolean(KEY_SHOW_ALBUM_ARTISTS)
             setBoolean(KEY_USE_ANDROID_MEDIA_LIBRARY)
@@ -1049,6 +1103,9 @@ class SettingsManager(private val context: Context) {
             setString(KEY_LYRIC_FONT_NAME)
             setString(KEY_LYRIC_FONT_PATH)
             setString(KEY_LYRIC_SHARE_CUSTOM_INFO)
+            setString(KEY_STARTUP_POSTER_URI)
+            setString(KEY_APP_WALLPAPER_URI)
+            setString(KEY_HI_RES_LOGO_URI)
             setString(KEY_METADATA_EDITOR_ID)
             setString(KEY_LYRIC_TIMING_EDITOR_ID)
             setString(KEY_SHORTCUT_LIBRARY_LABEL)

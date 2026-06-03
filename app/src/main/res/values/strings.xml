@@ -541,8 +541,8 @@
     <string name="home_import_api_source">导入 API 源</string>
     <string name="home_connect_cloud_music">连接云端音乐</string>
     <string name="library_refresh">刷新音乐库</string>
-    <string name="library_search_placeholder">搜索歌曲、艺术家或专辑</string>
-    <string name="library_search_page_placeholder">搜索歌曲、专辑、歌手</string>
+    <string name="library_search_placeholder">搜索歌曲、专辑、歌手、标签或歌词</string>
+    <string name="library_search_page_placeholder">搜索歌曲、专辑、歌手、标签或歌词</string>
     <string name="library_search_duplicates">重复歌曲</string>
     <string name="library_search_clear_history">清空历史</string>
     <string name="library_search_history">搜索历史</string>
@@ -554,6 +554,9 @@
     <string name="library_search_no_results">没有匹配结果</string>
     <string name="library_search_no_duplicates">没有找到同歌曲名、同专辑的重复歌曲</string>
     <string name="library_search_song_unit">首</string>
+    <string name="library_search_lyric_prefix">歌词：</string>
+    <string name="rating_filter_all">全部星级</string>
+    <string name="rating_filter_star">%1$d 星</string>
     <string name="library_select_songs_first">请先选择歌曲</string>
 
     <string name="settings_home_display">首页显示</string>
@@ -562,6 +565,18 @@
     <string name="settings_dynamic_cover_enabled">已开启动态封面</string>
     <string name="settings_dynamic_cover_permission_grant">请在系统设置中授予视频权限后再开启动态封面</string>
     <string name="settings_dynamic_cover_permission_denied">未授予视频权限，动态封面已关闭</string>
+    <string name="settings_startup_poster">开屏海报</string>
+    <string name="settings_startup_poster_summary">开启并选择图片后，每次打开 Ella 时显示约 3 秒</string>
+    <string name="settings_startup_poster_image">选择开屏海报图片</string>
+    <string name="settings_app_wallpaper">全局自定义壁纸</string>
+    <string name="settings_app_wallpaper_summary">在音乐库、专辑、歌单、文件夹等页面背后显示自定义壁纸</string>
+    <string name="settings_app_wallpaper_image">选择壁纸图片</string>
+    <string name="settings_hi_res_logo">Hi-Res 封面标识</string>
+    <string name="settings_hi_res_logo_summary">非沉浸播放页中，Hi-Res 音质歌曲的封面右下角显示小标识</string>
+    <string name="settings_hi_res_logo_image">选择 Hi-Res 标识图片</string>
+    <string name="settings_hi_res_logo_default">未选择时使用内置 Hi-Res 小标识</string>
+    <string name="settings_custom_image_selected">已选择自定义图片</string>
+    <string name="settings_custom_image_not_selected">未选择图片</string>
     <string name="settings_player_immersive_cover">沉浸专辑封面</string>
     <string name="settings_player_immersive_cover_summary">开启后播放页封面延伸到顶部；关闭后使用收敛的圆角封面布局</string>
     <string name="settings_lyric_font">歌词字体</string>

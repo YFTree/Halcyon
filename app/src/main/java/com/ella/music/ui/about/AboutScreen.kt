@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,17 +28,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
@@ -173,14 +167,14 @@ private fun AboutContent(
     }
 
     BgEffectBackground(
-        dynamicBackground = shaderSupported,
+        dynamicBackground = true,
         modifier = Modifier.fillMaxSize(),
         bgModifier = Modifier.layerBackdrop(backdrop),
-        effectBackground = shaderSupported,
+        effectBackground = true,
         isDarkTheme = isDark,
         alpha = {
             val fade = 1f - scrollProgress
-            if (isDark) 0.42f + 0.40f * fade else fade
+            if (isDark) 0.48f + 0.36f * fade else fade
         },
     ) {
         Column(
@@ -190,21 +184,13 @@ private fun AboutContent(
                     alpha = (1f - scrollProgress * 1.35f).coerceIn(0f, 1f)
                     translationY = -logoLiftPx * scrollProgress
                 }
-                .padding(top = padding.calculateTopPadding() + 120.dp)
+                .padding(top = padding.calculateTopPadding() + 72.dp)
                 .onSizeChanged { size -> with(density) { logoHeightDp = size.height.toDp() } },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_flyme_ticker),
-                contentDescription = null,
-                tint = colorScheme.primary.copy(alpha = if (isDark) 0.72f else 0.58f),
-                modifier = Modifier
-                    .size(112.dp)
-                    .padding(bottom = 18.dp)
-            )
             Text(
                 modifier = Modifier
-                    .padding(bottom = 5.dp)
+                    .padding(top = 0.dp, bottom = 5.dp)
                     .then(
                         if (blurEnable && !isDark) Modifier.textureBlur(
                             backdrop = backdrop,
@@ -251,7 +237,7 @@ private fun AboutContent(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(logoHeightDp + 218.dp)
+                        .height(logoHeightDp + 72.dp + padding.calculateTopPadding() + 98.dp)
                         .onSizeChanged { size -> onLogoHeightChanged(size.height) },
                 )
             }

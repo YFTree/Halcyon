@@ -15,7 +15,6 @@ import com.ella.music.R
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun ConfirmDangerDialog(
@@ -26,7 +25,7 @@ fun ConfirmDangerDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    WindowDialog(
+    EllaMiuixDialog(
         show = show,
         title = title,
         onDismissRequest = onDismiss

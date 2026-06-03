@@ -53,7 +53,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
@@ -61,10 +60,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
@@ -73,6 +70,7 @@ import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.formatPlaybackDuration
+import com.ella.music.data.model.matchesFullTagSearch
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.PlaylistExportFormat
 import com.ella.music.data.PlaylistImportMode
@@ -81,6 +79,9 @@ import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
+import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixSheetActions
+import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
@@ -96,7 +97,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
@@ -108,8 +108,10 @@ import top.yukonga.miuix.kmp.icon.extended.Share
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun PlaylistScreen(
@@ -526,16 +528,15 @@ fun PlaylistDetailScreen(
         sortMode == PlaylistSongSortMode.Custom &&
         searchQuery.isBlank()
     val baseSongs = if (reorderEnabled) manualOrder else sortedSongs
-    val displayedSongs = remember(baseSongs, searchQuery) {
+    val displayedSongs by produceState(initialValue = baseSongs, baseSongs, searchQuery, ratingRevision) {
         val query = searchQuery.trim()
-        if (query.isBlank()) {
+        value = if (query.isBlank()) {
             baseSongs
         } else {
-            baseSongs.filter { song ->
-                song.title.contains(query, ignoreCase = true) ||
-                    song.artist.contains(query, ignoreCase = true) ||
-                    song.album.contains(query, ignoreCase = true) ||
-                    song.fileName.contains(query, ignoreCase = true)
+            withContext(Dispatchers.IO) {
+                baseSongs.filter { song ->
+                    song.matchesFullTagSearch(query, mainViewModel.getSongTagInfo(song))
+                }
             }
         }
     }
@@ -1287,7 +1288,7 @@ private fun CreatePlaylistDialog(
         focusRequester.requestFocus()
         keyboardController?.show()
     }
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
         title = stringResource(R.string.playlist_create_title),
         onDismissRequest = onDismiss
@@ -1296,28 +1297,18 @@ private fun CreatePlaylistDialog(
             modifier = Modifier.padding(bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            TextField(
+            EllaMiuixTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = stringResource(R.string.playlist_name_label),
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                insideMargin = DpSize(12.dp, 10.dp),
-                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                cornerRadius = 12.dp,
-                textStyle = TextStyle(
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
+                focusRequester = focusRequester
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { onCreate(name) }) { Text(stringResource(R.string.common_create)) }
-            }
+            EllaMiuixSheetActions(
+                cancelText = stringResource(R.string.common_cancel),
+                confirmText = stringResource(R.string.common_create),
+                onCancel = onDismiss,
+                onConfirm = { onCreate(name) }
+            )
         }
     }
 }

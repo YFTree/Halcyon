@@ -46,9 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.Song
@@ -59,6 +57,9 @@ import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FolderOutlineIcon
 import com.ella.music.ui.components.ConfirmDangerDialog
+import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixDialog
+import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -69,8 +70,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
-import androidx.compose.ui.window.Dialog
 import com.ella.music.R
 import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.model.formatPlaybackDuration
@@ -1023,21 +1022,17 @@ internal fun FolderBlockDialog(
     onDismiss: () -> Unit,
     onBlock: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = stringResource(R.string.folder_block_folder),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-                Text(text = folderPath, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Button(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = onBlock) { Text(stringResource(R.string.folder_block)) }
-                }
+    EllaMiuixDialog(
+        show = true,
+        title = stringResource(R.string.folder_block_folder),
+        onDismissRequest = onDismiss
+    ) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = folderPath, fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = onBlock) { Text(stringResource(R.string.folder_block)) }
             }
         }
     }
@@ -1050,31 +1045,27 @@ private fun BlockedFoldersDialog(
     onRemove: (String) -> Unit,
     onClear: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = stringResource(R.string.folder_blocked_folders),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-                folders.forEach { folder ->
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = folder,
-                            fontSize = 13.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Button(onClick = { onRemove(folder) }) { Text(stringResource(R.string.common_remove)) }
-                    }
+    EllaMiuixDialog(
+        show = true,
+        title = stringResource(R.string.folder_blocked_folders),
+        onDismissRequest = onDismiss
+    ) {
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            folders.forEach { folder ->
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = folder,
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(onClick = { onRemove(folder) }) { Text(stringResource(R.string.common_remove)) }
                 }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    Button(onClick = onClear) { Text(stringResource(R.string.common_clear)) }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
-                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Button(onClick = onClear) { Text(stringResource(R.string.common_clear)) }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
             }
         }
     }
@@ -1094,7 +1085,7 @@ internal fun WebDavSettingsDialog(
     onSave: () -> Unit,
     onClear: () -> Unit
 ) {
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
         title = stringResource(R.string.webdav_library_title),
         onDismissRequest = onDismiss
@@ -1135,19 +1126,10 @@ internal fun WebDavTextField(
     value: String,
     onValueChange: (String) -> Unit
 ) {
-    TextField(
+    EllaMiuixTextField(
         value = value,
         onValueChange = onValueChange,
         label = label,
-        useLabelAsPlaceholder = true,
-        singleLine = true,
-        insideMargin = DpSize(12.dp, 10.dp),
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        cornerRadius = 12.dp,
-        textStyle = TextStyle(
-            color = MiuixTheme.colorScheme.onBackground,
-            fontSize = 14.sp
-        ),
         modifier = Modifier.fillMaxWidth()
     )
 }

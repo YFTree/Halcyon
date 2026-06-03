@@ -541,8 +541,8 @@
     <string name="home_import_api_source">Import API source</string>
     <string name="home_connect_cloud_music">Connect cloud music</string>
     <string name="library_refresh">Refresh library</string>
-    <string name="library_search_placeholder">Search songs, artists, or albums</string>
-    <string name="library_search_page_placeholder">Search songs, albums, artists</string>
+    <string name="library_search_placeholder">Search songs, albums, artists, tags, or lyrics</string>
+    <string name="library_search_page_placeholder">Search songs, albums, artists, tags, or lyrics</string>
     <string name="library_search_duplicates">Duplicate songs</string>
     <string name="library_search_clear_history">Clear history</string>
     <string name="library_search_history">Search history</string>
@@ -554,6 +554,9 @@
     <string name="library_search_no_results">No matching results</string>
     <string name="library_search_no_duplicates">No duplicate songs with the same title and album were found</string>
     <string name="library_search_song_unit">songs</string>
+    <string name="library_search_lyric_prefix">Lyrics: </string>
+    <string name="rating_filter_all">All ratings</string>
+    <string name="rating_filter_star">%1$d stars</string>
     <string name="library_select_songs_first">Select songs first</string>
 
     <string name="settings_home_display">Home display</string>
@@ -562,6 +565,18 @@
     <string name="settings_dynamic_cover_enabled">Dynamic cover enabled</string>
     <string name="settings_dynamic_cover_permission_grant">Grant video permission in system settings before enabling dynamic cover</string>
     <string name="settings_dynamic_cover_permission_denied">Video permission not granted, dynamic cover was disabled</string>
+    <string name="settings_startup_poster">Startup poster</string>
+    <string name="settings_startup_poster_summary">After enabling and choosing an image, show it for about 3 seconds whenever Ella opens</string>
+    <string name="settings_startup_poster_image">Choose startup poster image</string>
+    <string name="settings_app_wallpaper">Global custom wallpaper</string>
+    <string name="settings_app_wallpaper_summary">Show a custom wallpaper behind library, album, playlist, folder, and similar pages</string>
+    <string name="settings_app_wallpaper_image">Choose wallpaper image</string>
+    <string name="settings_hi_res_logo">Hi-Res cover badge</string>
+    <string name="settings_hi_res_logo_summary">Show a small badge at the bottom-right of the non-immersive player cover for Hi-Res tracks</string>
+    <string name="settings_hi_res_logo_image">Choose Hi-Res badge image</string>
+    <string name="settings_hi_res_logo_default">Uses the built-in Hi-Res badge when no image is selected</string>
+    <string name="settings_custom_image_selected">Custom image selected</string>
+    <string name="settings_custom_image_not_selected">No image selected</string>
     <string name="settings_player_immersive_cover">Immersive album cover</string>
     <string name="settings_player_immersive_cover_summary">Extend the album cover to the top of the player; disable it to use the compact rounded cover layout</string>
     <string name="settings_lyric_font">Lyric font</string>

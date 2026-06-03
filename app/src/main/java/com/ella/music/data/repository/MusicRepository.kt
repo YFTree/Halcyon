@@ -17,6 +17,7 @@ import com.ella.music.data.AppLogStore
 import com.ella.music.data.AppLogType
 import com.ella.music.data.AppNetworkLoggingInterceptor
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.looksLikeNeteaseKeyValue
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
@@ -480,10 +481,11 @@ class MusicRepository(private val context: Context) {
     }
 
     suspend fun writeSongRating(song: Song, rating: Int): Result<Song?> = withContext(Dispatchers.IO) {
+        val safeRating = rating.coerceIn(0, 5)
         val result = try {
             writeSongTags(
                 song,
-                AudioTagInfo(rating = rating.coerceIn(0, 5))
+                AudioTagInfo(rating = safeRating)
             )
         } catch (e: SecurityException) {
             val sender = createWritePermissionIntentSender(song)
@@ -492,7 +494,8 @@ class MusicRepository(private val context: Context) {
         }
         result.writePermissionRequestIfNeeded(song)?.let { return@withContext it }
         result.map {
-            refreshSongAfterExternalEdit(song)
+            val immediate = updateSongAfterLocalTagWrite(song)
+            refreshSongAfterExternalEdit(immediate) ?: immediate
         }
     }
 
@@ -513,7 +516,8 @@ class MusicRepository(private val context: Context) {
         }
         result.writePermissionRequestIfNeeded(song)?.let { return@withContext it }
         result.map {
-            refreshSongAfterExternalEdit(song)
+            val immediate = updateSongAfterLocalTagWrite(song)
+            refreshSongAfterExternalEdit(immediate) ?: immediate
         }
     }
 
@@ -527,8 +531,34 @@ class MusicRepository(private val context: Context) {
         }
         result.writePermissionRequestIfNeeded(song)?.let { return@withContext it }
         result.map {
-            refreshSongAfterExternalEdit(song)
+            val immediate = updateSongAfterLocalTagWrite(song)
+            refreshSongAfterExternalEdit(immediate) ?: immediate
         }
+    }
+
+    private suspend fun updateSongAfterLocalTagWrite(song: Song): Song = withContext(Dispatchers.IO) {
+        clearMetadataCache(song)
+        val updated = song.withCurrentFileSnapshot()
+        val currentSongs = _songs.value
+        if (currentSongs.isNotEmpty()) {
+            val nextSongs = currentSongs.map { existing ->
+                if (existing.id == song.id || existing.path == song.path) updated else existing
+            }
+            _songs.value = nextSongs
+            _albums.value = nextSongs.toAlbums()
+            saveLibraryCache(nextSongs, _albums.value)
+        }
+        updated
+    }
+
+    private fun Song.withCurrentFileSnapshot(): Song {
+        if (path.startsWith("http://") || path.startsWith("https://")) return this
+        val file = File(path)
+        if (!file.exists()) return copy(dateModified = System.currentTimeMillis())
+        return copy(
+            fileSize = file.length().takeIf { it > 0L } ?: fileSize,
+            dateModified = file.lastModified().takeIf { it > 0L } ?: System.currentTimeMillis()
+        )
     }
 
     private suspend fun writeSongTags(song: Song, tags: AudioTagInfo): Result<Unit> {
@@ -1187,8 +1217,45 @@ class MusicRepository(private val context: Context) {
             comment = comment.orEmpty(),
             copyright = copyright.orEmpty(),
             neteaseKey = neteaseKey.orEmpty(),
-            rating = rating ?: 0
+            rating = rating ?: 0,
+            customTagText = customTags.flattenForSearch()
         )
+
+    private fun Map<String, List<String>>.flattenForSearch(): String =
+        entries.asSequence()
+            .filterNot { (key, _) -> key.isIgnoredSearchTagKey() }
+            .flatMap { (key, values) ->
+                sequence {
+                    yield(key)
+                    values.forEach { value ->
+                        val text = value.trim()
+                        if (text.isNotBlank() && !text.looksLikeNeteaseKeyValue()) yield(text)
+                    }
+                }
+            }
+            .distinct()
+            .take(80)
+            .joinToString(" ")
+
+    private fun String.isIgnoredSearchTagKey(): Boolean {
+        val normalized = trim().lowercase()
+        return normalized in setOf(
+            "apic",
+            "covr",
+            "picture",
+            "metadata_block_picture",
+            "unsyncedlyrics",
+            "uslt",
+            "lyrics",
+            "lyric",
+            "syncedlyrics",
+            "replaygain_track_gain",
+            "replaygain_track_peak",
+            "replaygain_album_gain",
+            "replaygain_album_peak",
+            "replaygain_reference_loudness"
+        )
+    }
 
     private data class LibrarySyncInfo(
         val key: String,

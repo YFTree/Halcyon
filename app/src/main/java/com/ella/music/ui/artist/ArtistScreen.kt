@@ -49,20 +49,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import com.ella.music.data.detailedAudioInfo
 import com.ella.music.data.model.AudioInfo
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.ella.music.R
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
@@ -77,6 +76,9 @@ import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SafeCoverImage
+import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixSheetActions
+import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.buildTagEditorOptions
 import com.ella.music.ui.components.TagEditorOptionKind
@@ -93,7 +95,6 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -704,37 +705,27 @@ private fun ArtistCreatePlaylistSheet(
         focusRequester.requestFocus()
         keyboardController?.show()
     }
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
-        title = "新建歌单",
+        title = stringResource(R.string.playlist_create_title),
         onDismissRequest = onDismiss
     ) {
         Column(
             modifier = Modifier.padding(bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            TextField(
+            EllaMiuixTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = "歌单名称",
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                insideMargin = DpSize(12.dp, 10.dp),
-                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                cornerRadius = 12.dp,
-                textStyle = TextStyle(
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
+                label = stringResource(R.string.playlist_name_label),
+                focusRequester = focusRequester
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = onDismiss) { Text("取消") }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { onCreate(name) }) { Text("创建") }
-            }
+            EllaMiuixSheetActions(
+                cancelText = stringResource(R.string.common_cancel),
+                confirmText = stringResource(R.string.common_create),
+                onCancel = onDismiss,
+                onConfirm = { onCreate(name) }
+            )
         }
     }
 }

@@ -491,7 +491,8 @@ class MusicScanner(private val context: Context) {
                 .orEmpty()
                 .ifBlank { tagInfo.comment.orEmpty().extractPrefixedNeteaseCommentKey() }
                 .cleanTagText(),
-            rating = ratingStarsFromTagValues(tagInfo.rating?.toString())
+            rating = ratingStarsFromTagValues(tagInfo.rating?.toString()),
+            customTagText = tagInfo.customTags.flattenForSearch()
         )
     }
 
@@ -534,6 +535,42 @@ class MusicScanner(private val context: Context) {
                 ?.let { return it }
         }
         return null
+    }
+
+    private fun Map<String, List<String>>.flattenForSearch(): String =
+        entries.asSequence()
+            .filterNot { (key, _) -> key.isIgnoredSearchTagKey() }
+            .flatMap { (key, values) ->
+                sequence {
+                    yield(key)
+                    values.forEach { value ->
+                        val text = value.cleanTagText()
+                        if (text.isNotBlank() && !text.looksLikeNeteaseKeyValue()) yield(text)
+                    }
+                }
+            }
+            .distinct()
+            .take(80)
+            .joinToString(" ")
+
+    private fun String.isIgnoredSearchTagKey(): Boolean {
+        val normalized = trim().lowercase()
+        return normalized in setOf(
+            "apic",
+            "covr",
+            "picture",
+            "metadata_block_picture",
+            "unsyncedlyrics",
+            "uslt",
+            "lyrics",
+            "lyric",
+            "syncedlyrics",
+            "replaygain_track_gain",
+            "replaygain_track_peak",
+            "replaygain_album_gain",
+            "replaygain_album_peak",
+            "replaygain_reference_loudness"
+        )
     }
 
     private fun String.parseReplayGain(): Float? {

@@ -44,15 +44,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
@@ -65,6 +62,9 @@ import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
+import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixSheetActions
+import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.FolderOutlineIcon
 import com.ella.music.ui.components.LazyListScrollIndicator
@@ -81,7 +81,6 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
 import top.yukonga.miuix.kmp.icon.basic.Search
@@ -650,7 +649,7 @@ private fun CreatePlaylistAndAddSelectedSheet(
         focusRequester.requestFocus()
         keyboardController?.show()
     }
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
         title = stringResource(R.string.playlist_create_title),
         onDismissRequest = onDismiss
@@ -664,28 +663,18 @@ private fun CreatePlaylistAndAddSelectedSheet(
                 fontSize = 13.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
-            TextField(
+            EllaMiuixTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = stringResource(R.string.playlist_name_label),
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                insideMargin = DpSize(12.dp, 10.dp),
-                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                cornerRadius = 12.dp,
-                textStyle = TextStyle(
-                    color = MiuixTheme.colorScheme.onSurface,
-                    fontSize = 15.sp
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
+                focusRequester = focusRequester
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { onCreate(name) }) { Text(stringResource(R.string.common_create)) }
-            }
+            EllaMiuixSheetActions(
+                cancelText = stringResource(R.string.common_cancel),
+                confirmText = stringResource(R.string.common_create),
+                onCancel = onDismiss,
+                onConfirm = { onCreate(name) }
+            )
         }
     }
 }

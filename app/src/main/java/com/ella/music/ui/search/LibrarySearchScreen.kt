@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -36,13 +37,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.SettingsManager
+import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Artist
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.matchesFullTagSearch
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
@@ -70,6 +76,7 @@ fun LibrarySearchScreen(
     val songs by mainViewModel.songs.collectAsState()
     val albums by mainViewModel.albums.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
+    val lyricSourceMode by mainViewModel.settingsManager.lyricSourceMode.collectAsState(initial = SettingsManager.LYRIC_SOURCE_AUTO)
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(SearchFilter.All) }
     var actionSong by remember { mutableStateOf<Song?>(null) }
@@ -77,11 +84,46 @@ fun LibrarySearchScreen(
 
     val trimmedQuery = query.trim()
     val duplicateSongs = remember(songs) { songs.duplicateTitleAlbumSongs() }
-    val songResults = remember(songs, trimmedQuery, filter, duplicateSongs) {
+    val immediateSongResults = remember(songs, trimmedQuery, filter, duplicateSongs) {
         when {
-            filter == SearchFilter.Duplicates -> duplicateSongs
+            filter == SearchFilter.Duplicates -> duplicateSongs.map { SongSearchResult(it) }
             trimmedQuery.isBlank() || filter !in listOf(SearchFilter.All, SearchFilter.Songs) -> emptyList()
-            else -> songs.filter { it.matchesLibrarySearch(trimmedQuery) }.take(80)
+            else -> songs
+                .filter { it.matchesFullTagSearch(trimmedQuery) }
+                .take(80)
+                .map { SongSearchResult(it) }
+        }
+    }
+    val songResults by produceState(
+        initialValue = immediateSongResults,
+        songs,
+        trimmedQuery,
+        filter,
+        duplicateSongs,
+        lyricSourceMode
+    ) {
+        value = immediateSongResults
+        if (trimmedQuery.isBlank() || filter !in listOf(SearchFilter.All, SearchFilter.Songs) || filter == SearchFilter.Duplicates) {
+            return@produceState
+        }
+        val current = immediateSongResults.toMutableList()
+        val seenKeys = current.map { it.song.searchIdentityKey() }.toMutableSet()
+        for (song in songs) {
+            if (current.size >= 80) break
+            if (song.searchIdentityKey() in seenKeys) continue
+            if (song.matchesFullTagSearch(trimmedQuery, mainViewModel.getSongTagInfo(song))) {
+                current += SongSearchResult(song = song)
+                seenKeys += song.searchIdentityKey()
+                value = current.toList()
+                continue
+            }
+            val snippet = mainViewModel.repository
+                .getLyrics(song, lyricSourceMode)
+                .firstMatchingLyricSnippet(trimmedQuery)
+                ?: continue
+            current += SongSearchResult(song = song, lyricSnippet = snippet)
+            seenKeys += song.searchIdentityKey()
+            value = current.toList()
         }
     }
     val albumResults = remember(albums, trimmedQuery, filter) {
@@ -228,21 +270,27 @@ fun LibrarySearchScreen(
                 }
                 if (songResults.isNotEmpty()) {
                     item { SearchSectionHeader(stringResource(R.string.library_search_songs)) }
-                    items(songResults, key = { "${it.id}:${it.path}" }) { song ->
-                        SongItem(
-                            song = song,
-                            isCurrent = currentSong?.id == song.id,
-                            loadCoverArt = mainViewModel::getCoverArtBitmap,
-                            loadAudioInfo = mainViewModel::getAudioInfo,
-                            onClick = {
-                                val index = songResults.indexOfFirst { it.id == song.id && it.path == song.path }.coerceAtLeast(0)
-                                playerViewModel.setPlaylist(songResults, index)
-                                commitSearch()
-                                onNavigateToPlayer()
-                            },
-                            onLongClick = { actionSong = song },
-                            onMore = { actionSong = song }
-                        )
+                    items(songResults, key = { "${it.song.id}:${it.song.path}:${it.lyricSnippet.orEmpty()}" }) { result ->
+                        Column {
+                            SongItem(
+                                song = result.song,
+                                isCurrent = currentSong?.id == result.song.id,
+                                loadCoverArt = mainViewModel::getCoverArtBitmap,
+                                loadAudioInfo = mainViewModel::getAudioInfo,
+                                onClick = {
+                                    val playbackSongs = songResults.map { it.song }
+                                    val index = playbackSongs.indexOfFirst { it.id == result.song.id && it.path == result.song.path }.coerceAtLeast(0)
+                                    playerViewModel.setPlaylist(playbackSongs, index)
+                                    commitSearch()
+                                    onNavigateToPlayer()
+                                },
+                                onLongClick = { actionSong = result.song },
+                                onMore = { actionSong = result.song }
+                            )
+                            result.lyricSnippet?.let { snippet ->
+                                LyricSearchMatchLine(snippet = snippet)
+                            }
+                        }
                     }
                 }
                 if (albumResults.isNotEmpty()) {
@@ -305,6 +353,11 @@ private enum class SearchFilter {
 private data class ArtistSearchResult(
     val artist: Artist,
     val representativeSong: Song?
+)
+
+private data class SongSearchResult(
+    val song: Song,
+    val lyricSnippet: String? = null
 )
 
 @Composable
@@ -438,11 +491,54 @@ private fun EmptySearchHint(text: String) {
     }
 }
 
-private fun Song.matchesLibrarySearch(query: String): Boolean =
-    title.contains(query, ignoreCase = true) ||
-        artist.contains(query, ignoreCase = true) ||
-        album.contains(query, ignoreCase = true) ||
-        fileName.contains(query, ignoreCase = true)
+@Composable
+private fun LyricSearchMatchLine(snippet: String) {
+    Text(
+        text = buildAnnotatedString {
+            append(stringResource(R.string.library_search_lyric_prefix))
+            pushStyle(SpanStyle(color = MiuixTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold))
+            append(snippet)
+            pop()
+        },
+        fontSize = 13.sp,
+        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(start = 76.dp, end = 16.dp, bottom = 8.dp)
+    )
+}
+
+private fun List<LyricLine>.firstMatchingLyricSnippet(query: String): String? {
+    return asSequence()
+        .flatMap { line ->
+            sequenceOf(
+                line.text,
+                line.translation.orEmpty(),
+                line.pronunciation.orEmpty(),
+                line.backgroundText.orEmpty(),
+                line.backgroundTranslation.orEmpty()
+            )
+        }
+        .map { it.trim() }
+        .filter { it.isNotBlank() && it.contains(query, ignoreCase = true) }
+        .firstOrNull()
+        ?.compactSearchSnippet(query)
+}
+
+private fun String.compactSearchSnippet(query: String): String {
+    val normalized = replace(Regex("\\s+"), " ").trim()
+    if (normalized.length <= 52) return normalized
+    val index = normalized.indexOf(query, ignoreCase = true).coerceAtLeast(0)
+    val start = (index - 18).coerceAtLeast(0)
+    val end = (index + query.length + 28).coerceAtMost(normalized.length)
+    return buildString {
+        if (start > 0) append("...")
+        append(normalized.substring(start, end))
+        if (end < normalized.length) append("...")
+    }
+}
+
+private fun Song.searchIdentityKey(): String = "$id|$path"
 
 private fun Album.matchesLibrarySearch(query: String): Boolean =
     name.contains(query, ignoreCase = true) ||

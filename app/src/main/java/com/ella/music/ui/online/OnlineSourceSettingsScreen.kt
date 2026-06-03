@@ -30,14 +30,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.LxSourceConfig
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.lx.LxOnlineService
+import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.ellaPageBackground
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,7 +49,6 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
@@ -205,19 +203,11 @@ private fun SourceSettingsScaffold(
             SmallTitle(text = "导入")
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                    TextField(
+                    EllaMiuixTextField(
                         value = importUrl,
                         onValueChange = onImportUrlChange,
                         label = importPlaceholder,
-                        useLabelAsPlaceholder = true,
                         singleLine = true,
-                        insideMargin = DpSize(12.dp, 10.dp),
-                        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                        cornerRadius = 12.dp,
-                        textStyle = TextStyle(
-                            color = MiuixTheme.colorScheme.onSurface,
-                            fontSize = 14.sp
-                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(12.dp))

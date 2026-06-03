@@ -1,6 +1,7 @@
 package com.ella.music.ui.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -9,6 +10,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.InputField
@@ -41,10 +43,11 @@ fun EllaSearchBar(
         label = placeholder,
         textStyle = TextStyle(
             color = MiuixTheme.colorScheme.onSurface,
-            fontSize = 15.sp
+            fontSize = 16.sp
         ),
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 2.dp)
             .focusRequester(focusRequester)
     )
 }

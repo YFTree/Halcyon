@@ -1,6 +1,9 @@
 package com.ella.music.data.model
 
 import com.ella.music.data.decodeNeteaseKey
+import com.ella.music.data.neteaseAlbumUrl
+import com.ella.music.data.neteaseArtistUrl
+import com.ella.music.data.neteaseSongUrl
 
 data class AudioInfo(
     val format: String,
@@ -23,7 +26,8 @@ data class SongTagInfo(
     val comment: String = "",
     val copyright: String = "",
     val neteaseKey: String = "",
-    val rating: Int = 0
+    val rating: Int = 0,
+    val customTagText: String = ""
 ) {
     val displayComment: String
         get() = comment
@@ -32,6 +36,80 @@ data class SongTagInfo(
             ?.takeUnless { it.looksLikeNeteaseKey() || it == neteaseKey.cleanDisplayComment() || it.looksLikeSourceGarbageComment() }
             ?: decodeNeteaseKey(neteaseKey)?.comment?.cleanDisplayComment()?.takeIf { it.isNotBlank() }
             .orEmpty()
+}
+
+fun Song.matchesFullTagSearch(
+    query: String,
+    tagInfo: SongTagInfo = SongTagInfo()
+): Boolean {
+    val target = query.trim()
+    if (target.isBlank()) return false
+    return searchableTagValues(tagInfo).any { it.contains(target, ignoreCase = true) }
+}
+
+fun Song.searchableTagValues(tagInfo: SongTagInfo = SongTagInfo()): Sequence<String> = sequence {
+    yieldNonBlank(title)
+    yieldNonBlank(artist)
+    yieldNonBlank(album)
+    yieldNonBlank(albumArtist)
+    yieldNonBlank(genre)
+    yieldNonBlank(year)
+    yieldNonBlank(composer)
+    yieldNonBlank(lyricist)
+    yieldNonBlank(fileName)
+    yieldNonBlank(onlineSource)
+    yieldNonBlank(onlineId)
+    if (trackNumber > 0) yield(trackNumber.toString())
+    if (discNumber > 0) yield(discNumber.toString())
+
+    yieldNonBlank(tagInfo.title)
+    yieldNonBlank(tagInfo.artist)
+    yieldNonBlank(tagInfo.album)
+    yieldNonBlank(tagInfo.albumArtist)
+    yieldNonBlank(tagInfo.genre)
+    yieldNonBlank(tagInfo.year)
+    yieldNonBlank(tagInfo.composer)
+    yieldNonBlank(tagInfo.lyricist)
+    yieldNonBlank(tagInfo.track)
+    yieldNonBlank(tagInfo.displayComment)
+    yieldNonBlank(tagInfo.copyright)
+    yieldNonBlank(tagInfo.customTagText)
+    yieldRatingValues(tagInfo.rating)
+
+    decodeNeteaseKey(tagInfo.neteaseKey)?.let { key ->
+        yieldNonBlank(key.musicId)
+        yieldNonBlank(key.musicName)
+        key.aliases.forEach { yieldNonBlank(it) }
+        yieldNonBlank(key.albumId)
+        yieldNonBlank(key.albumName)
+        yieldNonBlank(key.comment)
+        if (key.musicId.isNotBlank()) yield(neteaseSongUrl(key.musicId))
+        if (key.albumId.isNotBlank()) yield(neteaseAlbumUrl(key.albumId))
+        key.artists.forEach { artist ->
+            yieldNonBlank(artist.id)
+            yieldNonBlank(artist.name)
+            if (artist.id.isNotBlank()) yield(neteaseArtistUrl(artist.id))
+        }
+    }
+}
+
+private suspend fun SequenceScope<String>.yieldNonBlank(value: String?) {
+    value?.trim()?.takeIf { it.isNotBlank() }?.let { yield(it) }
+}
+
+private suspend fun SequenceScope<String>.yieldRatingValues(rating: Int) {
+    val safeRating = rating.coerceIn(0, 5)
+    if (safeRating <= 0) return
+    yield(safeRating.toString())
+    yield("${safeRating}星")
+    yield("★".repeat(safeRating))
+    when (safeRating) {
+        1 -> yield("一星")
+        2 -> yield("二星")
+        3 -> yield("三星")
+        4 -> yield("四星")
+        5 -> yield("五星")
+    }
 }
 
 fun String.looksLikeNeteaseKey(): Boolean {

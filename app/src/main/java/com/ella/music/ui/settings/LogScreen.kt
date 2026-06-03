@@ -56,6 +56,8 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
+import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixDialog
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -68,8 +70,6 @@ import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
-import top.yukonga.miuix.kmp.window.WindowDialog
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -296,7 +296,7 @@ fun LogScreen(
         onCopy = ::copyEntry
     )
 
-    WindowDialog(
+    EllaMiuixDialog(
         show = showClearDialog,
         title = stringResource(R.string.logs_clear_action),
         onDismissRequest = { showClearDialog = false }
@@ -420,7 +420,7 @@ private fun AppLogDetailSheet(
     onDismissFinished: () -> Unit,
     onCopy: (AppLogEntry) -> Unit
 ) {
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = show,
         enableNestedScroll = false,
         title = stringResource(R.string.logs_detail_title),
@@ -437,7 +437,7 @@ private fun AppLogDetailSheet(
         onDismissRequest = onDismiss,
         onDismissFinished = onDismissFinished
     ) {
-        entry ?: return@WindowBottomSheet
+        entry ?: return@EllaMiuixBottomSheet
         Column(
             modifier = Modifier
                 .fillMaxWidth()

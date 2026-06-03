@@ -64,10 +64,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -96,6 +99,7 @@ import com.ella.music.ui.components.GlassPill
 import com.ella.music.ui.components.LiquidGlassBottomBar
 import com.ella.music.ui.components.LiquidGlassBottomBarItem
 import com.ella.music.ui.components.MiniPlayer
+import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.TagEditorEditTracker
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import com.ella.music.ui.components.updateEllaDynamicShortcuts
@@ -425,6 +429,18 @@ fun EllaApp(
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
     val miniPlayerRightButton by settingsManager.miniPlayerRightButton.collectAsState(initial = 0)
     val bottomBarGlassEffect by settingsManager.bottomBarGlassEffect.collectAsState(initial = BottomBarGlassEffect.LiquidGlass)
+    val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
+    val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
+    val startupPosterEnabled by settingsManager.startupPosterEnabled.collectAsState(initial = false)
+    val startupPosterUri by settingsManager.startupPosterUri.collectAsState(initial = "")
+    var showStartupPoster by rememberSaveable { mutableStateOf(true) }
+
+    LaunchedEffect(startupPosterEnabled, startupPosterUri) {
+        if (startupPosterEnabled && startupPosterUri.isNotBlank() && showStartupPoster) {
+            kotlinx.coroutines.delay(3_000L)
+            showStartupPoster = false
+        }
+    }
 
     val currentLyricLine = lyrics.getOrNull(currentLyricIndex)
     val miniPlayerLyricText = if (isPlaying && miniPlayerLyricsEnabled) {
@@ -486,141 +502,196 @@ fun EllaApp(
     val currentTabRoute = currentRoute.toCurrentTabRoute()
     val currentTab = tabs.firstOrNull { it.first == currentTabRoute } ?: tabs.first()
 
+    val wallpaperVisible = appWallpaperEnabled && appWallpaperUri.isNotBlank()
+    val startupPosterVisible = startupPosterEnabled && startupPosterUri.isNotBlank() && showStartupPoster
     val contentModifier = Modifier
         .fillMaxSize()
-        .background(MiuixTheme.colorScheme.background)
+        .then(if (wallpaperVisible) Modifier else Modifier.background(MiuixTheme.colorScheme.background))
         .layerBackdrop(backdrop)
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MiuixTheme.colorScheme.background)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-        ) {
-            AppNavigation(
-                navController = navController,
-                mainViewModel = mainViewModel,
-                playerViewModel = playerViewModel,
-                modifier = contentModifier.nestedScroll(dockScrollConnection),
-                onNavigateToPlayer = {
-                    playerDismissProgress = 0f
-                    playerOverlayOpenToken++
-                    showPlayerOverlay = true
-                }
-            )
-            FloatingBottomControls(
-                showMiniPlayer = showMiniPlayer,
-                showBottomBar = showBottomBar,
-                currentSong = currentSong,
-                isPlaying = isPlaying,
-                coverRotationEnabled = miniPlayerCoverRotation,
-                currentPosition = currentPosition,
-                duration = duration,
-                lyricText = miniPlayerLyricText,
-                lyricTranslation = miniPlayerLyricSecondaryText,
-                lyricProgress = miniPlayerLyricProgress,
-                miniPlayerRightButton = miniPlayerRightButton,
-                tabs = tabs,
-                currentTab = currentTab,
-                currentRoute = currentRoute,
-                bottomDockMode = bottomDockMode,
-                canCompact = canCompactBottomDock,
-                backdrop = backdrop,
-                glassEffect = bottomBarGlassEffect,
-                mainViewModel = mainViewModel,
-                playerViewModel = playerViewModel,
-                onNavigate = { route ->
-                    bottomDockMode = BottomDockMode.Expanded
-                    if (currentRoute != route) {
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = false
+        if (startupPosterVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(ComposeColor.Black)
+            ) {
+                SafeCoverImage(
+                    model = Uri.parse(startupPosterUri),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    sizePx = 1800,
+                    showDefaultPlaceholder = false
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(ComposeColor.Black.copy(alpha = 0.10f))
+                )
+            }
+        } else {
+            if (wallpaperVisible) {
+                SafeCoverImage(
+                    model = Uri.parse(appWallpaperUri),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    sizePx = 1600,
+                    showDefaultPlaceholder = false
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = if (isDarkTheme) {
+                                    listOf(
+                                        ComposeColor.Black.copy(alpha = 0.62f),
+                                        ComposeColor.Black.copy(alpha = 0.46f),
+                                        ComposeColor.Black.copy(alpha = 0.68f)
+                                    )
+                                } else {
+                                    listOf(
+                                        ComposeColor.White.copy(alpha = 0.54f),
+                                        ComposeColor.White.copy(alpha = 0.42f),
+                                        ComposeColor.White.copy(alpha = 0.62f)
+                                    )
+                                }
+                            )
+                        )
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                AppNavigation(
+                    navController = navController,
+                    mainViewModel = mainViewModel,
+                    playerViewModel = playerViewModel,
+                    modifier = contentModifier.nestedScroll(dockScrollConnection),
+                    onNavigateToPlayer = {
+                        playerDismissProgress = 0f
+                        playerOverlayOpenToken++
+                        showPlayerOverlay = true
+                    }
+                )
+                FloatingBottomControls(
+                    showMiniPlayer = showMiniPlayer,
+                    showBottomBar = showBottomBar,
+                    currentSong = currentSong,
+                    isPlaying = isPlaying,
+                    coverRotationEnabled = miniPlayerCoverRotation,
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    lyricText = miniPlayerLyricText,
+                    lyricTranslation = miniPlayerLyricSecondaryText,
+                    lyricProgress = miniPlayerLyricProgress,
+                    miniPlayerRightButton = miniPlayerRightButton,
+                    tabs = tabs,
+                    currentTab = currentTab,
+                    currentRoute = currentRoute,
+                    bottomDockMode = bottomDockMode,
+                    canCompact = canCompactBottomDock,
+                    backdrop = backdrop,
+                    glassEffect = bottomBarGlassEffect,
+                    mainViewModel = mainViewModel,
+                    playerViewModel = playerViewModel,
+                    onNavigate = { route ->
+                        bottomDockMode = BottomDockMode.Expanded
+                        if (currentRoute != route) {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = false
+                                }
+                                launchSingleTop = true
+                                restoreState = false
                             }
-                            launchSingleTop = true
-                            restoreState = false
                         }
+                    },
+                    onNavigatePlayer = {
+                        playerDismissProgress = 0f
+                        playerOverlayOpenToken++
+                        showPlayerOverlay = true
+                    },
+                    onExpand = {
+                        bottomDockMode = BottomDockMode.Expanded
+                    },
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                )
+            }
+            AnimatedVisibility(
+                visible = showPlayerOverlay,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = ExitTransition.None,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                PlayerScreen(
+                    mainViewModel = mainViewModel,
+                    playerViewModel = playerViewModel,
+                    onBack = {
+                        playerViewModel.setShowLyrics(false)
+                        showPlayerOverlay = false
+                        playerDismissProgress = 0f
+                    },
+                    onNavigateToAlbum = { albumId ->
+                        playerViewModel.setShowLyrics(false)
+                        showPlayerOverlay = false
+                        playerDismissProgress = 0f
+                        navController.navigate(Screen.AlbumDetail.createRoute(albumId))
+                    },
+                    onNavigateToArtist = { artistName ->
+                        playerViewModel.setShowLyrics(false)
+                        showPlayerOverlay = false
+                        playerDismissProgress = 0f
+                        navController.navigate(Screen.ArtistDetail.createRoute(artistName))
+                    },
+                    onNavigateToMetadataCategory = { type, name ->
+                        playerViewModel.setShowLyrics(false)
+                        showPlayerOverlay = false
+                        playerDismissProgress = 0f
+                        navController.navigate(Screen.MetadataCategoryDetail.createRoute(type, name))
+                    },
+                    onDismissProgressChange = { progress ->
+                        playerDismissProgress = progress
+                    },
+                    openToken = playerOverlayOpenToken
+                )
+            }
+
+            InitialScanPromptDialog(
+                show = showInitialScanPrompt,
+                onDismiss = {
+                    showInitialScanPrompt = false
+                    scope.launch {
+                        settingsManager.setInitialScanPromptHandled(true)
+                        settingsManager.setAutoScan(false)
                     }
                 },
-                onNavigatePlayer = {
-                    playerDismissProgress = 0f
-                    playerOverlayOpenToken++
-                    showPlayerOverlay = true
+                onCustomFolderScan = {
+                    showInitialScanPrompt = false
+                    scope.launch {
+                        settingsManager.setInitialScanPromptHandled(true)
+                        settingsManager.setUseAndroidMediaLibrary(false)
+                        settingsManager.setAutoScan(false)
+                    }
+                    initialScanFolderPicker.launch(null)
                 },
-                onExpand = {
-                    bottomDockMode = BottomDockMode.Expanded
-                },
-                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                onMediaLibraryScan = {
+                    showInitialScanPrompt = false
+                    scope.launch {
+                        settingsManager.setInitialScanPromptHandled(true)
+                        settingsManager.setUseAndroidMediaLibrary(true)
+                        settingsManager.setAutoScan(true)
+                        mainViewModel.scanMusic()
+                    }
+                }
             )
         }
-        AnimatedVisibility(
-            visible = showPlayerOverlay,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = ExitTransition.None,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            PlayerScreen(
-                mainViewModel = mainViewModel,
-                playerViewModel = playerViewModel,
-                onBack = {
-                    playerViewModel.setShowLyrics(false)
-                    showPlayerOverlay = false
-                    playerDismissProgress = 0f
-                },
-                onNavigateToAlbum = { albumId ->
-                    playerViewModel.setShowLyrics(false)
-                    showPlayerOverlay = false
-                    playerDismissProgress = 0f
-                    navController.navigate(Screen.AlbumDetail.createRoute(albumId))
-                },
-                onNavigateToArtist = { artistName ->
-                    playerViewModel.setShowLyrics(false)
-                    showPlayerOverlay = false
-                    playerDismissProgress = 0f
-                    navController.navigate(Screen.ArtistDetail.createRoute(artistName))
-                },
-                onNavigateToMetadataCategory = { type, name ->
-                    playerViewModel.setShowLyrics(false)
-                    showPlayerOverlay = false
-                    playerDismissProgress = 0f
-                    navController.navigate(Screen.MetadataCategoryDetail.createRoute(type, name))
-                },
-                onDismissProgressChange = { progress ->
-                    playerDismissProgress = progress
-                },
-                openToken = playerOverlayOpenToken
-            )
-        }
-
-        InitialScanPromptDialog(
-            show = showInitialScanPrompt,
-            onDismiss = {
-                showInitialScanPrompt = false
-                scope.launch {
-                    settingsManager.setInitialScanPromptHandled(true)
-                    settingsManager.setAutoScan(false)
-                }
-            },
-            onCustomFolderScan = {
-                showInitialScanPrompt = false
-                scope.launch {
-                    settingsManager.setInitialScanPromptHandled(true)
-                    settingsManager.setUseAndroidMediaLibrary(false)
-                    settingsManager.setAutoScan(false)
-                }
-                initialScanFolderPicker.launch(null)
-            },
-            onMediaLibraryScan = {
-                showInitialScanPrompt = false
-                scope.launch {
-                    settingsManager.setInitialScanPromptHandled(true)
-                    settingsManager.setUseAndroidMediaLibrary(true)
-                    settingsManager.setAutoScan(true)
-                    mainViewModel.scanMusic()
-                }
-            }
-        )
     }
 }
 

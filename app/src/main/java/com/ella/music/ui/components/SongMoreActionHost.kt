@@ -38,14 +38,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
@@ -74,7 +71,6 @@ import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import java.text.SimpleDateFormat
@@ -725,7 +721,7 @@ fun CreatePlaylistAndAddSheet(
         focusRequester.requestFocus()
         keyboardController?.show()
     }
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
         title = stringResource(R.string.playlist_create_title),
         onDismissRequest = onDismiss
@@ -733,30 +729,21 @@ fun CreatePlaylistAndAddSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                .background(MiuixTheme.colorScheme.background)
-                .padding(horizontal = 18.dp, vertical = 8.dp),
+                .padding(bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            TextField(
+            EllaMiuixTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = stringResource(R.string.playlist_name_label),
-                useLabelAsPlaceholder = true,
-                singleLine = true,
-                insideMargin = DpSize(12.dp, 10.dp),
-                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                cornerRadius = 12.dp,
-                textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 15.sp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
+                focusRequester = focusRequester
             )
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Button(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = { onCreate(name) }) { Text(stringResource(R.string.common_create)) }
-            }
+            EllaMiuixSheetActions(
+                cancelText = stringResource(R.string.common_cancel),
+                confirmText = stringResource(R.string.common_create),
+                onCancel = onDismiss,
+                onConfirm = { onCreate(name) }
+            )
         }
     }
 }
@@ -830,37 +817,25 @@ private fun BuiltInCustomTagSheet(
             .padding(horizontal = 18.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        TextField(
+        EllaMiuixTextField(
             value = key,
             onValueChange = { key = it },
             label = stringResource(R.string.song_more_custom_tag_name),
-            useLabelAsPlaceholder = true,
-            singleLine = true,
-            insideMargin = DpSize(12.dp, 10.dp),
-            backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-            cornerRadius = 12.dp,
-            textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 15.sp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(focusRequester)
+            focusRequester = focusRequester
         )
-        TextField(
+        EllaMiuixTextField(
             value = value,
             onValueChange = { value = it },
             label = stringResource(R.string.song_more_custom_tag_value),
-            useLabelAsPlaceholder = true,
             singleLine = false,
-            insideMargin = DpSize(12.dp, 10.dp),
-            backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-            cornerRadius = 12.dp,
-            textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 15.sp),
             modifier = Modifier.fillMaxWidth()
         )
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            Button(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = { onSave(key, value) }) { Text(stringResource(R.string.common_save)) }
-        }
+        EllaMiuixSheetActions(
+            cancelText = stringResource(R.string.common_cancel),
+            confirmText = stringResource(R.string.common_save),
+            onCancel = onDismiss,
+            onConfirm = { onSave(key, value) }
+        )
     }
 }
 
@@ -967,26 +942,16 @@ private fun SongMetadataEditorSheet(
                     .padding(horizontal = 18.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TextField(
+                EllaMiuixTextField(
                     value = pair.first,
                     onValueChange = { newKey -> customTags = customTags.toMutableList().apply { set(index, newKey to pair.second) } },
                     label = stringResource(R.string.song_more_custom_tag_name),
-                    singleLine = true,
-                    insideMargin = DpSize(12.dp, 10.dp),
-                    backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                    cornerRadius = 12.dp,
-                    textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp),
                     modifier = Modifier.weight(1f)
                 )
-                TextField(
+                EllaMiuixTextField(
                     value = pair.second,
                     onValueChange = { newValue -> customTags = customTags.toMutableList().apply { set(index, pair.first to newValue) } },
                     label = stringResource(R.string.song_more_custom_tag_value),
-                    singleLine = true,
-                    insideMargin = DpSize(12.dp, 10.dp),
-                    backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                    cornerRadius = 12.dp,
-                    textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp),
                     modifier = Modifier.weight(1f)
                 )
                 Text(
@@ -1010,26 +975,16 @@ private fun SongMetadataEditorSheet(
                     .padding(horizontal = 18.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TextField(
+                EllaMiuixTextField(
                     value = newKey,
                     onValueChange = { newKey = it },
                     label = stringResource(R.string.song_more_custom_tag_name),
-                    singleLine = true,
-                    insideMargin = DpSize(12.dp, 10.dp),
-                    backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                    cornerRadius = 12.dp,
-                    textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp),
                     modifier = Modifier.weight(1f)
                 )
-                TextField(
+                EllaMiuixTextField(
                     value = newValue,
                     onValueChange = { newValue = it },
                     label = stringResource(R.string.song_more_custom_tag_value),
-                    singleLine = true,
-                    insideMargin = DpSize(12.dp, 10.dp),
-                    backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                    cornerRadius = 12.dp,
-                    textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 14.sp),
                     modifier = Modifier.weight(1f)
                 )
                 Text(
@@ -1115,16 +1070,10 @@ private fun MetadataField(
     value: String,
     onValueChange: (String) -> Unit
 ) {
-    TextField(
+    EllaMiuixTextField(
         value = value,
         onValueChange = onValueChange,
         label = label,
-        useLabelAsPlaceholder = true,
-        singleLine = true,
-        insideMargin = DpSize(12.dp, 10.dp),
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-        cornerRadius = 12.dp,
-        textStyle = TextStyle(color = MiuixTheme.colorScheme.onSurface, fontSize = 15.sp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 18.dp, vertical = 2.dp)

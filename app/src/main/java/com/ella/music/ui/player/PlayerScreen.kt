@@ -83,6 +83,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -149,6 +150,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.zIndex
 import androidx.media3.common.Player
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -189,6 +191,7 @@ import com.ella.music.ui.components.shareLyricCard
 import com.ella.music.ui.components.shareLocalSong
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -206,6 +209,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -282,6 +286,8 @@ fun PlayerScreen(
     val audioVisualizerEnabled by settingsManager.audioVisualizerEnabled.collectAsState(initial = false)
     val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
     val immersiveAlbumCover by settingsManager.playerImmersiveCover.collectAsState(initial = true)
+    val hiResLogoEnabled by settingsManager.hiResLogoEnabled.collectAsState(initial = false)
+    val hiResLogoUri by settingsManager.hiResLogoUri.collectAsState(initial = "")
     val lyricShareCustomInfo by settingsManager.lyricShareCustomInfo.collectAsState(initial = "")
     val metadataEditorId by settingsManager.metadataEditorId.collectAsState(initial = TagEditorOptionIds.ASK_EACH_TIME)
     val lyricTimingEditorId by settingsManager.lyricTimingEditorId.collectAsState(initial = TagEditorOptionIds.ASK_EACH_TIME)
@@ -310,6 +316,7 @@ fun PlayerScreen(
     var playlistPickerSong by remember { mutableStateOf<Song?>(null) }
     var createPlaylistSong by remember { mutableStateOf<Song?>(null) }
     var landscapeExpanded by rememberSaveable { mutableStateOf(false) }
+    var landscapeCoverMode by rememberSaveable { mutableStateOf(false) }
     var dynamicCoverFailedPath by remember { mutableStateOf<String?>(null) }
     var hasVisualizerPermission by remember {
         mutableStateOf(
@@ -495,6 +502,8 @@ fun PlayerScreen(
             dynamicCoverFailedPath = dynamicCoverFailedPath,
             dynamicCoverEnabled = dynamicCoverEnabled,
             immersiveAlbumCover = immersiveAlbumCover,
+            hiResLogoEnabled = hiResLogoEnabled,
+            hiResLogoUri = hiResLogoUri,
             isPlaying = isPlaying,
             currentPosition = currentPosition,
             duration = duration,
@@ -566,6 +575,7 @@ fun PlayerScreen(
             },
             onLandscape = {
                 menuExpanded = false
+                landscapeCoverMode = false
                 landscapeExpanded = true
             },
             onSongInfo = {
@@ -909,37 +919,113 @@ fun PlayerScreen(
             }
 
             if (landscapeExpanded) {
-                LandscapeLyricsOverlay(
-                    song = song,
-                    embeddedCover = embeddedCover,
-                    annotation = songAnnotation,
-                    lyrics = lyrics,
-                    currentLyricIndex = currentLyricIndex,
-                    currentPosition = currentPosition,
-                    duration = duration,
-                    shuffleEnabled = shuffleEnabled,
-                    repeatMode = repeatMode,
-                    showTranslation = showLyricTranslation,
-                    showPronunciation = showLyricPronunciation,
-                    fontFamily = lyricFontFamily,
-                    fontWeight = lyricFontWeight,
-                    palette = palette,
-                    flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
-                    isPlaying = isPlaying,
-                    audioSessionId = audioSessionId,
-                    visualizerEnabled = effectiveAudioVisualizerEnabled,
-                    onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
-                    onLineLongClick = ::openLyricSharePicker,
-                    onSeek = { progress ->
-                        if (duration > 0L) playerViewModel.seekTo((duration * progress).toLong())
-                    },
-                    onCyclePlaybackMode = { playerViewModel.cyclePlaybackMode() },
-                    onPrevious = { playerViewModel.skipToPrevious() },
-                    onPlayPause = { playerViewModel.togglePlayPause() },
-                    onNext = { playerViewModel.skipToNext() },
-                    onDismiss = { landscapeExpanded = false },
-                    modifier = Modifier.fillMaxSize()
+                ForceLandscapePlayerBars(
+                    onDismiss = {
+                        landscapeExpanded = false
+                        landscapeCoverMode = false
+                    }
                 )
+                if (landscapeCoverMode) {
+                    val landscapeDynamicCoverFile = if (dynamicCoverEnabled) {
+                        song
+                            ?.dynamicCoverVideoFile(context)
+                            ?.takeUnless { it.absolutePath == dynamicCoverFailedPath }
+                    } else {
+                        null
+                    }
+                    LandscapeCoverPlaybackOverlay(
+                        song = song,
+                        embeddedCover = embeddedCover,
+                        annotation = songAnnotation,
+                        dynamicCoverFile = landscapeDynamicCoverFile,
+                        isPlaying = isPlaying,
+                        currentPosition = currentPosition,
+                        duration = duration,
+                        shuffleEnabled = shuffleEnabled,
+                        repeatMode = repeatMode,
+                        audioInfo = audioInfo,
+                        palette = palette,
+                        lyrics = lyrics,
+                        currentLyricIndex = currentLyricIndex,
+                        showTranslation = showLyricTranslation,
+                        showPronunciation = showLyricPronunciation,
+                        fontFamily = lyricFontFamily,
+                        fontWeight = lyricFontWeight,
+                        queueExpanded = queueExpanded,
+                        playlist = playlist,
+                        audioSessionId = audioSessionId,
+                        visualizerEnabled = effectiveAudioVisualizerEnabled,
+                        flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
+                        onDynamicCoverFailed = { dynamicCoverFailedPath = it },
+                        isFavorite = isCurrentSongFavorite,
+                        onToggleFavorite = { playerViewModel.toggleCurrentSongFavorite() },
+                        onToggleQueue = { queueExpanded = !queueExpanded },
+                        onDismissQueue = { queueExpanded = false },
+                        onShowLyrics = { landscapeCoverMode = false },
+                        onLyricLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
+                        onLyricLineLongClick = ::openLyricSharePicker,
+                        onSeek = { progress ->
+                            if (duration > 0L) playerViewModel.seekTo((duration * progress).toLong())
+                        },
+                        onCyclePlaybackMode = { playerViewModel.cyclePlaybackMode() },
+                        onPrevious = { playerViewModel.skipToPrevious() },
+                        onPlayPause = { playerViewModel.togglePlayPause() },
+                        onNext = { playerViewModel.skipToNext() },
+                        onQueueSongClick = { index ->
+                            queueExpanded = false
+                            playerViewModel.playQueueIndex(index)
+                        },
+                        onRemoveQueueSong = { index -> playerViewModel.removeFromPlaylist(index) },
+                        onClearQueue = {
+                            queueExpanded = false
+                            playerViewModel.clearPlaylist()
+                        },
+                        onArtist = {
+                            navigateToArtistOrChoose(song?.artist.orEmpty())
+                        },
+                        onDismiss = {
+                            landscapeExpanded = false
+                            landscapeCoverMode = false
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    LandscapeLyricsOverlay(
+                        song = song,
+                        embeddedCover = embeddedCover,
+                        annotation = songAnnotation,
+                        lyrics = lyrics,
+                        currentLyricIndex = currentLyricIndex,
+                        currentPosition = currentPosition,
+                        duration = duration,
+                        shuffleEnabled = shuffleEnabled,
+                        repeatMode = repeatMode,
+                        showTranslation = showLyricTranslation,
+                        showPronunciation = showLyricPronunciation,
+                        fontFamily = lyricFontFamily,
+                        fontWeight = lyricFontWeight,
+                        palette = palette,
+                        flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
+                        isPlaying = isPlaying,
+                        audioSessionId = audioSessionId,
+                        visualizerEnabled = effectiveAudioVisualizerEnabled,
+                        onLineClick = { line -> playerViewModel.seekTo(line.timeMs) },
+                        onLineLongClick = ::openLyricSharePicker,
+                        onSeek = { progress ->
+                            if (duration > 0L) playerViewModel.seekTo((duration * progress).toLong())
+                        },
+                        onCyclePlaybackMode = { playerViewModel.cyclePlaybackMode() },
+                        onPrevious = { playerViewModel.skipToPrevious() },
+                        onPlayPause = { playerViewModel.togglePlayPause() },
+                        onNext = { playerViewModel.skipToNext() },
+                        onShowCoverPlayer = { landscapeCoverMode = true },
+                        onDismiss = {
+                            landscapeExpanded = false
+                            landscapeCoverMode = false
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
             playlistPickerSong?.let { currentSong ->
@@ -1017,6 +1103,8 @@ private fun CoverPlayerPage(
     dynamicCoverFailedPath: String?,
     dynamicCoverEnabled: Boolean,
     immersiveAlbumCover: Boolean,
+    hiResLogoEnabled: Boolean,
+    hiResLogoUri: String,
     isPlaying: Boolean,
     currentPosition: Long,
     duration: Long,
@@ -1096,6 +1184,7 @@ private fun CoverPlayerPage(
         val useWidePlayer = maxWidth > maxHeight && maxWidth >= 700.dp
         val isSmallWindow = maxWidth < 300.dp || (maxWidth < 420.dp && maxHeight < 560.dp)
         val effectiveMiniLyricLine = miniLyricLine.takeUnless { isSmallWindow }
+        val showHiResLogo = hiResLogoEnabled && audioInfo?.isHiResLogoTrack() == true
         if (useWidePlayer) {
             LandscapeCoverPlayerPage(
                 song = song,
@@ -1317,6 +1406,8 @@ private fun CoverPlayerPage(
                                     song = song,
                                     embeddedCover = embeddedCover,
                                     cornerRadius = 24.dp,
+                                    showHiResLogo = showHiResLogo,
+                                    hiResLogoUri = hiResLogoUri,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
@@ -1638,6 +1729,272 @@ private fun LandscapeCoverPlayerPage(
                 .fillMaxWidth()
                 .height(68.dp)
         )
+    }
+}
+
+@Composable
+private fun LandscapeCoverPlaybackOverlay(
+    song: Song?,
+    embeddedCover: Bitmap?,
+    annotation: String,
+    dynamicCoverFile: File?,
+    isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
+    shuffleEnabled: Boolean,
+    repeatMode: Int,
+    audioInfo: AudioInfo?,
+    palette: PlayerPalette,
+    lyrics: List<com.ella.music.data.model.LyricLine>,
+    currentLyricIndex: Int,
+    showTranslation: Boolean,
+    showPronunciation: Boolean,
+    fontFamily: FontFamily?,
+    fontWeight: FontWeight,
+    queueExpanded: Boolean,
+    playlist: List<Song>,
+    audioSessionId: Int,
+    visualizerEnabled: Boolean,
+    flowEffectMode: Int,
+    onDynamicCoverFailed: (String) -> Unit,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onToggleQueue: () -> Unit,
+    onDismissQueue: () -> Unit,
+    onShowLyrics: () -> Unit,
+    onLyricLineClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onLyricLineLongClick: (com.ella.music.data.model.LyricLine) -> Unit,
+    onSeek: (Float) -> Unit,
+    onCyclePlaybackMode: () -> Unit,
+    onPrevious: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onQueueSongClick: (Int) -> Unit,
+    onRemoveQueueSong: (Int) -> Unit,
+    onClearQueue: () -> Unit,
+    onArtist: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val coverItems = remember(playlist, song?.id) {
+        val source = playlist.takeIf { it.isNotEmpty() } ?: listOfNotNull(song)
+        val centerIndex = source.indexOfFirst { it.id == song?.id }.takeIf { it >= 0 } ?: 0
+        listOf(-3, -2, -1, 0, 1, 2, 3)
+            .mapNotNull { offset -> source.getOrNull(centerIndex + offset)?.let { offset to it } }
+            .ifEmpty { listOfNotNull(song?.let { 0 to it }) }
+    }
+    val swipeThresholdPx = with(LocalDensity.current) { 92.dp.toPx() }
+    var swipeDragX by remember { mutableFloatStateOf(0f) }
+
+    Box(
+        modifier = modifier
+            .background(palette.middle)
+            .pointerInput(onPrevious, onNext) {
+                detectDragGestures(
+                    onDragStart = { swipeDragX = 0f },
+                    onDragCancel = { swipeDragX = 0f },
+                    onDragEnd = {
+                        when {
+                            swipeDragX > swipeThresholdPx -> onPrevious()
+                            swipeDragX < -swipeThresholdPx -> onNext()
+                        }
+                        swipeDragX = 0f
+                    },
+                    onDrag = { change, dragAmount ->
+                        if (abs(dragAmount.x) > abs(dragAmount.y)) {
+                            swipeDragX += dragAmount.x
+                            change.consume()
+                        }
+                    }
+                )
+            }
+    ) {
+        PlayerFlowBackground(
+            palette = palette,
+            flowEffectMode = flowEffectMode,
+            animate = false,
+            modifier = Modifier.fillMaxSize()
+        )
+        FluidLyricBackground(
+            palette = palette,
+            positionMs = currentPosition,
+            isPlaying = isPlaying,
+            flowEffectMode = flowEffectMode,
+            animate = false,
+            modifier = Modifier.fillMaxSize()
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 34.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                LandscapeCoverStack(
+                    currentSong = song,
+                    embeddedCover = embeddedCover,
+                    dynamicCoverFile = dynamicCoverFile,
+                    isPlaying = isPlaying,
+                    coverItems = coverItems,
+                    onDynamicCoverFailed = onDynamicCoverFailed,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = song?.title?.takeIf { it.isNotBlank() } ?: "Ella Music",
+                color = Color.White.copy(alpha = 0.96f),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = song?.artist?.takeIf { it.isNotBlank() } ?: stringResource(R.string.player_unknown_artist),
+                color = Color.White.copy(alpha = 0.52f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 26.dp, end = 92.dp)
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.14f))
+                .clickable(onClick = onShowLyrics),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Regular.Music,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.92f),
+                modifier = Modifier.size(26.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 26.dp, end = 28.dp)
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.14f))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center
+        ) {
+            CloseIcon(
+                color = Color.White.copy(alpha = 0.92f),
+                modifier = Modifier.size(26.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun LandscapeCoverStack(
+    currentSong: Song?,
+    embeddedCover: Bitmap?,
+    dynamicCoverFile: File?,
+    isPlaying: Boolean,
+    coverItems: List<Pair<Int, Song>>,
+    onDynamicCoverFailed: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val visibleItems = remember(coverItems) {
+        coverItems.sortedByDescending { abs(it.first) }
+    }
+    BoxWithConstraints(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        val coverSize = minOf(maxHeight * 0.84f, maxWidth * 0.30f).coerceAtLeast(118.dp)
+        visibleItems.forEach { (offsetIndex, itemSong) ->
+            val distance = abs(offsetIndex)
+            val isCenter = offsetIndex == 0
+            val xOffset = 126.dp * offsetIndex
+            val scale = (1f - distance * 0.13f).coerceAtLeast(0.58f)
+            val cardAlpha = (1f - distance * 0.14f).coerceAtLeast(0.34f)
+            val rotation = -offsetIndex * 13f
+            val coverModifier = Modifier
+                .size(coverSize)
+                .offset(x = xOffset, y = (distance * 8).dp)
+                .zIndex(10f - distance)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = cardAlpha
+                    rotationY = rotation
+                    cameraDistance = 18f * density
+                }
+                .clip(RoundedCornerShape(if (isCenter) 14.dp else 10.dp))
+                .background(Color.White.copy(alpha = 0.10f))
+
+            Box(
+                modifier = coverModifier,
+                contentAlignment = Alignment.Center
+            ) {
+                if (isCenter && dynamicCoverFile != null) {
+                    DynamicCoverVideo(
+                        file = dynamicCoverFile,
+                        isPlaying = isPlaying,
+                        onPlaybackError = { onDynamicCoverFailed(dynamicCoverFile.absolutePath) },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    LandscapeStackCoverImage(
+                        song = itemSong,
+                        embeddedCover = embeddedCover.takeIf { isCenter && itemSong.id == currentSong?.id },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                if (!isCenter) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.16f + distance * 0.05f))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LandscapeStackCoverImage(
+    song: Song,
+    embeddedCover: Bitmap?,
+    modifier: Modifier = Modifier
+) {
+    val uri = if (song.albumId > 0L) {
+        Uri.parse("content://media/external/audio/albumart/${song.albumId}")
+    } else {
+        null
+    }
+    val coverModel = embeddedCover ?: song.coverUrl.takeIf { it.isNotBlank() } ?: uri
+    if (coverModel != null) {
+        SafeCoverImage(
+            model = coverModel,
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = ContentScale.Crop,
+            sizePx = 512
+        )
+    } else {
+        DefaultAlbumCover(modifier = modifier)
     }
 }
 
@@ -2108,24 +2465,10 @@ private fun LandscapeLyricsOverlay(
     onPrevious: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
+    onShowCoverPlayer: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val activity = LocalContext.current.findActivity()
-    val view = LocalView.current
-    DisposableEffect(activity) {
-        val oldOrientation = activity?.requestedOrientation
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        setPlayerSystemBars(activity, view)
-        onDispose {
-            if (oldOrientation != null) {
-                activity.requestedOrientation = oldOrientation
-            }
-            setPlayerSystemBars(activity, view)
-            view.post { setPlayerSystemBars(activity, view) }
-        }
-    }
-    BackHandler(onBack = onDismiss)
     Box(modifier = modifier.background(palette.middle)) {
         FluidLyricBackground(
             palette = palette,
@@ -2207,6 +2550,24 @@ private fun LandscapeLyricsOverlay(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 26.dp, end = 92.dp)
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.14f))
+                .clickable(onClick = onShowCoverPlayer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Regular.Music,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.92f),
+                modifier = Modifier.size(26.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(top = 26.dp, end = 28.dp)
                 .size(56.dp)
                 .clip(CircleShape)
@@ -2221,6 +2582,25 @@ private fun LandscapeLyricsOverlay(
         }
     }
 
+}
+
+@Composable
+private fun ForceLandscapePlayerBars(onDismiss: () -> Unit) {
+    val activity = LocalContext.current.findActivity()
+    val view = LocalView.current
+    DisposableEffect(activity) {
+        val oldOrientation = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        setPlayerSystemBars(activity, view)
+        onDispose {
+            if (oldOrientation != null) {
+                activity.requestedOrientation = oldOrientation
+            }
+            setPlayerSystemBars(activity, view)
+            view.post { setPlayerSystemBars(activity, view) }
+        }
+    }
+    BackHandler(onBack = onDismiss)
 }
 
 @Composable
@@ -2687,7 +3067,7 @@ private fun FullBleedCover(
     val coverModel = embeddedCover ?: song?.coverUrl?.takeIf { it.isNotBlank() } ?: uri
     Box(modifier = modifier.background(Color.Black), contentAlignment = Alignment.Center) {
         if (coverModel != null) {
-            SafeCoverImage(
+            PlayerCoverImage(
                 model = coverModel,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
@@ -2708,6 +3088,35 @@ private fun SmallCover(song: Song?, embeddedCover: Bitmap?, modifier: Modifier =
         cornerRadius = 12.dp,
         modifier = modifier.clip(RoundedCornerShape(12.dp))
     )
+}
+
+@Composable
+private fun PlayerCoverImage(
+    model: Any?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    sizePx: Int = 1200
+) {
+    val context = LocalContext.current
+    val request = remember(context, model, sizePx) {
+        if (model is Uri || model is String) {
+            coil3.request.ImageRequest.Builder(context)
+                .data(model)
+                .size(sizePx)
+                .build()
+        } else {
+            model
+        }
+    }
+    if (request != null) {
+        AsyncImage(
+            model = request,
+            contentDescription = contentDescription,
+            modifier = modifier,
+            contentScale = contentScale
+        )
+    }
 }
 
 private enum class PlayerHeaderActionKind {
@@ -3601,7 +4010,7 @@ private fun PlayerBlurBackground(
 
     Box(modifier = modifier.background(palette.middle)) {
         if (coverModel != null) {
-            SafeCoverImage(
+            PlayerCoverImage(
                 model = coverModel,
                 contentDescription = null,
                 modifier = Modifier
@@ -5181,6 +5590,8 @@ internal fun AlbumArtView(
     song: Song?,
     embeddedCover: Bitmap?,
     cornerRadius: androidx.compose.ui.unit.Dp = 20.dp,
+    showHiResLogo: Boolean = false,
+    hiResLogoUri: String = "",
     modifier: Modifier = Modifier
 ) {
     val uri = if ((song?.albumId ?: 0L) > 0) {
@@ -5207,6 +5618,54 @@ internal fun AlbumArtView(
         } else {
             DefaultAlbumCover(modifier = Modifier.fillMaxSize())
         }
+        if (showHiResLogo) {
+            HiResLogoBadge(
+                logoUri = hiResLogoUri,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(10.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun HiResLogoBadge(
+    logoUri: String,
+    modifier: Modifier = Modifier
+) {
+    if (logoUri.isNotBlank()) {
+        AsyncImage(
+            model = Uri.parse(logoUri),
+            contentDescription = null,
+            modifier = modifier
+                .size(34.dp),
+            contentScale = ContentScale.Fit,
+        )
+        return
+    }
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color.Black.copy(alpha = 0.58f))
+            .padding(horizontal = 5.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "Hi-Res",
+            color = Color(0xFFFFD45A),
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
+            maxLines = 1
+        )
+        Text(
+            text = "AUDIO",
+            color = Color.White.copy(alpha = 0.92f),
+            fontSize = 5.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
     }
 }
 
@@ -5559,6 +6018,12 @@ private fun com.ella.music.data.AudioQualitySummary.playerCompactText(): String 
         showMobius -> "∞ $compactLabel"
         else -> compactLabel
     }
+}
+
+private fun AudioInfo.isHiResLogoTrack(): Boolean {
+    val summary = audioQualitySummary(this)
+    return summary.listTag in setOf("HR", "MQ") ||
+        summary.compactLabel.equals("Hi-Res", ignoreCase = true)
 }
 
 private fun Float.nextPlaybackStep(): Float {
