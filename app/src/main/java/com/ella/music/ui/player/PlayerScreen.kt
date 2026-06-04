@@ -172,9 +172,11 @@ import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.model.playlistIdentityKey
+import com.ella.music.data.repository.MusicRepository
 import com.ella.music.player.PlaybackAudioSession
 import com.ella.music.ui.components.ArtistPickerSheet
 import com.ella.music.ui.components.DefaultAlbumCover
+import com.ella.music.ui.components.SmoothLyricView
 import com.ella.music.ui.components.WordLyricView
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.CoverLoadLimiter
@@ -296,11 +298,14 @@ fun PlayerScreen(
     val playlists by mainViewModel.playlists.collectAsState()
     val playlist by playerViewModel.playlist.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
+    val lyricFormatAvailability by playerViewModel.lyricFormatAvailability.collectAsState()
+    val preferTtmlLyrics by playerViewModel.preferTtmlLyrics.collectAsState()
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
     val showLyrics by playerViewModel.showLyrics.collectAsState()
     val showLyricTranslation by playerViewModel.showLyricTranslation.collectAsState()
     val showLyricPronunciation by playerViewModel.showLyricPronunciation.collectAsState()
     val lyricPageKeepScreenOn by settingsManager.lyricPageKeepScreenOn.collectAsState(initial = false)
+    val smoothLyricView by settingsManager.smoothLyricView.collectAsState(initial = false)
     val lyricPerspectiveEffect by settingsManager.lyricPerspectiveEffect.collectAsState(initial = false)
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val sleepTimerEndRealtimeMs by playerViewModel.sleepTimerEndRealtimeMs.collectAsState()
@@ -671,8 +676,12 @@ fun PlayerScreen(
             showTranslation = showLyricTranslation,
             showPronunciation = showLyricPronunciation,
             keepScreenOn = lyricPageKeepScreenOn,
+            smoothLyricView = smoothLyricView,
+            lyricFormatAvailability = lyricFormatAvailability,
+            preferTtmlLyrics = preferTtmlLyrics,
             lyricSourceMode = lyricSourceMode,
             fontFamily = lyricFontFamily,
+            fontPath = lyricFontPath,
             fontWeight = lyricFontWeight,
             fontScale = lyricFontScale,
             perspectiveEffect = lyricPerspectiveEffect,
@@ -702,6 +711,9 @@ fun PlayerScreen(
             },
             onLyricSourceMode = { mode ->
                 playerViewModel.setLyricSourceMode(mode)
+            },
+            onLyricFormatPreference = { preferTtml ->
+                playerViewModel.setLyricFormatPreference(preferTtml)
             },
             onArtist = {
                 navigateToArtistOrChoose(song?.artist.orEmpty())
@@ -2009,8 +2021,12 @@ private fun LyricsPlayerPage(
     showTranslation: Boolean,
     showPronunciation: Boolean,
     keepScreenOn: Boolean,
+    smoothLyricView: Boolean,
+    lyricFormatAvailability: MusicRepository.LyricFormatAvailability,
+    preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
     fontFamily: FontFamily?,
+    fontPath: String,
     fontWeight: FontWeight,
     fontScale: Float,
     perspectiveEffect: Boolean,
@@ -2031,6 +2047,7 @@ private fun LyricsPlayerPage(
     onToggleFavorite: () -> Unit,
     onFontScale: (Float) -> Unit,
     onLyricSourceMode: (Int) -> Unit,
+    onLyricFormatPreference: (Boolean) -> Unit,
     onArtist: () -> Unit,
     enableSwipeDismiss: Boolean,
     useBlurBackground: Boolean,
@@ -2121,26 +2138,45 @@ private fun LyricsPlayerPage(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                WordLyricView(
-                    lyrics = lyrics,
-                    currentIndex = currentLyricIndex,
-                    currentPositionMs = currentPositionMs,
-                    isPlaying = isPlaying,
-                    showTranslation = showTranslation,
-                    showPronunciation = showPronunciation,
-                    fontScale = fontScale,
-                    fontFamily = fontFamily,
-                    fontWeight = fontWeight,
-                    topSpacer = 64.dp,
-                    bottomSpacer = if (visualizerEnabled) 150.dp else 166.dp,
-                    horizontalPadding = 0.dp,
-                    lineHorizontalPadding = 0.dp,
-                    perspectiveEffect = perspectiveEffect,
-                    onLineClick = onLineClick,
-                    onLineDoubleClick = onLineDoubleClick,
-                    onLineLongClick = onLineLongClick,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (smoothLyricView) {
+                    SmoothLyricView(
+                        songId = song?.id ?: 0L,
+                        songTitle = song?.title.orEmpty(),
+                        songArtist = song?.artist.orEmpty(),
+                        lyrics = lyrics,
+                        currentIndex = currentLyricIndex,
+                        currentPositionMs = currentPositionMs,
+                        showTranslation = showTranslation,
+                        showPronunciation = showPronunciation,
+                        fontScale = fontScale,
+                        fontPath = fontPath,
+                        fontWeight = fontWeight,
+                        onLineClick = onLineClick,
+                        onLineLongClick = onLineLongClick,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    WordLyricView(
+                        lyrics = lyrics,
+                        currentIndex = currentLyricIndex,
+                        currentPositionMs = currentPositionMs,
+                        isPlaying = isPlaying,
+                        showTranslation = showTranslation,
+                        showPronunciation = showPronunciation,
+                        fontScale = fontScale,
+                        fontFamily = fontFamily,
+                        fontWeight = fontWeight,
+                        topSpacer = 64.dp,
+                        bottomSpacer = if (visualizerEnabled) 150.dp else 166.dp,
+                        horizontalPadding = 0.dp,
+                        lineHorizontalPadding = 0.dp,
+                        perspectiveEffect = perspectiveEffect,
+                        onLineClick = onLineClick,
+                        onLineDoubleClick = onLineDoubleClick,
+                        onLineLongClick = onLineLongClick,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
 
@@ -2168,6 +2204,8 @@ private fun LyricsPlayerPage(
                     showPronunciation = showPronunciation,
                     showTranslation = showTranslation,
                     keepScreenOn = keepScreenOn,
+                    lyricFormatAvailability = lyricFormatAvailability,
+                    preferTtmlLyrics = preferTtmlLyrics,
                     lyricSourceMode = lyricSourceMode,
                     fontScale = fontScale,
                     onTogglePronunciation = {
@@ -2185,6 +2223,10 @@ private fun LyricsPlayerPage(
                     onLyricSourceMode = { mode ->
                         lyricMenuExpanded = false
                         onLyricSourceMode(mode)
+                    },
+                    onLyricFormatPreference = { preferTtml ->
+                        lyricMenuExpanded = false
+                        onLyricFormatPreference(preferTtml)
                     },
                     onFontScale = onFontScale,
                     modifier = Modifier.fillMaxWidth()
@@ -3591,12 +3633,15 @@ private fun LyricActionMenu(
     showPronunciation: Boolean,
     showTranslation: Boolean,
     keepScreenOn: Boolean,
+    lyricFormatAvailability: MusicRepository.LyricFormatAvailability,
+    preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
     fontScale: Float,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
     onToggleKeepScreenOn: () -> Unit,
     onLyricSourceMode: (Int) -> Unit,
+    onLyricFormatPreference: (Boolean) -> Unit,
     onFontScale: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -3637,6 +3682,33 @@ private fun LyricActionMenu(
                 .height(82.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
+        if (lyricFormatAvailability.hasBoth) {
+            Text(
+                text = stringResource(R.string.player_lyric_format),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                LyricSourceChip(
+                    text = stringResource(R.string.player_lyric_format_ttml),
+                    selected = preferTtmlLyrics != false,
+                    onClick = { onLyricFormatPreference(true) },
+                    modifier = Modifier.weight(1f)
+                )
+                LyricSourceChip(
+                    text = stringResource(R.string.player_lyric_format_lrc),
+                    selected = preferTtmlLyrics == false,
+                    onClick = { onLyricFormatPreference(false) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
         Text(
             text = stringResource(R.string.player_lyric_source),
             fontSize = 14.sp,

@@ -138,6 +138,8 @@ private fun AboutContent(
     val density = LocalDensity.current
     var logoHeightDp by remember { mutableStateOf(300.dp) }
     val logoLiftPx = with(density) { 96.dp.toPx() }
+    val heroTopPadding = 148.dp
+    val heroBottomPadding = 112.dp
 
     val titleBlend = remember(isDark) {
         if (isDark) {
@@ -174,7 +176,7 @@ private fun AboutContent(
         isDarkTheme = isDark,
         alpha = {
             val fade = 1f - scrollProgress
-            if (isDark) 0.48f + 0.36f * fade else fade
+            if (isDark) 0.84f * fade else fade
         },
     ) {
         Column(
@@ -184,7 +186,7 @@ private fun AboutContent(
                     alpha = (1f - scrollProgress * 1.35f).coerceIn(0f, 1f)
                     translationY = -logoLiftPx * scrollProgress
                 }
-                .padding(top = padding.calculateTopPadding() + 72.dp)
+                .padding(top = padding.calculateTopPadding() + heroTopPadding)
                 .onSizeChanged { size -> with(density) { logoHeightDp = size.height.toDp() } },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -237,7 +239,7 @@ private fun AboutContent(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(logoHeightDp + 72.dp + padding.calculateTopPadding() + 98.dp)
+                        .height(logoHeightDp + heroTopPadding + padding.calculateTopPadding() + heroBottomPadding)
                         .onSizeChanged { size -> onLogoHeightChanged(size.height) },
                 )
             }

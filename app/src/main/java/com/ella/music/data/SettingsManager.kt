@@ -70,6 +70,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_SOURCE_MODE = intPreferencesKey("lyric_source_mode")
         val KEY_LYRIC_PAGE_TRANSLATION = booleanPreferencesKey("lyric_page_translation")
         val KEY_LYRIC_PAGE_KEEP_SCREEN_ON = booleanPreferencesKey("lyric_page_keep_screen_on")
+        val KEY_SMOOTH_LYRIC_VIEW = booleanPreferencesKey("smooth_lyric_view")
         val KEY_MINI_PLAYER_LYRIC_TRANSLATION = booleanPreferencesKey("mini_player_lyric_translation")
         val KEY_MINI_PLAYER_LYRIC_SECONDARY = intPreferencesKey("mini_player_lyric_secondary")
         val KEY_MINI_PLAYER_COVER_ROTATION = booleanPreferencesKey("mini_player_cover_rotation")
@@ -143,6 +144,7 @@ class SettingsManager(private val context: Context) {
         val KEY_HOME_HIDDEN_SECTIONS = stringPreferencesKey("home_hidden_sections")
         val KEY_HOME_LIBRARY_TILE_ORDER = stringPreferencesKey("home_library_tile_order")
         val KEY_HOME_HIDDEN_LIBRARY_TILES = stringPreferencesKey("home_hidden_library_tiles")
+        val KEY_HOME_TILE_PIN_BUTTONS_VISIBLE = booleanPreferencesKey("home_tile_pin_buttons_visible")
 
         val KEY_BLUETOOTH_LYRIC_ENABLED = booleanPreferencesKey("bluetooth_lyric_enabled")
         val KEY_BLUETOOTH_LYRIC_TRANSLATION = booleanPreferencesKey("bluetooth_lyric_translation")
@@ -259,6 +261,7 @@ class SettingsManager(private val context: Context) {
     val lyricPageTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PAGE_TRANSLATION] ?: true }
     val lyricPageKeepScreenOn: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] ?: false }
+    val smoothLyricView: Flow<Boolean> = context.dataStore.data.map { it[KEY_SMOOTH_LYRIC_VIEW] ?: false }
     val miniPlayerLyricTranslation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] ?: true }
     val miniPlayerLyricSecondary: Flow<Int> = context.dataStore.data.map {
@@ -389,6 +392,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_HOME_LIBRARY_TILE_ORDER] ?: DEFAULT_HOME_LIBRARY_TILE_ORDER }
     val homeHiddenLibraryTiles: Flow<String> =
         context.dataStore.data.map { it[KEY_HOME_HIDDEN_LIBRARY_TILES] ?: "" }
+    val homeTilePinButtonsVisible: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_HOME_TILE_PIN_BUTTONS_VISIBLE] ?: true }
     fun metadataCategorySortIndex(type: String): Flow<Int> =
         context.dataStore.data.map { it[metadataCategorySortKey(type)] ?: 0 }
 
@@ -583,6 +588,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setLyricPageKeepScreenOn(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] = enabled }
+    }
+
+    suspend fun setSmoothLyricView(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_SMOOTH_LYRIC_VIEW] = enabled }
     }
 
     suspend fun setLyricPerspectiveEffect(enabled: Boolean) {
@@ -937,6 +946,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_HOME_HIDDEN_LIBRARY_TILES] = hidden.trim() }
     }
 
+    suspend fun setHomeTilePinButtonsVisible(visible: Boolean) {
+        context.dataStore.edit { it[KEY_HOME_TILE_PIN_BUTTONS_VISIBLE] = visible }
+    }
+
     suspend fun setMetadataCategorySortIndex(type: String, index: Int) {
         context.dataStore.edit { it[metadataCategorySortKey(type)] = index.coerceAtLeast(0) }
     }
@@ -1025,6 +1038,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_AUDIO_FOCUS_DISABLED)
             setBoolean(KEY_LYRIC_PAGE_TRANSLATION)
             setBoolean(KEY_LYRIC_PAGE_KEEP_SCREEN_ON)
+            setBoolean(KEY_SMOOTH_LYRIC_VIEW)
             setBoolean(KEY_LYRIC_PERSPECTIVE_EFFECT)
             setBoolean(KEY_MINI_PLAYER_LYRIC_TRANSLATION)
             setInt(KEY_MINI_PLAYER_RIGHT_BUTTON)
@@ -1037,6 +1051,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_HI_RES_LOGO_ENABLED)
             setBoolean(KEY_SHOW_PLAY_NEXT_IN_LISTS)
             setBoolean(KEY_SHOW_ALBUM_ARTISTS)
+            setBoolean(KEY_HOME_TILE_PIN_BUTTONS_VISIBLE)
             setBoolean(KEY_USE_ANDROID_MEDIA_LIBRARY)
             setBoolean(KEY_INITIAL_SCAN_PROMPT_HANDLED)
             setBoolean(KEY_TAG_IGNORE_CASE)

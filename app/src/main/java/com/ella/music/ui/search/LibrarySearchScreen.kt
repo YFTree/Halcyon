@@ -36,12 +36,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.LyricLine
@@ -111,7 +113,7 @@ fun LibrarySearchScreen(
         for (song in songs) {
             if (current.size >= 80) break
             if (song.searchIdentityKey() in seenKeys) continue
-            if (song.matchesFullTagSearch(trimmedQuery, mainViewModel.getSongTagInfo(song))) {
+            if (mainViewModel.songMatchesSearchSnapshot(song, trimmedQuery)) {
                 current += SongSearchResult(song = song)
                 seenKeys += song.searchIdentityKey()
                 value = current.toList()
@@ -288,7 +290,7 @@ fun LibrarySearchScreen(
                                 onMore = { actionSong = result.song }
                             )
                             result.lyricSnippet?.let { snippet ->
-                                LyricSearchMatchLine(snippet = snippet)
+                                LyricSearchMatchLine(snippet = snippet, query = trimmedQuery)
                             }
                         }
                     }
@@ -492,13 +494,11 @@ private fun EmptySearchHint(text: String) {
 }
 
 @Composable
-private fun LyricSearchMatchLine(snippet: String) {
+private fun LyricSearchMatchLine(snippet: String, query: String) {
     Text(
         text = buildAnnotatedString {
             append(stringResource(R.string.library_search_lyric_prefix))
-            pushStyle(SpanStyle(color = MiuixTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold))
-            append(snippet)
-            pop()
+            appendHighlightedQuery(snippet, query, MiuixTheme.colorScheme.primary)
         },
         fontSize = 13.sp,
         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -506,6 +506,27 @@ private fun LyricSearchMatchLine(snippet: String) {
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.padding(start = 76.dp, end = 16.dp, bottom = 8.dp)
     )
+}
+
+private fun AnnotatedString.Builder.appendHighlightedQuery(text: String, query: String, highlightColor: Color) {
+    val normalizedQuery = query.trim()
+    if (normalizedQuery.isBlank()) {
+        append(text)
+        return
+    }
+    var start = 0
+    while (start < text.length) {
+        val index = text.indexOf(normalizedQuery, startIndex = start, ignoreCase = true)
+        if (index < 0) {
+            append(text.substring(start))
+            break
+        }
+        if (index > start) append(text.substring(start, index))
+        pushStyle(SpanStyle(color = highlightColor, fontWeight = FontWeight.SemiBold))
+        append(text.substring(index, index + normalizedQuery.length))
+        pop()
+        start = index + normalizedQuery.length
+    }
 }
 
 private fun List<LyricLine>.firstMatchingLyricSnippet(query: String): String? {

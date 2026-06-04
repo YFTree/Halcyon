@@ -77,7 +77,6 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.albumIdentityId
-import com.ella.music.data.model.matchesFullTagSearch
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.neteaseAlbumUrl
 import com.ella.music.data.neteaseArtistUrl
@@ -168,6 +167,7 @@ fun LibraryScreen(
     var listCoversEnabled by remember { mutableStateOf(false) }
     var pendingSystemDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var pendingConfirmDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var ratingFilterExpanded by remember { mutableStateOf(false) }
     var scrollToTopRequest by remember { mutableStateOf(0) }
     val scope = rememberCoroutineScope()
     fun navigateToArtistOrChoose(artistText: String) {
@@ -249,7 +249,7 @@ fun LibraryScreen(
             songs.filter { song ->
                 val ratingMatched = ratingFilter <= 0 || mainViewModel.getSongRating(song) == ratingFilter
                 if (!ratingMatched) return@filter false
-                query.isBlank() || song.matchesFullTagSearch(query, mainViewModel.getSongTagInfo(song))
+                query.isBlank() || mainViewModel.songMatchesSearchSnapshot(song, query)
             }
         }
     }
@@ -286,17 +286,33 @@ fun LibraryScreen(
                 color = ellaPageBackground(),
                 navigationIcon = {
                     if (!selectionMode) {
-                        IconButton(
-                            onClick = {
-                                if (!isScanning) mainViewModel.scanMusic()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    if (!isScanning) mainViewModel.scanMusic()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = MiuixIcons.Regular.Refresh,
+                                    contentDescription = stringResource(R.string.library_refresh),
+                                    tint = MiuixTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(24.dp)
+                                )
                             }
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.Regular.Refresh,
-                                contentDescription = stringResource(R.string.library_refresh),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            if (songs.isNotEmpty()) {
+                                IconButton(onClick = { ratingFilterExpanded = !ratingFilterExpanded }) {
+                                    Text(
+                                        text = "★",
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (ratingFilter > 0 || ratingFilterExpanded) {
+                                            MiuixTheme.colorScheme.primary
+                                        } else {
+                                            MiuixTheme.colorScheme.onSurface
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 },
@@ -373,11 +389,12 @@ fun LibraryScreen(
                 onDoubleTap = { scrollToTopRequest++ },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
+                    .height(56.dp),
+                startPadding = if (!selectionMode && songs.isNotEmpty()) 112.dp else 56.dp
             )
         }
 
-        BackHandler(enabled = selectionMode || searchExpanded || sortExpanded) {
+        BackHandler(enabled = selectionMode || searchExpanded || sortExpanded || ratingFilterExpanded) {
             when {
                 selectionMode -> {
                     selectedIds = emptySet()
@@ -388,6 +405,7 @@ fun LibraryScreen(
                     searchQuery = ""
                 }
                 sortExpanded -> sortExpanded = false
+                ratingFilterExpanded -> ratingFilterExpanded = false
             }
         }
 
@@ -437,10 +455,17 @@ fun LibraryScreen(
             )
         }
 
-        if (songs.isNotEmpty() && !selectionMode) {
+        AnimatedVisibility(
+            visible = songs.isNotEmpty() && !selectionMode && ratingFilterExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically()
+        ) {
             StarRatingFilterRow(
                 selectedRating = ratingFilter,
-                onRatingSelected = { ratingFilter = it }
+                onRatingSelected = {
+                    ratingFilter = it
+                    ratingFilterExpanded = false
+                }
             )
         }
 

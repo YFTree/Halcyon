@@ -3,6 +3,7 @@ package com.ella.music.data
 import android.content.Context
 import android.util.Log
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.albumIdentityId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,14 +71,19 @@ class PlaybackStatsStore private constructor(context: Context) {
         addDailyListenTime(now, listenedMs)
     }
 
-    suspend fun exportJson(): JSONObject = withContext(Dispatchers.IO) {
+    suspend fun exportJson(librarySongs: List<Song> = emptyList()): JSONObject = withContext(Dispatchers.IO) {
         JSONObject()
             .put("stats", statsToJson(_stats.value))
             .put("history", historyToJson(_history.value))
             .put("dailyListenMs", dailyStatsToJson(_dailyListenMs.value))
+            .put("sessions", historyToSollinSessions(_history.value, _stats.value, librarySongs))
     }
 
     suspend fun restoreJson(payload: JSONObject) = withContext(Dispatchers.IO) {
+        if (payload.has("sessions")) {
+            restoreSollinSessions(payload.optJSONArray("sessions") ?: JSONArray())
+            return@withContext
+        }
         val stats = payload.optJSONArray("stats")?.toStatsList().orEmpty()
         val history = payload.optJSONArray("history")?.toHistoryList().orEmpty()
         val daily = payload.optJSONObject("dailyListenMs")?.toDailyStatsMap().orEmpty()
@@ -235,6 +241,47 @@ class PlaybackStatsStore private constructor(context: Context) {
         return payload
     }
 
+    private fun historyToSollinSessions(
+        history: List<PlaybackHistoryEntry>,
+        stats: List<SongPlaybackStats>,
+        librarySongs: List<Song>
+    ): JSONArray {
+        val statBySong = stats.associateBy { it.songId }
+        val libraryById = librarySongs.associateBy { it.id }
+        val libraryByFingerprint = librarySongs.associateBy { it.statsFingerprint() }
+        val array = JSONArray()
+        history.forEach { entry ->
+            val stat = statBySong[entry.songId]
+            val song = libraryById[entry.songId] ?: libraryByFingerprint[entry.statsFingerprint()]
+            val averagePlayedMs = stat?.let {
+                if (it.playCount > 0) it.listenedMs / it.playCount else it.listenedMs
+            } ?: 0L
+            val durationMs = song?.duration ?: 0L
+            val playedMs = averagePlayedMs
+                .takeIf { it > 0L }
+                ?: durationMs.takeIf { it > 0L }
+                ?: DEFAULT_SOLIN_SESSION_PLAYED_MS
+            val endedAtMs = entry.playedAt
+            val startedAtMs = (endedAtMs - playedMs).coerceAtLeast(1L)
+            array.put(
+                JSONObject()
+                    .put("uid", "${entry.songId}|${entry.playedAt}")
+                    .put("songId", entry.songId)
+                    .put("title", entry.title)
+                    .put("artist", entry.artist)
+                    .put("album", entry.album)
+                    .put("albumKey", song?.let { "id:${it.albumId.takeIf { id -> id > 0L } ?: it.albumIdentityId()}" }.orEmpty())
+                    .put("durationMs", durationMs)
+                    .put("playedMs", playedMs)
+                    .put("startedAtMs", startedAtMs)
+                    .put("endedAtMs", endedAtMs)
+                    .put("dayBucket", endedAtMs.toDayBucket())
+                    .put("cover", song?.statsCoverUri().orEmpty())
+            )
+        }
+        return array
+    }
+
     private fun JSONArray.toStatsList(): List<SongPlaybackStats> =
         List(length()) { index ->
             val item = getJSONObject(index)
@@ -271,6 +318,71 @@ class PlaybackStatsStore private constructor(context: Context) {
         return parsed
     }
 
+    private fun restoreSollinSessions(sessions: JSONArray) {
+        val history = mutableListOf<PlaybackHistoryEntry>()
+        val aggregates = linkedMapOf<String, SollinAggregate>()
+        val daily = mutableMapOf<String, Long>()
+
+        for (index in 0 until sessions.length()) {
+            val item = sessions.optJSONObject(index) ?: continue
+            val songId = item.optLong("songId")
+            val title = item.optString("title")
+            val artist = item.optString("artist")
+            val album = item.optString("album")
+            val startedAt = item.optLong("startedAtMs")
+            val endedAt = item.optLong("endedAtMs").takeIf { it > 0L } ?: startedAt
+            val playedMs = item.optLong("playedMs").coerceAtLeast(0L)
+            val key = if (songId != 0L) "id:$songId" else "$title|$artist|$album"
+
+            if (endedAt > 0L) {
+                history += PlaybackHistoryEntry(
+                    songId = songId,
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    playedAt = endedAt
+                )
+            }
+
+            val aggregate = aggregates.getOrPut(key) {
+                SollinAggregate(songId, title, artist, album)
+            }
+            aggregate.playCount += 1
+            aggregate.listenedMs += playedMs
+            aggregate.lastPlayedAt = maxOf(aggregate.lastPlayedAt, endedAt)
+
+            val dayKey = item.optInt("dayBucket")
+                .takeIf { it > 0 }
+                ?.toDateKeyFromBucket()
+                ?: endedAt.toDateKey()
+            daily[dayKey] = (daily[dayKey] ?: 0L) + playedMs
+        }
+
+        val stats = aggregates.values.map { aggregate ->
+            SongPlaybackStats(
+                songId = aggregate.songId,
+                title = aggregate.title,
+                artist = aggregate.artist,
+                album = aggregate.album,
+                playCount = aggregate.playCount,
+                listenedMs = aggregate.listenedMs,
+                lastPlayedAt = aggregate.lastPlayedAt
+            )
+        }.sortedByDescending { it.lastPlayedAt }
+
+        val sortedHistory = history
+            .distinctBy { "${it.songId}:${it.playedAt}" }
+            .sortedByDescending { it.playedAt }
+            .take(MAX_HISTORY_ITEMS)
+
+        _stats.value = stats
+        _history.value = sortedHistory
+        _dailyListenMs.value = daily.toSortedMap()
+        save(stats)
+        saveHistory(sortedHistory)
+        saveDailyStats(daily)
+    }
+
     private fun Long.toDateKey(): String {
         val calendar = java.util.Calendar.getInstance()
         calendar.timeInMillis = this
@@ -280,8 +392,49 @@ class PlaybackStatsStore private constructor(context: Context) {
         return "%04d-%02d-%02d".format(year, month, day)
     }
 
+    private fun Long.toDayBucket(): Int {
+        val calendar = java.util.Calendar.getInstance()
+        calendar.timeInMillis = this
+        val year = calendar.get(java.util.Calendar.YEAR)
+        val month = calendar.get(java.util.Calendar.MONTH) + 1
+        val day = calendar.get(java.util.Calendar.DAY_OF_MONTH)
+        return year * 10000 + month * 100 + day
+    }
+
+    private fun Int.toDateKeyFromBucket(): String {
+        val year = this / 10000
+        val month = (this / 100) % 100
+        val day = this % 100
+        return "%04d-%02d-%02d".format(year, month, day)
+    }
+
+    private fun Song.statsCoverUri(): String =
+        coverUrl.takeIf { it.isNotBlank() }
+            ?: albumId.takeIf { it > 0L }?.let { "content://media/external/audio/albumart/$it" }
+            ?: ""
+
+    private fun Song.statsFingerprint(): String =
+        listOf(title, artist, album).joinToString("|") { it.statsKeyPart() }
+
+    private fun PlaybackHistoryEntry.statsFingerprint(): String =
+        listOf(title, artist, album).joinToString("|") { it.statsKeyPart() }
+
+    private fun String.statsKeyPart(): String =
+        trim().lowercase().replace(Regex("\\s+"), " ")
+
+    private data class SollinAggregate(
+        val songId: Long,
+        val title: String,
+        val artist: String,
+        val album: String,
+        var playCount: Int = 0,
+        var listenedMs: Long = 0L,
+        var lastPlayedAt: Long = 0L
+    )
+
     companion object {
         private const val MAX_HISTORY_ITEMS = 200
+        private const val DEFAULT_SOLIN_SESSION_PLAYED_MS = 60_000L
 
         @Volatile
         private var instance: PlaybackStatsStore? = null

@@ -1,11 +1,13 @@
 package com.ella.music.ui.settings
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.webkit.MimeTypeMap
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -71,6 +73,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import android.widget.Toast
 import org.json.JSONObject
+import java.io.File
 import java.util.Locale
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -80,6 +83,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import com.ella.music.ui.components.EllaSmallTopAppBar
+import com.ella.music.ui.components.EllaMiuixDialog
 import com.ella.music.ui.components.EllaMiuixTextField
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.DropdownItem
@@ -167,6 +171,14 @@ fun SettingsScreen(
                                 playerViewModel?.clearOnlineMetadataCache()
                                 Toast.makeText(context, context.getString(R.string.settings_clear_online_cache_done), Toast.LENGTH_SHORT).show()
                             }
+                        }
+                    )
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_clear_library_snapshot_cache),
+                        summary = stringResource(R.string.settings_clear_library_snapshot_cache_summary),
+                        onClick = {
+                            mainViewModel?.clearLibrarySnapshotCache()
+                            Toast.makeText(context, context.getString(R.string.settings_clear_library_snapshot_cache_done), Toast.LENGTH_SHORT).show()
                         }
                     )
                     ArrowPreference(
@@ -397,15 +409,19 @@ fun AudioSettingsScreen(
 
 @Composable
 fun BackupSettingsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    mainViewModel: MainViewModel? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settingsManager = remember { SettingsManager(context) }
     val playbackStatsStore = remember { PlaybackStatsStore.getInstance(context) }
+    val librarySongs by mainViewModel?.songs?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
+    var showPlaybackExportFormatDialog by remember { mutableStateOf(false) }
+    var playbackExportFormat by remember { mutableStateOf(PlaybackExportFormat.Ella) }
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
-    val exportLauncher = rememberLauncherForActivityResult(
+    val settingsExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -415,7 +431,6 @@ fun BackupSettingsScreen(
                     .put("version", 1)
                     .put("exportedAt", System.currentTimeMillis())
                     .put("settings", settingsManager.exportSettingsJson())
-                    .put("playback", playbackStatsStore.exportJson())
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
                         output.write(backup.toString(2).toByteArray(Charsets.UTF_8))
@@ -428,7 +443,36 @@ fun BackupSettingsScreen(
             }
         }
     }
-    val importLauncher = rememberLauncherForActivityResult(
+    val playbackExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val exported = playbackStatsStore.exportJson(librarySongs)
+                val backup = when (playbackExportFormat) {
+                    PlaybackExportFormat.Ella -> JSONObject()
+                        .put("version", 1)
+                        .put("exportedAt", System.currentTimeMillis())
+                        .put("playback", exported)
+                    PlaybackExportFormat.Sollin -> JSONObject()
+                        .put("version", 1)
+                        .put("exportedAtMs", System.currentTimeMillis())
+                        .put("sessions", exported.optJSONArray("sessions") ?: org.json.JSONArray())
+                }
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        output.write(backup.toString(2).toByteArray(Charsets.UTF_8))
+                    } ?: error(context.getString(R.string.settings_backup_open_failed))
+                }
+            }.onSuccess {
+                Toast.makeText(context, context.getString(R.string.settings_backup_export_success), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, context.getString(R.string.settings_backup_export_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val settingsImportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -441,7 +485,26 @@ fun BackupSettingsScreen(
                 }
                 val root = JSONObject(text)
                 settingsManager.restoreSettingsJson(root.optJSONObject("settings") ?: root)
-                root.optJSONObject("playback")?.let { playbackStatsStore.restoreJson(it) }
+            }.onSuccess {
+                Toast.makeText(context, context.getString(R.string.settings_backup_restore_success), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(context, context.getString(R.string.settings_backup_restore_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    val playbackImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val text = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        input.bufferedReader(Charsets.UTF_8).readText()
+                    } ?: error(context.getString(R.string.settings_backup_read_failed))
+                }
+                val root = JSONObject(text)
+                playbackStatsStore.restoreJson(root.optJSONObject("playback") ?: root)
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_restore_success), Toast.LENGTH_SHORT).show()
             }.onFailure {
@@ -478,22 +541,43 @@ fun BackupSettingsScreen(
                 .padding(horizontal = 12.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
-            SmallTitle(text = stringResource(R.string.settings_backup))
+            SmallTitle(text = stringResource(R.string.settings_backup_settings_section))
 
             SettingsCardGroup {
                 Column {
                     ArrowPreference(
-                        title = stringResource(R.string.settings_backup_export_title),
-                        summary = stringResource(R.string.settings_backup_export_summary),
+                        title = stringResource(R.string.settings_backup_export_settings_title),
+                        summary = stringResource(R.string.settings_backup_export_settings_summary),
                         onClick = {
-                            exportLauncher.launch("ella_backup_${System.currentTimeMillis()}.json")
+                            settingsExportLauncher.launch("ella_settings_${System.currentTimeMillis()}.json")
                         }
                     )
                     ArrowPreference(
-                        title = stringResource(R.string.settings_backup_restore_title),
-                        summary = stringResource(R.string.settings_backup_restore_summary),
+                        title = stringResource(R.string.settings_backup_restore_settings_title),
+                        summary = stringResource(R.string.settings_backup_restore_settings_summary),
                         onClick = {
-                            importLauncher.launch(arrayOf("application/json", "text/json", "text/*"))
+                            settingsImportLauncher.launch(arrayOf("application/json", "text/json", "text/*"))
+                        }
+                    )
+                }
+            }
+
+            SmallTitle(text = stringResource(R.string.settings_backup_playback_section))
+
+            SettingsCardGroup {
+                Column {
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_backup_export_playback_title),
+                        summary = stringResource(R.string.settings_backup_export_playback_summary),
+                        onClick = {
+                            showPlaybackExportFormatDialog = true
+                        }
+                    )
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_backup_restore_playback_title),
+                        summary = stringResource(R.string.settings_backup_restore_playback_summary),
+                        onClick = {
+                            playbackImportLauncher.launch(arrayOf("application/json", "text/json", "text/*"))
                         }
                     )
                 }
@@ -502,6 +586,58 @@ fun BackupSettingsScreen(
             Spacer(modifier = Modifier.height(160.dp))
         }
     }
+
+    if (showPlaybackExportFormatDialog) {
+        EllaMiuixDialog(
+            show = true,
+            title = stringResource(R.string.settings_backup_export_format_title),
+            onDismissRequest = { showPlaybackExportFormatDialog = false }
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                BackupExportFormatRow(
+                    title = stringResource(R.string.settings_backup_export_format_ella),
+                    summary = stringResource(R.string.settings_backup_export_format_ella_summary),
+                    onClick = {
+                        playbackExportFormat = PlaybackExportFormat.Ella
+                        showPlaybackExportFormatDialog = false
+                        playbackExportLauncher.launch("ella_listening_stats_${System.currentTimeMillis()}.json")
+                    }
+                )
+                BackupExportFormatRow(
+                    title = stringResource(R.string.settings_backup_export_format_sollin),
+                    summary = stringResource(R.string.settings_backup_export_format_sollin_summary),
+                    onClick = {
+                        playbackExportFormat = PlaybackExportFormat.Sollin
+                        showPlaybackExportFormatDialog = false
+                        playbackExportLauncher.launch("aurora-listening-stats_${System.currentTimeMillis()}.json")
+                    }
+                )
+            }
+        }
+    }
+}
+
+private enum class PlaybackExportFormat {
+    Ella,
+    Sollin
+}
+
+@Composable
+private fun BackupExportFormatRow(
+    title: String,
+    summary: String,
+    onClick: () -> Unit
+) {
+    BasicComponent(
+        title = title,
+        summary = summary,
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+    )
 }
 
 @Composable
@@ -555,6 +691,7 @@ fun SettingsDetailScreen(
     val miniPlayerCoverRotation by settingsManager.miniPlayerCoverRotation.collectAsState(initial = true)
     val miniPlayerRightButton by settingsManager.miniPlayerRightButton.collectAsState(initial = 0)
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
+    val smoothLyricView by settingsManager.smoothLyricView.collectAsState(initial = false)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
@@ -589,6 +726,7 @@ fun SettingsDetailScreen(
     val homeHiddenSections by settingsManager.homeHiddenSections.collectAsState(initial = "")
     val homeLibraryTileOrder by settingsManager.homeLibraryTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
     val homeHiddenLibraryTiles by settingsManager.homeHiddenLibraryTiles.collectAsState(initial = "")
+    val homeTilePinButtonsVisible by settingsManager.homeTilePinButtonsVisible.collectAsState(initial = true)
     val themeLabels = listOf(
         stringResource(R.string.theme_follow_system),
         stringResource(R.string.theme_light),
@@ -729,21 +867,45 @@ fun SettingsDetailScreen(
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         context.persistImageReadPermission(uri)
-        scope.launch { settingsManager.setStartupPosterUri(uri.toString()) }
+        scope.launch {
+            val persisted = context.copyCustomImageIntoApp(uri, "startup_poster")
+            if (persisted == null) {
+                Toast.makeText(context, context.getString(R.string.settings_custom_image_save_failed), Toast.LENGTH_SHORT).show()
+            } else {
+                context.deletePersistedCustomImage(startupPosterUri)
+                settingsManager.setStartupPosterUri(persisted)
+            }
+        }
     }
     val appWallpaperPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         context.persistImageReadPermission(uri)
-        scope.launch { settingsManager.setAppWallpaperUri(uri.toString()) }
+        scope.launch {
+            val persisted = context.copyCustomImageIntoApp(uri, "app_wallpaper")
+            if (persisted == null) {
+                Toast.makeText(context, context.getString(R.string.settings_custom_image_save_failed), Toast.LENGTH_SHORT).show()
+            } else {
+                context.deletePersistedCustomImage(appWallpaperUri)
+                settingsManager.setAppWallpaperUri(persisted)
+            }
+        }
     }
     val hiResLogoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         context.persistImageReadPermission(uri)
-        scope.launch { settingsManager.setHiResLogoUri(uri.toString()) }
+        scope.launch {
+            val persisted = context.copyCustomImageIntoApp(uri, "hi_res_logo")
+            if (persisted == null) {
+                Toast.makeText(context, context.getString(R.string.settings_custom_image_save_failed), Toast.LENGTH_SHORT).show()
+            } else {
+                context.deletePersistedCustomImage(hiResLogoUri)
+                settingsManager.setHiResLogoUri(persisted)
+            }
+        }
     }
     val dynamicCoverPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -840,6 +1002,7 @@ fun SettingsDetailScreen(
                     tileItems = homeLibraryTileItems,
                     tileOrder = homeLibraryTileOrder,
                     hiddenTiles = homeHiddenLibraryTiles,
+                    tilePinButtonsVisible = homeTilePinButtonsVisible,
                     onHiddenSectionsChange = { value ->
                         scope.launch { settingsManager.setHomeHiddenSections(value) }
                     },
@@ -851,6 +1014,9 @@ fun SettingsDetailScreen(
                     },
                     onTileOrderChange = { value ->
                         scope.launch { settingsManager.setHomeLibraryTileOrder(value) }
+                    },
+                    onTilePinButtonsVisibleChange = { value ->
+                        scope.launch { settingsManager.setHomeTilePinButtonsVisible(value) }
                     }
                 )
                 Spacer(modifier = Modifier.height(160.dp))
@@ -899,6 +1065,18 @@ fun SettingsDetailScreen(
                             },
                             onClick = { startupPosterPicker.launch(arrayOf("image/*")) }
                         )
+                        if (startupPosterUri.isNotBlank()) {
+                            ArrowPreference(
+                                title = stringResource(R.string.settings_custom_image_remove),
+                                summary = stringResource(R.string.settings_custom_image_remove_summary),
+                                onClick = {
+                                    scope.launch {
+                                        context.deletePersistedCustomImage(startupPosterUri)
+                                        settingsManager.setStartupPosterUri("")
+                                    }
+                                }
+                            )
+                        }
                         SwitchPreference(
                             title = stringResource(R.string.settings_app_wallpaper),
                             summary = stringResource(R.string.settings_app_wallpaper_summary),
@@ -916,6 +1094,18 @@ fun SettingsDetailScreen(
                             },
                             onClick = { appWallpaperPicker.launch(arrayOf("image/*")) }
                         )
+                        if (appWallpaperUri.isNotBlank()) {
+                            ArrowPreference(
+                                title = stringResource(R.string.settings_custom_image_remove),
+                                summary = stringResource(R.string.settings_custom_image_remove_summary),
+                                onClick = {
+                                    scope.launch {
+                                        context.deletePersistedCustomImage(appWallpaperUri)
+                                        settingsManager.setAppWallpaperUri("")
+                                    }
+                                }
+                            )
+                        }
                         WindowSpinnerPreference(
                             title = stringResource(R.string.settings_category_grid_columns),
                             summary = stringResource(
@@ -975,6 +1165,18 @@ fun SettingsDetailScreen(
                             },
                             onClick = { hiResLogoPicker.launch(arrayOf("image/*")) }
                         )
+                        if (hiResLogoUri.isNotBlank()) {
+                            ArrowPreference(
+                                title = stringResource(R.string.settings_custom_image_remove),
+                                summary = stringResource(R.string.settings_custom_image_remove_summary),
+                                onClick = {
+                                    scope.launch {
+                                        context.deletePersistedCustomImage(hiResLogoUri)
+                                        settingsManager.setHiResLogoUri("")
+                                    }
+                                }
+                            )
+                        }
                         SwitchPreference(
                             title = stringResource(R.string.settings_player_immersive_cover),
                             summary = stringResource(R.string.settings_player_immersive_cover_summary),
@@ -1242,6 +1444,15 @@ fun SettingsDetailScreen(
                         selectedIndex = miniPlayerRightButton.coerceIn(0, 1),
                         onSelectedIndexChange = { index ->
                             scope.launch { settingsManager.setMiniPlayerRightButton(index) }
+                        }
+                    )
+
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_smooth_lyric_view),
+                        summary = stringResource(R.string.settings_smooth_lyric_view_summary),
+                        checked = smoothLyricView,
+                        onCheckedChange = { enabled ->
+                            scope.launch { settingsManager.setSmoothLyricView(enabled) }
                         }
                     )
 
@@ -1829,10 +2040,12 @@ private fun HomeDisplaySettingsPage(
     tileItems: List<HomePreferenceItem>,
     tileOrder: String,
     hiddenTiles: String,
+    tilePinButtonsVisible: Boolean,
     onHiddenSectionsChange: (String) -> Unit,
     onHiddenTilesChange: (String) -> Unit,
     onSectionOrderChange: (String) -> Unit,
-    onTileOrderChange: (String) -> Unit
+    onTileOrderChange: (String) -> Unit,
+    onTilePinButtonsVisibleChange: (Boolean) -> Unit
 ) {
     val orderedSections = remember(sectionItems, sectionOrder) {
         sectionItems.orderedByCsv(sectionOrder, SettingsManager.DEFAULT_HOME_SECTION_ORDER)
@@ -1858,6 +2071,14 @@ private fun HomeDisplaySettingsPage(
         onHiddenIdsChange = onHiddenTilesChange,
         onOrderChange = onTileOrderChange
     )
+    SettingsCardGroup {
+        SwitchPreference(
+            title = stringResource(R.string.settings_home_tile_pin_buttons),
+            summary = stringResource(R.string.settings_home_tile_pin_buttons_summary),
+            checked = tilePinButtonsVisible,
+            onCheckedChange = onTilePinButtonsVisibleChange
+        )
+    }
 }
 
 @Composable
@@ -2030,6 +2251,36 @@ private fun Set<String>.toCsv(): String = sorted().joinToString(",")
 private fun android.content.Context.persistImageReadPermission(uri: Uri) {
     runCatching {
         contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+}
+
+private suspend fun Context.copyCustomImageIntoApp(uri: Uri, name: String): String? = withContext(Dispatchers.IO) {
+    runCatching {
+        val dir = File(filesDir, "custom_images").apply { mkdirs() }
+        val extension = contentResolver.getType(uri)
+            ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+            ?.takeIf { it.isNotBlank() }
+            ?: "jpg"
+        dir.listFiles()
+            ?.filter { it.isFile && it.nameWithoutExtension == name }
+            ?.forEach { it.delete() }
+        val target = File(dir, "$name.$extension")
+        contentResolver.openInputStream(uri)?.use { input ->
+            target.outputStream().use { output -> input.copyTo(output) }
+        } ?: return@runCatching null
+        Uri.fromFile(target).toString()
+    }.getOrNull()
+}
+
+private suspend fun Context.deletePersistedCustomImage(uriString: String) = withContext(Dispatchers.IO) {
+    runCatching {
+        if (uriString.isBlank()) return@runCatching
+        val uri = Uri.parse(uriString)
+        if (uri.scheme != "file") return@runCatching
+        val file = File(uri.path ?: return@runCatching)
+        val dir = File(filesDir, "custom_images").canonicalFile
+        val target = file.canonicalFile
+        if (target.path.startsWith(dir.path) && target.isFile) target.delete()
     }
 }
 

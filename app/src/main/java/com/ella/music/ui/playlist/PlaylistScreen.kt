@@ -70,7 +70,6 @@ import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.formatPlaybackDuration
-import com.ella.music.data.model.matchesFullTagSearch
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.PlaylistExportFormat
 import com.ella.music.data.PlaylistImportMode
@@ -535,7 +534,7 @@ fun PlaylistDetailScreen(
         } else {
             withContext(Dispatchers.IO) {
                 baseSongs.filter { song ->
-                    song.matchesFullTagSearch(query, mainViewModel.getSongTagInfo(song))
+                    mainViewModel.songMatchesSearchSnapshot(song, query)
                 }
             }
         }

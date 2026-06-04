@@ -85,6 +85,7 @@ fun AnalyticsScreen(
     val playbackHistory by mainViewModel.playbackHistory.collectAsState()
     val dailyListenMs by mainViewModel.dailyListenMs.collectAsState()
     val libraryById = remember(songs) { songs.associateBy { it.id } }
+    val libraryByStatsKey = remember(songs) { songs.associateBy { it.analyticsStatsKey() } }
 
     Column(
         modifier = Modifier
@@ -130,6 +131,7 @@ fun AnalyticsScreen(
                     history = playbackHistory.take(20),
                     totalCount = playbackHistory.size,
                     libraryById = libraryById,
+                    libraryByStatsKey = libraryByStatsKey,
                     mainViewModel = mainViewModel,
                     onClick = onNavigateToHistory
                 )
@@ -148,6 +150,7 @@ fun AnalyticsScreen(
                         .sortedByDescending { it.listenedMs }
                         .take(10),
                     libraryById = libraryById,
+                    libraryByStatsKey = libraryByStatsKey,
                     mainViewModel = mainViewModel,
                     valueText = { formatListenDuration(context, it.listenedMs) }
                 )
@@ -162,6 +165,7 @@ fun AnalyticsScreen(
                         .sortedByDescending { it.playCount }
                         .take(10),
                     libraryById = libraryById,
+                    libraryByStatsKey = libraryByStatsKey,
                     mainViewModel = mainViewModel,
                     valueText = { context.getString(R.string.analytics_times_count, it.playCount) }
                 )
@@ -351,6 +355,7 @@ private fun HistoryCard(
     history: List<PlaybackHistoryEntry>,
     totalCount: Int,
     libraryById: Map<Long, Song>,
+    libraryByStatsKey: Map<String, Song>,
     mainViewModel: MainViewModel,
     onClick: () -> Unit
 ) {
@@ -392,7 +397,7 @@ private fun HistoryCard(
                 history.forEach { entry ->
                     HistoryRow(
                         entry = entry,
-                        song = libraryById[entry.songId],
+                        song = libraryById[entry.songId] ?: libraryByStatsKey[entry.analyticsStatsKey()],
                         mainViewModel = mainViewModel
                     )
                 }
@@ -649,6 +654,7 @@ private fun RankingCard(
     emptyText: String,
     stats: List<SongPlaybackStats>,
     libraryById: Map<Long, Song>,
+    libraryByStatsKey: Map<String, Song>,
     mainViewModel: MainViewModel,
     valueText: (SongPlaybackStats) -> String
 ) {
@@ -672,7 +678,7 @@ private fun RankingCard(
                         index = index + 1,
                         stat = stat,
                         value = valueText(stat),
-                        song = libraryById[stat.songId],
+                        song = libraryById[stat.songId] ?: libraryByStatsKey[stat.analyticsStatsKey()],
                         mainViewModel = mainViewModel
                     )
                 }
@@ -965,6 +971,18 @@ private fun parseHistoryDateKey(dateKey: String): Date? {
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateKey)
     }.getOrNull()
 }
+
+private fun Song.analyticsStatsKey(): String =
+    listOf(title, artist, album).joinToString("|") { it.analyticsKeyPart() }
+
+private fun PlaybackHistoryEntry.analyticsStatsKey(): String =
+    listOf(title, artist, album).joinToString("|") { it.analyticsKeyPart() }
+
+private fun SongPlaybackStats.analyticsStatsKey(): String =
+    listOf(title, artist, album).joinToString("|") { it.analyticsKeyPart() }
+
+private fun String.analyticsKeyPart(): String =
+    trim().lowercase().replace(Regex("\\s+"), " ")
 
 private val qualityOrder = listOf("Dolby", "MQ", "Hi-Res", "LOSSLESS", "HQ", "LQ", "UNKNOWN", "OTHER")
 

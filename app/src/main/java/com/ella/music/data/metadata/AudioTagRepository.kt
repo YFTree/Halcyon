@@ -264,7 +264,7 @@ class LyricoAudioTagReaderWriter : AudioTagReader, AudioTagWriter {
             trackNumber = data.trackNumber?.substringBefore('/')?.toIntOrNull(),
             discNumber = data.discNumber,
             comment = resolvedComment,
-            lyrics = data.lyrics?.ifBlank { null } ?: raw.bestLyrics(),
+            lyrics = raw.bestTtmlLyrics() ?: data.lyrics?.ifBlank { null } ?: raw.bestLyrics(),
             copyright = data.copyright,
             neteaseKey = resolvedNeteaseKey,
             rating = data.rating,
@@ -363,6 +363,15 @@ class LyricoAudioTagReaderWriter : AudioTagReader, AudioTagWriter {
         }
     }
 }
+
+private fun Map<String, List<String>>.bestTtmlLyrics(): String? =
+    firstTagValue(
+        "TTML LYRICS",
+        "TTML LYRIC",
+        "TTMLLYRICS",
+        "TTMLLYRIC",
+        "TTML"
+    )
 
 private fun Map<String, List<String>>.bestLyrics(): String? =
     firstTagValue(

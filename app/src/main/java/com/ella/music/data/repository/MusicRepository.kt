@@ -24,6 +24,7 @@ import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.albumIdentityId
+import com.ella.music.data.model.searchableTagValues
 import com.ella.music.data.metadata.AudioTagInfo
 import com.ella.music.data.metadata.AudioTagRepository
 import com.ella.music.data.metadata.LyricoAudioTagReaderWriter
@@ -66,6 +67,13 @@ private sealed class CoverDataState {
 }
 
 class MusicRepository(private val context: Context) {
+    data class LyricFormatAvailability(
+        val hasTtml: Boolean = false,
+        val hasPlain: Boolean = false
+    ) {
+        val hasBoth: Boolean get() = hasTtml && hasPlain
+    }
+
 
     private val scanner = MusicScanner(context)
     private val audioTagRepository = AudioTagRepository(
@@ -103,6 +111,10 @@ class MusicRepository(private val context: Context) {
     private val coverArtLock = Any()
     private val coverDataStates = ConcurrentHashMap<String, CoverDataState>()
     private val libraryCacheFile = File(context.filesDir, "music_library_cache.json")
+    private val librarySearchSnapshotFile = File(context.filesDir, "library_search_snapshot.json")
+    private val searchTextCache = ConcurrentHashMap<String, String>()
+    @Volatile
+    private var searchSnapshotLoaded = false
     private val remoteAudioCacheDir = File(context.cacheDir, "webdav_audio")
 
     suspend fun scanMusic(
@@ -347,37 +359,78 @@ class MusicRepository(private val context: Context) {
         return parsed.lyrics.takeIf { it.isNotEmpty() }
     }
 
+    private fun loadExternalLyricsByFormat(song: Song, effectivePath: String, preferTtml: Boolean): List<LyricLine>? {
+        val content = findExternalLyricContentByFormat(effectivePath, preferTtml) ?: return null
+        val parsed = LrcParser.parse(content)
+        val lyrics = parsed.lyrics.takeIf { it.isNotEmpty() } ?: return null
+        return lyrics.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
+            .also { Log.d("MusicRepo", "External lyric format ${if (preferTtml) "TTML" else "LRC/ELRC"} parsed: ${lyrics.size} lines for ${song.title}") }
+    }
+
     private fun loadEmbeddedLyrics(song: Song, effectivePath: String): List<LyricLine>? {
         Log.d("MusicRepo", "Trying embedded lyrics for ${song.title}")
-        val embedded = audioTagRepository.readEmbeddedLyricsBlocking(effectivePath)
+        val embedded = audioTagRepository.readTagsBlocking(effectivePath)
+            ?.embeddedLyricsContent(preferTtml = true)
+            ?: audioTagRepository.readEmbeddedLyricsBlocking(effectivePath)
         if (!embedded.isNullOrBlank()) {
             Log.d("MusicRepo", "Embedded lyrics found (${embedded.length} chars) for ${song.title}")
-            val parsed = LrcParser.parse(embedded)
-            if (parsed.lyrics.isNotEmpty()) {
-                Log.d("MusicRepo", "Embedded lyrics parsed as LRC: ${parsed.lyrics.size} lines")
-                return parsed.lyrics
-            }
-
-            Log.d("MusicRepo", "Embedded lyrics not LRC format, using plain text")
-            val result = mutableListOf<LyricLine>()
-            val lines = embedded.lines()
-            var timeOffset = 0L
-            for (line in lines) {
-                val trimmed = line.trim()
-                if (trimmed.isNotEmpty()) {
-                    result.add(LyricLine(timeMs = timeOffset, text = trimmed, words = emptyList()))
-                    timeOffset += 3000L
-                }
-            }
-            return result.takeIf { it.isNotEmpty() }
+            return parseEmbeddedLyrics(song, embedded)
         }
         return null
+    }
+
+    private fun loadEmbeddedLyricsByFormat(song: Song, effectivePath: String, preferTtml: Boolean): List<LyricLine>? {
+        val embedded = audioTagRepository.readTagsBlocking(effectivePath)
+            ?.embeddedLyricsContent(preferTtml = preferTtml)
+            ?: return null
+        val parsed = parseEmbeddedLyrics(song, embedded) ?: return null
+        return parsed.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
+    }
+
+    private fun parseEmbeddedLyrics(song: Song, embedded: String): List<LyricLine>? {
+        val parsed = LrcParser.parse(embedded)
+        if (parsed.lyrics.isNotEmpty()) {
+            Log.d("MusicRepo", "Embedded lyrics parsed: ${parsed.lyrics.size} lines for ${song.title}")
+            return parsed.lyrics
+        }
+
+        Log.d("MusicRepo", "Embedded lyrics not synchronized format, using plain text")
+        val result = mutableListOf<LyricLine>()
+        var timeOffset = 0L
+        embedded.lines().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.isNotEmpty()) {
+                result.add(LyricLine(timeMs = timeOffset, text = trimmed, words = emptyList()))
+                timeOffset += 3000L
+            }
+        }
+        return result.takeIf { it.isNotEmpty() }
     }
 
     suspend fun reloadLyrics(song: Song, sourceMode: Int): List<LyricLine> = withContext(Dispatchers.IO) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
         lyricsCache.remove("${song.id}:$safeMode")
         getLyrics(song, safeMode)
+    }
+
+    suspend fun getLyricFormatAvailability(song: Song): LyricFormatAvailability = withContext(Dispatchers.IO) {
+        val effectivePath = song.effectiveLocalPathForMetadata()
+        val ttml = loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
+            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true)
+        val plain = loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
+            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false)
+        LyricFormatAvailability(hasTtml = !ttml.isNullOrEmpty(), hasPlain = !plain.isNullOrEmpty())
+    }
+
+    suspend fun reloadLyricsByFormat(song: Song, preferTtml: Boolean): List<LyricLine> = withContext(Dispatchers.IO) {
+        val cacheKey = "${song.id}:format:$preferTtml"
+        lyricsCache.remove(cacheKey)
+        val effectivePath = song.effectiveLocalPathForMetadata()
+        val lyrics = loadExternalLyricsByFormat(song, effectivePath, preferTtml)
+            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml)
+            ?: emptyList()
+        lyricsCache[cacheKey] = lyrics
+        lyrics
     }
 
     private fun fetchOnlineLyrics(song: Song): List<LyricLine>? {
@@ -474,6 +527,47 @@ class MusicRepository(private val context: Context) {
         }
         tagInfoCache[cacheKey] = info
         return info
+    }
+
+    suspend fun songMatchesSearchSnapshot(song: Song, query: String): Boolean = withContext(Dispatchers.IO) {
+        val normalizedQuery = query.trim().lowercase()
+        if (normalizedQuery.isBlank()) return@withContext false
+        getSongSearchText(song).contains(normalizedQuery)
+    }
+
+    suspend fun getSongSearchText(song: Song): String = withContext(Dispatchers.IO) {
+        ensureSearchSnapshotLoaded()
+        val key = song.searchSnapshotKey()
+        searchTextCache[key]?.let { return@withContext it }
+        val text = buildSongSearchText(song)
+        searchTextCache[key] = text
+        saveSearchSnapshot()
+        text
+    }
+
+    suspend fun preloadLibrarySearchSnapshot(songs: List<Song>) = withContext(Dispatchers.IO) {
+        if (songs.isEmpty()) return@withContext
+        ensureSearchSnapshotLoaded()
+        var changed = false
+        songs.forEach { song ->
+            val key = song.searchSnapshotKey()
+            if (!searchTextCache.containsKey(key)) {
+                searchTextCache[key] = buildSongSearchText(song)
+                changed = true
+            }
+        }
+        if (changed) saveSearchSnapshot()
+    }
+
+    private fun buildSongSearchText(song: Song): String =
+        song.searchableTagValues(getSongTagInfo(song))
+            .joinToString(separator = "\n")
+            .lowercase()
+
+    suspend fun clearLibrarySnapshotCache() = withContext(Dispatchers.IO) {
+        searchTextCache.clear()
+        searchSnapshotLoaded = true
+        if (librarySearchSnapshotFile.exists()) librarySearchSnapshotFile.delete()
     }
 
     fun getSongRating(song: Song): Int {
@@ -782,6 +876,9 @@ class MusicRepository(private val context: Context) {
         audioInfoCache.remove(song.id)
         tagInfoCache.keys.removeAll { it.startsWith("${song.id}:") }
         replayGainCache.remove(song.id)
+        ensureSearchSnapshotLoaded()
+        searchTextCache.keys.removeAll { it == song.searchSnapshotKey() || it.startsWith("${song.id}|") }
+        saveSearchSnapshot()
         audioTagRepository.clear(song.effectiveLocalPathForMetadata())
         val keyPrefix = song.coverCacheKey()
         coverDataStates.keys.removeAll { it.startsWith(keyPrefix) }
@@ -1137,6 +1234,88 @@ class MusicRepository(private val context: Context) {
 
     private fun Song.coverDataCacheKey(): String =
         "${coverCacheKey()}:$dateModified:$fileSize"
+
+    private fun Song.searchSnapshotKey(): String =
+        "${id}|${path.sha256()}"
+
+    private fun AudioTagInfo.embeddedLyricsContent(preferTtml: Boolean): String? {
+        val names = if (preferTtml) {
+            listOf("TTML LYRICS", "TTML LYRIC", "TTMLLYRICS", "TTMLLYRIC", "TTML")
+        } else {
+            listOf("SYNCEDLYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS", "LYRICS", "USLT", "SYLT", "LYRIC")
+        }
+        names.forEach { target ->
+            customTags.firstMatchingTagValue(target)?.let { return it }
+        }
+        return lyrics?.takeIf { it.isNotBlank() && (preferTtml == it.contains("<tt", ignoreCase = true)) }
+    }
+
+    private fun Map<String, List<String>>.firstMatchingTagValue(target: String): String? {
+        val normalizedTarget = target.normalizedTagName()
+        return entries.firstOrNull { (key, values) ->
+            key.normalizedTagName() == normalizedTarget && values.any { it.isNotBlank() }
+        }?.value?.firstOrNull { it.isNotBlank() }
+    }
+
+    private fun String.normalizedTagName(): String =
+        uppercase().filter { it.isLetterOrDigit() }
+
+    private fun findExternalLyricContentByFormat(songPath: String, preferTtml: Boolean): String? {
+        val extensions = if (preferTtml) listOf("ttml") else listOf("lrc", "elrc")
+        val baseName = songPath.substringBeforeLast('.')
+        extensions.forEach { ext ->
+            readTextIfExists("$baseName.$ext")?.let { return it }
+        }
+
+        val parentDir = File(songPath).parentFile ?: return null
+        val songName = File(songPath).nameWithoutExtension
+        return runCatching {
+            parentDir.listFiles()
+                ?.filter { file -> extensions.any { file.extension.equals(it, ignoreCase = true) } }
+                ?.sortedWith(compareBy<File> { extensions.indexOf(it.extension.lowercase()) }.thenBy { it.name })
+                ?.firstOrNull { it.nameWithoutExtension.contains(songName, ignoreCase = true) }
+                ?.let { readTextIfExists(it.absolutePath) }
+        }.getOrNull()
+    }
+
+    private fun readTextIfExists(path: String): String? =
+        runCatching {
+            val file = File(path)
+            if (!file.exists()) return null
+            file.readText()
+        }.getOrNull()
+
+    private fun ensureSearchSnapshotLoaded() {
+        if (searchSnapshotLoaded) return
+        synchronized(searchTextCache) {
+            if (searchSnapshotLoaded) return
+            if (librarySearchSnapshotFile.exists()) {
+                runCatching {
+                    val root = JSONObject(librarySearchSnapshotFile.readText())
+                    root.keys().forEach { key ->
+                        val value = root.optString(key)
+                        val parts = key.split('|')
+                        val stableKey = if (parts.size >= 2) "${parts[0]}|${parts[1]}" else key
+                        searchTextCache[stableKey] = value
+                    }
+                }.onFailure {
+                    Log.w("MusicRepo", "Failed to load library search snapshot", it)
+                    searchTextCache.clear()
+                }
+            }
+            searchSnapshotLoaded = true
+        }
+    }
+
+    private fun saveSearchSnapshot() {
+        runCatching {
+            val root = JSONObject()
+            searchTextCache.forEach { (key, value) -> root.put(key, value) }
+            librarySearchSnapshotFile.writeText(root.toString())
+        }.onFailure {
+            Log.w("MusicRepo", "Failed to save library search snapshot", it)
+        }
+    }
 
     private fun Song.librarySyncKey(): String =
         if (id > 0L) {

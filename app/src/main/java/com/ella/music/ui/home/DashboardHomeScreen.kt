@@ -88,6 +88,7 @@ fun HomeScreen(
     val homeHiddenSections by settingsManager.homeHiddenSections.collectAsState(initial = "")
     val homeLibraryTileOrder by settingsManager.homeLibraryTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
     val homeHiddenLibraryTiles by settingsManager.homeHiddenLibraryTiles.collectAsState(initial = "")
+    val homeTilePinButtonsVisible by settingsManager.homeTilePinButtonsVisible.collectAsState(initial = true)
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = ellaPageBackground()
     val cardText = if (isDark) Color.White else Color(0xFF15151A)
@@ -193,7 +194,7 @@ fun HomeScreen(
 
             sectionOrder.filterNot { it in hiddenSections }.forEach { section ->
                 when (section) {
-                    "library" -> HomeTileSection(stringResource(R.string.home_library), libraryTiles, context)
+                    "library" -> HomeTileSection(stringResource(R.string.home_library), libraryTiles, context, homeTilePinButtonsVisible)
                     "online" -> {
                         SectionTitle(stringResource(R.string.home_online_music))
                         HomeTileGrid(
@@ -201,7 +202,8 @@ fun HomeScreen(
                                 HomeTileSpec("lx", "LX Music", stringResource(R.string.home_import_api_source), Color(0xFF00A896), Screen.LxOnline.route, onNavigateToLxOnline),
                                 HomeTileSpec("webdav", "WebDAV", stringResource(R.string.home_connect_cloud_music), Color(0xFF5E60CE), Screen.WebDav.route, onNavigateToWebDav)
                             ),
-                            context = context
+                            context = context,
+                            showPinButtons = homeTilePinButtonsVisible
                         )
                     }
                     "recent" -> {
@@ -245,14 +247,23 @@ private data class HomeTileSpec(
 )
 
 @Composable
-private fun HomeTileSection(title: String, tiles: List<HomeTileSpec>, context: android.content.Context) {
+private fun HomeTileSection(
+    title: String,
+    tiles: List<HomeTileSpec>,
+    context: android.content.Context,
+    showPinButtons: Boolean
+) {
     if (tiles.isEmpty()) return
     SectionTitle(title)
-    HomeTileGrid(tiles = tiles, context = context)
+    HomeTileGrid(tiles = tiles, context = context, showPinButtons = showPinButtons)
 }
 
 @Composable
-private fun HomeTileGrid(tiles: List<HomeTileSpec>, context: android.content.Context) {
+private fun HomeTileGrid(
+    tiles: List<HomeTileSpec>,
+    context: android.content.Context,
+    showPinButtons: Boolean
+) {
     tiles.chunked(2).forEachIndexed { index, rowTiles ->
         if (index > 0) Spacer(modifier = Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -262,14 +273,16 @@ private fun HomeTileGrid(tiles: List<HomeTileSpec>, context: android.content.Con
                     subtitle = tile.subtitle,
                     color = tile.color,
                     onClick = tile.onClick,
-                    onPinClick = {
+                    onPinClick = if (showPinButtons) {
+                        {
                         val ok = requestPinnedEllaShortcut(context, "home_${tile.id}", tile.title, tile.route)
                         android.widget.Toast.makeText(
                             context,
                             if (ok) "已请求添加桌面快捷方式" else "当前桌面不支持固定快捷方式",
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
-                    },
+                        }
+                    } else null,
                     modifier = Modifier.weight(1f)
                 )
             }

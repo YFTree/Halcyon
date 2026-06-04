@@ -68,10 +68,123 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
 import com.ella.music.R
+import io.github.proify.lyricon.lyric.view.PlaceholderFormat
+import io.github.proify.lyricon.lyric.view.RawsLyricView
+import io.github.proify.lyricon.lyric.view.RichLyricLineConfig
+import io.github.proify.lyricon.lyric.view.SyllableConfig
+import io.github.proify.lyricon.lyric.view.TextConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import androidx.compose.ui.viewinterop.AndroidView
+
+@Composable
+fun SmoothLyricView(
+    songId: Long,
+    songTitle: String,
+    songArtist: String,
+    lyrics: List<LyricLine>,
+    currentIndex: Int,
+    currentPositionMs: Long,
+    showTranslation: Boolean,
+    showPronunciation: Boolean = true,
+    modifier: Modifier = Modifier,
+    fontScale: Float = 1f,
+    fontPath: String = "",
+    fontWeight: FontWeight = FontWeight.ExtraBold,
+    onLineClick: (LyricLine) -> Unit = {},
+    onLineLongClick: (LyricLine) -> Unit = {}
+) {
+    if (lyrics.isEmpty()) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                text = stringResource(R.string.no_lyrics),
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.72f)
+            )
+        }
+        return
+    }
+
+    val density = LocalDensity.current
+    val lyriconSong = remember(songId, songTitle, songArtist, lyrics) {
+        lyrics.toLyriconSong(songId, songTitle, songArtist)
+    }
+    val lyricTypeface = remember(fontPath, fontWeight) {
+        fontPath.toAndroidTypeface(fontWeight.weight, boldFallback = true)
+    }
+    val secondaryTypeface = remember(fontPath) {
+        fontPath.toAndroidTypeface(400, boldFallback = false)
+    }
+    val style = remember(fontScale, density.fontScale, lyricTypeface, secondaryTypeface) {
+        RichLyricLineConfig(
+            primary = TextConfig(
+                textSize = with(density) { (28.sp * fontScale).toPx() },
+                textColor = intArrayOf(android.graphics.Color.WHITE),
+                typeface = lyricTypeface
+            ),
+            secondary = TextConfig(
+                textSize = with(density) { (20.sp * fontScale).toPx() },
+                textColor = intArrayOf(android.graphics.Color.argb(190, 255, 255, 255)),
+                typeface = secondaryTypeface
+            ),
+            syllable = SyllableConfig(
+                highlightColor = intArrayOf(android.graphics.Color.WHITE),
+                backgroundColor = intArrayOf(android.graphics.Color.argb(88, 255, 255, 255))
+            ),
+            placeholderFormat = PlaceholderFormat.NAME_ARTIST,
+            enableAnim = true
+        )
+    }
+
+    AndroidView(
+        modifier = modifier,
+        factory = { context ->
+            RawsLyricView(context).apply {
+                layoutParams = android.view.ViewGroup.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        },
+        update = { view ->
+            if (view.tag !== lyriconSong) {
+                view.song = lyriconSong
+                view.tag = lyriconSong
+            }
+            view.setStyle(style)
+            view.setNonCurrentLineBlurEnabled(false)
+            view.setEdgeFadeEnabled(false)
+            view.updateAnchorOffset(-view.height * 0.12f)
+            view.updateDisplayTranslation(showTranslation, showPronunciation)
+            view.onLineClickListener = object : RawsLyricView.OnLineClickListener {
+                override fun onLineClick(beginMs: Long) {
+                    val line = lyrics.minByOrNull { kotlin.math.abs(it.timeMs - beginMs) }
+                    if (line != null) onLineClick(line)
+                }
+            }
+            view.onLineLongClickListener = RawsLyricView.OnLineLongClickListener { beginMs ->
+                val line = lyrics.minByOrNull { kotlin.math.abs(it.timeMs - beginMs) }
+                if (line != null) onLineLongClick(line)
+            }
+            view.setPosition(currentPositionMs)
+        }
+    )
+}
+
+private fun String.toAndroidTypeface(weight: Int, boldFallback: Boolean): android.graphics.Typeface {
+    val safeWeight = weight.coerceIn(100, 900)
+    val base = if (isNotBlank()) {
+        runCatching {
+            val file = java.io.File(this)
+            if (file.exists() && file.isFile) android.graphics.Typeface.createFromFile(file) else null
+        }.getOrNull()
+    } else {
+        null
+    } ?: if (boldFallback) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+    return android.graphics.Typeface.create(base, safeWeight, false)
+}
 
 @Composable
 fun LyricView(
@@ -775,6 +888,47 @@ private fun LyricLine.isBackgroundAfterMain(): Boolean {
     val mainStart = words.minOfOrNull { it.startMs } ?: timeMs
     return backgroundStart == null || backgroundStart > mainStart
 }
+
+private fun List<LyricLine>.toLyriconSong(
+    songId: Long,
+    songTitle: String,
+    songArtist: String
+): io.github.proify.lyricon.lyric.model.Song {
+    val lines = mapIndexedNotNull { index, line ->
+        val end = line.endMs
+            ?: getOrNull(index + 1)?.timeMs
+            ?: line.words.maxOfOrNull { it.endMs }
+            ?: (line.timeMs + 4_000L)
+        if (line.text.isBlank() && line.backgroundText.isNullOrBlank()) return@mapIndexedNotNull null
+        io.github.proify.lyricon.lyric.model.RichLyricLine(
+            begin = line.timeMs,
+            end = end.coerceAtLeast(line.timeMs + 1L),
+            isAlignedRight = line.agent.equals("v2", ignoreCase = true),
+            text = line.text.ifBlank { "♪" },
+            words = line.words.toLyriconWords().ifEmpty { null },
+            secondary = line.backgroundText?.takeIf { it.isNotBlank() },
+            secondaryWords = line.backgroundWords.toLyriconWords().ifEmpty { null },
+            translation = line.displayTranslationText(),
+            roma = line.displayPronunciationText()
+        )
+    }
+    return io.github.proify.lyricon.lyric.model.Song(
+        id = songId.takeIf { it > 0L }?.toString(),
+        name = songTitle,
+        artist = songArtist,
+        lyrics = lines
+    ).normalize()
+}
+
+private fun List<LyricWord>.toLyriconWords(): List<io.github.proify.lyricon.lyric.model.LyricWord> =
+    mapNotNull { word ->
+        if (word.text.isBlank() || word.endMs <= word.startMs) return@mapNotNull null
+        io.github.proify.lyricon.lyric.model.LyricWord(
+            begin = word.startMs,
+            end = word.endMs,
+            text = word.text
+        )
+    }
 
 private fun LyricLine.isBackgroundVisibleAt(positionMs: Long): Boolean {
     val start = backgroundStartMs ?: backgroundWords.minOfOrNull { it.startMs } ?: return true

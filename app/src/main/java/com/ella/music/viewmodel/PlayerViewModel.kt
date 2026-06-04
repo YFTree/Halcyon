@@ -74,6 +74,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val lyrics: StateFlow<List<LyricLine>> = _lyrics.asStateFlow()
 
+    private val _lyricFormatAvailability = MutableStateFlow(MusicRepository.LyricFormatAvailability())
+    val lyricFormatAvailability: StateFlow<MusicRepository.LyricFormatAvailability> =
+        _lyricFormatAvailability.asStateFlow()
+
+    private val _preferTtmlLyrics = MutableStateFlow<Boolean?>(null)
+    val preferTtmlLyrics: StateFlow<Boolean?> = _preferTtmlLyrics.asStateFlow()
+
     private val _currentLyricIndex = MutableStateFlow(-1)
     val currentLyricIndex: StateFlow<Int> = _currentLyricIndex.asStateFlow()
 
@@ -919,9 +926,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setLyricSourceMode(mode: Int) {
         viewModelScope.launch {
+            _preferTtmlLyrics.value = null
             settingsManager.setLyricSourceMode(mode)
             lyricSourceMode = mode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
             appliedLyricSourceMode = lyricSourceMode
+            currentSong.value?.let { reloadLyrics(it, force = true) }
+        }
+    }
+
+    fun setLyricFormatPreference(preferTtml: Boolean) {
+        viewModelScope.launch {
+            _preferTtmlLyrics.value = preferTtml
             currentSong.value?.let { reloadLyrics(it, force = true) }
         }
     }
@@ -955,7 +970,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun reloadLyrics(song: Song, force: Boolean = false) {
         lastTickerPayload = null
         lastBluetoothLyricPayload = null
-        val songLyrics = if (force) {
+        val availability = repository.getLyricFormatAvailability(song)
+        _lyricFormatAvailability.value = availability
+        val formatOverride = _preferTtmlLyrics.value.takeIf { availability.hasBoth }
+        if (!availability.hasBoth) _preferTtmlLyrics.value = null
+        val songLyrics = if (formatOverride != null) {
+            repository.reloadLyricsByFormat(song, formatOverride)
+        } else if (force) {
             repository.reloadLyrics(song, lyricSourceMode)
         } else {
             repository.getLyrics(song, lyricSourceMode)

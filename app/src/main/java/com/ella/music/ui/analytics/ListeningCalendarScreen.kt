@@ -82,8 +82,9 @@ fun ListeningCalendarHistoryScreen(
     val playbackHistory by mainViewModel.playbackHistory.collectAsState()
     val dailyListenMs by mainViewModel.dailyListenMs.collectAsState()
     val libraryById = remember(songs) { songs.associateBy { it.id } }
-    val dayAggregates = remember(playbackHistory, dailyListenMs, libraryById) {
-        buildListeningDayAggregates(playbackHistory, dailyListenMs, libraryById)
+    val libraryByStatsKey = remember(songs) { songs.associateBy { it.calendarStatsKey() } }
+    val dayAggregates = remember(playbackHistory, dailyListenMs, libraryById, libraryByStatsKey) {
+        buildListeningDayAggregates(playbackHistory, dailyListenMs, libraryById, libraryByStatsKey)
     }
     val monthSections = remember(dayAggregates) { buildListeningMonths(dayAggregates) }
     val firstDayWithHistory = remember(dayAggregates) { dayAggregates.values.firstOrNull { it.entries.isNotEmpty() }?.dateKey }
@@ -403,11 +404,21 @@ private fun ListeningActionIconButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val containerColor = if (active) {
+        MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+    } else {
+        MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.88f)
+    }
+    val iconColor = if (active) {
+        MiuixTheme.colorScheme.primary
+    } else {
+        MiuixTheme.colorScheme.onSurface
+    }
     Box(
         modifier = modifier
             .size(52.dp)
             .clip(RoundedCornerShape(18.dp))
-            .background(if (active) Color.White.copy(alpha = 0.90f) else Color.White.copy(alpha = 0.10f))
+            .background(containerColor)
             .clickable(onClick = onClick)
             .padding(14.dp),
         contentAlignment = Alignment.Center
@@ -415,7 +426,7 @@ private fun ListeningActionIconButton(
         Icon(
             painter = androidx.compose.ui.res.painterResource(id = iconRes),
             contentDescription = contentDescription,
-            tint = if (active) Color(0xFF111111) else Color.White,
+            tint = iconColor,
             modifier = Modifier.fillMaxSize()
         )
     }
@@ -440,6 +451,8 @@ private fun ListeningTimelineRow(
             song?.let(mainViewModel::getAudioInfo)
         }
     }
+    val axisDotColor = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.82f)
+    val axisLineColor = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.32f)
 
     Row(
         modifier = Modifier
@@ -455,14 +468,14 @@ private fun ListeningTimelineRow(
                 modifier = Modifier
                     .size(12.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.84f))
+                    .background(axisDotColor)
             )
             if (!isLast) {
                 Box(
                     modifier = Modifier
                         .width(2.dp)
                         .height(94.dp)
-                        .background(Color.White.copy(alpha = 0.20f))
+                        .background(axisLineColor)
                 )
             }
         }
@@ -592,7 +605,8 @@ private data class ListeningMonthSection(
 private fun buildListeningDayAggregates(
     history: List<PlaybackHistoryEntry>,
     dailyListenMs: Map<String, Long>,
-    libraryById: Map<Long, Song>
+    libraryById: Map<Long, Song>,
+    libraryByStatsKey: Map<String, Song>
 ): Map<String, ListeningDayAggregate> {
     val groupedHistory = history
         .groupBy(::historyDateKey)
@@ -603,7 +617,9 @@ private fun buildListeningDayAggregates(
         .sortedDescending()
 
     val rawAggregates = allDateKeys.associateWith { dateKey ->
-        val entries = groupedHistory[dateKey].orEmpty().map { ListeningTimelineEntry(it, libraryById[it.songId]) }
+        val entries = groupedHistory[dateKey].orEmpty().map { entry ->
+            ListeningTimelineEntry(entry, libraryById[entry.songId] ?: libraryByStatsKey[entry.calendarStatsKey()])
+        }
         val totalDuration = dailyListenMs[dateKey]
             ?: entries.sumOf { it.song?.duration ?: 0L }
         val dayOfMonth = dateKey.substringAfterLast('-').toIntOrNull() ?: 1
@@ -745,3 +761,12 @@ private fun parseHistoryDateKey(dateKey: String): Date? {
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dateKey)
     }.getOrNull()
 }
+
+private fun Song.calendarStatsKey(): String =
+    listOf(title, artist, album).joinToString("|") { it.calendarKeyPart() }
+
+private fun PlaybackHistoryEntry.calendarStatsKey(): String =
+    listOf(title, artist, album).joinToString("|") { it.calendarKeyPart() }
+
+private fun String.calendarKeyPart(): String =
+    trim().lowercase().replace(Regex("\\s+"), " ")

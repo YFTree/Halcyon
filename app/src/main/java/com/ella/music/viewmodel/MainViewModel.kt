@@ -154,12 +154,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 deepRescan = deepRescan
             )
         }
+        preloadLibrarySearchSnapshot()
     }
 
     fun loadCachedLibrary() {
         viewModelScope.launch {
             repository.loadCachedLibrary()
             _libraryCacheLoaded.value = true
+            preloadLibrarySearchSnapshot()
+        }
+    }
+
+    fun preloadLibrarySearchSnapshot() {
+        val currentSongs = songs.value
+        if (currentSongs.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.preloadLibrarySearchSnapshot(currentSongs)
         }
     }
 
@@ -392,6 +402,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearOnlineMetadataCache() {
         repository.clearRemoteMetadataCache()
+    }
+
+    suspend fun songMatchesSearchSnapshot(song: Song, query: String): Boolean =
+        repository.songMatchesSearchSnapshot(song, query)
+
+    fun clearLibrarySnapshotCache() {
+        viewModelScope.launch {
+            repository.clearLibrarySnapshotCache()
+        }
     }
 
     fun refreshSongAfterExternalEdit(song: Song, onUpdated: (Song?) -> Unit = {}) {

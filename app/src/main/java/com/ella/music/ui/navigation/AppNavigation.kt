@@ -393,7 +393,8 @@ fun AppNavigation(
 
         composable(Screen.BackupSettings.route) {
             BackupSettingsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                mainViewModel = mainViewModel
             )
         }
 
