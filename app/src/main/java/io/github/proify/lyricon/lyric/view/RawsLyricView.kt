@@ -4,6 +4,7 @@ import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.BlurMaskFilter
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
@@ -87,6 +88,7 @@ class RawsLyricView @JvmOverloads constructor(
         private const val LINE_OFFSET_GAP_MIN_MS = 200L
         private const val LINE_OFFSET_GAP_MAX_MS = 750L
         private const val KARAOKE_WORD_OFFSET_MS = 100L
+        private const val SECONDARY_TRANSLATION_SEPARATOR = "\u000B"
     }
 
     private val density = resources.displayMetrics.density
@@ -130,12 +132,17 @@ class RawsLyricView @JvmOverloads constructor(
     private var currentIndex = -1
     private var currentPosMs = 0L
     private var lastPositionWallTime = 0L
+    private var playbackActive = true
     private var lineOffsetMs = LINE_OFFSET_MIN_MS
     private var displayTranslation = false
     private var displayRoma = false
     private var anchorOffsetPx = 0f
     private var edgeFadeEnabled = false
+    private var fullLayerBlurEnabled = false
     private var nonCurrentLineBlurEnabled = false
+    private var continuousFrameUpdatesEnabled = true
+    private var lineAlphaAnimationsEnabled = true
+    private var pronunciationAboveMainEnabled = false
     private var placeholderFormat = PlaceholderFormat.NAME_ARTIST
     private var currentStyleConfig: RichLyricLineConfig? = null
     private var songName: String? = null
@@ -170,6 +177,8 @@ class RawsLyricView @JvmOverloads constructor(
     private var velocityTracker: VelocityTracker? = null
     private val scroller = OverScroller(context)
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var scrollAnimator: ValueAnimator? = null
+    private var positionInitialized = false
 
     private val popPathUp = PathInterpolator(0.25f, 0.1f, 0.25f, 1.0f)
     private val popPathDown = PathInterpolator(0.25f, 0.0f, 1.0f, 0.2f)
@@ -181,17 +190,29 @@ class RawsLyricView @JvmOverloads constructor(
     private val lineAlphas = mutableMapOf<Int, Float>()
     private data class LineEntry(
         val yTop: Float,
+        val preH: Float,
         val mainH: Float,
+        val secondaryH: Float,
+        val secondaryTranslationH: Float,
         val transH: Float,
         val totalH: Float,
+        val preText: String?,
         val mainText: String?,
+        val secondaryText: String?,
+        val secondaryTranslationText: String?,
         val transText: String?,
         val romaText: String?,
         val words: List<LyricWord>?,
+        val secondaryWords: List<LyricWord>?,
+        val secondaryStart: Long?,
+        val secondaryEnd: Long?,
+        val alignedRight: Boolean,
         val begin: Long,
         val end: Long,
     )
     private var entries = listOf<LineEntry>()
+    private val distantLineBlur = BlurMaskFilter(4f * density, BlurMaskFilter.Blur.NORMAL)
+    private val sustainPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
 
     private val choreographer = Choreographer.getInstance()
     private var framePosted = false
@@ -234,6 +255,11 @@ class RawsLyricView @JvmOverloads constructor(
     }
     var onLineClickListener: OnLineClickListener? = null
 
+    fun interface OnLineDoubleClickListener {
+        fun onLineDoubleClick(beginMs: Long)
+    }
+    var onLineDoubleClickListener: OnLineDoubleClickListener? = null
+
     fun interface OnLineLongClickListener {
         fun onLineLongClick(beginMs: Long)
     }
@@ -262,6 +288,17 @@ class RawsLyricView @JvmOverloads constructor(
                 }
             }
         }
+        override fun onDoubleTap(e: MotionEvent): Boolean {
+            if (isDragging) return false
+            val tapY = e.y + scrollY
+            for (entry in entries) {
+                if (tapY in entry.yTop..(entry.yTop + entry.totalH)) {
+                    onLineDoubleClickListener?.onLineDoubleClick(entry.begin)
+                    return true
+                }
+            }
+            return false
+        }
         override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
             if (!isUserScrolling) return false
             scroller.fling(
@@ -289,10 +326,24 @@ class RawsLyricView @JvmOverloads constructor(
             if (isUserScrolling && !isDragging) isUserScrolling = false
             onLineChanged(currentIndex, newIndex)
             currentIndex = newIndex
-            if (!isUserScrolling) scrollToCurrentLine(true)
+            if (!isUserScrolling) {
+                scrollToCurrentLine(positionInitialized && playbackActive)
+            }
+            positionInitialized = true
             updateLineOffset(newIndex)
+        } else if (!positionInitialized) {
+            scrollToCurrentLine(false)
+            positionInitialized = true
         }
         detectInterlude()
+        invalidate()
+        postFrame()
+    }
+
+    fun setPlaybackActive(active: Boolean) {
+        if (playbackActive == active) return
+        playbackActive = active
+        lastPositionWallTime = if (active) SystemClock.elapsedRealtime() else 0L
         invalidate()
         postFrame()
     }
@@ -321,6 +372,32 @@ class RawsLyricView @JvmOverloads constructor(
         if (nonCurrentLineBlurEnabled == enabled) return
         nonCurrentLineBlurEnabled = enabled
         if (!enabled) clearBlurCache()
+        invalidate()
+    }
+
+    fun setContinuousFrameUpdatesEnabled(enabled: Boolean) {
+        if (continuousFrameUpdatesEnabled == enabled) return
+        continuousFrameUpdatesEnabled = enabled
+        if (!enabled && framePosted) {
+            choreographer.removeFrameCallback(frameCb)
+            framePosted = false
+        } else {
+            postFrame()
+        }
+    }
+
+    fun setLineAlphaAnimationsEnabled(enabled: Boolean) {
+        if (lineAlphaAnimationsEnabled == enabled) return
+        lineAlphaAnimationsEnabled = enabled
+        if (!enabled) lineAlphas.clear()
+        invalidate()
+    }
+
+    fun setPronunciationAboveMainEnabled(enabled: Boolean) {
+        if (pronunciationAboveMainEnabled == enabled) return
+        pronunciationAboveMainEnabled = enabled
+        rebuildEntries()
+        scrollToCurrentLine(false)
         invalidate()
     }
 
@@ -414,7 +491,10 @@ class RawsLyricView @JvmOverloads constructor(
         clearInterlude()
         popAnimators.values.toList().forEach { it.cancel() }
         popAnimators.clear()
+        scrollAnimator?.cancel()
+        scrollAnimator = null
         previousIndex = -1
+        positionInitialized = false
         rebuildEntries()
         scrollY = 0f
         scrollToCurrentLine(false)
@@ -436,19 +516,53 @@ class RawsLyricView @JvmOverloads constructor(
         var y = max(topContentPadding, minTopPad)
         for (line in lyrics) {
             val mainText = line.text ?: continue
-            val mainH = measureMainHeight(mainText)
+            val preText = if (pronunciationAboveMainEnabled && displayRoma && !line.roma.isNullOrBlank()) line.roma else null
+            val preH = preText?.let { measureTransHeight(it) + transGapPx } ?: 0f
+            val mainH = max(measureMainHeight(mainText), measureWordsHeight(line.words, mainPaint))
+            val secondaryBlock = line.secondary?.splitSecondaryBlock()
+            val secondaryText = secondaryBlock?.first?.takeIf { it.isNotBlank() }
+            val secondaryTranslationText = secondaryBlock?.second?.takeIf { displayTranslation && it.isNotBlank() }
+            val secondaryH = secondaryText?.let {
+                max(measureTransHeight(it), measureWordsHeight(line.secondaryWords, transPaint)) + transGapPx
+            } ?: 0f
+            val secondaryTranslationH = secondaryTranslationText?.let { measureTransHeight(it) + transGapPx } ?: 0f
+            val secondaryStart = line.secondaryWords?.minOfOrNull { it.begin }
+            val secondaryEnd = line.secondaryWords?.maxOfOrNull { it.end }
             var transH = 0f
             var transText: String? = null
             var romaText: String? = null
             if (displayTranslation && !line.translation.isNullOrBlank()) {
                 transText = line.translation!!
                 transH = measureTransHeight(transText) + transGapPx
-            } else if (displayRoma && !line.roma.isNullOrBlank()) {
+            } else if (displayRoma && !pronunciationAboveMainEnabled && !line.roma.isNullOrBlank()) {
                 romaText = line.roma!!
                 transH = measureTransHeight(romaText) + transGapPx
             }
-            val totalH = linePadTopPx + mainH + transH + linePadBottomPx + lineGapPx
-            result.add(LineEntry(y, mainH, transH, totalH, mainText, transText, romaText, line.words, line.begin, line.end))
+            val totalH = linePadTopPx + preH + mainH + secondaryH + secondaryTranslationH + transH + linePadBottomPx + lineGapPx
+            result.add(
+                LineEntry(
+                    yTop = y,
+                    preH = preH,
+                    mainH = mainH,
+                    secondaryH = secondaryH,
+                    secondaryTranslationH = secondaryTranslationH,
+                    transH = transH,
+                    totalH = totalH,
+                    preText = preText,
+                    mainText = mainText,
+                    secondaryText = secondaryText,
+                    secondaryTranslationText = secondaryTranslationText,
+                    transText = transText,
+                    romaText = romaText,
+                    words = line.words,
+                    secondaryWords = line.secondaryWords,
+                    secondaryStart = secondaryStart,
+                    secondaryEnd = secondaryEnd,
+                    alignedRight = line.isAlignedRight,
+                    begin = line.begin,
+                    end = line.end
+                )
+            )
             y += totalH
         }
         entries = result
@@ -464,6 +578,14 @@ class RawsLyricView @JvmOverloads constructor(
         return layout.height.toFloat()
     }
 
+    private fun String.splitSecondaryBlock(): Pair<String, String?> {
+        val markerIndex = indexOf(SECONDARY_TRANSLATION_SEPARATOR)
+        if (markerIndex < 0) return this to null
+        val primary = substring(0, markerIndex)
+        val translation = substring(markerIndex + SECONDARY_TRANSLATION_SEPARATOR.length)
+        return primary to translation
+    }
+
     private fun measureTransHeight(text: String): Float {
         val w = width - paddingLeft - paddingRight
         if (w <= 0) return transPaint.fontSpacing
@@ -471,9 +593,28 @@ class RawsLyricView @JvmOverloads constructor(
         return layout.height.toFloat()
     }
 
-    private fun buildLayout(text: String, paint: TextPaint, widthPx: Int): StaticLayout {
+    private fun measureWordsHeight(words: List<LyricWord>?, paint: TextPaint): Float {
+        if (words.isNullOrEmpty()) return 0f
+        val availW = (width - paddingLeft - paddingRight).toFloat()
+        if (availW <= 0f) return paint.fontSpacing
+        var cursorX = 0f
+        var lines = 1
+        words.forEach { word ->
+            val text = word.text ?: return@forEach
+            if (text.isBlank()) return@forEach
+            val wordW = paint.measureText(text)
+            if (cursorX + wordW > availW && cursorX > 0f) {
+                cursorX = 0f
+                lines++
+            }
+            cursorX += wordW
+        }
+        return lines * paint.fontSpacing + linePadTopPx
+    }
+
+    private fun buildLayout(text: String, paint: TextPaint, widthPx: Int, alignedRight: Boolean = false): StaticLayout {
         return StaticLayout.Builder.obtain(text, 0, text.length, paint, max(1, widthPx))
-            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setAlignment(if (alignedRight) Layout.Alignment.ALIGN_OPPOSITE else Layout.Alignment.ALIGN_NORMAL)
             .setLineSpacing(0f, 1f)
             .setIncludePad(true)
             .build()
@@ -577,10 +718,11 @@ class RawsLyricView @JvmOverloads constructor(
     }
 
     private fun animateScrollTo(target: Float) {
+        scrollAnimator?.cancel()
         val start = scrollY
         val delta = target - start
         if (abs(delta) < 1f) return
-        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+        scrollAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = SCROLL_ANIM_MS
             interpolator = PathInterpolator(0.25f, 0.1f, 0.25f, 1.0f)
             addUpdateListener {
@@ -588,8 +730,17 @@ class RawsLyricView @JvmOverloads constructor(
                 clampScroll()
                 invalidate()
             }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (scrollAnimator == animation) scrollAnimator = null
+                }
+
+                override fun onAnimationCancel(animation: android.animation.Animator) {
+                    if (scrollAnimator == animation) scrollAnimator = null
+                }
+            })
         }
-        animator.start()
+        scrollAnimator?.start()
     }
 
     private fun clampScroll() {
@@ -608,16 +759,18 @@ class RawsLyricView @JvmOverloads constructor(
             scrollToCurrentLine(true)
         }
         var anyAlphaAnimating = false
-        for (i in entries.indices) {
-            val target = calculateTargetAlpha(i)
-            val current = lineAlphas[i]
-            if (current == null) {
-                lineAlphas[i] = target
-            } else if (abs(current - target) > 0.002f) {
-                lineAlphas[i] = current + (target - current) * 0.12f
-                anyAlphaAnimating = true
-            } else {
-                lineAlphas[i] = target
+        if (lineAlphaAnimationsEnabled) {
+            for (i in entries.indices) {
+                val target = calculateTargetAlpha(i)
+                val current = lineAlphas[i]
+                if (current == null) {
+                    lineAlphas[i] = target
+                } else if (abs(current - target) > 0.002f) {
+                    lineAlphas[i] = current + (target - current) * 0.12f
+                    anyAlphaAnimating = true
+                } else {
+                    lineAlphas[i] = target
+                }
             }
         }
         val interludeAnimating = updateInterludeExpand()
@@ -646,7 +799,11 @@ class RawsLyricView @JvmOverloads constructor(
     }
 
     private fun postFrame() {
-        val needFrame = lyrics.any { it.words?.isNotEmpty() == true } || !scroller.isFinished || popAnimators.isNotEmpty() || isInterludeActive() || lineAlphas.any { i -> abs((lineAlphas[i.key] ?: 0f) - calculateTargetAlpha(i.key)) > 0.005f }
+        val needFrame = (playbackActive && continuousFrameUpdatesEnabled && lyrics.any { it.words?.isNotEmpty() == true || it.secondaryWords?.isNotEmpty() == true }) ||
+                !scroller.isFinished ||
+                popAnimators.isNotEmpty() ||
+                isInterludeActive() ||
+                (lineAlphaAnimationsEnabled && lineAlphas.any { (index, alpha) -> abs(alpha - calculateTargetAlpha(index)) > 0.005f })
         if (needFrame && !framePosted) {
             framePosted = true
             choreographer.postFrameCallback(frameCb)
@@ -679,7 +836,7 @@ class RawsLyricView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
         val saveCount = canvas.saveLayer(0f, 0f, w, h, null)
-        if (nonCurrentLineBlurEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !isUserScrolling) {
+        if (fullLayerBlurEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !isUserScrolling) {
             val node = blurRenderNode?.takeIf { blurNodeW == width && blurNodeH == height }
                 ?: RenderNode("nonCurrentBlur").also {
                     it.setPosition(0, 0, width, height)
@@ -720,18 +877,18 @@ class RawsLyricView @JvmOverloads constructor(
             if (excludeCurrent && i == currentIndex) continue
             val entry = entries[i]
             val targetAlpha = calculateTargetAlpha(i)
-            val alpha = lineAlphas.getOrPut(i) { targetAlpha }
+            val alpha = if (lineAlphaAnimationsEnabled) lineAlphas.getOrPut(i) { targetAlpha } else targetAlpha
             val scale = lineScales[i] ?: if (i == currentIndex) SCALE_HIGHLIGHT else SCALE_NORMAL
             val yExtra = if (expandOffset > 0f && i > interludePrevIdx) expandOffset else 0f
             val lineCenterY = entry.yTop + entry.totalH / 2f - scrollY + yExtra
             if (lineCenterY + entry.totalH < -50f || lineCenterY - entry.totalH > viewH + 50f) continue
+            val farBlur = nonCurrentLineBlurEnabled && !isUserScrolling && currentIndex >= 0 && abs(i - currentIndex) >= 2
             canvas.save()
-            val isRtl = entryIsRtl(entry.mainText ?: "")
-            val pivotX = if (isRtl) paddingLeft.toFloat() + mainPaint.measureText(entry.mainText ?: "") else paddingLeft.toFloat()
+            val pivotX = entry.pivotX()
             val pivotY = lineCenterY + entry.totalH / 2f
             canvas.scale(scale, scale, pivotX, pivotY)
             canvas.saveLayerAlpha(0f, lineCenterY - entry.totalH, viewW, lineCenterY + entry.totalH, (alpha * 255).toInt())
-            drawSingleLine(canvas, entry, i, lineCenterY)
+            drawSingleLine(canvas, entry, i, lineCenterY, farBlur)
             canvas.restore()
             canvas.restore()
         }
@@ -740,7 +897,11 @@ class RawsLyricView @JvmOverloads constructor(
     private fun drawSingleCurrentLine(canvas: Canvas) {
         if (currentIndex < 0 || currentIndex >= entries.size) return
         val entry = entries[currentIndex]
-        val alpha = lineAlphas.getOrPut(currentIndex) { calculateTargetAlpha(currentIndex) }
+        val alpha = if (lineAlphaAnimationsEnabled) {
+            lineAlphas.getOrPut(currentIndex) { calculateTargetAlpha(currentIndex) }
+        } else {
+            calculateTargetAlpha(currentIndex)
+        }
         val scale = lineScales[currentIndex] ?: SCALE_HIGHLIGHT
         val expandOffset = getInterludeExpandOffset()
         val yExtra = if (expandOffset > 0f && currentIndex > interludePrevIdx) expandOffset else 0f
@@ -749,12 +910,11 @@ class RawsLyricView @JvmOverloads constructor(
         val viewW = width.toFloat()
         if (lineCenterY + entry.totalH < -50f || lineCenterY - entry.totalH > viewH + 50f) return
         canvas.save()
-        val isRtl = entryIsRtl(entry.mainText ?: "")
-        val pivotX = if (isRtl) paddingLeft.toFloat() + mainPaint.measureText(entry.mainText ?: "") else paddingLeft.toFloat()
+        val pivotX = entry.pivotX()
         val pivotY = lineCenterY + entry.totalH / 2f
         canvas.scale(scale, scale, pivotX, pivotY)
         canvas.saveLayerAlpha(0f, lineCenterY - entry.totalH, viewW, lineCenterY + entry.totalH, (alpha * 255).toInt())
-        drawSingleLine(canvas, entry, currentIndex, lineCenterY)
+        drawSingleLine(canvas, entry, currentIndex, lineCenterY, farBlur = false)
         canvas.restore()
         canvas.restore()
     }
@@ -768,42 +928,79 @@ class RawsLyricView @JvmOverloads constructor(
             .coerceIn(LINE_MIN_ALPHA, LINE_MAX_ALPHA)
     }
 
-    private fun drawSingleLine(canvas: Canvas, entry: LineEntry, index: Int, lineCenterY: Float) {
+    private fun drawSingleLine(canvas: Canvas, entry: LineEntry, index: Int, lineCenterY: Float, farBlur: Boolean) {
         val isCurrent = index == currentIndex
         val contentTop = lineCenterY - entry.totalH / 2f + linePadTopPx
-        val mainTopY = contentTop
+        val textStartX = paddingLeft.toFloat()
+        if (entry.preText != null) {
+            val preBaseline = contentTop + transGapPx + (-transPaint.fontMetrics.ascent)
+            val pPaint = if (isCurrent) hlTransPaint else dimTransPaint
+            drawTextAligned(canvas, entry.preText, pPaint, textStartX, preBaseline, entry.alignedRight, farBlur)
+        }
+        val mainTopY = contentTop + entry.preH
         val mainBottomY = mainTopY + entry.mainH
         // setIncludePad(true) 时 StaticLayout.height 包含 top padding
         // 第一行基线 = mainTopY + getLineBaseline(0) ≈ mainTopY + (-ascent + topPad)
         // 但卡拉OK直接用 baseline 绘制，不含 topPad，所以需要分开处理
         val topPad = mainPaint.fontMetrics.let { it.top - it.ascent }.coerceAtLeast(0f)
         val mainBaseline = mainTopY + topPad + (-mainPaint.fontMetrics.ascent)
-        val textStartX = paddingLeft.toFloat()
         if (!entry.words.isNullOrEmpty() && isCurrent) {
-            drawKaraokeWords(canvas, entry, index, textStartX, mainBaseline)
+            drawKaraokeWords(canvas, entry, index, textStartX, mainBaseline, entry.alignedRight)
         } else {
             val paint = when {
                 isCurrent -> hlPaint
                 index == previousIndex -> dimPaint
                 else -> dimPaint
             }
-            drawTextLeftAligned(canvas, entry.mainText ?: "", paint, textStartX, mainBaseline)
+            drawTextAligned(canvas, entry.mainText ?: "", paint, textStartX, mainBaseline, entry.alignedRight, farBlur)
         }
+        var secondaryBaseY = mainBottomY
         if (entry.transText != null) {
-            val transBaseline = mainBottomY + transGapPx + (-transPaint.fontMetrics.ascent)
+            val transBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
             val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
-            drawTextLeftAligned(canvas, entry.transText, tPaint, textStartX, transBaseline)
+            drawTextAligned(canvas, entry.transText, tPaint, textStartX, transBaseline, entry.alignedRight, farBlur)
+            secondaryBaseY += entry.transH
         } else if (entry.romaText != null) {
-            val romaBaseline = mainBottomY + transGapPx + (-transPaint.fontMetrics.ascent)
+            val romaBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
             val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
-            drawTextLeftAligned(canvas, entry.romaText, tPaint, textStartX, romaBaseline)
+            drawTextAligned(canvas, entry.romaText, tPaint, textStartX, romaBaseline, entry.alignedRight, farBlur)
+            secondaryBaseY += entry.transH
+        }
+        val shouldDrawSecondary = entry.secondaryText != null && entry.isSecondaryVisible(currentPosMs)
+        if (entry.secondaryText != null) {
+            if (!shouldDrawSecondary) return
+            val secondaryBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
+            val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
+            if (!entry.secondaryWords.isNullOrEmpty() && isCurrent) {
+                drawKaraokeWords(canvas, entry, index, textStartX, secondaryBaseline, entry.alignedRight, useSecondary = true)
+            } else {
+                drawTextAligned(canvas, entry.secondaryText, tPaint, textStartX, secondaryBaseline, entry.alignedRight, farBlur)
+            }
+            secondaryBaseY += entry.secondaryH
+        }
+        if (entry.secondaryTranslationText != null) {
+            val secondaryTranslationBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
+            val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
+            drawTextAligned(canvas, entry.secondaryTranslationText, tPaint, textStartX, secondaryTranslationBaseline, entry.alignedRight, farBlur)
+            secondaryBaseY += entry.secondaryTranslationH
         }
     }
 
-    private fun drawTextLeftAligned(canvas: Canvas, text: String, paint: TextPaint, startX: Float, baseline: Float) {
+    private fun LineEntry.isSecondaryVisible(positionMs: Long): Boolean {
+        val start = secondaryStart ?: return true
+        val end = secondaryEnd ?: this.end
+        return positionMs in start..end
+    }
+
+    private fun LineEntry.pivotX(): Float =
+        if (alignedRight) width - paddingRight.toFloat() else paddingLeft.toFloat()
+
+    private fun drawTextAligned(canvas: Canvas, text: String, paint: TextPaint, startX: Float, baseline: Float, alignedRight: Boolean, blur: Boolean = false) {
         val w = width - paddingLeft - paddingRight
         if (w <= 0) return
-        val layout = buildLayout(text, paint, w)
+        val oldMask = paint.maskFilter
+        if (blur) paint.maskFilter = distantLineBlur
+        val layout = buildLayout(text, paint, w, alignedRight)
         canvas.save()
         // StaticLayout line 0 baseline is at getLineTop(0) + getLineBaseline(0) - getLineTop(0)
         // = getLineBaseline(0). With includePad=true, getLineTop(0) includes top padding.
@@ -812,6 +1009,7 @@ class RawsLyricView @JvmOverloads constructor(
         canvas.translate(startX, baseline - line0Baseline)
         layout.draw(canvas)
         canvas.restore()
+        paint.maskFilter = oldMask
     }
 
     private fun clearBlurCache() {
@@ -950,15 +1148,25 @@ class RawsLyricView @JvmOverloads constructor(
                 Character.getDirectionality(first) == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC
     }
 
-    private fun drawKaraokeWords(canvas: Canvas, entry: LineEntry, lineIndex: Int, startX: Float, baseline: Float) {
-        val words = entry.words ?: return
+    private fun drawKaraokeWords(
+        canvas: Canvas,
+        entry: LineEntry,
+        lineIndex: Int,
+        startX: Float,
+        baseline: Float,
+        alignedRight: Boolean,
+        useSecondary: Boolean = false
+    ) {
+        val words = (if (useSecondary) entry.secondaryWords else entry.words) ?: return
         val elapsed = SystemClock.elapsedRealtime() - lastPositionWallTime
-        val pos = if (lastPositionWallTime > 0 && elapsed in 0..2000) currentPosMs + elapsed else currentPosMs
+        val pos = if (playbackActive && lastPositionWallTime > 0 && elapsed in 0..2000) currentPosMs + elapsed else currentPosMs
         val karaokePos = pos + KARAOKE_WORD_OFFSET_MS
         val availW = (width - paddingLeft - paddingRight).toFloat()
-        val lineSpacing = hlPaint.fontSpacing
+        val activePaint = if (useSecondary) hlTransPaint else hlPaint
+        val inactivePaint = if (useSecondary) dimTransPaint else dimPaint
+        val lineSpacing = activePaint.fontSpacing
 
-        data class WordDrawInfo(val text: String, val x: Float, val y: Float, val w: Float, val visualLine: Int)
+        data class WordDrawInfo(val word: LyricWord, val text: String, val x: Float, val y: Float, val w: Float, val visualLine: Int)
         val wordInfos = mutableListOf<WordDrawInfo>()
         var cursorX = startX
         var cursorY = baseline
@@ -966,41 +1174,52 @@ class RawsLyricView @JvmOverloads constructor(
 
         for (word in words) {
             val wordText = word.text ?: continue
-            val wordW = hlPaint.measureText(wordText)
+            val wordW = activePaint.measureText(wordText)
             if (cursorX + wordW > startX + availW && cursorX > startX) {
                 cursorX = startX
                 cursorY += lineSpacing
                 visualLine++
             }
-            wordInfos.add(WordDrawInfo(wordText, cursorX, cursorY, wordW, visualLine))
+            wordInfos.add(WordDrawInfo(word, wordText, cursorX, cursorY, wordW, visualLine))
             cursorX += wordW
         }
 
         if (wordInfos.isEmpty()) return
 
+        val lineOffsets = if (alignedRight) {
+            wordInfos.groupBy { it.visualLine }.mapValues { (_, infos) ->
+                val lineStart = infos.minOf { it.x }
+                val lineEnd = infos.maxOf { it.x + it.w }
+                (availW - (lineEnd - lineStart)).coerceAtLeast(0f)
+            }
+        } else {
+            emptyMap()
+        }
+        fun WordDrawInfo.drawX(): Float = x + (lineOffsets[visualLine] ?: 0f)
+
         canvas.save()
 
         for (info in wordInfos) {
-            canvas.drawText(info.text, info.x, info.y, dimPaint)
+            canvas.drawText(info.text, info.drawX(), info.y, inactivePaint)
         }
 
-        val sweepFraction = calculateSweepFraction(entry, karaokePos)
+        val sweepFraction = calculateSweepFraction(entry, karaokePos, words)
         if (sweepFraction > 0f) {
             val totalW = wordInfos.sumOf { it.w.toDouble() }.toFloat()
             if (totalW <= 0f) { canvas.restore(); return }
             val sungWidth = sweepFraction.coerceIn(0f, 1f) * totalW
             val featherPx = featherWidthPx
 
-            val fmTop = hlPaint.fontMetrics.top
-            val fmBottom = hlPaint.fontMetrics.bottom
+            val fmTop = activePaint.fontMetrics.top
+            val fmBottom = activePaint.fontMetrics.bottom
             val maxVisualLine = wordInfos.last().visualLine
 
             for (vl in 0..maxVisualLine) {
                 val lineWords = wordInfos.filter { it.visualLine == vl }
                 if (lineWords.isEmpty()) continue
 
-                val lineStartX = lineWords.first().x
-                val lineEndX = lineWords.last().x + lineWords.last().w
+                val lineStartX = lineWords.first().drawX()
+                val lineEndX = lineWords.last().drawX() + lineWords.last().w
                 val lineW = lineEndX - lineStartX
                 val lineY = lineWords.first().y
                 val mTop = lineY + fmTop - 4f
@@ -1021,7 +1240,7 @@ class RawsLyricView @JvmOverloads constructor(
 
                 val saveCount = canvas.saveLayer(lineStartX, mTop, lineEndX, mBottom, null)
                 for (info in lineWords) {
-                    canvas.drawText(info.text, info.x, info.y, hlPaint)
+                    canvas.drawText(info.text, info.drawX(), info.y, activePaint)
                 }
                 val maskColors = intArrayOf(
                     Color.argb(255, 0, 0, 0),
@@ -1047,11 +1266,75 @@ class RawsLyricView @JvmOverloads constructor(
             }
         }
 
+        wordInfos.firstOrNull { info -> karaokePos in info.word.begin..info.word.end }
+            ?.let { activeInfo ->
+                drawSustainGlowIfNeeded(canvas, activeInfo.text, activeInfo.drawX(), activeInfo.y, activeInfo.w, activePaint, activeInfo.word, karaokePos)
+            }
+
         canvas.restore()
     }
 
-    private fun calculateSweepFraction(entry: LineEntry, pos: Long): Float {
-        val words = entry.words ?: return 0f
+    private fun drawSustainGlowIfNeeded(
+        canvas: Canvas,
+        text: String,
+        x: Float,
+        baseline: Float,
+        width: Float,
+        sourcePaint: TextPaint,
+        word: LyricWord,
+        position: Long
+    ) {
+        if (!text.isCjkKanaHangulOnlyLyricWord()) return
+        val duration = word.duration
+        if (duration < 900L || width <= 0f) return
+        val elapsed = (position - word.begin).coerceIn(0L, duration)
+        val triggerDelay = min(420L, (duration * 0.36f).toLong().coerceAtLeast(1L))
+        if (elapsed < triggerDelay || elapsed >= duration) return
+        val progress = ((elapsed - triggerDelay).toFloat() / (duration - triggerDelay).coerceAtLeast(1L)).coerceIn(0f, 1f)
+        val edgeFade = when {
+            progress < 0.18f -> progress / 0.18f
+            progress > 0.82f -> (1f - progress) / 0.18f
+            else -> 1f
+        }.coerceIn(0f, 1f)
+        if (edgeFade <= 0f) return
+
+        val glowColor = Color.argb((82 * edgeFade).toInt().coerceIn(0, 110), 255, 255, 255)
+        canvas.save()
+        canvas.clipRect(x - 8f * density, 0f, x + width + 8f * density, height.toFloat())
+        sustainPaint.set(sourcePaint)
+        sustainPaint.shader = null
+        sustainPaint.maskFilter = BlurMaskFilter(7f * density * edgeFade, BlurMaskFilter.Blur.NORMAL)
+        sustainPaint.style = Paint.Style.STROKE
+        sustainPaint.strokeWidth = (1.8f * density).coerceAtLeast(1f)
+        sustainPaint.color = glowColor
+        canvas.drawText(text, x, baseline, sustainPaint)
+        canvas.restore()
+    }
+
+    private fun String.isCjkKanaHangulOnlyLyricWord(): Boolean {
+        var hasTarget = false
+        for (char in this) {
+            if (char.isWhitespace()) continue
+            val block = Character.UnicodeBlock.of(char)
+            val cjk = block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
+                    block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A ||
+                    block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B ||
+                    block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
+                    block == Character.UnicodeBlock.HIRAGANA ||
+                    block == Character.UnicodeBlock.KATAKANA ||
+                    block == Character.UnicodeBlock.HANGUL_SYLLABLES ||
+                    block == Character.UnicodeBlock.HANGUL_JAMO ||
+                    block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
+            if (cjk) {
+                hasTarget = true
+            } else if (char.isLetterOrDigit()) {
+                return false
+            }
+        }
+        return hasTarget
+    }
+
+    private fun calculateSweepFraction(entry: LineEntry, pos: Long, words: List<LyricWord>): Float {
         if (words.isEmpty()) return 0f
         if (pos < entry.begin) return 0f
         if (pos >= entry.end) return 1f
@@ -1126,6 +1409,8 @@ class RawsLyricView @JvmOverloads constructor(
         gestureDetector.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                scrollAnimator?.cancel()
+                scroller.abortAnimation()
                 isDragging = false
                 longPressHandled = false
                 lastTouchY = event.y
@@ -1139,6 +1424,8 @@ class RawsLyricView @JvmOverloads constructor(
                 velocityTracker?.addMovement(event)
                 val dy = event.y - lastTouchY
                 if (!isDragging && abs(dy) > touchSlop) {
+                    scrollAnimator?.cancel()
+                    scroller.abortAnimation()
                     isDragging = true
                     isUserScrolling = true
                     postFrame()
@@ -1211,6 +1498,8 @@ class RawsLyricView @JvmOverloads constructor(
         clearInterlude()
         popAnimators.values.toList().forEach { it.cancel() }
         popAnimators.clear()
+        scrollAnimator?.cancel()
+        scrollAnimator = null
         scroller.abortAnimation()
     }
 }

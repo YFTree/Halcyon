@@ -6,12 +6,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
 import android.util.LruCache
+import androidx.documentfile.provider.DocumentFile
 import com.ella.music.data.exception.WritePermissionRequiredException
 import com.ella.music.data.AppLogStore
 import com.ella.music.data.AppLogType
@@ -320,7 +322,8 @@ class MusicRepository(private val context: Context) {
         sourceMode: Int = SettingsManager.LYRIC_SOURCE_AUTO
     ): List<LyricLine> = withContext(Dispatchers.IO) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
-        val cacheKey = "${song.id}:$safeMode"
+        val sourcePriority = settingsManager.lyricSourcePriority.first()
+        val cacheKey = "${song.id}:$safeMode:$sourcePriority"
         lyricsCache[cacheKey]?.let { return@withContext it }
 
         Log.d("MusicRepo", "Loading lyrics for: ${song.title} path=${song.path}")
@@ -333,23 +336,45 @@ class MusicRepository(private val context: Context) {
         }
 
         val effectivePath = song.effectiveLocalPathForMetadata()
-        if (safeMode != SettingsManager.LYRIC_SOURCE_EXTERNAL) {
-            loadEmbeddedLyrics(song, effectivePath)?.let { embeddedLyrics ->
-                lyricsCache[cacheKey] = embeddedLyrics
-                return@withContext embeddedLyrics
-            }
-        }
-
-        if (safeMode != SettingsManager.LYRIC_SOURCE_EMBEDDED) {
-            loadExternalLyrics(song, effectivePath)?.let { externalLyrics ->
-                lyricsCache[cacheKey] = externalLyrics
-                return@withContext externalLyrics
+        for (sourceId in orderedLyricSourceIds(sourcePriority, safeMode)) {
+            loadLyricsBySourceId(song, effectivePath, sourceId)?.let { lyrics ->
+                lyricsCache[cacheKey] = lyrics
+                return@withContext lyrics
             }
         }
 
         Log.d("MusicRepo", "No lyrics found for ${song.title}")
         lyricsCache[cacheKey] = emptyList()
         emptyList()
+    }
+
+    private fun orderedLyricSourceIds(priority: String, sourceMode: Int): List<String> {
+        val ordered = SettingsManager.normalizeLyricSourcePriority(priority).split(',')
+        return when (sourceMode) {
+            SettingsManager.LYRIC_SOURCE_EXTERNAL -> ordered.filter {
+                it == SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML ||
+                    it == SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN
+            }
+            SettingsManager.LYRIC_SOURCE_EMBEDDED -> ordered.filter {
+                it == SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML ||
+                    it == SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN
+            }
+            else -> ordered
+        }
+    }
+
+    private fun loadLyricsBySourceId(song: Song, effectivePath: String, sourceId: String): List<LyricLine>? {
+        return when (sourceId) {
+            SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML ->
+                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true)
+            SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN ->
+                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false)
+            SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML ->
+                loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
+            SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN ->
+                loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
+            else -> null
+        }
     }
 
     private fun loadExternalLyrics(song: Song, effectivePath: String): List<LyricLine>? {
@@ -423,11 +448,19 @@ class MusicRepository(private val context: Context) {
     }
 
     suspend fun reloadLyricsByFormat(song: Song, preferTtml: Boolean): List<LyricLine> = withContext(Dispatchers.IO) {
-        val cacheKey = "${song.id}:format:$preferTtml"
+        val sourcePriority = settingsManager.lyricSourcePriority.first()
+        val cacheKey = "${song.id}:format:$preferTtml:$sourcePriority"
         lyricsCache.remove(cacheKey)
         val effectivePath = song.effectiveLocalPathForMetadata()
-        val lyrics = loadExternalLyricsByFormat(song, effectivePath, preferTtml)
-            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml)
+        val lyrics = orderedLyricSourceIds(sourcePriority, SettingsManager.LYRIC_SOURCE_AUTO)
+            .filter { id ->
+                if (preferTtml) {
+                    id == SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML || id == SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML
+                } else {
+                    id == SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN || id == SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN
+                }
+            }
+            .firstNotNullOfOrNull { sourceId -> loadLyricsBySourceId(song, effectivePath, sourceId) }
             ?: emptyList()
         lyricsCache[cacheKey] = lyrics
         lyrics
@@ -469,13 +502,15 @@ class MusicRepository(private val context: Context) {
 
     fun getAudioInfo(song: Song): AudioInfo {
         audioInfoCache[song.id]?.let { return it }
+        val replayGainDb = getReplayGain(song)
         audioTagRepository.readQualityInfoBlocking(song.effectiveLocalPathForMetadata())?.let { quality ->
             val info = AudioInfo(
                 format = song.audioFormatLabel(quality.mimeType),
                 bitRate = quality.bitRate.takeIf { it > 0 } ?: song.estimatedBitRate(),
                 sampleRate = quality.sampleRate,
                 bitDepth = quality.bitDepth,
-                channels = quality.channels
+                channels = quality.channels,
+                replayGainDb = replayGainDb
             )
             audioInfoCache[song.id] = info
             return info
@@ -503,14 +538,15 @@ class MusicRepository(private val context: Context) {
                     bitRate = bitRate,
                     sampleRate = format?.getIntOrZero(MediaFormat.KEY_SAMPLE_RATE) ?: 0,
                     bitDepth = format?.getIntOrZero("bits-per-sample") ?: 0,
-                    channels = format?.getIntOrZero(MediaFormat.KEY_CHANNEL_COUNT) ?: 0
+                    channels = format?.getIntOrZero(MediaFormat.KEY_CHANNEL_COUNT) ?: 0,
+                    replayGainDb = replayGainDb
                 )
             } finally {
                 extractor.release()
             }
         }.getOrElse {
             Log.w("MusicRepo", "Failed to read audio info for ${song.path}", it)
-            AudioInfo(format = song.audioFormatLabel(null))
+            AudioInfo(format = song.audioFormatLabel(null), replayGainDb = replayGainDb)
         }
         audioInfoCache[song.id] = info
         return info
@@ -743,7 +779,9 @@ class MusicRepository(private val context: Context) {
         synchronized(coverArtLock) {
             coverArtCache.get(cacheKey)?.let { return it }
             val art = try {
-                audioTagRepository.readEmbeddedCoverDataBlocking(song.effectiveLocalPathForMetadata())
+                val metadataPath = song.effectiveLocalPathForMetadata()
+                audioTagRepository.readEmbeddedCoverDataBlocking(metadataPath)
+                    ?: readEmbeddedPictureWithRetriever(metadataPath)
             } catch (error: Throwable) {
                 if (error is OutOfMemoryError) {
                     coverArtCache.evictAll()
@@ -760,6 +798,26 @@ class MusicRepository(private val context: Context) {
                 coverDataStates.putIfAbsent(cacheKey, CoverDataState.Missing)
             }
             return art
+        }
+    }
+
+    private fun readEmbeddedPictureWithRetriever(path: String): ByteArray? {
+        if (path.isBlank()) return null
+        return runCatching {
+            val retriever = MediaMetadataRetriever()
+            try {
+                if (path.startsWith("content://", ignoreCase = true)) {
+                    retriever.setDataSource(context, Uri.parse(path))
+                } else {
+                    retriever.setDataSource(path)
+                }
+                retriever.embeddedPicture?.takeIf { it.isNotEmpty() }
+            } finally {
+                retriever.release()
+            }
+        }.getOrElse { error ->
+            Log.d("MusicRepo", "MediaMetadataRetriever embedded picture unavailable for $path", error)
+            null
         }
     }
 
@@ -825,39 +883,81 @@ class MusicRepository(private val context: Context) {
 
     suspend fun deleteSongs(songs: Collection<Song>): Int = withContext(Dispatchers.IO) {
         var deleted = 0
+        val deletedSongs = mutableListOf<Song>()
+        val mediaStoreUrisNeedingPermission = mutableListOf<Uri>()
+
         songs.forEach { song ->
-            val deletedFromStore = runCatching {
-                val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
-                context.contentResolver.delete(uri, null, null) > 0
-            }.getOrDefault(false)
-
-            val deletedFromFile = if (!deletedFromStore) {
-                runCatching {
-                    val file = File(song.path)
-                    file.exists() && file.delete()
-                }.getOrDefault(false)
-            } else {
-                true
+            if (tryDeleteSongDirect(song)) {
+                deleted++
+                deletedSongs += song
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                song.mediaStoreDeleteUriOrNull()?.let { mediaStoreUrisNeedingPermission += it }
             }
-
-            if (deletedFromFile) deleted++
         }
 
-        if (deleted > 0) {
-            val deletedIds = songs.map { it.id }.toSet()
-            _songs.value = _songs.value.filterNot { it.id in deletedIds }
-            _albums.value = _songs.value.toAlbums()
-            saveLibraryCache(_songs.value, _albums.value)
+        if (deletedSongs.isNotEmpty()) {
+            removeDeletedSongsFromState(deletedSongs)
         }
+
+        if (mediaStoreUrisNeedingPermission.isNotEmpty()) {
+            val request = MediaStore.createDeleteRequest(context.contentResolver, mediaStoreUrisNeedingPermission.distinct())
+            throw WritePermissionRequiredException(request.intentSender)
+        }
+
         deleted
     }
 
-    suspend fun removeSongsFromLibrary(songs: Collection<Song>): Unit = withContext(Dispatchers.IO) {
-        if (songs.isEmpty()) return@withContext
-        val deletedIds = songs.map { it.id }.toSet()
-        _songs.value = _songs.value.filterNot { it.id in deletedIds }
+    private fun tryDeleteSongDirect(song: Song): Boolean {
+        if (song.onlineSource.isNotBlank()) return false
+        val path = song.path.trim()
+        if (path.startsWith("content://", ignoreCase = true)) {
+            val uri = Uri.parse(path)
+            val documentDeleted = runCatching {
+                DocumentFile.fromSingleUri(context, uri)?.delete() == true
+            }.getOrDefault(false)
+            if (documentDeleted) return true
+            return runCatching { context.contentResolver.delete(uri, null, null) > 0 }.getOrDefault(false)
+        }
+
+        val fileDeleted = runCatching {
+            val file = File(path)
+            file.exists() && file.delete()
+        }.getOrDefault(false)
+        if (fileDeleted) return true
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R && song.id > 0L) {
+            return runCatching {
+                val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
+                context.contentResolver.delete(uri, null, null) > 0
+            }.getOrDefault(false)
+        }
+
+        return false
+    }
+
+    private fun Song.mediaStoreDeleteUriOrNull(): Uri? {
+        if (onlineSource.isNotBlank() || id <= 0L) return null
+        if (path.startsWith("content://", ignoreCase = true) && !path.startsWith("content://media/", ignoreCase = true)) {
+            return null
+        }
+        return ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+    }
+
+    private suspend fun removeDeletedSongsFromState(deletedSongs: Collection<Song>) {
+        val deletedKeys = deletedSongs.map { it.deleteIdentityKey() }.toSet()
+        val deletedIds = deletedSongs.map { it.id }.filter { it > 0L }.toSet()
+        _songs.value = _songs.value.filterNot { song ->
+            (song.id > 0L && song.id in deletedIds) || song.deleteIdentityKey() in deletedKeys
+        }
         _albums.value = _songs.value.toAlbums()
         saveLibraryCache(_songs.value, _albums.value)
+    }
+
+    private fun Song.deleteIdentityKey(): String = "$id|$path"
+
+    suspend fun removeSongsFromLibrary(songs: Collection<Song>): Unit = withContext(Dispatchers.IO) {
+        if (songs.isEmpty()) return@withContext
+        removeDeletedSongsFromState(songs)
         Unit
     }
 
@@ -998,7 +1098,6 @@ class MusicRepository(private val context: Context) {
             ?: "Unknown Artist"
         val mergedAlbum = tagInfo.album.takeIf { it.isUsableAlbumText() }
             ?: album.takeIf { it.isUsableAlbumText() && !it.looksLikeLastFolderName(path) }
-            ?: path.parentFolderName().takeIf { it.isUsableAlbumText() }
             ?: "Unknown Album"
         val mergedAlbumArtist = tagInfo.albumArtist.takeIf { it.isUsableTagText() }
             ?: albumArtist.takeIf { it.isUsableTagText() && !it.isUnknownArtistValue() }
@@ -1023,7 +1122,6 @@ class MusicRepository(private val context: Context) {
     private fun Song.withFinalLibraryFallbacks(): Song {
         val fallbackArtist = artist.takeIf { it.isUsableTagText() } ?: "Unknown Artist"
         val fallbackAlbum = album.takeIf { it.isUsableAlbumText() && !it.looksLikeLastFolderName(path) }
-            ?: path.parentFolderName().takeIf { it.isUsableAlbumText() }
             ?: "Unknown Album"
         return copy(
             title = title.takeIf { it.isUsableTagText() } ?: fileName.substringBeforeLast('.').ifBlank { path.substringAfterLast('/') },

@@ -91,7 +91,8 @@ fun SongMoreActionHost(
     showDelete: Boolean = true,
     showLocalFileActions: Boolean = true,
     resolveSongForAction: (suspend (Song) -> Song)? = null,
-    onDeleteSong: ((Song) -> Unit)? = null
+    onDeleteSong: ((Song) -> Unit)? = null,
+    extraTopContent: (@Composable ColumnScope.() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val defaultDangerText = stringResource(R.string.common_delete)
@@ -182,6 +183,7 @@ fun SongMoreActionHost(
         ) {
             SongMoreActionSheet(
                 song = song,
+                extraTopContent = extraTopContent,
                 onDismiss = ::closeAction,
                 onAddToPlaylist = {
                     closeAction()
@@ -303,7 +305,25 @@ fun SongMoreActionHost(
                             if (onDeleteSong != null) {
                                 onDeleteSong(song)
                             } else if (deleteFromLibrary) {
-                                mainViewModel.deleteSongs(listOf(song))
+                                scope.launch {
+                                    val result = mainViewModel.deleteSongsResult(listOf(song))
+                                    if (result.isSuccess) {
+                                        Toast.makeText(context, context.getString(R.string.library_deleted_songs, 1), Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val error = result.exceptionOrNull()
+                                        if (error is WritePermissionRequiredException) {
+                                            pendingWriteRetry = {
+                                                mainViewModel.removeSongsFromLibrary(listOf(song))
+                                                Toast.makeText(context, context.getString(R.string.library_deleted_songs, 1), Toast.LENGTH_SHORT).show()
+                                            }
+                                            writePermissionLauncher.launch(
+                                                IntentSenderRequest.Builder(error.intentSender).build()
+                                            )
+                                        } else {
+                                            Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_metadata_save_failed), Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
                             } else {
                                 mainViewModel.removeSongsFromLibrary(listOf(song))
                             }
@@ -569,6 +589,7 @@ fun SongMoreActionHost(
 @Composable
 private fun SongMoreActionSheet(
     song: Song,
+    extraTopContent: (@Composable ColumnScope.() -> Unit)?,
     onDismiss: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onAddToQueue: () -> Unit,
@@ -587,6 +608,7 @@ private fun SongMoreActionSheet(
     showSpectrum: Boolean
 ) {
     SongSheetColumn {
+        extraTopContent?.invoke(this)
         SongMenuItem(stringResource(R.string.song_more_add_to_playlist), onAddToPlaylist)
         SongMenuItem(stringResource(R.string.common_add_to_queue), onAddToQueue)
         SongMenuItem(stringResource(R.string.song_more_play_next), onPlayNext)

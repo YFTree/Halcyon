@@ -231,16 +231,6 @@ fun LibrarySearchScreen(
                     if (filter == SearchFilter.Duplicates) query = ""
                 }
             )
-            if (history.isNotEmpty()) {
-                SearchPill(
-                    text = stringResource(R.string.library_search_clear_history),
-                    selected = false,
-                    onClick = {
-                        history = emptyList()
-                        saveSearchHistory(context, emptyList())
-                    }
-                )
-            }
         }
 
         LazyColumn(
@@ -249,7 +239,16 @@ fun LibrarySearchScreen(
         ) {
             if (trimmedQuery.isBlank() && filter != SearchFilter.Duplicates) {
                 if (history.isNotEmpty()) {
-                    item { SearchSectionHeader(stringResource(R.string.library_search_history)) }
+                    item {
+                        SearchSectionHeader(
+                            text = stringResource(R.string.library_search_history),
+                            actionText = stringResource(R.string.library_search_clear_history),
+                            onActionClick = {
+                                history = emptyList()
+                                saveSearchHistory(context, emptyList())
+                            }
+                        )
+                    }
                     items(history, key = { it }) { item ->
                         HistoryRow(
                             text = item,
@@ -378,14 +377,37 @@ private fun SearchPill(text: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SearchSectionHeader(text: String) {
-    Text(
-        text = text,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Bold,
-        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-    )
+private fun SearchSectionHeader(
+    text: String,
+    actionText: String? = null,
+    onActionClick: (() -> Unit)? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 24.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.weight(1f)
+        )
+        if (actionText != null && onActionClick != null) {
+            Text(
+                text = actionText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onActionClick)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+    }
 }
 
 @Composable

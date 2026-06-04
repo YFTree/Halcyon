@@ -115,7 +115,8 @@ private fun splitNames(
             }
         }
 
-    val separatorPattern = (defaultSeparatorPatterns + customSeparators.map { Regex.escape(it) })
+    val separatorPattern = customSeparators
+        .map { Regex.escape(it) }
         .filter { it.isNotBlank() }
         .joinToString("|")
     if (separatorPattern.isBlank()) return listOf(normalized)

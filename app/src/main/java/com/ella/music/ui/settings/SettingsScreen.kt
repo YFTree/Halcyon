@@ -13,7 +13,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -35,7 +34,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,9 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -78,6 +74,7 @@ import java.util.Locale
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Slider
@@ -94,6 +91,8 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import sh.calvin.reorderable.ReorderableColumn
 
 @Composable
 fun SettingsScreen(
@@ -692,6 +691,7 @@ fun SettingsDetailScreen(
     val miniPlayerRightButton by settingsManager.miniPlayerRightButton.collectAsState(initial = 0)
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
     val smoothLyricView by settingsManager.smoothLyricView.collectAsState(initial = false)
+    val lyricSourcePriority by settingsManager.lyricSourcePriority.collectAsState(initial = SettingsManager.DEFAULT_LYRIC_SOURCE_PRIORITY)
     val minDurationSec by settingsManager.minDurationSec.collectAsState(initial = 15)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = true)
@@ -700,10 +700,13 @@ fun SettingsDetailScreen(
     val startupPosterUri by settingsManager.startupPosterUri.collectAsState(initial = "")
     val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
     val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
+    val playerBackgroundEnabled by settingsManager.playerBackgroundEnabled.collectAsState(initial = false)
+    val playerBackgroundUri by settingsManager.playerBackgroundUri.collectAsState(initial = "")
     val hiResLogoEnabled by settingsManager.hiResLogoEnabled.collectAsState(initial = false)
     val hiResLogoUri by settingsManager.hiResLogoUri.collectAsState(initial = "")
     val playerImmersiveCover by settingsManager.playerImmersiveCover.collectAsState(initial = true)
     val transportButtonOutlines by settingsManager.transportButtonOutlines.collectAsState(initial = false)
+    val playlistSpecialEntriesVisible by settingsManager.playlistSpecialEntriesVisible.collectAsState(initial = false)
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val lyricShareCustomInfo by settingsManager.lyricShareCustomInfo.collectAsState(initial = "")
     val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = false)
@@ -726,7 +729,7 @@ fun SettingsDetailScreen(
     val homeHiddenSections by settingsManager.homeHiddenSections.collectAsState(initial = "")
     val homeLibraryTileOrder by settingsManager.homeLibraryTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
     val homeHiddenLibraryTiles by settingsManager.homeHiddenLibraryTiles.collectAsState(initial = "")
-    val homeTilePinButtonsVisible by settingsManager.homeTilePinButtonsVisible.collectAsState(initial = true)
+    val homeTilePinButtonsVisible by settingsManager.homeTilePinButtonsVisible.collectAsState(initial = false)
     val themeLabels = listOf(
         stringResource(R.string.theme_follow_system),
         stringResource(R.string.theme_light),
@@ -889,6 +892,21 @@ fun SettingsDetailScreen(
             } else {
                 context.deletePersistedCustomImage(appWallpaperUri)
                 settingsManager.setAppWallpaperUri(persisted)
+            }
+        }
+    }
+    val playerBackgroundPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        context.persistImageReadPermission(uri)
+        scope.launch {
+            val persisted = context.copyCustomImageIntoApp(uri, "player_background")
+            if (persisted == null) {
+                Toast.makeText(context, context.getString(R.string.settings_custom_image_save_failed), Toast.LENGTH_SHORT).show()
+            } else {
+                context.deletePersistedCustomImage(playerBackgroundUri)
+                settingsManager.setPlayerBackgroundUri(persisted)
             }
         }
     }
@@ -1106,6 +1124,35 @@ fun SettingsDetailScreen(
                                 }
                             )
                         }
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_player_background),
+                            summary = stringResource(R.string.settings_player_background_summary),
+                            checked = playerBackgroundEnabled,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setPlayerBackgroundEnabled(it) }
+                            }
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_player_background_image),
+                            summary = if (playerBackgroundUri.isBlank()) {
+                                stringResource(R.string.settings_custom_image_not_selected)
+                            } else {
+                                stringResource(R.string.settings_custom_image_selected)
+                            },
+                            onClick = { playerBackgroundPicker.launch(arrayOf("image/*")) }
+                        )
+                        if (playerBackgroundUri.isNotBlank()) {
+                            ArrowPreference(
+                                title = stringResource(R.string.settings_custom_image_remove),
+                                summary = stringResource(R.string.settings_custom_image_remove_summary),
+                                onClick = {
+                                    scope.launch {
+                                        context.deletePersistedCustomImage(playerBackgroundUri)
+                                        settingsManager.setPlayerBackgroundUri("")
+                                    }
+                                }
+                            )
+                        }
                         WindowSpinnerPreference(
                             title = stringResource(R.string.settings_category_grid_columns),
                             summary = stringResource(
@@ -1140,6 +1187,14 @@ fun SettingsDetailScreen(
                             checked = showPlayNextInLists,
                             onCheckedChange = {
                                 scope.launch { settingsManager.setShowPlayNextInLists(it) }
+                            }
+                        )
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_playlist_special_entries),
+                            summary = stringResource(R.string.settings_playlist_special_entries_summary),
+                            checked = playlistSpecialEntriesVisible,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setPlaylistSpecialEntriesVisible(it) }
                             }
                         )
                         SwitchPreference(
@@ -1453,6 +1508,34 @@ fun SettingsDetailScreen(
                         checked = smoothLyricView,
                         onCheckedChange = { enabled ->
                             scope.launch { settingsManager.setSmoothLyricView(enabled) }
+                        }
+                    )
+
+                    LyricSourcePriorityBlock(
+                        items = listOf(
+                            LyricSourcePreferenceItem(
+                                id = SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML,
+                                title = stringResource(R.string.settings_lyric_source_embedded_ttml),
+                                summary = stringResource(R.string.settings_lyric_source_embedded_ttml_summary)
+                            ),
+                            LyricSourcePreferenceItem(
+                                id = SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN,
+                                title = stringResource(R.string.settings_lyric_source_embedded_plain),
+                                summary = stringResource(R.string.settings_lyric_source_embedded_plain_summary)
+                            ),
+                            LyricSourcePreferenceItem(
+                                id = SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML,
+                                title = stringResource(R.string.settings_lyric_source_external_ttml),
+                                summary = stringResource(R.string.settings_lyric_source_external_ttml_summary)
+                            ),
+                            LyricSourcePreferenceItem(
+                                id = SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN,
+                                title = stringResource(R.string.settings_lyric_source_external_plain),
+                                summary = stringResource(R.string.settings_lyric_source_external_plain_summary)
+                            )
+                        ).orderedByLyricPriority(lyricSourcePriority),
+                        onOrderChange = { priority ->
+                            scope.launch { settingsManager.setLyricSourcePriority(priority) }
                         }
                     )
 
@@ -2022,6 +2105,12 @@ private data class HomePreferenceItem(
     val summary: String
 )
 
+private data class LyricSourcePreferenceItem(
+    val id: String,
+    val title: String,
+    val summary: String
+)
+
 @Composable
 private fun <T> Flow<T>.collectSettingsState(initialValue: T): State<T> {
     val initial = remember(this) {
@@ -2089,11 +2178,7 @@ private fun HomeDisplayGroup(
     onHiddenIdsChange: (String) -> Unit,
     onOrderChange: (String) -> Unit
 ) {
-    val density = LocalDensity.current
     var manualItems by remember(items.map { it.id }.joinToString(",")) { mutableStateOf(items) }
-    var dragAnchorId by remember { mutableStateOf<String?>(null) }
-    var dragAccumulatedPx by remember { mutableFloatStateOf(0f) }
-    val estimatedRowHeightPx = with(density) { 64.dp.toPx() }
 
     if (title != null) {
         SmallTitle(text = title)
@@ -2121,52 +2206,32 @@ private fun HomeDisplayGroup(
                     }
                 )
             }
-            manualItems.forEach { item ->
+            ReorderableColumn(
+                list = manualItems,
+                onSettle = { fromIndex, toIndex ->
+                    if (fromIndex !in manualItems.indices || toIndex !in manualItems.indices || fromIndex == toIndex) return@ReorderableColumn
+                    manualItems = manualItems.moveItem(fromIndex, toIndex)
+                    onOrderChange(manualItems.joinToString(",") { it.id })
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { _, item, isDragging ->
                 val checked = item.id !in hiddenIds
-                HomeDisplayCheckRow(
-                    item = item,
-                    checked = checked,
-                    dragging = dragAnchorId == item.id,
-                    modifier = Modifier.pointerInput(manualItems, item.id) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = {
-                                dragAnchorId = item.id
-                                dragAccumulatedPx = 0f
-                            },
-                            onDragCancel = {
-                                dragAnchorId = null
-                                dragAccumulatedPx = 0f
-                            },
-                            onDragEnd = {
-                                dragAnchorId = null
-                                dragAccumulatedPx = 0f
-                                onOrderChange(manualItems.joinToString(",") { it.id })
+                ReorderableItem {
+                    HomeDisplayCheckRow(
+                        item = item,
+                        checked = checked,
+                        dragging = isDragging,
+                        modifier = Modifier.longPressDraggableHandle(),
+                        onClick = {
+                            val nextHidden = if (checked) {
+                                hiddenIds + item.id
+                            } else {
+                                hiddenIds - item.id
                             }
-                        ) { change, dragAmount ->
-                            change.consume()
-                            dragAccumulatedPx += dragAmount.y
-                            val activeId = dragAnchorId ?: return@detectDragGesturesAfterLongPress
-                            val steps = (dragAccumulatedPx / estimatedRowHeightPx.coerceAtLeast(1f)).toInt()
-                            if (steps == 0) return@detectDragGesturesAfterLongPress
-                            val fromIndex = manualItems.indexOfFirst { it.id == activeId }
-                            if (fromIndex < 0) return@detectDragGesturesAfterLongPress
-                            val targetIndex = (fromIndex + steps).coerceIn(0, manualItems.lastIndex)
-                            if (targetIndex == fromIndex) return@detectDragGesturesAfterLongPress
-                            manualItems = manualItems.toMutableList().apply {
-                                add(targetIndex, removeAt(fromIndex))
-                            }
-                            dragAccumulatedPx -= (targetIndex - fromIndex) * estimatedRowHeightPx
+                            onHiddenIdsChange(nextHidden.toCsv())
                         }
-                    },
-                    onClick = {
-                        val nextHidden = if (checked) {
-                            hiddenIds + item.id
-                        } else {
-                            hiddenIds - item.id
-                        }
-                        onHiddenIdsChange(nextHidden.toCsv())
-                    }
-                )
+                    )
+                }
             }
         }
     }
@@ -2228,10 +2293,100 @@ private fun HomeDisplayCheckRow(
     )
 }
 
+@Composable
+private fun LyricSourcePriorityBlock(
+    items: List<LyricSourcePreferenceItem>,
+    onOrderChange: (String) -> Unit
+) {
+    var sheetVisible by remember { mutableStateOf(false) }
+    var manualItems by remember(items.map { it.id }.joinToString(",")) { mutableStateOf(items) }
+
+    BasicComponent(
+        title = stringResource(R.string.settings_lyric_source_priority),
+        summary = manualItems.joinToString(" / ") { it.title },
+        modifier = Modifier.clickable { sheetVisible = true }
+    )
+
+    WindowBottomSheet(
+        show = sheetVisible,
+        title = stringResource(R.string.settings_lyric_source_priority),
+        onDismissRequest = { sheetVisible = false }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.settings_lyric_source_priority_summary),
+                fontSize = 13.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+            )
+            ReorderableColumn(
+                list = manualItems,
+                onSettle = { fromIndex, toIndex ->
+                    if (fromIndex !in manualItems.indices || toIndex !in manualItems.indices || fromIndex == toIndex) return@ReorderableColumn
+                    manualItems = manualItems.moveItem(fromIndex, toIndex)
+                    onOrderChange(manualItems.joinToString(",") { it.id })
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { _, item, isDragging ->
+                ReorderableItem {
+                    BasicComponent(
+                        title = item.title,
+                        summary = item.summary,
+                        modifier = Modifier
+                            .background(
+                                if (isDragging) MiuixTheme.colorScheme.primary.copy(alpha = 0.08f) else Color.Transparent,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .longPressDraggableHandle(),
+                        endActions = {
+                            Text(
+                                text = "☰",
+                                fontSize = 16.sp,
+                                color = if (isDragging) {
+                                    MiuixTheme.colorScheme.primary
+                                } else {
+                                    MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                }
+                            )
+                        }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { sheetVisible = false },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+            ) {
+                Text(text = stringResource(R.string.common_done))
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+private fun <T> List<T>.moveItem(from: Int, to: Int): List<T> {
+    if (from !in indices || to !in indices || from == to) return this
+    return toMutableList().apply {
+        add(to, removeAt(from))
+    }
+}
+
 private fun List<HomePreferenceItem>.orderedByCsv(order: String, defaultOrder: String): List<HomePreferenceItem> {
     val byId = associateBy { it.id }
     val orderIds = order.csvIds(defaultOrder)
     return (orderIds.mapNotNull { byId[it] } + filterNot { it.id in orderIds }).distinctBy { it.id }
+}
+
+private fun List<LyricSourcePreferenceItem>.orderedByLyricPriority(priority: String): List<LyricSourcePreferenceItem> {
+    val byId = associateBy { it.id }
+    val ids = SettingsManager.normalizeLyricSourcePriority(priority).split(',')
+    return (ids.mapNotNull { byId[it] } + filterNot { it.id in ids }).distinctBy { it.id }
 }
 
 private fun String.csvIdSet(): Set<String> =

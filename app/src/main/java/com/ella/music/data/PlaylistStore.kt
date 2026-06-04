@@ -373,6 +373,21 @@ class PlaylistStore private constructor(context: Context) {
         }
     }
 
+    suspend fun removeSongsFromPlaylist(playlistId: String, songKeys: Set<String>) = withContext(Dispatchers.IO) {
+        if (songKeys.isEmpty()) return@withContext
+        synchronized(lock) {
+            val now = System.currentTimeMillis()
+            val next = playlists.value.withPlaylist(playlistId) { playlist ->
+                playlist.copy(
+                    songs = playlist.songs.filterNot { it.key in songKeys },
+                    updatedAt = now
+                )
+            }
+            _playlists.value = next
+            saveLocked(next)
+        }
+    }
+
     suspend fun reorderPlaylistSongs(playlistId: String, orderedKeys: List<String>) = withContext(Dispatchers.IO) {
         if (orderedKeys.isEmpty()) return@withContext
         synchronized(lock) {

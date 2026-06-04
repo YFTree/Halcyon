@@ -10,7 +10,8 @@ data class AudioInfo(
     val bitRate: Int = 0,
     val sampleRate: Int = 0,
     val bitDepth: Int = 0,
-    val channels: Int = 0
+    val channels: Int = 0,
+    val replayGainDb: Float? = null
 )
 
 data class SongTagInfo(

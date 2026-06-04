@@ -1,7 +1,11 @@
 package com.ella.music.ui.folder
 
+import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -53,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.exception.WritePermissionRequiredException
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
@@ -124,6 +129,7 @@ fun FolderDetailScreen(
     var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
     var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
     var pendingDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var pendingSystemDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var folderToBlock by remember { mutableStateOf<String?>(null) }
     val sortIndex by mainViewModel.settingsManager.folderDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.folderDetailSongSortIndex)
     val sortMode = FolderSongSortMode.entries.getOrElse(sortIndex) { FolderSongSortMode.Title }
@@ -166,6 +172,40 @@ fun FolderDetailScreen(
     }
 
     val folderName = normalizedFolderPath.substringAfterLast('/')
+    val deleteRequestLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val songsToDelete = pendingSystemDeleteSongs
+        pendingSystemDeleteSongs = emptyList()
+        if (result.resultCode == Activity.RESULT_OK && songsToDelete.isNotEmpty()) {
+            mainViewModel.removeSongsFromLibrary(songsToDelete)
+            Toast.makeText(context, context.getString(R.string.library_deleted_songs, songsToDelete.size), Toast.LENGTH_SHORT).show()
+            selectedIds = emptySet()
+            selectionMode = false
+        } else if (songsToDelete.isNotEmpty()) {
+            Toast.makeText(context, context.getString(R.string.library_delete_cancelled), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun deleteSelectedSongs(songsToDelete: List<Song>) {
+        if (songsToDelete.isEmpty()) return
+        scope.launch {
+            val result = mainViewModel.deleteSongsResult(songsToDelete)
+            if (result.isSuccess) {
+                Toast.makeText(context, context.getString(R.string.library_deleted_songs, songsToDelete.size), Toast.LENGTH_SHORT).show()
+                selectedIds = emptySet()
+                selectionMode = false
+                return@launch
+            }
+            val error = result.exceptionOrNull()
+            if (error is WritePermissionRequiredException) {
+                pendingSystemDeleteSongs = songsToDelete
+                deleteRequestLauncher.launch(IntentSenderRequest.Builder(error.intentSender).build())
+            } else {
+                Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_metadata_save_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     BackHandler(enabled = selectionMode || searchExpanded || sortExpanded || folderToBlock != null) {
         when {
@@ -564,10 +604,9 @@ fun FolderDetailScreen(
             confirmText = stringResource(R.string.song_more_delete_permanently),
             onDismiss = { pendingDeleteSongs = emptyList() },
             onConfirm = {
-                mainViewModel.deleteSongs(pendingDeleteSongs)
+                val songsToDelete = pendingDeleteSongs
                 pendingDeleteSongs = emptyList()
-                selectedIds = emptySet()
-                selectionMode = false
+                deleteSelectedSongs(songsToDelete)
             }
         )
     }

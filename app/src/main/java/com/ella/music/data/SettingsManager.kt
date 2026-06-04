@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "ella_settings")
 
@@ -68,6 +69,7 @@ class SettingsManager(private val context: Context) {
         val KEY_SHUFFLE_MODE = intPreferencesKey("shuffle_mode")
         val KEY_PREVIOUS_BUTTON_ACTION = intPreferencesKey("previous_button_action")
         val KEY_LYRIC_SOURCE_MODE = intPreferencesKey("lyric_source_mode")
+        val KEY_LYRIC_SOURCE_PRIORITY = stringPreferencesKey("lyric_source_priority")
         val KEY_LYRIC_PAGE_TRANSLATION = booleanPreferencesKey("lyric_page_translation")
         val KEY_LYRIC_PAGE_KEEP_SCREEN_ON = booleanPreferencesKey("lyric_page_keep_screen_on")
         val KEY_SMOOTH_LYRIC_VIEW = booleanPreferencesKey("smooth_lyric_view")
@@ -86,8 +88,11 @@ class SettingsManager(private val context: Context) {
         val KEY_STARTUP_POSTER_URI = stringPreferencesKey("startup_poster_uri")
         val KEY_APP_WALLPAPER_ENABLED = booleanPreferencesKey("app_wallpaper_enabled")
         val KEY_APP_WALLPAPER_URI = stringPreferencesKey("app_wallpaper_uri")
+        val KEY_PLAYER_BACKGROUND_ENABLED = booleanPreferencesKey("player_background_enabled")
+        val KEY_PLAYER_BACKGROUND_URI = stringPreferencesKey("player_background_uri")
         val KEY_HI_RES_LOGO_ENABLED = booleanPreferencesKey("hi_res_logo_enabled")
         val KEY_HI_RES_LOGO_URI = stringPreferencesKey("hi_res_logo_uri")
+        val KEY_PLAYLIST_SPECIAL_ENTRIES_VISIBLE = booleanPreferencesKey("playlist_special_entries_visible")
         val KEY_SHOW_PLAY_NEXT_IN_LISTS = booleanPreferencesKey("show_play_next_in_lists")
         val KEY_LYRIC_SHARE_CUSTOM_INFO = stringPreferencesKey("lyric_share_custom_info")
         val KEY_SHOW_ALBUM_ARTISTS = booleanPreferencesKey("show_album_artists")
@@ -164,6 +169,12 @@ class SettingsManager(private val context: Context) {
         const val LYRIC_SOURCE_AUTO = 0
         const val LYRIC_SOURCE_EXTERNAL = 1
         const val LYRIC_SOURCE_EMBEDDED = 2
+        const val LYRIC_SOURCE_EMBEDDED_TTML = "embedded_ttml"
+        const val LYRIC_SOURCE_EMBEDDED_PLAIN = "embedded_plain"
+        const val LYRIC_SOURCE_EXTERNAL_TTML = "external_ttml"
+        const val LYRIC_SOURCE_EXTERNAL_PLAIN = "external_plain"
+        const val DEFAULT_LYRIC_SOURCE_PRIORITY =
+            "$LYRIC_SOURCE_EMBEDDED_TTML,$LYRIC_SOURCE_EMBEDDED_PLAIN,$LYRIC_SOURCE_EXTERNAL_TTML,$LYRIC_SOURCE_EXTERNAL_PLAIN"
 
         const val PLAYER_FLOW_EFFECT_DARK = 0
         const val APP_LANGUAGE_SYSTEM = "system"
@@ -188,6 +199,23 @@ class SettingsManager(private val context: Context) {
         const val DEFAULT_SHORTCUT_FOLDER_LABEL = "文件夹"
         const val DEFAULT_HOME_SECTION_ORDER = "library,online,recent"
         const val DEFAULT_HOME_LIBRARY_TILE_ORDER = "artist,album,folder,folder_tree,playlist,analytics,genre,year,composer,lyricist"
+
+        val LYRIC_SOURCE_PRIORITY_IDS = listOf(
+            LYRIC_SOURCE_EMBEDDED_TTML,
+            LYRIC_SOURCE_EMBEDDED_PLAIN,
+            LYRIC_SOURCE_EXTERNAL_TTML,
+            LYRIC_SOURCE_EXTERNAL_PLAIN
+        )
+
+        fun normalizeLyricSourcePriority(value: String): String {
+            val requested = value
+                .split(',', '，', ';', '；')
+                .map { it.trim().lowercase(Locale.ROOT) }
+                .filter { it in LYRIC_SOURCE_PRIORITY_IDS }
+            return (requested + LYRIC_SOURCE_PRIORITY_IDS)
+                .distinct()
+                .joinToString(",")
+        }
     }
 
     private fun metadataCategorySortKey(type: String): Preferences.Key<Int> =
@@ -258,6 +286,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_PREVIOUS_BUTTON_ACTION] ?: PREVIOUS_BUTTON_PREVIOUS }
     val lyricSourceMode: Flow<Int> =
         context.dataStore.data.map { it[KEY_LYRIC_SOURCE_MODE] ?: LYRIC_SOURCE_AUTO }
+    val lyricSourcePriority: Flow<String> =
+        context.dataStore.data.map {
+            normalizeLyricSourcePriority(it[KEY_LYRIC_SOURCE_PRIORITY] ?: DEFAULT_LYRIC_SOURCE_PRIORITY)
+        }
     val lyricPageTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PAGE_TRANSLATION] ?: true }
     val lyricPageKeepScreenOn: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] ?: false }
@@ -298,10 +330,16 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_APP_WALLPAPER_ENABLED] ?: false }
     val appWallpaperUri: Flow<String> =
         context.dataStore.data.map { it[KEY_APP_WALLPAPER_URI] ?: "" }
+    val playerBackgroundEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_PLAYER_BACKGROUND_ENABLED] ?: false }
+    val playerBackgroundUri: Flow<String> =
+        context.dataStore.data.map { it[KEY_PLAYER_BACKGROUND_URI] ?: "" }
     val hiResLogoEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_HI_RES_LOGO_ENABLED] ?: false }
     val hiResLogoUri: Flow<String> =
         context.dataStore.data.map { it[KEY_HI_RES_LOGO_URI] ?: "" }
+    val playlistSpecialEntriesVisible: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_PLAYLIST_SPECIAL_ENTRIES_VISIBLE] ?: false }
     val showPlayNextInLists: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_SHOW_PLAY_NEXT_IN_LISTS] ?: false }
     val lyricShareCustomInfo: Flow<String> =
@@ -393,7 +431,7 @@ class SettingsManager(private val context: Context) {
     val homeHiddenLibraryTiles: Flow<String> =
         context.dataStore.data.map { it[KEY_HOME_HIDDEN_LIBRARY_TILES] ?: "" }
     val homeTilePinButtonsVisible: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_HOME_TILE_PIN_BUTTONS_VISIBLE] ?: true }
+        context.dataStore.data.map { it[KEY_HOME_TILE_PIN_BUTTONS_VISIBLE] ?: false }
     fun metadataCategorySortIndex(type: String): Flow<Int> =
         context.dataStore.data.map { it[metadataCategorySortKey(type)] ?: 0 }
 
@@ -582,6 +620,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_LYRIC_SOURCE_MODE] = mode.coerceIn(LYRIC_SOURCE_AUTO, LYRIC_SOURCE_EMBEDDED) }
     }
 
+    suspend fun setLyricSourcePriority(priority: String) {
+        context.dataStore.edit { it[KEY_LYRIC_SOURCE_PRIORITY] = normalizeLyricSourcePriority(priority) }
+    }
+
     suspend fun setLyricPageTranslation(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRIC_PAGE_TRANSLATION] = enabled }
     }
@@ -668,6 +710,17 @@ class SettingsManager(private val context: Context) {
         }
     }
 
+    suspend fun setPlayerBackgroundEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_PLAYER_BACKGROUND_ENABLED] = enabled }
+    }
+
+    suspend fun setPlayerBackgroundUri(uri: String) {
+        context.dataStore.edit {
+            val safeUri = uri.trim()
+            if (safeUri.isBlank()) it.remove(KEY_PLAYER_BACKGROUND_URI) else it[KEY_PLAYER_BACKGROUND_URI] = safeUri
+        }
+    }
+
     suspend fun setHiResLogoEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_HI_RES_LOGO_ENABLED] = enabled }
     }
@@ -677,6 +730,10 @@ class SettingsManager(private val context: Context) {
             val safeUri = uri.trim()
             if (safeUri.isBlank()) it.remove(KEY_HI_RES_LOGO_URI) else it[KEY_HI_RES_LOGO_URI] = safeUri
         }
+    }
+
+    suspend fun setPlaylistSpecialEntriesVisible(visible: Boolean) {
+        context.dataStore.edit { it[KEY_PLAYLIST_SPECIAL_ENTRIES_VISIBLE] = visible }
     }
 
     suspend fun setShowPlayNextInLists(enabled: Boolean) {
@@ -1115,6 +1172,7 @@ class SettingsManager(private val context: Context) {
             setString(KEY_OPENAI_API_KEY)
             setString(KEY_OPENAI_BASE_URL)
             setString(KEY_OPENAI_MODEL)
+            setString(KEY_LYRIC_SOURCE_PRIORITY)
             setString(KEY_LYRIC_FONT_NAME)
             setString(KEY_LYRIC_FONT_PATH)
             setString(KEY_LYRIC_SHARE_CUSTOM_INFO)

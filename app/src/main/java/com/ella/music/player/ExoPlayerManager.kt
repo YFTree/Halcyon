@@ -760,11 +760,11 @@ class ExoPlayerManager(private val context: Context) {
             .setDisplayTitle(titleOverride ?: title)
             .setSubtitle(artistOverride ?: artist)
             .setDescription(album)
-            .setDurationMs(duration.takeIf { it > 0L } ?: C.TIME_UNSET)
             .setTrackNumber(trackNumber.takeIf { it > 0 })
             .setDiscNumber(discNumber.takeIf { it > 0 })
             .setExtras(extras)
             .apply {
+                duration.takeIf { it > 0L }?.let(::setDurationMs)
                 if (artworkData != null) {
                     setArtworkData(artworkData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
                 }

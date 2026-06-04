@@ -12,7 +12,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +37,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -54,10 +52,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.FIVE_STAR_PLAYLIST_ID
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
@@ -92,6 +88,8 @@ import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import com.ella.music.ui.components.EllaSmallTopAppBar
@@ -100,9 +98,11 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Download
 import top.yukonga.miuix.kmp.icon.extended.FavoritesFill
 import top.yukonga.miuix.kmp.icon.extended.Playlist
+import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Share
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -111,6 +111,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Composable
 fun PlaylistScreen(
@@ -127,6 +129,7 @@ fun PlaylistScreen(
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val playlistSortIndex by mainViewModel.settingsManager.playlistListSortIndex.collectAsState(initial = 2)
+    val specialPlaylistEntriesVisible by mainViewModel.settingsManager.playlistSpecialEntriesVisible.collectAsState(initial = false)
     val playlistSortMode = PlaylistSortMode.entries.getOrElse(playlistSortIndex) { PlaylistSortMode.UpdatedAt }
     var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var showImportModeSheet by remember { mutableStateOf(false) }
@@ -136,7 +139,7 @@ fun PlaylistScreen(
     val favorites = playlists.firstOrNull { it.id == FAVORITES_PLAYLIST_ID }
     val customPlaylists = remember(playlists, playlistSortMode) {
         playlists
-            .filterNot { it.id == FAVORITES_PLAYLIST_ID }
+            .filterNot { it.id == FAVORITES_PLAYLIST_ID || it.id == FIVE_STAR_PLAYLIST_ID }
             .sortedForPlaylistList(playlistSortMode)
     }
     val displayedCustomPlaylists = remember(customPlaylists, searchQuery) {
@@ -148,12 +151,15 @@ fun PlaylistScreen(
             playlist.id to mainViewModel.playlistSongs(playlist).firstOrNull().playlistCoverModel()
         }
     }
-    val showFavorites = remember(favorites, searchQuery) {
-        favorites != null && (searchQuery.isBlank() || favorites.matchesPlaylistSearch(searchQuery.trim()))
+    val showFavorites = remember(favorites, searchQuery, specialPlaylistEntriesVisible) {
+        specialPlaylistEntriesVisible &&
+            favorites != null &&
+            (searchQuery.isBlank() || favorites.matchesPlaylistSearch(searchQuery.trim()))
     }
     val fiveStarName = stringResource(R.string.playlist_five_star_name)
-    val showFiveStar = remember(searchQuery, fiveStarName) {
-        searchQuery.isBlank() || fiveStarName.contains(searchQuery.trim(), ignoreCase = true)
+    val showFiveStar = remember(searchQuery, fiveStarName, specialPlaylistEntriesVisible) {
+        specialPlaylistEntriesVisible &&
+            (searchQuery.isBlank() || fiveStarName.contains(searchQuery.trim(), ignoreCase = true))
     }
     val fiveStarSongs by produceState(initialValue = emptyList(), librarySongs, ratingRevision) {
         value = mainViewModel.getFiveStarSongs()
@@ -514,18 +520,20 @@ fun PlaylistDetailScreen(
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var removeFromPlaylistSong by remember { mutableStateOf<Song?>(null) }
+    var removeSelectedPlaylistSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var manualOrder by remember(playlist?.id) { mutableStateOf(songs) }
-    var dragAnchorKey by remember { mutableStateOf<String?>(null) }
-    var dragAccumulatedPx by remember { mutableFloatStateOf(0f) }
-    val density = LocalDensity.current
-    var estimatedRowHeightPx by remember { mutableFloatStateOf(with(density) { 76.dp.toPx() }) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedSongKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     val sortedSongs = remember(songs, sortMode) { songs.sortedForPlaylistDetail(sortMode) }
     LaunchedEffect(playlist?.id, songs) {
         manualOrder = songs
+        selectionMode = false
+        selectedSongKeys = emptySet()
     }
     val reorderEnabled = playlist?.isFiveStarRating != true &&
         sortMode == PlaylistSongSortMode.Custom &&
         searchQuery.isBlank()
+    val reorderHandlesVisible = selectionMode && reorderEnabled
     val baseSongs = if (reorderEnabled) manualOrder else sortedSongs
     val displayedSongs by produceState(initialValue = baseSongs, baseSongs, searchQuery, ratingRevision) {
         val query = searchQuery.trim()
@@ -539,8 +547,38 @@ fun PlaylistDetailScreen(
             }
         }
     }
-    BackHandler(enabled = sortExpanded || searchExpanded) {
+    val songListHeaderCount = 2
+    val reorderableLazyListState = rememberReorderableLazyListState(
+        lazyListState = listState,
+        onMove = { from, to ->
+            if (!reorderHandlesVisible) return@rememberReorderableLazyListState
+            val fromSongIndex = from.index - songListHeaderCount
+            val toSongIndex = to.index - songListHeaderCount
+            if (fromSongIndex !in manualOrder.indices || toSongIndex !in manualOrder.indices) return@rememberReorderableLazyListState
+            manualOrder = manualOrder.toMutableList().apply {
+                add(toSongIndex, removeAt(fromSongIndex))
+            }
+        }
+    )
+    fun finishSelectionMode() {
+        selectionMode = false
+        selectedSongKeys = emptySet()
+    }
+    fun toggleSelection(song: Song) {
+        val key = song.playlistIdentityKey()
+        val next = if (key in selectedSongKeys) selectedSongKeys - key else selectedSongKeys + key
+        selectedSongKeys = next
+        if (next.isEmpty()) selectionMode = false
+    }
+    fun selectAllDisplayedSongs() {
+        selectedSongKeys = displayedSongs.mapTo(mutableSetOf()) { it.playlistIdentityKey() }
+        selectionMode = selectedSongKeys.isNotEmpty()
+    }
+    fun selectedDisplayedSongs(): List<Song> =
+        displayedSongs.filter { it.playlistIdentityKey() in selectedSongKeys }
+    BackHandler(enabled = selectionMode || sortExpanded || searchExpanded) {
         when {
+            selectionMode -> finishSelectionMode()
             searchExpanded -> {
                 searchExpanded = false
                 searchQuery = ""
@@ -598,13 +636,14 @@ fun PlaylistDetailScreen(
         Box {
             EllaSmallTopAppBar(
                 title = when {
+                    selectionMode -> "已选择 ${selectedSongKeys.size} 首"
                     playlist == null -> stringResource(R.string.playlist_title)
                     listState.firstVisibleItemIndex > 0 -> playlist.name
                     else -> stringResource(R.string.playlist_title)
                 },
                 color = ellaPageBackground(),
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (selectionMode) finishSelectionMode() else onBack() }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Back,
                             contentDescription = stringResource(R.string.common_back),
@@ -613,33 +652,49 @@ fun PlaylistDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Sort,
-                            contentDescription = stringResource(R.string.common_sort),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = {
-                        searchExpanded = !searchExpanded
-                        if (!searchExpanded) searchQuery = ""
-                    }) {
-                        Icon(
-                            imageVector = MiuixIcons.Basic.Search,
-                            contentDescription = stringResource(R.string.common_search),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    if (playlist != null && !isFiveStarPlaylist) {
-                        IconButton(onClick = { showExportFormatSheet = true }) {
+                    if (selectionMode) {
+                        if (!isFiveStarPlaylist) {
+                            IconButton(onClick = {
+                                val selected = selectedDisplayedSongs()
+                                if (selected.isNotEmpty()) removeSelectedPlaylistSongs = selected
+                            }) {
+                                Icon(
+                                    imageVector = MiuixIcons.Regular.Delete,
+                                    contentDescription = stringResource(R.string.common_delete),
+                                    tint = Color(0xFFE5484D),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        IconButton(onClick = { sortExpanded = !sortExpanded }) {
                             Icon(
-                                imageVector = MiuixIcons.Regular.Share,
-                                contentDescription = stringResource(R.string.playlist_export_title),
+                                imageVector = MiuixIcons.Regular.Sort,
+                                contentDescription = stringResource(R.string.common_sort),
                                 tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(24.dp)
                             )
+                        }
+                        IconButton(onClick = {
+                            searchExpanded = !searchExpanded
+                            if (!searchExpanded) searchQuery = ""
+                        }) {
+                            Icon(
+                                imageVector = MiuixIcons.Basic.Search,
+                                contentDescription = stringResource(R.string.common_search),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        if (playlist != null && !isFiveStarPlaylist) {
+                            IconButton(onClick = { showExportFormatSheet = true }) {
+                                Icon(
+                                    imageVector = MiuixIcons.Regular.Share,
+                                    contentDescription = stringResource(R.string.playlist_export_title),
+                                    tint = MiuixTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -655,7 +710,7 @@ fun PlaylistDetailScreen(
         }
 
         AnimatedVisibility(
-            visible = sortExpanded,
+            visible = sortExpanded && !selectionMode,
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {
@@ -684,7 +739,7 @@ fun PlaylistDetailScreen(
         }
 
         AnimatedVisibility(
-            visible = searchExpanded,
+            visible = searchExpanded && !selectionMode,
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {
@@ -763,101 +818,114 @@ fun PlaylistDetailScreen(
                 }
             } else {
                 itemsIndexed(displayedSongs, key = { _, song -> song.playlistIdentityKey() }) { index, song ->
-                    SongItem(
-                        song = song,
-                        isCurrent = currentSong?.playlistIdentityKey() == song.playlistIdentityKey(),
-                        albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
-                        loadCoverArt = mainViewModel::getCoverArtBitmap,
-                        loadAudioInfo = mainViewModel::getAudioInfo,
-                        isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
-                        loadSongRating = mainViewModel::getSongRating,
-                        ratingRevision = ratingRevision,
-                        onClick = {
-                            playerViewModel.setPlaylist(displayedSongs, index)
-                            if (openPlayerOnPlay) onNavigateToPlayer()
-                        },
-                        onAddToQueue = { playerViewModel.addToPlaylist(song) },
-                        onRemove = if (playlist.isFiveStarRating) null else {
-                            {
-                                removeFromPlaylistSong = song
+                    ReorderableItem(
+                        state = reorderableLazyListState,
+                        key = song.playlistIdentityKey()
+                    ) { isDragging ->
+                        val dragHandleModifier = Modifier.draggableHandle(
+                            onDragStopped = {
+                                mainViewModel.reorderPlaylistSongs(
+                                    playlist.id,
+                                    manualOrder.map { it.playlistIdentityKey() }
+                                )
                             }
-                        },
-                        onMore = { actionSong = song },
-                        leadingLabel = (index + 1).toString(),
-                        leadingLabelBeforeCover = true,
-                        trailingContent = if (reorderEnabled) {
-                            {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .pointerInput(displayedSongs, song.playlistIdentityKey()) {
-                                            detectDragGesturesAfterLongPress(
-                                                onDragStart = {
-                                                    dragAnchorKey = song.playlistIdentityKey()
-                                                    dragAccumulatedPx = 0f
-                                                },
-                                                onDragCancel = {
-                                                    dragAnchorKey = null
-                                                    dragAccumulatedPx = 0f
-                                                },
-                                                onDragEnd = {
-                                                    dragAnchorKey = null
-                                                    dragAccumulatedPx = 0f
-                                                    mainViewModel.reorderPlaylistSongs(
-                                                        playlist.id,
-                                                        manualOrder.map { it.playlistIdentityKey() }
-                                                    )
-                                                }
-                                            ) { change, dragAmount ->
-                                                change.consume()
-                                                dragAccumulatedPx += dragAmount.y
-                                                val activeKey = dragAnchorKey ?: return@detectDragGesturesAfterLongPress
-                                                val rowHeight = estimatedRowHeightPx.coerceAtLeast(1f)
-                                                val steps = (dragAccumulatedPx / rowHeight).toInt()
-                                                if (steps == 0) return@detectDragGesturesAfterLongPress
-                                                val fromIndex = manualOrder.indexOfFirst { it.playlistIdentityKey() == activeKey }
-                                                if (fromIndex < 0) return@detectDragGesturesAfterLongPress
-                                                val targetIndex = (fromIndex + steps).coerceIn(0, manualOrder.lastIndex)
-                                                if (targetIndex == fromIndex) return@detectDragGesturesAfterLongPress
-                                                manualOrder = manualOrder.toMutableList().apply {
-                                                    add(targetIndex, removeAt(fromIndex))
-                                                }
-                                                dragAccumulatedPx -= (targetIndex - fromIndex) * rowHeight
-                                            }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "\u2630",
-                                        fontSize = 16.sp,
-                                        color = if (dragAnchorKey == song.playlistIdentityKey()) {
-                                            MiuixTheme.colorScheme.primary
-                                        } else {
-                                            MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                        }
-                                    )
+                        )
+                        SongItem(
+                            song = song,
+                            isCurrent = currentSong?.playlistIdentityKey() == song.playlistIdentityKey(),
+                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                            loadCoverArt = mainViewModel::getCoverArtBitmap,
+                            loadAudioInfo = mainViewModel::getAudioInfo,
+                            selectionMode = selectionMode,
+                            selected = song.playlistIdentityKey() in selectedSongKeys,
+                            isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
+                            loadSongRating = mainViewModel::getSongRating,
+                            ratingRevision = ratingRevision,
+                            onClick = {
+                                if (selectionMode) {
+                                    toggleSelection(song)
+                                } else {
+                                    playerViewModel.setPlaylist(displayedSongs, index)
+                                    if (openPlayerOnPlay) onNavigateToPlayer()
                                 }
-                            }
-                        } else null,
-                        modifier = Modifier.onSizeChanged { size ->
-                            if (size.height > 0) {
-                                estimatedRowHeightPx = size.height.toFloat()
-                            }
-                        }
-                    )
+                            },
+                            onLongClick = {
+                                selectionMode = true
+                                selectedSongKeys = selectedSongKeys + song.playlistIdentityKey()
+                            },
+                            onAddToQueue = { playerViewModel.addToPlaylist(song) },
+                            onRemove = if (playlist.isFiveStarRating) null else {
+                                {
+                                    removeFromPlaylistSong = song
+                                }
+                            },
+                            onMore = { actionSong = song },
+                            leadingLabel = (index + 1).toString(),
+                            leadingLabelBeforeCover = true,
+                            trailingContent = if (reorderHandlesVisible) {
+                                {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(
+                                                if (isDragging) {
+                                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                                } else {
+                                                    Color.Transparent
+                                                }
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "\u2630",
+                                            fontSize = 16.sp,
+                                            color = if (isDragging) {
+                                                MiuixTheme.colorScheme.primary
+                                            } else {
+                                                MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                            }
+                                        )
+                                    }
+                                }
+                            } else null,
+                            showTrailingContentInSelectionMode = reorderHandlesVisible,
+                            modifier = if (reorderHandlesVisible) dragHandleModifier else Modifier
+                        )
+                    }
                 }
             }
             }
 
             LocateCurrentSongFloatingButton(
                 listState = listState,
-                currentItemIndex = currentSongItemIndex,
+                currentItemIndex = if (selectionMode) -1 else currentSongItemIndex,
                 locateRequest = locateCurrentSongRequest,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 22.dp, bottom = 118.dp)
             )
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = selectionMode && displayedSongs.isNotEmpty(),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 22.dp, bottom = 118.dp)
+            ) {
+                FloatingActionButton(
+                    onClick = { selectAllDisplayedSongs() },
+                    minWidth = 46.dp,
+                    minHeight = 46.dp,
+                    containerColor = MiuixTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.SelectAll,
+                        contentDescription = stringResource(R.string.common_select_all),
+                        tint = MiuixTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
+            }
 
             SongMoreActionHost(
                 actionSong = actionSong,
@@ -881,6 +949,24 @@ fun PlaylistDetailScreen(
                     onConfirm = {
                         mainViewModel.removeSongFromPlaylist(playlist.id, song.playlistIdentityKey())
                         removeFromPlaylistSong = null
+                    }
+                )
+            }
+
+            if (removeSelectedPlaylistSongs.isNotEmpty()) {
+                ConfirmDangerDialog(
+                    show = true,
+                    title = stringResource(R.string.playlist_remove_selected_title),
+                    message = stringResource(R.string.playlist_remove_selected_message, removeSelectedPlaylistSongs.size),
+                    confirmText = stringResource(R.string.common_remove),
+                    onDismiss = { removeSelectedPlaylistSongs = emptyList() },
+                    onConfirm = {
+                        mainViewModel.removeSongsFromPlaylist(
+                            playlist.id,
+                            removeSelectedPlaylistSongs.mapTo(mutableSetOf()) { it.playlistIdentityKey() }
+                        )
+                        removeSelectedPlaylistSongs = emptyList()
+                        finishSelectionMode()
                     }
                 )
             }
@@ -1177,7 +1263,8 @@ private fun PlaylistRow(
                 onClick = onClick,
                 onLongClick = onLongClick
             ),
-        cornerRadius = 16.dp
+        cornerRadius = 16.dp,
+        colors = CardDefaults.defaultColors(color = wallpaperAwarePlaylistCardColor())
     ) {
         Row(
             modifier = Modifier
@@ -1395,6 +1482,7 @@ private fun ImportModeItem(
     Card(
         modifier = Modifier.fillMaxWidth(),
         cornerRadius = 14.dp,
+        colors = CardDefaults.defaultColors(color = wallpaperAwarePlaylistCardColor(alpha = 0.50f)),
         onClick = onClick
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
@@ -1411,5 +1499,18 @@ private fun ImportModeItem(
                 modifier = Modifier.padding(top = 3.dp)
             )
         }
+    }
+}
+
+@Composable
+private fun wallpaperAwarePlaylistCardColor(alpha: Float = 0.42f): Color {
+    val context = LocalContext.current
+    val settingsManager = remember(context) { SettingsManager(context) }
+    val wallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
+    val wallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
+    return if (wallpaperEnabled && wallpaperUri.isNotBlank()) {
+        MiuixTheme.colorScheme.surfaceContainer.copy(alpha = alpha)
+    } else {
+        MiuixTheme.colorScheme.surfaceContainer
     }
 }

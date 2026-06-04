@@ -63,6 +63,8 @@
     <string name="common_close">关闭</string>
     <string name="common_clear">清空</string>
     <string name="common_done">完成</string>
+    <string name="common_move_up">上移</string>
+    <string name="common_move_down">下移</string>
     <string name="common_delete">删除</string>
     <string name="common_remove">移除</string>
     <string name="common_save">保存</string>
@@ -577,6 +579,7 @@
     <string name="library_search_lyric_prefix">歌词：</string>
     <string name="rating_filter_all">全部星级</string>
     <string name="rating_filter_star">%1$d 星</string>
+    <string name="favorite_filter">喜欢</string>
     <string name="library_select_songs_first">请先选择歌曲</string>
 
     <string name="settings_home_display">首页显示</string>
@@ -591,6 +594,9 @@
     <string name="settings_app_wallpaper">全局自定义壁纸</string>
     <string name="settings_app_wallpaper_summary">在音乐库、专辑、歌单、文件夹等页面背后显示自定义壁纸</string>
     <string name="settings_app_wallpaper_image">选择壁纸图片</string>
+    <string name="settings_player_background">播放页自定义背景</string>
+    <string name="settings_player_background_summary">仅在平板横屏播放页和手机非沉浸播放页显示</string>
+    <string name="settings_player_background_image">选择播放页背景图片</string>
     <string name="settings_hi_res_logo">Hi-Res 封面标识</string>
     <string name="settings_hi_res_logo_summary">非沉浸播放页中，Hi-Res 音质歌曲的封面右下角显示小标识</string>
     <string name="settings_hi_res_logo_image">选择 Hi-Res 标识图片</string>
@@ -602,6 +608,8 @@
     <string name="settings_custom_image_save_failed">保存自定义图片失败</string>
     <string name="settings_player_immersive_cover">沉浸专辑封面</string>
     <string name="settings_player_immersive_cover_summary">开启后播放页封面延伸到顶部；关闭后使用收敛的圆角封面布局</string>
+    <string name="settings_playlist_special_entries">歌单页显示喜欢和五星入口</string>
+    <string name="settings_playlist_special_entries_summary">关闭后歌单页只显示自定义歌单；喜欢和星级可在音乐库筛选</string>
     <string name="settings_lyric_font">歌词字体</string>
     <string name="settings_system_default">系统默认</string>
     <string name="settings_home_customize">首页自定义</string>
@@ -643,6 +651,16 @@
     <string name="settings_mini_player_lyrics_summary">播放时在迷你播放条显示当前歌词；关闭后显示歌曲标题和歌手</string>
     <string name="settings_smooth_lyric_view">启用更流畅的歌词</string>
     <string name="settings_smooth_lyric_view_summary">歌词页使用 Lyricon 的流畅歌词视图渲染</string>
+    <string name="settings_lyric_source_priority">歌词来源优先级</string>
+    <string name="settings_lyric_source_priority_summary">打开后长按条目拖动调整读取顺序</string>
+    <string name="settings_lyric_source_embedded_ttml">TTML Lyrics 内嵌</string>
+    <string name="settings_lyric_source_embedded_ttml_summary">优先读取音频标签里的 TTML LYRICS</string>
+    <string name="settings_lyric_source_embedded_plain">Lyrics 内嵌</string>
+    <string name="settings_lyric_source_embedded_plain_summary">读取音频标签里的 LYRICS/SYNCEDLYRICS</string>
+    <string name="settings_lyric_source_external_ttml">TTML 外挂</string>
+    <string name="settings_lyric_source_external_ttml_summary">读取同名 .ttml 歌词文件</string>
+    <string name="settings_lyric_source_external_plain">LRC 外挂</string>
+    <string name="settings_lyric_source_external_plain_summary">读取同名 .lrc/.elrc 歌词文件</string>
     <string name="settings_mini_player_translation">迷你播放条显示翻译</string>
     <string name="settings_mini_player_translation_summary">播放栏显示歌词时同时显示翻译</string>
     <string name="settings_mini_player_secondary">迷你播放条副行内容</string>
@@ -799,6 +817,8 @@
     <string name="playlist_empty_songs">这个歌单还没有歌曲</string>
     <string name="playlist_remove_song_title">从歌单移除</string>
     <string name="playlist_remove_song_message">确定要从「%1$s」移除《%2$s》吗？不会删除本地文件。</string>
+    <string name="playlist_remove_selected_title">从歌单移除</string>
+    <string name="playlist_remove_selected_message">确定要从当前歌单移除已选的 %1$d 首歌曲吗？不会删除本地文件。</string>
     <string name="playlist_detail_summary">%1$d 首歌曲 · %2$s · %3$s</string>
     <string name="playlist_sort_custom">自定义</string>
     <string name="playlist_sort_custom_desc">自定义倒序</string>

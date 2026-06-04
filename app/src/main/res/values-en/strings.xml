@@ -63,6 +63,8 @@
     <string name="common_close">Close</string>
     <string name="common_clear">Clear</string>
     <string name="common_done">Done</string>
+    <string name="common_move_up">Move up</string>
+    <string name="common_move_down">Move down</string>
     <string name="common_delete">Delete</string>
     <string name="common_remove">Remove</string>
     <string name="common_save">Save</string>
@@ -557,6 +559,7 @@
     <string name="library_search_lyric_prefix">Lyrics: </string>
     <string name="rating_filter_all">All ratings</string>
     <string name="rating_filter_star">%1$d stars</string>
+    <string name="favorite_filter">Favorites</string>
     <string name="library_select_songs_first">Select songs first</string>
 
     <string name="settings_home_display">Home display</string>
@@ -571,14 +574,22 @@
     <string name="settings_app_wallpaper">Global custom wallpaper</string>
     <string name="settings_app_wallpaper_summary">Show a custom wallpaper behind library, album, playlist, folder, and similar pages</string>
     <string name="settings_app_wallpaper_image">Choose wallpaper image</string>
+    <string name="settings_player_background">Custom player background</string>
+    <string name="settings_player_background_summary">Only shown on tablet landscape player pages and phone non-immersive player pages</string>
+    <string name="settings_player_background_image">Choose player background image</string>
     <string name="settings_hi_res_logo">Hi-Res cover badge</string>
     <string name="settings_hi_res_logo_summary">Show a small badge at the bottom-right of the non-immersive player cover for Hi-Res tracks</string>
     <string name="settings_hi_res_logo_image">Choose Hi-Res badge image</string>
     <string name="settings_hi_res_logo_default">Uses the built-in Hi-Res badge when no image is selected</string>
     <string name="settings_custom_image_selected">Custom image selected</string>
     <string name="settings_custom_image_not_selected">No image selected</string>
+    <string name="settings_custom_image_remove">Remove custom image</string>
+    <string name="settings_custom_image_remove_summary">Restore the unselected state and delete the image copy saved in Ella</string>
+    <string name="settings_custom_image_save_failed">Failed to save custom image</string>
     <string name="settings_player_immersive_cover">Immersive album cover</string>
     <string name="settings_player_immersive_cover_summary">Extend the album cover to the top of the player; disable it to use the compact rounded cover layout</string>
+    <string name="settings_playlist_special_entries">Show Favorites and Five-star entries on playlist page</string>
+    <string name="settings_playlist_special_entries_summary">When off, the playlist page only shows custom playlists; favorites and ratings stay available as library filters</string>
     <string name="settings_lyric_font">Lyric font</string>
     <string name="settings_system_default">System default</string>
     <string name="settings_home_customize">Home customization</string>
@@ -618,6 +629,18 @@
     <string name="settings_tag_ignore_case_summary">Merge tags that differ only by letter case, such as LiSA and LISA</string>
     <string name="settings_mini_player_lyrics">Show lyrics in mini player</string>
     <string name="settings_mini_player_lyrics_summary">Show the current lyric in the mini player while playing; disable it to show the song title and artist</string>
+    <string name="settings_smooth_lyric_view">Enable smoother lyrics</string>
+    <string name="settings_smooth_lyric_view_summary">Use the Lyricon smooth lyric view on the lyric page</string>
+    <string name="settings_lyric_source_priority">Lyric source priority</string>
+    <string name="settings_lyric_source_priority_summary">Open it, then long press and drag an item to adjust the loading order</string>
+    <string name="settings_lyric_source_embedded_ttml">TTML Lyrics embedded</string>
+    <string name="settings_lyric_source_embedded_ttml_summary">Read TTML LYRICS from audio tags first</string>
+    <string name="settings_lyric_source_embedded_plain">Lyrics embedded</string>
+    <string name="settings_lyric_source_embedded_plain_summary">Read LYRICS/SYNCEDLYRICS from audio tags</string>
+    <string name="settings_lyric_source_external_ttml">TTML external</string>
+    <string name="settings_lyric_source_external_ttml_summary">Read matching .ttml lyric files</string>
+    <string name="settings_lyric_source_external_plain">LRC external</string>
+    <string name="settings_lyric_source_external_plain_summary">Read matching .lrc/.elrc lyric files</string>
     <string name="settings_mini_player_translation">Show translation in mini player</string>
     <string name="settings_mini_player_translation_summary">Show lyric translation when the mini player is displaying lyrics</string>
     <string name="settings_mini_player_secondary">Mini player secondary line</string>
@@ -771,6 +794,8 @@
     <string name="playlist_empty_songs">This playlist does not contain any songs yet</string>
     <string name="playlist_remove_song_title">Remove from playlist</string>
     <string name="playlist_remove_song_message">Remove “%2$s” from “%1$s”? The local file will not be deleted.</string>
+    <string name="playlist_remove_selected_title">Remove from playlist</string>
+    <string name="playlist_remove_selected_message">Remove the selected %1$d songs from this playlist? Local files will not be deleted.</string>
     <string name="playlist_detail_summary">%1$d songs · %2$s · %3$s</string>
     <string name="playlist_sort_custom">Custom</string>
     <string name="playlist_sort_custom_desc">Custom reversed</string>

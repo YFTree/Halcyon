@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.SettingsManager
 import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.SongPlaybackStats
 import com.ella.music.data.audioQualitySummary
@@ -61,6 +62,7 @@ import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -280,7 +282,10 @@ private fun ListenHeatmapCard(dailyListenMs: Map<String, Long>) {
     val days = remember(dailyListenMs) { recentDateKeys(56) }
     val maxMs = days.maxOfOrNull { dailyListenMs[it] ?: 0L }?.coerceAtLeast(1L) ?: 1L
     val todayListenMs = days.lastOrNull()?.let { dailyListenMs[it] } ?: 0L
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = analyticsWallpaperCardColors()
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = stringResource(R.string.analytics_heatmap_title),
@@ -361,6 +366,7 @@ private fun HistoryCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        colors = analyticsWallpaperCardColors(),
         onClick = onClick
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -460,7 +466,8 @@ private fun DateChip(
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier.widthIn(min = 88.dp)
+        modifier = Modifier.widthIn(min = 88.dp),
+        colors = analyticsWallpaperCardColors(alpha = 0.42f)
     ) {
         Column(
             modifier = Modifier
@@ -494,7 +501,10 @@ private fun SummaryCard(
     val context = LocalContext.current
     val listenedMs = playbackStats.sumOf { it.listenedMs }
     val playCount = playbackStats.sumOf { it.playCount }
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = analyticsWallpaperCardColors()
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = stringResource(R.string.analytics_overview),
@@ -520,7 +530,10 @@ private fun DonutChartCard(
     totalSizeBytes: Long,
     palette: List<Color>
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = analyticsWallpaperCardColors()
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = title,
@@ -658,7 +671,10 @@ private fun RankingCard(
     mainViewModel: MainViewModel,
     valueText: (SongPlaybackStats) -> String
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = analyticsWallpaperCardColors()
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = title,
@@ -786,6 +802,23 @@ private fun StatLine(label: String, value: String) {
             fontWeight = FontWeight.Medium,
             color = MiuixTheme.colorScheme.onSurface
         )
+    }
+}
+
+@Composable
+private fun analyticsWallpaperCardColors(alpha: Float = 0.42f) =
+    CardDefaults.defaultColors(color = analyticsWallpaperCardColor(alpha))
+
+@Composable
+private fun analyticsWallpaperCardColor(alpha: Float): Color {
+    val context = LocalContext.current
+    val settingsManager = remember(context) { SettingsManager(context) }
+    val wallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
+    val wallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
+    return if (wallpaperEnabled && wallpaperUri.isNotBlank()) {
+        MiuixTheme.colorScheme.surfaceContainer.copy(alpha = alpha)
+    } else {
+        MiuixTheme.colorScheme.surfaceContainer
     }
 }
 

@@ -152,6 +152,7 @@ fun LibraryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var ratingFilter by remember { mutableStateOf(0) }
+    var favoriteFilter by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
     val sortIndex by settingsManager.librarySongSortIndex.collectAsState(initial = LibrarySortUiState.librarySongSortIndex)
     val sortMode = HomeSortMode.entries.getOrElse(sortIndex) { HomeSortMode.Title }
@@ -242,13 +243,17 @@ fun LibraryScreen(
         songs,
         searchQuery,
         ratingFilter,
+        favoriteFilter,
+        favoriteSongKeys,
         ratingRevision
     ) {
         val query = searchQuery.trim()
+        val favoriteKeys = favoriteSongKeys
         value = withContext(Dispatchers.IO) {
             songs.filter { song ->
                 val ratingMatched = ratingFilter <= 0 || mainViewModel.getSongRating(song) == ratingFilter
                 if (!ratingMatched) return@filter false
+                if (favoriteFilter && song.playlistIdentityKey() !in favoriteKeys) return@filter false
                 query.isBlank() || mainViewModel.songMatchesSearchSnapshot(song, query)
             }
         }
@@ -310,6 +315,24 @@ fun LibraryScreen(
                                         } else {
                                             MiuixTheme.colorScheme.onSurface
                                         }
+                                    )
+                                }
+                                IconButton(onClick = { favoriteFilter = !favoriteFilter }) {
+                                    Icon(
+                                        painter = painterResource(
+                                            id = if (favoriteFilter) {
+                                                R.drawable.ic_notification_favorite_filled
+                                            } else {
+                                                R.drawable.ic_notification_favorite
+                                            }
+                                        ),
+                                        contentDescription = stringResource(R.string.favorite_filter),
+                                        tint = if (favoriteFilter) {
+                                            Color(0xFFFF4D6D)
+                                        } else {
+                                            MiuixTheme.colorScheme.onSurface
+                                        },
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
                             }
@@ -390,7 +413,7 @@ fun LibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                startPadding = if (!selectionMode && songs.isNotEmpty()) 112.dp else 56.dp
+                startPadding = if (!selectionMode && songs.isNotEmpty()) 160.dp else 56.dp
             )
         }
 
@@ -544,7 +567,11 @@ fun LibraryScreen(
                             stringResource(
                                 R.string.library_song_count_sorted,
                                 sortedSongs.size,
-                                stringResource(sortMode.labelRes)
+                                listOfNotNull(
+                                    stringResource(sortMode.labelRes),
+                                    stringResource(R.string.rating_filter_star, ratingFilter).takeIf { ratingFilter > 0 },
+                                    stringResource(R.string.favorite_filter).takeIf { favoriteFilter }
+                                ).joinToString(" · ")
                             )
                         },
                         fontSize = 13.sp,

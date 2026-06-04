@@ -140,12 +140,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        requestNotificationPermissionIfNeeded()
     }
-
-    private val requestNotificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {}
 
     private var mainViewModel: MainViewModel? = null
     private var appliedLanguageTag: String? = null
@@ -247,10 +242,7 @@ class MainActivity : ComponentActivity() {
         return if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
             requestPermissionLauncher.launch(permission)
             false
-        } else {
-            requestNotificationPermissionIfNeeded()
-            true
-        }
+        } else true
     }
 
     private fun applySavedAppLanguage() {
@@ -273,18 +265,6 @@ class MainActivity : ComponentActivity() {
             return true
         }
         return false
-    }
-
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
     }
 
     private companion object {
@@ -550,15 +530,15 @@ fun EllaApp(
                             Brush.verticalGradient(
                                 colors = if (isDarkTheme) {
                                     listOf(
-                                        ComposeColor.Black.copy(alpha = 0.62f),
-                                        ComposeColor.Black.copy(alpha = 0.46f),
-                                        ComposeColor.Black.copy(alpha = 0.68f)
+                                        ComposeColor.Black.copy(alpha = 0.32f),
+                                        ComposeColor.Black.copy(alpha = 0.22f),
+                                        ComposeColor.Black.copy(alpha = 0.40f)
                                     )
                                 } else {
                                     listOf(
-                                        ComposeColor.White.copy(alpha = 0.54f),
-                                        ComposeColor.White.copy(alpha = 0.42f),
-                                        ComposeColor.White.copy(alpha = 0.62f)
+                                        ComposeColor.White.copy(alpha = 0.28f),
+                                        ComposeColor.White.copy(alpha = 0.18f),
+                                        ComposeColor.White.copy(alpha = 0.34f)
                                     )
                                 }
                             )

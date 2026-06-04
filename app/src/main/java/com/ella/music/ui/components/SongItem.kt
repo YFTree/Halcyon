@@ -68,6 +68,7 @@ fun SongItem(
     loadSongRating: ((Song) -> Int)? = null,
     ratingRevision: Int = 0,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
+    showTrailingContentInSelectionMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -79,7 +80,7 @@ fun SongItem(
         value = withContext(Dispatchers.IO) { loadAudioInfo?.invoke(song) }
     }
     val preferEmbeddedCover = song.fileName.substringAfterLast('.', song.path.substringAfterLast('.'))
-        .lowercase() in setOf("wav", "wave", "aif", "aiff")
+        .lowercase() in setOf("m4a", "mp4", "alac", "flac", "wav", "wave", "aif", "aiff")
     val shouldLoadEmbeddedCover = song.coverUrl.isBlank() &&
         loadCoverArt != null &&
         (albumArtUri == null || preferEmbeddedCover)
@@ -300,7 +301,7 @@ fun SongItem(
                 )
             }
         }
-        if (!selectionMode && trailingContent != null) {
+        if ((showTrailingContentInSelectionMode || !selectionMode) && trailingContent != null) {
             Spacer(modifier = Modifier.width(8.dp))
             trailingContent()
         }

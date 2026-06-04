@@ -87,6 +87,7 @@ fun SmoothLyricView(
     lyrics: List<LyricLine>,
     currentIndex: Int,
     currentPositionMs: Long,
+    isPlaying: Boolean,
     showTranslation: Boolean,
     showPronunciation: Boolean = true,
     modifier: Modifier = Modifier,
@@ -94,6 +95,7 @@ fun SmoothLyricView(
     fontPath: String = "",
     fontWeight: FontWeight = FontWeight.ExtraBold,
     onLineClick: (LyricLine) -> Unit = {},
+    onLineDoubleClick: () -> Unit = {},
     onLineLongClick: (LyricLine) -> Unit = {}
 ) {
     if (lyrics.isEmpty()) {
@@ -114,8 +116,8 @@ fun SmoothLyricView(
     val lyricTypeface = remember(fontPath, fontWeight) {
         fontPath.toAndroidTypeface(fontWeight.weight, boldFallback = true)
     }
-    val secondaryTypeface = remember(fontPath) {
-        fontPath.toAndroidTypeface(400, boldFallback = false)
+    val secondaryTypeface = remember(fontPath, fontWeight) {
+        fontPath.toAndroidTypeface((fontWeight.weight - 200).coerceIn(100, 900), boldFallback = false)
     }
     val style = remember(fontScale, density.fontScale, lyricTypeface, secondaryTypeface) {
         RichLyricLineConfig(
@@ -125,7 +127,7 @@ fun SmoothLyricView(
                 typeface = lyricTypeface
             ),
             secondary = TextConfig(
-                textSize = with(density) { (20.sp * fontScale).toPx() },
+                textSize = with(density) { (15.sp * fontScale).toPx() },
                 textColor = intArrayOf(android.graphics.Color.argb(190, 255, 255, 255)),
                 typeface = secondaryTypeface
             ),
@@ -134,7 +136,7 @@ fun SmoothLyricView(
                 backgroundColor = intArrayOf(android.graphics.Color.argb(88, 255, 255, 255))
             ),
             placeholderFormat = PlaceholderFormat.NAME_ARTIST,
-            enableAnim = true
+            enableAnim = false
         )
     }
 
@@ -146,6 +148,7 @@ fun SmoothLyricView(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT
                 )
+                setPadding(0, 0, 0, 0)
             }
         },
         update = { view ->
@@ -154,8 +157,12 @@ fun SmoothLyricView(
                 view.tag = lyriconSong
             }
             view.setStyle(style)
-            view.setNonCurrentLineBlurEnabled(false)
+            view.setNonCurrentLineBlurEnabled(true)
             view.setEdgeFadeEnabled(false)
+            view.setLineAlphaAnimationsEnabled(false)
+            view.setContinuousFrameUpdatesEnabled(true)
+            view.setPlaybackActive(isPlaying)
+            view.setPronunciationAboveMainEnabled(true)
             view.updateAnchorOffset(-view.height * 0.12f)
             view.updateDisplayTranslation(showTranslation, showPronunciation)
             view.onLineClickListener = object : RawsLyricView.OnLineClickListener {
@@ -163,6 +170,9 @@ fun SmoothLyricView(
                     val line = lyrics.minByOrNull { kotlin.math.abs(it.timeMs - beginMs) }
                     if (line != null) onLineClick(line)
                 }
+            }
+            view.onLineDoubleClickListener = RawsLyricView.OnLineDoubleClickListener {
+                onLineDoubleClick()
             }
             view.onLineLongClickListener = RawsLyricView.OnLineLongClickListener { beginMs ->
                 val line = lyrics.minByOrNull { kotlin.math.abs(it.timeMs - beginMs) }
@@ -710,15 +720,7 @@ private fun WordTimedText(
             fontFamily = fontFamily,
             fontWeight = fontWeight,
             textAlign = textAlign,
-            shadow = if (isActive) {
-                Shadow(
-                    color = Color.White.copy(alpha = 0.42f),
-                    offset = Offset.Zero,
-                    blurRadius = 18f
-                )
-            } else {
-                null
-            }
+            shadow = null
         ),
         maxLines = maxLines,
         softWrap = true,
@@ -750,10 +752,14 @@ private fun buildWordTimedAnnotatedString(
                     color = inactiveFutureColor,
                     fontWeight = fontWeight
                 )
-                positionMs <= word.endMs -> SpanStyle(
-                    color = currentWordColor,
-                    fontWeight = activeFontWeight
-                )
+                positionMs <= word.endMs -> {
+                    val sustainShadow = word.sustainShadowAt(positionMs)
+                    SpanStyle(
+                        color = currentWordColor,
+                        fontWeight = activeFontWeight,
+                        shadow = sustainShadow
+                    )
+                }
                 else -> SpanStyle(
                     color = baseColor,
                     fontWeight = activeFontWeight
@@ -765,7 +771,7 @@ private fun buildWordTimedAnnotatedString(
                 val activeCharCount = (wordText.length * progress).toInt().coerceIn(0, wordText.length)
                 val leadCount = if (progress > 0f) activeCharCount.coerceAtLeast(1) else activeCharCount
                 if (leadCount > 0) {
-                    pushStyle(SpanStyle(color = currentWordColor, fontWeight = activeFontWeight))
+                    pushStyle(SpanStyle(color = currentWordColor, fontWeight = activeFontWeight, shadow = word.sustainShadowAt(positionMs)))
                     append(wordText.take(leadCount))
                     pop()
                 }
@@ -781,6 +787,26 @@ private fun buildWordTimedAnnotatedString(
             }
         }
     }
+}
+
+private fun LyricWord.sustainShadowAt(positionMs: Long): Shadow? {
+    val duration = endMs - startMs
+    if (duration < 900L || positionMs !in startMs..endMs) return null
+    val triggerDelay = minOf(420L, (duration * 0.36f).toLong().coerceAtLeast(1L))
+    val elapsed = (positionMs - startMs).coerceIn(0L, duration)
+    if (elapsed < triggerDelay || elapsed >= duration) return null
+    val progress = ((elapsed - triggerDelay).toFloat() / (duration - triggerDelay).coerceAtLeast(1L)).coerceIn(0f, 1f)
+    val edgeFade = when {
+        progress < 0.18f -> progress / 0.18f
+        progress > 0.82f -> (1f - progress) / 0.18f
+        else -> 1f
+    }.coerceIn(0f, 1f)
+    if (edgeFade <= 0f) return null
+    return Shadow(
+        color = Color.White.copy(alpha = 0.42f * edgeFade),
+        offset = Offset.Zero,
+        blurRadius = 18f * edgeFade
+    )
 }
 
 @Composable
@@ -906,7 +932,7 @@ private fun List<LyricLine>.toLyriconSong(
             isAlignedRight = line.agent.equals("v2", ignoreCase = true),
             text = line.text.ifBlank { "♪" },
             words = line.words.toLyriconWords().ifEmpty { null },
-            secondary = line.backgroundText?.takeIf { it.isNotBlank() },
+            secondary = line.displaySmoothSecondaryBlockText(),
             secondaryWords = line.backgroundWords.toLyriconWords().ifEmpty { null },
             translation = line.displayTranslationText(),
             roma = line.displayPronunciationText()
@@ -939,6 +965,7 @@ private fun LyricLine.isBackgroundVisibleAt(positionMs: Long): Boolean {
 private val LYRIC_EDGE_GUARD_DP = 10.dp
 
 private const val USER_BROWSING_TIMEOUT_MS = 3_600L
+private const val SMOOTH_SECONDARY_TRANSLATION_SEPARATOR = "\u000B"
 
 @Composable
 private fun InterludeDots(
@@ -1020,6 +1047,16 @@ private fun LyricLine.displayTranslationText(): String? {
     val value = translation?.takeIf { it.isNotBlank() } ?: return null
     if (pronunciation.isNullOrBlank() && isLikelyRomanizationSecondary(text, value)) return null
     return value
+}
+
+private fun LyricLine.displaySmoothSecondaryBlockText(): String? {
+    val background = backgroundText?.takeIf { it.isNotBlank() } ?: return null
+    val translation = displayBackgroundTranslationText()
+    return if (translation.isNullOrBlank()) {
+        background
+    } else {
+        "$background$SMOOTH_SECONDARY_TRANSLATION_SEPARATOR$translation"
+    }
 }
 
 private fun LyricLine.displayBackgroundTranslationText(): String? {

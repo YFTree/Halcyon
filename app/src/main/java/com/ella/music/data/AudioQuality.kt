@@ -1,6 +1,7 @@
 package com.ella.music.data
 
 import com.ella.music.data.model.AudioInfo
+import java.util.Locale
 
 data class AudioQualitySummary(
     val compactLabel: String,
@@ -98,7 +99,10 @@ private fun detailedAudioInfo(info: AudioInfo, bitDepth: Int): String {
     } else {
         "%.1fkHz".format(info.sampleRate / 1000f)
     }
-    if (bitDepth > 0) parts += "${bitDepth}bit"
+    if (bitDepth > 0) parts += "${bitDepth}bits"
     if (info.channels > 0) parts += "${info.channels}ch"
-    return parts.joinToString("/")
+    info.replayGainDb?.let { gain ->
+        parts += String.format(Locale.US, "%+.2f dB", gain)
+    }
+    return parts.joinToString(" / ")
 }

@@ -438,6 +438,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistStore.removeSongFromPlaylist(playlistId, songKey) }
     }
 
+    fun removeSongsFromPlaylist(playlistId: String, songKeys: Set<String>) {
+        if (songKeys.isEmpty()) return
+        viewModelScope.launch { playlistStore.removeSongsFromPlaylist(playlistId, songKeys) }
+    }
+
     fun addSongsToPlaylist(playlistId: String, songs: Collection<Song>) {
         if (songs.isEmpty()) return
         viewModelScope.launch { playlistStore.addSongsToPlaylist(playlistId, songs) }
@@ -481,8 +486,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteSongs(songs: Collection<Song>) {
         if (songs.isEmpty()) return
         viewModelScope.launch {
-            repository.deleteSongs(songs)
+            runCatching { repository.deleteSongs(songs) }
         }
+    }
+
+    suspend fun deleteSongsResult(songs: Collection<Song>): Result<Int> {
+        if (songs.isEmpty()) return Result.success(0)
+        return runCatching { repository.deleteSongs(songs) }
     }
 
     fun removeSongsFromLibrary(songs: Collection<Song>) {

@@ -1,7 +1,11 @@
 package com.ella.music.ui.category
 
+import android.app.Activity
 import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -65,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.exception.WritePermissionRequiredException
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
@@ -139,6 +144,16 @@ fun MetadataCategoryScreen(
             sortedItems
         } else {
             sortedItems.filter { it.matchesCategorySearch(query, type) }
+        }
+    }
+    val representativeSongsByName = remember(type, items, songs) {
+        items.associate { item ->
+            item.name to mainViewModel.getSongsForMetadataCategory(type, item.name).firstOrNull()
+        }
+    }
+    val albumArtUrisByName = remember(items) {
+        items.associate { item ->
+            item.name to item.coverAlbumIds.firstOrNull()?.let(mainViewModel::getAlbumArtUri)
         }
     }
     val gridColumns by mainViewModel.settingsManager.categoryGridColumns.collectAsState(initial = 2)
@@ -286,11 +301,9 @@ fun MetadataCategoryScreen(
                         type = type,
                         item = item,
                         sortMode = sortMode,
-                        albumArtUri = item.coverAlbumIds.firstOrNull()?.let(mainViewModel::getAlbumArtUri),
-                        representativeSong = remember(type, item.name, songs) {
-                            mainViewModel.getSongsForMetadataCategory(type, item.name).firstOrNull()
-                        },
-                        loadCoverArt = mainViewModel::getAlbumCoverArtBitmap,
+                        albumArtUri = albumArtUrisByName[item.name],
+                        representativeSong = representativeSongsByName[item.name],
+                        loadCoverArt = if (type.prefersEmbeddedCategoryCardCover()) mainViewModel::getAlbumCoverArtBitmap else null,
                         onClick = { onCategoryClick(item.name) },
                         onLongClick = {
                             val ok = requestPinnedEllaShortcut(
@@ -347,6 +360,7 @@ fun MetadataCategoryDetailScreen(
     var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
     var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
     var pendingDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    var pendingSystemDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     val sortedSongs = remember(songs, sortMode) { songs.sortedForMetadataDetail(sortMode) }
     val showAlbumTab = type == "genre" || type == "year" || type == "composer" || type == "lyricist"
     val detailAlbums = remember(songs, libraryAlbums) {
@@ -370,6 +384,39 @@ fun MetadataCategoryDetailScreen(
     val pageBackground = ellaPageBackground()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val deleteRequestLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val songsToDelete = pendingSystemDeleteSongs
+        pendingSystemDeleteSongs = emptyList()
+        if (result.resultCode == Activity.RESULT_OK && songsToDelete.isNotEmpty()) {
+            mainViewModel.removeSongsFromLibrary(songsToDelete)
+            Toast.makeText(context, context.getString(R.string.library_deleted_songs, songsToDelete.size), Toast.LENGTH_SHORT).show()
+            selectedIds = emptySet()
+            selectionMode = false
+        } else if (songsToDelete.isNotEmpty()) {
+            Toast.makeText(context, context.getString(R.string.library_delete_cancelled), Toast.LENGTH_SHORT).show()
+        }
+    }
+    fun deleteSelectedSongs(songsToDelete: List<Song>) {
+        if (songsToDelete.isEmpty()) return
+        scope.launch {
+            val result = mainViewModel.deleteSongsResult(songsToDelete)
+            if (result.isSuccess) {
+                Toast.makeText(context, context.getString(R.string.library_deleted_songs, songsToDelete.size), Toast.LENGTH_SHORT).show()
+                selectedIds = emptySet()
+                selectionMode = false
+                return@launch
+            }
+            val error = result.exceptionOrNull()
+            if (error is WritePermissionRequiredException) {
+                pendingSystemDeleteSongs = songsToDelete
+                deleteRequestLauncher.launch(IntentSenderRequest.Builder(error.intentSender).build())
+            } else {
+                Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_metadata_save_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     val currentSongItemIndex = remember(sortedSongs, currentSong?.id, selectedTab, selectionMode) {
         if (selectedTab != MetadataDetailTab.Songs || selectionMode) return@remember -1
         sortedSongs.indexOfFirst { it.id == currentSong?.id }
@@ -710,10 +757,9 @@ fun MetadataCategoryDetailScreen(
                 confirmText = "永久删除",
                 onDismiss = { pendingDeleteSongs = emptyList() },
                 onConfirm = {
-                    mainViewModel.deleteSongs(pendingDeleteSongs)
+                    val songsToDelete = pendingDeleteSongs
                     pendingDeleteSongs = emptyList()
-                    selectedIds = emptySet()
-                    selectionMode = false
+                    deleteSelectedSongs(songsToDelete)
                 }
             )
         }
@@ -1161,6 +1207,9 @@ private fun Song.prefersEmbeddedCategoryCover(): Boolean {
     val extension = fileName.substringAfterLast('.', path.substringAfterLast('.')).lowercase()
     return extension in setOf("m4a", "mp4", "alac", "flac", "wav", "wave", "aiff", "aif")
 }
+
+private fun String.prefersEmbeddedCategoryCardCover(): Boolean =
+    this == "folder" || this == "composer" || this == "lyricist"
 
 private fun Color.darkenCategoryColor(factor: Float): Color {
     return Color(

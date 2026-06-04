@@ -1136,8 +1136,9 @@ internal fun WebDavTextField(
 
 internal fun WebDavItem.toRemoteSong(): Song {
     val title = name.substringBeforeLast('.', name)
+    val stableId = kotlin.math.abs(url.hashCode().toLong()).takeIf { it != 0L } ?: 1L
     return Song(
-        id = -url.hashCode().toLong().coerceAtLeast(1L),
+        id = stableId,
         title = title,
         artist = "WebDAV",
         album = "WebDAV",
