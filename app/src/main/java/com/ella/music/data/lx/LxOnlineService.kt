@@ -76,7 +76,7 @@ class LxOnlineService(private val context: Context) {
                 val mid = item.optString("MUSICRID").removePrefix("MUSIC_").ifBlank { item.optString("DC_TARGETID") }
                 val title = decodeHtml(item.optString("SONGNAME"))
                 val artist = decodeHtml(item.optString("ARTIST")).replace("&", "、")
-                val album = decodeHtml(item.optString("ALBUM")).ifBlank { "在线音乐" }
+                val album = decodeHtml(item.optString("ALBUM"))
                 val durationMs = item.optLong("DURATION", 0L) * 1000L
                 val id = "lx_kw_$mid".hashCode().toLong()
                 val coverUrl = buildKuwoCoverUrl(item.optString("web_albumpic_short"))

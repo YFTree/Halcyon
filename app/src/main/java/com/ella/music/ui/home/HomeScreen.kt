@@ -151,7 +151,7 @@ fun LibraryScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
-    var ratingFilter by remember { mutableStateOf(0) }
+    var ratingFilter by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var favoriteFilter by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
     val sortIndex by settingsManager.librarySongSortIndex.collectAsState(initial = LibrarySortUiState.librarySongSortIndex)
@@ -251,7 +251,7 @@ fun LibraryScreen(
         val favoriteKeys = favoriteSongKeys
         value = withContext(Dispatchers.IO) {
             songs.filter { song ->
-                val ratingMatched = ratingFilter <= 0 || mainViewModel.getSongRating(song) == ratingFilter
+                val ratingMatched = ratingFilter.isEmpty() || mainViewModel.getSongRating(song) in ratingFilter
                 if (!ratingMatched) return@filter false
                 if (favoriteFilter && song.playlistIdentityKey() !in favoriteKeys) return@filter false
                 query.isBlank() || mainViewModel.songMatchesSearchSnapshot(song, query)
@@ -319,7 +319,7 @@ fun LibraryScreen(
                                         text = "★",
                                         fontSize = 24.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (ratingFilter > 0 || ratingFilterExpanded) {
+                                        color = if (ratingFilter.isNotEmpty() || ratingFilterExpanded) {
                                             MiuixTheme.colorScheme.primary
                                         } else {
                                             MiuixTheme.colorScheme.onSurface
@@ -493,10 +493,9 @@ fun LibraryScreen(
             exit = shrinkVertically()
         ) {
             StarRatingFilterRow(
-                selectedRating = ratingFilter,
-                onRatingSelected = {
+                selectedRatings = ratingFilter,
+                onRatingsChange = {
                     ratingFilter = it
-                    ratingFilterExpanded = false
                 }
             )
         }
@@ -573,12 +572,12 @@ fun LibraryScreen(
                         text = if (selectionMode) {
                             stringResource(R.string.library_selected_count, selectedIds.size)
                         } else {
-                            stringResource(
-                                R.string.library_song_count_sorted,
-                                sortedSongs.size,
-                                listOfNotNull(
-                                    stringResource(sortMode.labelRes),
-                                    stringResource(R.string.rating_filter_star, ratingFilter).takeIf { ratingFilter > 0 },
+                                stringResource(
+                                    R.string.library_song_count_sorted,
+                                    sortedSongs.size,
+                                    listOfNotNull(
+                                        stringResource(sortMode.labelRes),
+                                        ratingFilter.summaryLabel(context),
                                     stringResource(R.string.favorite_filter).takeIf { favoriteFilter }
                                 ).joinToString(" · ")
                             )
@@ -1324,9 +1323,10 @@ private fun CreatePlaylistAndAddSheet(
 
 @Composable
 private fun StarRatingFilterRow(
-    selectedRating: Int,
-    onRatingSelected: (Int) -> Unit
+    selectedRatings: Set<Int>,
+    onRatingsChange: (Set<Int>) -> Unit
 ) {
+    val allSelected = selectedRatings.isEmpty()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1336,17 +1336,47 @@ private fun StarRatingFilterRow(
     ) {
         StarRatingPill(
             text = stringResource(R.string.rating_filter_all),
-            selected = selectedRating <= 0,
-            onClick = { onRatingSelected(0) }
+            selected = allSelected,
+            onClick = { onRatingsChange(emptySet()) }
         )
         (1..5).forEach { rating ->
             StarRatingPill(
                 text = stringResource(R.string.rating_filter_star, rating),
-                selected = selectedRating == rating,
-                onClick = { onRatingSelected(rating) }
+                selected = rating in selectedRatings,
+                onClick = {
+                    val next = selectedRatings.toggleRating(rating)
+                    onRatingsChange(next.normalizedRatingFilter())
+                }
             )
         }
     }
+}
+
+private fun Set<Int>.toggleRating(rating: Int): Set<Int> {
+    val safeRating = rating.coerceIn(1, 5)
+    return if (isEmpty()) {
+        setOf(safeRating)
+    } else if (safeRating in this) {
+        this - safeRating
+    } else {
+        this + safeRating
+    }
+}
+
+private fun Set<Int>.normalizedRatingFilter(): Set<Int> {
+    val normalized = filter { it in 1..5 }.toSortedSet()
+    return if (normalized.isEmpty() || normalized.size == 5) emptySet() else normalized
+}
+
+private fun Set<Int>.summaryLabel(context: android.content.Context): String? {
+    if (isEmpty()) return null
+    return this
+        .filter { it in 1..5 }
+        .sorted()
+        .joinToString(separator = " · ") { rating ->
+            context.getString(R.string.rating_filter_star, rating)
+        }
+        .ifBlank { null }
 }
 
 @Composable

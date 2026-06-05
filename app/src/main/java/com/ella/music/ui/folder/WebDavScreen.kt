@@ -245,13 +245,23 @@ fun WebDavScreen(
                                 scope.launch { mainViewModel.settingsManager.setWebDavLastUrl(item.url) }
                                 load(item.url)
                             } else {
-                                playerViewModel.setPlaylist(listOf(item.toRemoteSong()), 0)
-                                if (openPlayerOnPlay) onNavigateToPlayer()
+                                scope.launch {
+                                    val resolvedSong = withContext(Dispatchers.IO) {
+                                        mainViewModel.resolveSongForPlayback(item.toRemoteSong())
+                                    }
+                                    playerViewModel.setPlaylist(listOf(resolvedSong), 0)
+                                    if (openPlayerOnPlay) onNavigateToPlayer()
+                                }
                             }
                         },
                         onAddToQueue = { item ->
-                            playerViewModel.addToPlaylist(item.toRemoteSong())
-                            Toast.makeText(context, R.string.webdav_added_to_queue, Toast.LENGTH_SHORT).show()
+                            scope.launch {
+                                val resolvedSong = withContext(Dispatchers.IO) {
+                                    mainViewModel.resolveSongForPlayback(item.toRemoteSong())
+                                }
+                                playerViewModel.addToPlaylist(resolvedSong)
+                                Toast.makeText(context, R.string.webdav_added_to_queue, Toast.LENGTH_SHORT).show()
+                            }
                         }
                     )
                 }

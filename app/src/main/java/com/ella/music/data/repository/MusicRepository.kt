@@ -1030,6 +1030,15 @@ class MusicRepository(private val context: Context) {
         }
     }
 
+    suspend fun resolveSongForPlayback(song: Song): Song = withContext(Dispatchers.IO) {
+        runCatching {
+            song.withRepositoryTags()
+        }.getOrElse { error ->
+            Log.w("MusicRepo", "Failed to resolve playback song for ${song.path}", error)
+            song
+        }
+    }
+
     suspend fun prefetchWebDavMetadataHeaders(songs: List<Song>, maxItems: Int = 80) = coroutineScope {
         val targets = songs
             .asSequence()

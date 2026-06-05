@@ -409,6 +409,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.prefetchWebDavMetadataHeaders(songs, maxItems)
     }
 
+    suspend fun resolveSongForPlayback(song: Song): Song =
+        repository.resolveSongForPlayback(song)
+
     suspend fun songMatchesSearchSnapshot(song: Song, query: String): Boolean =
         repository.songMatchesSearchSnapshot(song, query)
 

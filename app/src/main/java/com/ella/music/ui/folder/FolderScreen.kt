@@ -1144,8 +1144,8 @@ internal fun WebDavItem.toRemoteSong(): Song {
     return Song(
         id = stableId,
         title = title,
-        artist = "WebDAV",
-        album = "WebDAV",
+        artist = "",
+        album = "",
         albumId = 0L,
         duration = 0L,
         path = url,

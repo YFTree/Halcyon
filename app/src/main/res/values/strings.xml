@@ -250,6 +250,7 @@
     <string name="player_landscape_lyrics">横屏歌词</string>
     <string name="player_view_album">查看专辑页</string>
     <string name="player_view_artist">查看歌手页</string>
+    <string name="player_view_named">查看：%1$s</string>
     <string name="player_edit_metadata">编辑元数据</string>
     <string name="player_lyric_timing">歌词打轴</string>
     <string name="player_download_lx_song">下载 LX 歌曲</string>

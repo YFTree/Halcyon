@@ -98,6 +98,13 @@ private data class LyricSizingCandidate(
     val blockGap: Float
 )
 
+private data class SharePaletteRegion(
+    val leftFraction: Float,
+    val topFraction: Float,
+    val rightFraction: Float,
+    val bottomFraction: Float
+)
+
 fun shareLyricCard(
     context: Context,
     song: Song?,
@@ -575,21 +582,21 @@ private fun drawShareBackground(
             0f,
             0f,
             width.toFloat(),
-            height.toFloat(),
+            height * 0.92f,
             intArrayOf(
-                c1.lightenForShare(1.02f),
-                c2.darkenForShare(0.76f),
-                c3.darkenForShare(0.58f)
+                c1.lightenForShare(1.12f),
+                c2.lightenForShare(1.04f),
+                c3.darkenForShare(0.74f)
             ),
-            floatArrayOf(0f, 0.54f, 1f),
+            floatArrayOf(0f, 0.5f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), this)
     }
 
-    drawShareColorBlob(canvas, width * 0.14f, height * 0.18f, width * 0.72f, c1.lightenForShare(1.08f), 92)
-    drawShareColorBlob(canvas, width * 0.82f, height * 0.28f, width * 0.58f, c2.lightenForShare(1.04f), 72)
-    drawShareColorBlob(canvas, width * 0.48f, height * 0.82f, width * 0.76f, c3.lightenForShare(1.08f), 82)
+    drawShareColorBlob(canvas, width * 0.14f, height * 0.16f, width * 0.76f, c1.lightenForShare(1.12f), 112)
+    drawShareColorBlob(canvas, width * 0.84f, height * 0.24f, width * 0.62f, c2.lightenForShare(1.08f), 96)
+    drawShareColorBlob(canvas, width * 0.46f, height * 0.86f, width * 0.82f, c3.lightenForShare(1.10f), 108)
 
     Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = RadialGradient(
@@ -597,7 +604,7 @@ private fun drawShareBackground(
             height * 0.42f,
             width * 0.82f,
             intArrayOf(
-                Color.argb(56, 255, 255, 255),
+                Color.argb(42, 255, 255, 255),
                 Color.argb(0, 255, 255, 255)
             ),
             floatArrayOf(0f, 1f),
@@ -613,9 +620,9 @@ private fun drawShareBackground(
             0f,
             height.toFloat(),
             intArrayOf(
-                Color.argb(74, 4, 7, 12),
-                Color.argb(18, 4, 7, 12),
-                Color.argb(96, 4, 7, 12)
+                Color.argb(46, 4, 7, 12),
+                Color.argb(12, 4, 7, 12),
+                Color.argb(68, 4, 7, 12)
             ),
             floatArrayOf(0f, 0.5f, 1f),
             Shader.TileMode.CLAMP
@@ -624,7 +631,7 @@ private fun drawShareBackground(
     }
 
     Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(20, 0, 0, 0)
+        color = Color.argb(10, 0, 0, 0)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), this)
     }
 }
@@ -752,24 +759,66 @@ private fun baseShareLyricTextSize(blockCount: Int, longestLine: Int): Float {
 
 private fun Bitmap?.extractSharePalette(fallback: List<Int>): List<Int> {
     if (this == null || width <= 0 || height <= 0) return fallback
-    val step = (minOf(width, height) / 42).coerceAtLeast(1)
+    val regions = listOf(
+        SharePaletteRegion(0f, 0f, 0.58f, 0.54f),
+        SharePaletteRegion(0.42f, 0.06f, 1f, 0.64f),
+        SharePaletteRegion(0.10f, 0.44f, 0.92f, 1f),
+        SharePaletteRegion(0.18f, 0.18f, 0.82f, 0.82f)
+    )
+    val sampledColors = regions.mapNotNull { region ->
+        sampleShareRegionColor(region)
+    }
+    val fallbackColors = fallback.filter { Color.alpha(it) > 0 }
+    val palette = mutableListOf<Int>()
+    sampledColors
+        .sortedByDescending { it.shareVibrancyScore() }
+        .forEach { color ->
+            if (palette.none { it.shareColorDistanceTo(color) < 68f }) {
+                palette += color.boostForShare()
+            }
+        }
+    fallbackColors.forEach { color ->
+        if (palette.size >= 3) return@forEach
+        if (palette.none { it.shareColorDistanceTo(color) < 56f }) {
+            palette += color.boostForShare()
+        }
+    }
+    if (palette.isEmpty()) return fallback
+    if (palette.size == 1) {
+        val base = palette.first()
+        palette += base.lightenForShare(1.10f)
+        palette += base.darkenForShare(0.78f)
+    } else if (palette.size == 2) {
+        val bridge = blendShareColors(palette.first(), palette.last(), 0.45f).lightenForShare(1.04f)
+        palette.add(if (palette.none { it.shareColorDistanceTo(bridge) < 36f }) bridge else palette.last().darkenForShare(0.78f))
+    }
+    return palette.take(3)
+}
+
+private fun Bitmap.sampleShareRegionColor(region: SharePaletteRegion): Int? {
+    val left = (width * region.leftFraction).roundToInt().coerceIn(0, width - 1)
+    val top = (height * region.topFraction).roundToInt().coerceIn(0, height - 1)
+    val right = (width * region.rightFraction).roundToInt().coerceIn(left + 1, width)
+    val bottom = (height * region.bottomFraction).roundToInt().coerceIn(top + 1, height)
+    val step = (minOf(right - left, bottom - top) / 18).coerceAtLeast(1)
     var red = 0.0
     var green = 0.0
     var blue = 0.0
     var weightSum = 0.0
     val hsv = FloatArray(3)
-    var y = 0
-    while (y < height) {
-        var x = 0
-        while (x < width) {
+    var y = top
+    while (y < bottom) {
+        var x = left
+        while (x < right) {
             val pixel = getPixel(x, y)
             if (Color.alpha(pixel) > 32) {
                 Color.colorToHSV(pixel, hsv)
                 val saturation = hsv[1].coerceIn(0f, 1f)
                 val value = hsv[2].coerceIn(0f, 1f)
-                val weight = (0.28 + saturation * 1.9 + value * 0.7).let {
+                val chromaWeight = if (saturation > 0.16f) 1.0 else 0.55
+                val weight = (0.30 + saturation * 2.35 + value * 0.82).let {
                     if (value < 0.10f) it * 0.20 else it
-                }
+                } * chromaWeight
                 red += Color.red(pixel) * weight
                 green += Color.green(pixel) * weight
                 blue += Color.blue(pixel) * weight
@@ -779,30 +828,20 @@ private fun Bitmap?.extractSharePalette(fallback: List<Int>): List<Int> {
         }
         y += step
     }
-    if (weightSum <= 0.0) return fallback
-    val base = Color.rgb(
+    if (weightSum <= 0.0) return null
+    return Color.rgb(
         (red / weightSum).toInt().coerceIn(0, 255),
         (green / weightSum).toInt().coerceIn(0, 255),
         (blue / weightSum).toInt().coerceIn(0, 255)
-    ).boostForShare()
-    return listOf(
-        base.lightenForShare(1.05f),
-        base.darkenForShare(0.82f),
-        base.darkenForShare(0.62f)
     )
 }
 
 private fun Int.boostForShare(): Int {
-    val r = Color.red(this)
-    val g = Color.green(this)
-    val b = Color.blue(this)
-    val maxChannel = maxOf(r, g, b).coerceAtLeast(1)
-    val boost = (174f / maxChannel).coerceIn(1.06f, 2.20f)
-    return Color.rgb(
-        (r * boost).toInt().coerceIn(0, 255),
-        (g * boost).toInt().coerceIn(0, 255),
-        (b * boost).toInt().coerceIn(0, 255)
-    )
+    val hsv = FloatArray(3)
+    Color.colorToHSV(this, hsv)
+    hsv[1] = (hsv[1] * 1.18f + 0.06f).coerceIn(0.20f, 0.98f)
+    hsv[2] = (hsv[2] * 1.08f + 0.05f).coerceIn(0.28f, 0.98f)
+    return Color.HSVToColor(hsv)
 }
 
 private fun Int.lightenForShare(factor: Float): Int {
@@ -818,6 +857,29 @@ private fun Int.darkenForShare(factor: Float): Int {
         (Color.red(this) * factor).toInt().coerceIn(0, 255),
         (Color.green(this) * factor).toInt().coerceIn(0, 255),
         (Color.blue(this) * factor).toInt().coerceIn(0, 255)
+    )
+}
+
+private fun Int.shareColorDistanceTo(other: Int): Float {
+    val dr = (Color.red(this) - Color.red(other)).toFloat()
+    val dg = (Color.green(this) - Color.green(other)).toFloat()
+    val db = (Color.blue(this) - Color.blue(other)).toFloat()
+    return kotlin.math.sqrt(dr * dr + dg * dg + db * db)
+}
+
+private fun Int.shareVibrancyScore(): Float {
+    val hsv = FloatArray(3)
+    Color.colorToHSV(this, hsv)
+    return hsv[1] * 1.6f + hsv[2]
+}
+
+private fun blendShareColors(start: Int, end: Int, fraction: Float): Int {
+    val t = fraction.coerceIn(0f, 1f)
+    val inverse = 1f - t
+    return Color.rgb(
+        (Color.red(start) * inverse + Color.red(end) * t).roundToInt().coerceIn(0, 255),
+        (Color.green(start) * inverse + Color.green(end) * t).roundToInt().coerceIn(0, 255),
+        (Color.blue(start) * inverse + Color.blue(end) * t).roundToInt().coerceIn(0, 255)
     )
 }
 

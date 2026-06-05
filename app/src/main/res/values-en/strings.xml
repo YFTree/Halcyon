@@ -247,6 +247,7 @@
     <string name="player_landscape_lyrics">Landscape lyrics</string>
     <string name="player_view_album">View album</string>
     <string name="player_view_artist">View artist</string>
+    <string name="player_view_named">View: %1$s</string>
     <string name="player_edit_metadata">Edit metadata</string>
     <string name="player_lyric_timing">Lyric timing</string>
     <string name="player_download_lx_song">Download LX song</string>

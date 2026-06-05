@@ -996,7 +996,7 @@ private fun SongTagEditorSheet(
 }
 
 @Composable
-private fun RatingSheet(
+internal fun RatingSheet(
     currentRating: Int,
     onDismiss: () -> Unit,
     onRatingSelected: (Int) -> Unit
@@ -1422,7 +1422,7 @@ fun SongInfoSheet(
 }
 
 @Composable
-private fun SongAiInterpretationSheet(
+internal fun SongAiInterpretationSheet(
     song: Song,
     mainViewModel: MainViewModel,
     onDismiss: () -> Unit

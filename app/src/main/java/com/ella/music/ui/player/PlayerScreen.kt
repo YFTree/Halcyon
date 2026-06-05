@@ -34,6 +34,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -162,6 +163,7 @@ import com.ella.music.data.SettingsManager
 import com.ella.music.data.NeteaseKeyInfo
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.decodeNeteaseKey
+import com.ella.music.data.exception.WritePermissionRequiredException
 import com.ella.music.data.neteaseAlbumUrl
 import com.ella.music.data.neteaseArtistUrl
 import com.ella.music.data.neteaseSongUrl
@@ -178,12 +180,15 @@ import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.repository.MusicRepository
 import com.ella.music.player.PlaybackAudioSession
 import com.ella.music.ui.components.ArtistPickerSheet
+import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SmoothLyricView
 import com.ella.music.ui.components.WordLyricView
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.CoverLoadLimiter
 import com.ella.music.ui.components.LyricSharePicker
+import com.ella.music.ui.components.RatingSheet
+import com.ella.music.ui.components.SongAiInterpretationSheet
 import com.ella.music.ui.components.TagEditorOption
 import com.ella.music.ui.components.TagEditorOptionIds
 import com.ella.music.ui.components.TagEditorOptionKind
@@ -192,7 +197,7 @@ import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.buildTagEditorOptions
 import com.ella.music.ui.components.launchTagEditorOption
 import com.ella.music.ui.components.SongInfoSheet
-import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.openSongSpectrumWithAspectPro
 import com.ella.music.ui.components.shareLyricCard
 import com.ella.music.ui.components.shareLocalSong
 import com.ella.music.viewmodel.MainViewModel
@@ -361,6 +366,10 @@ fun PlayerScreen(
     var artistChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     var playlistPickerSong by remember { mutableStateOf<Song?>(null) }
     var createPlaylistSong by remember { mutableStateOf<Song?>(null) }
+    var ratingSheetSong by remember { mutableStateOf<Song?>(null) }
+    var aiSheetSong by remember { mutableStateOf<Song?>(null) }
+    var deleteConfirmSong by remember { mutableStateOf<Song?>(null) }
+    var pendingWriteRetry by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
     var landscapeExpanded by rememberSaveable { mutableStateOf(false) }
     var landscapeCoverMode by rememberSaveable { mutableStateOf(false) }
     var dynamicCoverFailedPath by remember { mutableStateOf<String?>(null) }
@@ -395,6 +404,18 @@ fun PlayerScreen(
             scope.launch {
                 settingsManager.setAudioVisualizerEnabled(enabled)
             }
+        }
+    }
+    val deletePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            pendingWriteRetry?.let { retry ->
+                scope.launch { retry() }
+            }
+            pendingWriteRetry = null
+        } else {
+            pendingWriteRetry = null
         }
     }
     val dragDismissOffset = remember { Animatable(0f) }
@@ -446,6 +467,9 @@ fun PlayerScreen(
 
     val song = currentSong
     val isCurrentSongFavorite = song?.playlistIdentityKey()?.let { it in favoriteSongKeys } == true
+    fun requestDeleteSong(targetSong: Song) {
+        deleteConfirmSong = targetSong
+    }
     val embeddedCover by produceState<Bitmap?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
         value = withContext(Dispatchers.IO) {
             runCatching {
@@ -649,6 +673,62 @@ fun PlayerScreen(
                 val current = song
                 if (current != null) shareLocalSong(context, current)
                 else Toast.makeText(context, context.getString(R.string.player_no_share_song), Toast.LENGTH_SHORT).show()
+            },
+            onAddToQueue = {
+                val current = song
+                if (current != null) {
+                    playerViewModel.addToPlaylist(current)
+                    menuExpanded = false
+                    Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, context.getString(R.string.player_no_song_playing), Toast.LENGTH_SHORT).show()
+                }
+            },
+            onPlayNext = {
+                val current = song
+                if (current != null) {
+                    playerViewModel.playNext(current)
+                    menuExpanded = false
+                    Toast.makeText(context, context.getString(R.string.song_more_added_to_play_next), Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, context.getString(R.string.player_no_song_playing), Toast.LENGTH_SHORT).show()
+                }
+            },
+            onSetRating = {
+                val current = song
+                if (current != null) {
+                    menuExpanded = false
+                    ratingSheetSong = current
+                } else {
+                    Toast.makeText(context, context.getString(R.string.player_no_song_playing), Toast.LENGTH_SHORT).show()
+                }
+            },
+            onAiInterpret = {
+                val current = song
+                if (current != null) {
+                    menuExpanded = false
+                    aiSheetSong = current
+                } else {
+                    Toast.makeText(context, context.getString(R.string.player_no_song_playing), Toast.LENGTH_SHORT).show()
+                }
+            },
+            onSpectrum = {
+                val current = song
+                if (current != null) {
+                    menuExpanded = false
+                    openSongSpectrumWithAspectPro(context, current)
+                } else {
+                    Toast.makeText(context, context.getString(R.string.player_no_song_playing), Toast.LENGTH_SHORT).show()
+                }
+            },
+            onDeleteSong = {
+                val current = song
+                if (current != null) {
+                    menuExpanded = false
+                    requestDeleteSong(current)
+                } else {
+                    Toast.makeText(context, context.getString(R.string.player_no_song_playing), Toast.LENGTH_SHORT).show()
+                }
             },
             onOpenTimer = {
                 actionMenuInitialPage = PlayerActionSheetPage.Timer
@@ -1101,6 +1181,98 @@ fun PlayerScreen(
                 }
             }
 
+            ratingSheetSong?.let { currentSong ->
+                WindowBottomSheet(
+                    show = true,
+                    enableNestedScroll = false,
+                    title = stringResource(R.string.song_more_rating_title),
+                    onDismissRequest = { ratingSheetSong = null }
+                ) {
+                    RatingSheet(
+                        currentRating = mainViewModel.getSongRating(currentSong),
+                        onDismiss = { ratingSheetSong = null },
+                        onRatingSelected = { rating ->
+                            scope.launch {
+                                val result = mainViewModel.writeSongRating(currentSong, rating)
+                                if (result.isSuccess) {
+                                    Toast.makeText(context, context.getString(R.string.song_more_rating_saved), Toast.LENGTH_SHORT).show()
+                                    ratingSheetSong = null
+                                } else {
+                                    val error = result.exceptionOrNull()
+                                    if (error is WritePermissionRequiredException) {
+                                        pendingWriteRetry = {
+                                            val retryResult = mainViewModel.writeSongRating(currentSong, rating)
+                                            if (retryResult.isSuccess) {
+                                                Toast.makeText(context, context.getString(R.string.song_more_rating_saved), Toast.LENGTH_SHORT).show()
+                                                ratingSheetSong = null
+                                            } else {
+                                                Toast.makeText(context, retryResult.exceptionOrNull()?.localizedMessage ?: context.getString(R.string.song_more_rating_failed), Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                        deletePermissionLauncher.launch(
+                                            IntentSenderRequest.Builder(error.intentSender).build()
+                                        )
+                                    } else {
+                                        Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_rating_failed), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
+
+            aiSheetSong?.let { currentSong ->
+                WindowBottomSheet(
+                    show = true,
+                    enableNestedScroll = false,
+                    title = stringResource(R.string.song_more_ai_title),
+                    onDismissRequest = { aiSheetSong = null }
+                ) {
+                    SongAiInterpretationSheet(
+                        song = currentSong,
+                        mainViewModel = mainViewModel,
+                        onDismiss = { aiSheetSong = null }
+                    )
+                }
+            }
+
+            ConfirmDangerDialog(
+                show = deleteConfirmSong != null,
+                title = stringResource(R.string.song_more_delete_song_title),
+                message = deleteConfirmSong?.let {
+                    context.getString(
+                        R.string.song_more_delete_song_message,
+                        it.title.ifBlank { it.fileName.ifBlank { context.getString(R.string.common_this_song) } }
+                    )
+                }.orEmpty(),
+                confirmText = stringResource(R.string.song_more_delete_permanently),
+                onDismiss = { deleteConfirmSong = null },
+                onConfirm = {
+                    val currentSong = deleteConfirmSong ?: return@ConfirmDangerDialog
+                    deleteConfirmSong = null
+                    scope.launch {
+                        val result = mainViewModel.deleteSongsResult(listOf(currentSong))
+                        if (result.isSuccess) {
+                            Toast.makeText(context, context.getString(R.string.library_deleted_songs, 1), Toast.LENGTH_SHORT).show()
+                        } else {
+                            val error = result.exceptionOrNull()
+                            if (error is WritePermissionRequiredException) {
+                                pendingWriteRetry = {
+                                    mainViewModel.removeSongsFromLibrary(listOf(currentSong))
+                                    Toast.makeText(context, context.getString(R.string.library_deleted_songs, 1), Toast.LENGTH_SHORT).show()
+                                }
+                                deletePermissionLauncher.launch(
+                                    IntentSenderRequest.Builder(error.intentSender).build()
+                                )
+                            } else {
+                                Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_metadata_save_failed), Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
+            )
+
             playlistPickerSong?.let { currentSong ->
                 WindowBottomSheet(
                     show = true,
@@ -1241,6 +1413,12 @@ private fun CoverPlayerPage(
     onSongInfo: () -> Unit,
     onAddToPlaylist: () -> Unit,
     onShareSong: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onPlayNext: () -> Unit,
+    onSetRating: () -> Unit,
+    onAiInterpret: () -> Unit,
+    onSpectrum: () -> Unit,
+    onDeleteSong: () -> Unit,
     onOpenTimer: () -> Unit,
     onOpenMetadataEditor: () -> Unit,
     onStopAfterCurrent: (Boolean) -> Unit,
@@ -1594,26 +1772,7 @@ private fun CoverPlayerPage(
             }
         }
 
-        SongMoreActionHost(
-            actionSong = if (menuExpanded && actionMenuInitialPage == PlayerActionSheetPage.Main) song else null,
-            mainViewModel = mainViewModel,
-            playerViewModel = playerViewModel,
-            onDismissAction = onDismissMenu,
-            onNavigateToAlbum = { albumId ->
-                onDismissMenu()
-                onNavigateToAlbumId(albumId)
-            },
-            onNavigateToArtist = { artist ->
-                onDismissMenu()
-                onNavigateToArtistName(artist)
-            },
-            showAddToQueue = false,
-            extraTopContent = {
-                PlayerActionMenuItem(stringResource(R.string.player_landscape_lyrics), onLandscape)
-                PlayerActionMenuItem(stringResource(R.string.player_sleep_timer), onOpenTimer)
-            }
-        )
-        if (menuExpanded && actionMenuInitialPage != PlayerActionSheetPage.Main) {
+        if (menuExpanded) {
             WindowBottomSheet(
                 show = true,
                 enableNestedScroll = false,
@@ -1640,6 +1799,13 @@ private fun CoverPlayerPage(
                     onLandscape = onLandscape,
                     onSongInfo = onSongInfo,
                     onAddToPlaylist = onAddToPlaylist,
+                    onAddToQueue = onAddToQueue,
+                    onPlayNext = onPlayNext,
+                    onShare = onShareSong,
+                    onSetRating = onSetRating,
+                    onAiInterpret = onAiInterpret,
+                    onSpectrum = onSpectrum,
+                    onDeleteSong = onDeleteSong,
                     onStopAfterCurrent = onStopAfterCurrent,
                     onTimer = onTimer,
                     onCustomTimerMinutes = onCustomTimerMinutes,
@@ -4994,6 +5160,13 @@ private fun PlayerActionMenu(
     onLandscape: () -> Unit,
     onSongInfo: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onPlayNext: () -> Unit,
+    onShare: () -> Unit,
+    onSetRating: () -> Unit,
+    onAiInterpret: () -> Unit,
+    onSpectrum: () -> Unit,
+    onDeleteSong: () -> Unit,
     onStopAfterCurrent: (Boolean) -> Unit,
     onTimer: (Int) -> Unit,
     onCustomTimerMinutes: (Int) -> Unit,
@@ -5006,6 +5179,20 @@ private fun PlayerActionMenu(
 ) {
     var page by remember(initialPage) { mutableStateOf(initialPage) }
     val context = LocalContext.current
+    val artistEntryLabel = remember(song?.artist) {
+        context.getString(
+            R.string.player_view_named,
+            song?.artist?.ifBlank { context.getString(R.string.player_unknown_artist) }
+                ?: context.getString(R.string.player_unknown_artist)
+        )
+    }
+    val albumEntryLabel = remember(song?.album) {
+        context.getString(
+            R.string.player_view_named,
+            song?.album?.ifBlank { context.getString(R.string.player_unknown_album) }
+                ?: context.getString(R.string.player_unknown_album)
+        )
+    }
     val metadataOptions = remember(song?.id, song?.path, song?.mimeType) {
         song?.let { buildTagEditorOptions(context, it) }
             .orEmpty()
@@ -5046,10 +5233,16 @@ private fun PlayerActionMenu(
         when (page) {
             PlayerActionSheetPage.Main -> {
                 PlayerActionMenuItem(stringResource(R.string.player_landscape_lyrics), onLandscape)
-                PlayerActionMenuItem(stringResource(R.string.player_view_album), onAlbum)
-                PlayerActionMenuItem(stringResource(R.string.player_view_artist), onArtist)
+                PlayerActionMenuItem(albumEntryLabel, onAlbum)
+                PlayerActionMenuItem(artistEntryLabel, onArtist)
                 PlayerActionMenuItem(stringResource(R.string.player_add_to_playlist), onAddToPlaylist)
+                PlayerActionMenuItem(stringResource(R.string.common_add_to_queue), onAddToQueue)
+                PlayerActionMenuItem(stringResource(R.string.song_more_play_next), onPlayNext)
+                PlayerActionMenuItem(stringResource(R.string.common_share), onShare)
+                PlayerActionMenuItem(stringResource(R.string.song_more_view_spectrum), onSpectrum)
+                PlayerActionMenuItem(stringResource(R.string.song_more_ai_title), onAiInterpret)
                 PlayerActionMenuItem(stringResource(R.string.player_song_info), onSongInfo)
+                PlayerActionMenuItem(stringResource(R.string.song_more_set_rating), onSetRating)
                 PlayerActionMenuItem(stringResource(R.string.player_edit_metadata), { openEditorPage(TagEditorOptionKind.Metadata, metadataEditorId) })
                 PlayerActionMenuItem(stringResource(R.string.player_lyric_timing), { openEditorPage(TagEditorOptionKind.LyricTiming, lyricTimingEditorId) })
                 if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
@@ -5059,6 +5252,9 @@ private fun PlayerActionMenu(
                 PlayerActionMenuItem(stringResource(R.string.player_speed_pitch), { page = PlayerActionSheetPage.Speed })
                 if (visualizerAvailable) {
                     PlayerActionMenuItem(stringResource(R.string.player_visualizer_settings), { page = PlayerActionSheetPage.Visualizer })
+                }
+                if (song != null && !song.path.startsWith("http://", ignoreCase = true) && !song.path.startsWith("https://", ignoreCase = true)) {
+                    PlayerActionMenuItem(stringResource(R.string.song_more_delete_permanently), onDeleteSong, danger = true)
                 }
             }
             PlayerActionSheetPage.Timer -> {
@@ -5648,13 +5844,14 @@ private fun DottedValueSlider(
 @Composable
 private fun PlayerActionMenuItem(
     text: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    danger: Boolean = false
 ) {
     Text(
         text = text,
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
-        color = MiuixTheme.colorScheme.onSurface,
+        color = if (danger) Color(0xFFE5484D) else MiuixTheme.colorScheme.onSurface,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
