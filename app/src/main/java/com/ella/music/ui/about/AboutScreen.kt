@@ -278,10 +278,6 @@ private fun AboutContent(
                         summary = "部分界面视觉与 UI 效果参考",
                         onClick = { uriHandler.openUri("https://coneplayer.trantor.ink/") },
                     )
-                    BasicComponent(
-                        title = "Mimo-V2.5-Pro",
-                        summary = "1.0.0 至 1.0.1 早期版本主要开发",
-                    )
                 }
             }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
+import androidx.documentfile.provider.DocumentFile
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
@@ -45,6 +46,12 @@ enum class PlaylistImportMode {
 
 data class PlaylistExportResult(
     val exportedCount: Int,
+    val skippedCount: Int
+)
+
+data class PlaylistBatchExportResult(
+    val exportedPlaylists: Int,
+    val exportedSongs: Int,
     val skippedCount: Int
 )
 
@@ -114,6 +121,17 @@ class PlaylistStore private constructor(context: Context) {
         if (id == FAVORITES_PLAYLIST_ID) return@withContext
         synchronized(lock) {
             val next = playlists.value.filterNot { it.id == id }.ensureFavorites()
+            _playlists.value = next
+            saveLocked(next)
+        }
+    }
+
+    suspend fun deletePlaylists(ids: Set<String>) = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext
+        synchronized(lock) {
+            val next = playlists.value
+                .filterNot { it.id != FAVORITES_PLAYLIST_ID && it.id in ids }
+                .ensureFavorites()
             _playlists.value = next
             saveLocked(next)
         }
@@ -318,6 +336,42 @@ class PlaylistStore private constructor(context: Context) {
         PlaylistExportFormat.M3u -> exportM3uPlaylist(playlist, uri)
     }
 
+    suspend fun exportLocalPlaylists(
+        playlists: List<UserPlaylist>,
+        treeUri: Uri,
+        format: PlaylistExportFormat = PlaylistExportFormat.PlainText
+    ): PlaylistBatchExportResult = withContext(Dispatchers.IO) {
+        val root = DocumentFile.fromTreeUri(appContext, treeUri)
+            ?: error("无法打开导出目录")
+        val mimeType = when (format) {
+            PlaylistExportFormat.PlainText -> "text/plain"
+            PlaylistExportFormat.M3u -> "audio/x-mpegurl"
+        }
+        val extension = when (format) {
+            PlaylistExportFormat.PlainText -> "txt"
+            PlaylistExportFormat.M3u -> "m3u"
+        }
+        var exportedPlaylists = 0
+        var exportedSongs = 0
+        var skippedSongs = 0
+        playlists.forEach { playlist ->
+            val target = root.createUniqueChildFile(
+                mimeType = mimeType,
+                baseName = playlist.name.safePlaylistFileName(),
+                extension = extension
+            ) ?: error("无法创建导出文件")
+            val result = exportLocalPlaylist(playlist, target.uri, format)
+            exportedPlaylists += 1
+            exportedSongs += result.exportedCount
+            skippedSongs += result.skippedCount
+        }
+        PlaylistBatchExportResult(
+            exportedPlaylists = exportedPlaylists,
+            exportedSongs = exportedSongs,
+            skippedCount = skippedSongs
+        )
+    }
+
     suspend fun exportSaltPlayerPlaylist(playlist: UserPlaylist, uri: Uri): PlaylistExportResult =
         withContext(Dispatchers.IO) {
             val paths = playlist.songs
@@ -407,6 +461,21 @@ class PlaylistStore private constructor(context: Context) {
         }
     }
 
+    suspend fun reorderPlaylists(orderedIds: List<String>) = withContext(Dispatchers.IO) {
+        if (orderedIds.isEmpty()) return@withContext
+        synchronized(lock) {
+            val current = playlists.value
+            val protected = current.filter { it.id == FAVORITES_PLAYLIST_ID }
+            val custom = current.filterNot { it.id == FAVORITES_PLAYLIST_ID }
+            val customById = custom.associateBy { it.id }
+            val reordered = orderedIds.mapNotNull(customById::get)
+            if (reordered.size != custom.size) return@withContext
+            val next = (protected + reordered).ensureFavorites()
+            _playlists.value = next
+            saveLocked(next)
+        }
+    }
+
     private fun loadPlaylists(): List<UserPlaylist> {
         if (!file.exists()) return emptyList<UserPlaylist>().ensureFavorites()
         return runCatching {
@@ -469,6 +538,27 @@ class PlaylistStore private constructor(context: Context) {
             ?.trim()
             .orEmpty()
         return displayName.ifBlank { "导入歌单" }
+    }
+
+    private fun String.safePlaylistFileName(): String =
+        replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "Ella Playlist" }
+
+    private fun DocumentFile.createUniqueChildFile(
+        mimeType: String,
+        baseName: String,
+        extension: String
+    ): DocumentFile? {
+        for (index in 0 until 1000) {
+            val candidate = if (index == 0) {
+                "$baseName.$extension"
+            } else {
+                "$baseName ($index).$extension"
+            }
+            if (findFile(candidate) == null) {
+                return createFile(mimeType, candidate)
+            }
+        }
+        return null
     }
 
     private fun placeholderSong(path: String): Song {

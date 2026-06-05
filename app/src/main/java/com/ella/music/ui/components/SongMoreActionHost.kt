@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -672,12 +674,7 @@ fun AddToPlaylistSheet(
     var appendToEnd by remember { mutableStateOf(false) }
     var sortMode by remember { mutableStateOf(AddPlaylistSortMode.Custom) }
     val sortedPlaylists = remember(playlists, sortMode) {
-        when (sortMode) {
-            AddPlaylistSortMode.Custom -> playlists
-            AddPlaylistSortMode.UpdatedAt -> playlists.sortedByDescending { it.updatedAt }
-            AddPlaylistSortMode.Name -> playlists.sortedBy { it.name.lowercase(Locale.getDefault()) }
-            AddPlaylistSortMode.SongCount -> playlists.sortedByDescending { it.songs.size }
-        }
+        playlists.sortedForAddToPlaylist(sortMode)
     }
     val visiblePlaylists = remember(sortedPlaylists, query) {
         query.trim().takeIf { it.isNotBlank() }?.let { q ->
@@ -745,13 +742,9 @@ fun AddToPlaylistSheet(
             ) {
                 items(visiblePlaylists, key = { it.id }) { playlist ->
                     val selected = playlist.id in selectedIds
-                    SongMenuItem(
-                        stringResource(
-                            R.string.song_more_playlist_item_summary,
-                            if (selected) "\u2713 " else "",
-                            playlist.name,
-                            playlist.songs.size
-                        ),
+                    AddToPlaylistRow(
+                        playlist = playlist,
+                        selected = selected,
                         onClick = {
                             if (multiSelect) {
                                 selectedIds = if (selected) {
@@ -794,6 +787,103 @@ private enum class AddPlaylistSortMode(val labelRes: Int) {
     SongCount(R.string.playlist_sort_song_count);
 
     fun next(): AddPlaylistSortMode = entries[(ordinal + 1) % entries.size]
+}
+
+private fun List<UserPlaylist>.sortedForAddToPlaylist(mode: AddPlaylistSortMode): List<UserPlaylist> {
+    val favorites = firstOrNull { it.id == FAVORITES_PLAYLIST_ID }
+    val others = filterNot { it.id == FAVORITES_PLAYLIST_ID }
+    val sortedOthers = when (mode) {
+        AddPlaylistSortMode.Custom -> others
+        AddPlaylistSortMode.UpdatedAt -> others.sortedWith(
+            compareByDescending<UserPlaylist> { it.updatedAt }
+                .thenByDescending { it.createdAt }
+                .thenBy { it.name.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+        AddPlaylistSortMode.Name -> others.sortedWith(
+            compareBy<UserPlaylist> { it.name.lowercase(Locale.ROOT) }
+                .thenByDescending { it.updatedAt }
+                .thenByDescending { it.createdAt }
+                .thenBy { it.id }
+        )
+        AddPlaylistSortMode.SongCount -> others.sortedWith(
+            compareByDescending<UserPlaylist> { it.songs.size }
+                .thenByDescending { it.updatedAt }
+                .thenByDescending { it.createdAt }
+                .thenBy { it.name.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+    }
+    return listOfNotNull(favorites) + sortedOthers
+}
+
+@Composable
+private fun AddToPlaylistRow(
+    playlist: UserPlaylist,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val coverModel = remember(playlist.id, playlist.songs) { playlist.coverModel() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 8.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MiuixTheme.colorScheme.surfaceContainer),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            if (coverModel != null) {
+                SafeCoverImage(
+                    model = coverModel,
+                    contentDescription = null,
+                    modifier = Modifier.size(42.dp),
+                    contentScale = ContentScale.Crop,
+                    sizePx = 128,
+                    showDefaultPlaceholder = false
+                )
+            } else {
+                DefaultAlbumCover(modifier = Modifier.size(42.dp))
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = playlist.name,
+                fontSize = 15.sp,
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${playlist.songs.size} 首歌曲",
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (selected) {
+            Text(
+                text = "\u2713",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+private fun UserPlaylist.coverModel(): Any? {
+    val song = songs.firstOrNull() ?: return null
+    return song.coverUrl.takeIf { it.isNotBlank() }
+        ?: song.albumId.takeIf { it > 0L }?.let { Uri.parse("content://media/external/audio/albumart/$it") }
 }
 
 @Composable

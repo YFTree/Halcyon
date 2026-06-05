@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -35,11 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -67,9 +71,16 @@ fun LyricFontScreen(
     val settingsManager = remember { SettingsManager(context) }
     val selectedFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
     val lyricFontWeight by settingsManager.lyricFontWeight.collectAsState(initial = 800)
-    var fonts by remember { mutableStateOf(collectFontChoices(context)) }
+    val lyricFontItalic by settingsManager.lyricFontItalic.collectAsState(initial = false)
+    var fonts by remember { mutableStateOf<List<FontChoice>>(emptyList()) }
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
+    LaunchedEffect(Unit) {
+        fonts = withContext(Dispatchers.IO) { collectFontChoices(context) }
+    }
+    LaunchedEffect(lyricFontItalic) {
+        if (lyricFontItalic) settingsManager.setLyricFontItalic(false)
+    }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
@@ -77,10 +88,14 @@ fun LyricFontScreen(
                 withContext(Dispatchers.IO) { copyImportedFont(context, uri) }
             }.onSuccess { font ->
                 settingsManager.setLyricFont(font.name, font.path)
-                fonts = collectFontChoices(context)
-                Toast.makeText(context, "已应用 ${font.name}", Toast.LENGTH_SHORT).show()
+                fonts = withContext(Dispatchers.IO) { collectFontChoices(context) }
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.settings_lyric_font_applied, font.name),
+                    Toast.LENGTH_SHORT
+                ).show()
             }.onFailure {
-                Toast.makeText(context, "字体导入失败", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.settings_lyric_font_import_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -92,12 +107,12 @@ fun LyricFontScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         EllaSmallTopAppBar(
-            title = "歌词字体",
+            title = stringResource(R.string.settings_lyric_font),
             navigationIcon = {
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = "返回",
+                        contentDescription = stringResource(R.string.common_back),
                         tint = MiuixTheme.colorScheme.onSurface
                     )
                 }
@@ -109,6 +124,7 @@ fun LyricFontScreen(
                             arrayOf(
                                 "font/ttf",
                                 "font/otf",
+                                "font/ttc",
                                 "application/x-font-ttf",
                                 "application/x-font-otf",
                                 "application/vnd.ms-opentype",
@@ -119,7 +135,7 @@ fun LyricFontScreen(
                 ) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Download,
-                        contentDescription = "导入字体",
+                        contentDescription = stringResource(R.string.settings_lyric_font_import),
                         tint = MiuixTheme.colorScheme.onSurface
                     )
                 }
@@ -139,13 +155,17 @@ fun LyricFontScreen(
                     onClick = {
                         scope.launch {
                             settingsManager.clearLyricFont()
-                            Toast.makeText(context, "已使用系统默认字体", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.settings_lyric_font_system_default_applied),
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     }
                 ) {
                     BasicComponent(
-                        title = "系统默认",
-                        summary = "使用应用默认字体渲染歌词",
+                        title = stringResource(R.string.settings_system_default),
+                        summary = stringResource(R.string.settings_lyric_font_system_default_summary),
                         endActions = {
                             if (selectedFontPath.isBlank()) {
                                 Icon(
@@ -162,25 +182,30 @@ fun LyricFontScreen(
                     modifier = Modifier.padding(vertical = 4.dp)
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                        Spacer(modifier = Modifier.height(6.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "歌词字重",
+                                    text = stringResource(R.string.settings_lyric_font_weight),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = MiuixTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "当前 ${lyricFontWeight.coerceIn(100, 900)}",
+                                    text = stringResource(
+                                        R.string.settings_lyric_font_weight_current,
+                                        lyricFontWeight.coerceIn(100, 900)
+                                    ),
                                     fontSize = 12.sp,
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                             Text(
-                                text = "春江花月夜",
+                                text = stringResource(R.string.settings_lyric_font_preview_sample),
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight(lyricFontWeight.coerceIn(100, 900)),
+                                fontFamily = previewFontFamily(selectedFontPath, lyricFontWeight, false),
                                 color = MiuixTheme.colorScheme.onSurface
                             )
                         }
@@ -188,20 +213,28 @@ fun LyricFontScreen(
                         Slider(
                             value = (lyricFontWeight.coerceIn(100, 900) - 100) / 800f,
                             onValueChange = { fraction ->
-                                val weight = ((fraction.coerceIn(0f, 1f) * 8).toInt() + 1) * 100
+                                val weight = (100 + fraction.coerceIn(0f, 1f) * 800f).toInt()
                                 scope.launch { settingsManager.setLyricFontWeight(weight) }
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
                         Row(modifier = Modifier.fillMaxWidth()) {
-                            Text(text = "细", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                            Text(
+                                text = stringResource(R.string.settings_lyric_font_weight_light),
+                                fontSize = 11.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
                             Spacer(modifier = Modifier.weight(1f))
-                            Text(text = "粗", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                            Text(
+                                text = stringResource(R.string.settings_lyric_font_weight_heavy),
+                                fontSize = 11.sp,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
                         }
                     }
                 }
                 Text(
-                    text = "系统字体",
+                    text = stringResource(R.string.settings_lyric_font_list),
                     fontSize = 14.sp,
                     color = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 4.dp)
@@ -211,14 +244,20 @@ fun LyricFontScreen(
             items(fonts, key = { it.path }) { font ->
                 FontChoiceItem(
                     font = font,
+                    currentWeight = lyricFontWeight,
+                    italic = false,
                     selected = selectedFontPath == font.path,
                     onClick = {
                         scope.launch {
                             settingsManager.setLyricFont(font.name, font.path)
-                            Toast.makeText(context, "已应用 ${font.name}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.settings_lyric_font_applied, font.name),
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                     },
-                    onDelete = if (font.source == "已导入") {
+                    onDelete = if (font.sourceRank == 1) {
                         {
                             scope.launch {
                                 val deleted = withContext(Dispatchers.IO) {
@@ -229,11 +268,15 @@ fun LyricFontScreen(
                                     settingsManager.clearLyricFont()
                                 }
 
-                                fonts = collectFontChoices(context)
+                                fonts = withContext(Dispatchers.IO) { collectFontChoices(context) }
 
                                 Toast.makeText(
                                     context,
-                                    if (deleted) "字体已删除" else "字体删除失败",
+                                    if (deleted) {
+                                        context.getString(R.string.settings_lyric_font_deleted)
+                                    } else {
+                                        context.getString(R.string.settings_lyric_font_delete_failed)
+                                    },
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -254,11 +297,15 @@ fun LyricFontScreen(
 @Composable
 private fun FontChoiceItem(
     font: FontChoice,
+    currentWeight: Int,
+    italic: Boolean,
     selected: Boolean,
     onClick: () -> Unit,
     onDelete: (() -> Unit)? = null
 ) {
-    val fontFamily = remember(font.path) { font.path.toFontFamilyOrNull() }
+    val fontFamily = remember(font.path, currentWeight, italic) {
+        font.path.toFontFamilyOrNull(currentWeight, italic)
+    }
 
     Card(
         modifier = Modifier.padding(vertical = 4.dp),
@@ -281,9 +328,10 @@ private fun FontChoiceItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "春江花月夜  Shape of You  123",
+                    text = stringResource(R.string.settings_lyric_font_preview_sample),
                     fontSize = 18.sp,
                     fontFamily = fontFamily,
+                    fontWeight = FontWeight(currentWeight.coerceIn(100, 900)),
                     color = MiuixTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -310,7 +358,7 @@ private fun FontChoiceItem(
             if (onDelete != null) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "删除",
+                    text = stringResource(R.string.common_delete),
                     fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.clickable(onClick = onDelete)
@@ -323,35 +371,70 @@ private fun FontChoiceItem(
 private data class FontChoice(
     val name: String,
     val path: String,
-    val source: String
+    val source: String,
+    val sourceRank: Int
 )
 
 private fun collectFontChoices(context: Context): List<FontChoice> {
+    val bundledFonts = ensureBundledFontChoices(context)
     val importedDir = File(context.filesDir, IMPORTED_FONT_DIR)
     val fontDirs = listOf(
-        importedDir to "已导入",
-        File("/system/fonts") to "系统",
-        File("/product/fonts") to "系统",
-        File("/system_ext/fonts") to "系统",
-        File("/vendor/fonts") to "系统"
+        Triple(importedDir, context.getString(R.string.settings_lyric_font_source_imported), 1),
+        Triple(File("/system/fonts"), context.getString(R.string.settings_lyric_font_source_system), 2),
+        Triple(File("/product/fonts"), context.getString(R.string.settings_lyric_font_source_system), 2),
+        Triple(File("/system_ext/fonts"), context.getString(R.string.settings_lyric_font_source_system), 2),
+        Triple(File("/vendor/fonts"), context.getString(R.string.settings_lyric_font_source_system), 2)
     )
-    return fontDirs
-        .flatMap { (dir, source) ->
+    return (bundledFonts + fontDirs
+        .flatMap { (dir, source, rank) ->
             dir.listFiles()
                 ?.asSequence()
                 ?.filter { it.isFile && it.extension.lowercase() in SUPPORTED_FONT_EXTENSIONS && it.canRead() }
-                ?.map { file -> FontChoice(file.nameWithoutExtension.cleanFontName(), file.absolutePath, source) }
+                ?.map { file -> FontChoice(file.nameWithoutExtension.cleanFontName(), file.absolutePath, source, rank) }
                 ?.toList()
                 .orEmpty()
-        }
+        })
         .distinctBy { it.path }
-        .sortedWith(compareBy<FontChoice> { it.source != "已导入" }.thenBy { it.name.lowercase() })
+        .sortedWith(compareBy<FontChoice> { it.sourceRank }.thenBy { it.name.lowercase() })
 }
 
-private fun String.toFontFamilyOrNull(): FontFamily? {
+private fun ensureBundledFontChoices(context: Context): List<FontChoice> {
+    val bundledDir = File(context.filesDir, BUNDLED_FONT_DIR).apply { mkdirs() }
+    val legacyTarget = File(bundledDir, "MiSansVF.ttf")
+    if (legacyTarget.exists()) {
+        runCatching { legacyTarget.delete() }
+    }
+    val target = File(bundledDir, "MiSans-Semibold.ttf")
+    runCatching {
+        if (!target.exists() || target.length() <= 0L) {
+            context.assets.open(MISANS_VF_ASSET_PATH).use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+    }.onFailure {
+        if (target.exists() && target.length() <= 0L) target.delete()
+    }
+    return if (target.exists() && target.canRead() && target.length() > 0L) {
+        listOf(
+            FontChoice(
+                name = "MiSans SemiBold",
+                path = target.absolutePath,
+                source = context.getString(R.string.settings_lyric_font_source_builtin),
+                sourceRank = 0
+            )
+        )
+    } else {
+        emptyList()
+    }
+}
+
+private fun String.toFontFamilyOrNull(weight: Int, italic: Boolean): FontFamily? {
     val file = File(this)
     if (!file.exists() || !file.canRead()) return null
-    return runCatching { FontFamily(Typeface.createFromFile(file)) }.getOrNull()
+    return runCatching {
+        val base = Typeface.createFromFile(file)
+        FontFamily(Typeface.create(base, weight.coerceIn(100, 900), italic))
+    }.getOrNull()
 }
 
 private fun copyImportedFont(context: Context, uri: Uri): FontChoice {
@@ -362,7 +445,12 @@ private fun copyImportedFont(context: Context, uri: Uri): FontChoice {
     context.contentResolver.openInputStream(uri)?.use { input ->
         target.outputStream().use { output -> input.copyTo(output) }
     } ?: error("Unable to open font")
-    return FontChoice(target.nameWithoutExtension.cleanFontName(), target.absolutePath, "已导入")
+    return FontChoice(
+        name = target.nameWithoutExtension.cleanFontName(),
+        path = target.absolutePath,
+        source = context.getString(R.string.settings_lyric_font_source_imported),
+        sourceRank = 1
+    )
 }
 
 private fun Context.resolveDisplayName(uri: Uri): String {
@@ -374,7 +462,7 @@ private fun Context.resolveDisplayName(uri: Uri): String {
 }
 
 private fun deleteImportedFont(font: FontChoice): Boolean {
-    if (font.source != "已导入") return false
+    if (font.sourceRank != 1) return false
 
     val file = File(font.path)
     if (!file.exists()) return true
@@ -396,5 +484,12 @@ private fun String.cleanFontName(): String {
     return replace('_', ' ').replace('-', ' ').trim().ifBlank { "字体" }
 }
 
+@Composable
+private fun previewFontFamily(path: String, weight: Int, italic: Boolean): FontFamily? {
+    return remember(path, weight, italic) { path.toFontFamilyOrNull(weight, italic) }
+}
+
 private const val IMPORTED_FONT_DIR = "lyric_fonts"
+private const val BUNDLED_FONT_DIR = "lyric_builtin_fonts"
+private const val MISANS_VF_ASSET_PATH = "fonts/MiSans-Semibold.ttf"
 private val SUPPORTED_FONT_EXTENSIONS = setOf("ttf", "otf", "ttc")

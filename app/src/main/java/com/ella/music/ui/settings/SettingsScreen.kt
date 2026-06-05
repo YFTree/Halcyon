@@ -652,7 +652,7 @@ fun SettingsDetailScreen(
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
 
-    val autoScan by settingsManager.autoScan.collectAsState(initial = true)
+    val autoScan by settingsManager.autoScan.collectAsState(initial = false)
     val lyriconEnabled by settingsManager.lyriconEnabled.collectAsState(initial = false)
     val lyriconTranslation by settingsManager.lyriconTranslation.collectAsState(initial = true)
     val lyriconPronunciation by settingsManager.lyriconPronunciation.collectAsState(initial = false)
@@ -706,6 +706,8 @@ fun SettingsDetailScreen(
     val hiResLogoUri by settingsManager.hiResLogoUri.collectAsState(initial = "")
     val playerImmersiveCover by settingsManager.playerImmersiveCover.collectAsState(initial = true)
     val transportButtonOutlines by settingsManager.transportButtonOutlines.collectAsState(initial = false)
+    val playerTapSeekEnabled by settingsManager.playerTapSeekEnabled.collectAsState(initial = true)
+    val playerShowTotalDuration by settingsManager.playerShowTotalDuration.collectAsState(initial = false)
     val playlistSpecialEntriesVisible by settingsManager.playlistSpecialEntriesVisible.collectAsState(initial = false)
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val lyricShareCustomInfo by settingsManager.lyricShareCustomInfo.collectAsState(initial = "")
@@ -1259,10 +1261,21 @@ fun SettingsDetailScreen(
                                 scope.launch { settingsManager.setTransportButtonOutlines(it) }
                             }
                         )
-                        ArrowPreference(
-                            title = stringResource(R.string.settings_lyric_font),
-                            summary = lyricFontName.ifBlank { stringResource(R.string.settings_system_default) },
-                            onClick = onNavigateToLyricFont
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_player_tap_seek),
+                            summary = stringResource(R.string.settings_player_tap_seek_summary),
+                            checked = playerTapSeekEnabled,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setPlayerTapSeekEnabled(it) }
+                            }
+                        )
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_player_show_total_duration),
+                            summary = stringResource(R.string.settings_player_show_total_duration_summary),
+                            checked = playerShowTotalDuration,
+                            onCheckedChange = {
+                                scope.launch { settingsManager.setPlayerShowTotalDuration(it) }
+                            }
                         )
                     }
                 }
@@ -1524,6 +1537,12 @@ fun SettingsDetailScreen(
                         onSelectedIndexChange = { index ->
                             scope.launch { settingsManager.setSmoothLyricView(index == 1) }
                         }
+                    )
+
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_lyric_font),
+                        summary = lyricFontName.ifBlank { stringResource(R.string.settings_system_default) },
+                        onClick = onNavigateToLyricFont
                     )
 
                     LyricSourcePriorityBlock(

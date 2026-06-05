@@ -139,6 +139,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
@@ -269,12 +270,46 @@ fun PlayerScreen(
     val lyricFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
     val lyricFontWeightValue by settingsManager.lyricFontWeight.collectAsState(initial = 800)
     val lyricFontScaleValue by settingsManager.lyricFontScale.collectAsState(initial = 100)
+    val playerTapSeekEnabled by settingsManager.playerTapSeekEnabled.collectAsState(initial = true)
+    val playerShowTotalDuration by settingsManager.playerShowTotalDuration.collectAsState(initial = false)
     val lyricSourceMode by settingsManager.lyricSourceMode.collectAsState(initial = SettingsManager.LYRIC_SOURCE_AUTO)
     val transportButtonOutlines by settingsManager.transportButtonOutlines.collectAsState(initial = false)
-    val lyricFontFamily = remember(lyricFontPath, lyricFontWeightValue) {
-        lyricFontPath.toPlayerLyricFontFamily(lyricFontWeightValue)
+    val bundledDefaultLyricFontPath = remember(context) { ensureBundledMiSansSemiboldPath(context) }
+    val preferBundledLyricFontByDefault = remember { !isXiaomiFamilyPlayerDevice() }
+    val defaultLyricFontPath = remember(preferBundledLyricFontByDefault, bundledDefaultLyricFontPath) {
+        bundledDefaultLyricFontPath.takeIf { preferBundledLyricFontByDefault }
     }
-    val lyricFontWeight = remember(lyricFontWeightValue) { FontWeight(lyricFontWeightValue.coerceIn(100, 900)) }
+    val effectiveLyricFontPath = remember(lyricFontPath, defaultLyricFontPath) {
+        lyricFontPath.ifBlank { defaultLyricFontPath.orEmpty() }
+    }
+    val effectiveLyricFontWeightValue = remember(lyricFontWeightValue, lyricFontPath, defaultLyricFontPath) {
+        when {
+            lyricFontPath.isNotBlank() -> lyricFontWeightValue
+            defaultLyricFontPath != null -> 800
+            else -> lyricFontWeightValue
+        }
+    }
+    val defaultLyricFontFamily = remember(preferBundledLyricFontByDefault) {
+        if (!preferBundledLyricFontByDefault) {
+            null
+        } else {
+            FontFamily(
+                Font(
+                    resId = R.font.misans_semibold,
+                    weight = FontWeight(800)
+                )
+            )
+        }
+    }
+    val lyricFontFamily = remember(effectiveLyricFontPath, effectiveLyricFontWeightValue, defaultLyricFontFamily) {
+        effectiveLyricFontPath.toPlayerLyricFontFamily(
+            weight = effectiveLyricFontWeightValue,
+            italic = false
+        ) ?: defaultLyricFontFamily
+    }
+    val lyricFontWeight = remember(effectiveLyricFontWeightValue) {
+        FontWeight(effectiveLyricFontWeightValue.coerceIn(100, 900))
+    }
     val lyricFontScale = remember(lyricFontScaleValue) { lyricFontScaleValue.coerceIn(75, 130) / 100f }
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
@@ -535,6 +570,8 @@ fun PlayerScreen(
             showPronunciation = showLyricPronunciation,
             fontFamily = lyricFontFamily,
             fontWeight = lyricFontWeight,
+            playerTapSeekEnabled = playerTapSeekEnabled,
+            playerShowTotalDuration = playerShowTotalDuration,
             menuExpanded = menuExpanded,
             queueExpanded = queueExpanded,
             playlist = playlist,
@@ -635,7 +672,11 @@ fun PlayerScreen(
             },
             onStopAfterCurrent = {
                 scope.launch { settingsManager.setSleepTimerStopAfterCurrent(it) }
-                playerViewModel.setStopAfterCurrentEnabled(it)
+                if (sleepTimerEndRealtimeMs == null) {
+                    playerViewModel.setStopAfterCurrentEnabled(it)
+                } else if (!it) {
+                    playerViewModel.setStopAfterCurrentEnabled(false)
+                }
                 Toast.makeText(
                     context,
                     if (it) context.getString(R.string.player_pause_after_current_on) else context.getString(R.string.player_pause_after_current_off),
@@ -644,10 +685,11 @@ fun PlayerScreen(
             },
             onTimer = { minutes ->
                 scope.launch { settingsManager.setSleepTimerCustomMinutes(minutes) }
-                if (sleepTimerStopAfterCurrent) {
-                    playerViewModel.setStopAfterCurrentEnabled(true)
-                }
-                playerViewModel.startSleepTimer(minutes)
+                playerViewModel.setStopAfterCurrentEnabled(false)
+                playerViewModel.startSleepTimer(
+                    minutes = minutes,
+                    stopAfterCurrentWhenExpired = sleepTimerStopAfterCurrent
+                )
                 Toast.makeText(context, context.getString(R.string.player_sleep_timer_minutes, minutes), Toast.LENGTH_SHORT).show()
             },
             onCustomTimerMinutes = { minutes ->
@@ -693,8 +735,9 @@ fun PlayerScreen(
             preferTtmlLyrics = preferTtmlLyrics,
             lyricSourceMode = lyricSourceMode,
             fontFamily = lyricFontFamily,
-            fontPath = lyricFontPath,
+            fontPath = effectiveLyricFontPath,
             fontWeight = lyricFontWeight,
+            italic = false,
             fontScale = lyricFontScale,
             perspectiveEffect = lyricPerspectiveEffect,
             palette = palette,
@@ -744,6 +787,9 @@ fun PlayerScreen(
             song = song,
             tagInfo = tagInfo,
             neteaseInfo = neteaseInfo,
+            customBackgroundUri = playerBackgroundUri.takeIf {
+                !immersiveAlbumCover && playerBackgroundEnabled && playerBackgroundUri.isNotBlank()
+            }.orEmpty(),
             onAlbum = {
                 val albumId = song?.albumIdentityId() ?: 0L
                 if (albumId > 0L) onNavigateToAlbum(albumId)
@@ -1030,6 +1076,7 @@ fun PlayerScreen(
                         showPronunciation = showLyricPronunciation,
                         fontFamily = lyricFontFamily,
                         fontWeight = lyricFontWeight,
+                        showTotalDuration = playerShowTotalDuration,
                         palette = palette,
                         flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
                         isPlaying = isPlaying,
@@ -1151,6 +1198,8 @@ private fun CoverPlayerPage(
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
     fontWeight: FontWeight,
+    playerTapSeekEnabled: Boolean,
+    playerShowTotalDuration: Boolean,
     menuExpanded: Boolean,
     queueExpanded: Boolean,
     playlist: List<Song>,
@@ -1247,6 +1296,7 @@ private fun CoverPlayerPage(
                 showPronunciation = showPronunciation,
                 fontFamily = fontFamily,
                 fontWeight = fontWeight,
+                showTotalDuration = playerShowTotalDuration,
                 queueExpanded = queueExpanded,
                 playlist = playlist,
                 audioSessionId = audioSessionId,
@@ -1385,6 +1435,8 @@ private fun CoverPlayerPage(
                             audioInfo = audioInfo,
                             bluetoothDeviceName = bluetoothDeviceName,
                             palette = palette,
+                            allowTapSeek = playerTapSeekEnabled,
+                            showTotalDuration = playerShowTotalDuration,
                             onSeek = onSeek
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -1512,6 +1564,8 @@ private fun CoverPlayerPage(
                             audioInfo = audioInfo,
                             bluetoothDeviceName = bluetoothDeviceName,
                             palette = palette,
+                            allowTapSeek = playerTapSeekEnabled,
+                            showTotalDuration = playerShowTotalDuration,
                             onSeek = onSeek
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -1556,6 +1610,7 @@ private fun CoverPlayerPage(
             showAddToQueue = false,
             extraTopContent = {
                 PlayerActionMenuItem(stringResource(R.string.player_landscape_lyrics), onLandscape)
+                PlayerActionMenuItem(stringResource(R.string.player_sleep_timer), onOpenTimer)
             }
         )
         if (menuExpanded && actionMenuInitialPage != PlayerActionSheetPage.Main) {
@@ -1618,6 +1673,7 @@ private fun LandscapeCoverPlayerPage(
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
     fontWeight: FontWeight,
+    showTotalDuration: Boolean,
     queueExpanded: Boolean,
     playlist: List<Song>,
     audioSessionId: Int,
@@ -1761,6 +1817,8 @@ private fun LandscapeCoverPlayerPage(
                     audioInfo = audioInfo,
                     bluetoothDeviceName = bluetoothDeviceName,
                     palette = palette,
+                    allowTapSeek = false,
+                    showTotalDuration = showTotalDuration,
                     onSeek = onSeek
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -2056,7 +2114,8 @@ private fun LandscapeStackCoverImage(
             contentDescription = null,
             modifier = modifier,
             contentScale = ContentScale.Fit,
-            sizePx = 512
+            sizePx = 512,
+            showDefaultPlaceholder = false
         )
     } else {
         DefaultAlbumCover(modifier = modifier)
@@ -2081,6 +2140,7 @@ private fun LyricsPlayerPage(
     fontFamily: FontFamily?,
     fontPath: String,
     fontWeight: FontWeight,
+    italic: Boolean,
     fontScale: Float,
     perspectiveEffect: Boolean,
     palette: PlayerPalette,
@@ -2213,6 +2273,7 @@ private fun LyricsPlayerPage(
                         fontScale = fontScale,
                         fontPath = fontPath,
                         fontWeight = fontWeight,
+                        italic = italic,
                         onLineClick = onLineClick,
                         onLineDoubleClick = onLineDoubleClick,
                         onLineLongClick = onLineLongClick,
@@ -2304,6 +2365,7 @@ private fun PlayerDetailPage(
     song: Song?,
     tagInfo: SongTagInfo?,
     neteaseInfo: NeteaseKeyInfo?,
+    customBackgroundUri: String,
     onAlbum: () -> Unit,
     onComposer: (String) -> Unit,
     onLyricist: (String) -> Unit,
@@ -2355,106 +2417,115 @@ private fun PlayerDetailPage(
         }
     }
 
-    LazyColumn(
-        modifier = modifier
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .windowInsetsPadding(WindowInsets.navigationBars),
-        contentPadding = PaddingValues(horizontal = 28.dp, vertical = 36.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        item {
-            Text(
-                text = stringResource(R.string.player_song_details),
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-            PlayerDetailInfoLine(stringResource(R.string.player_detail_song), song?.title.orEmpty().ifBlank { stringResource(R.string.player_unknown_song) })
-            PlayerDetailInfoLine(stringResource(R.string.player_detail_artist), song?.artist.orEmpty().ifBlank { stringResource(R.string.player_unknown_artist) })
-            PlayerDetailInfoLine(stringResource(R.string.player_detail_album), song?.album.orEmpty().ifBlank { stringResource(R.string.player_unknown_album) })
-            tagInfo?.displayComment?.takeIf { it.isNotBlank() }?.let {
-                PlayerDetailInfoLine(stringResource(R.string.player_detail_comment), it)
-            }
-            Spacer(modifier = Modifier.height(18.dp))
-        }
-
-        item {
-            PlayerDetailActionRow(
-                title = stringResource(R.string.player_detail_album_section),
-                summary = song?.album.orEmpty().ifBlank { stringResource(R.string.player_no_album_info) },
-                enabled = (song?.albumIdentityId() ?: 0L) > 0L,
-                onClick = onAlbum
+    Box(modifier = modifier.fillMaxSize()) {
+        if (customBackgroundUri.isNotBlank()) {
+            PlayerCustomBackground(
+                uri = customBackgroundUri,
+                modifier = Modifier.fillMaxSize()
             )
         }
-
-        composerNames.forEach { composer ->
-            item(key = "composer_$composer") {
-                PlayerDetailActionRow(
-                    title = stringResource(R.string.player_detail_composer),
-                    summary = composer,
-                    enabled = composer.isNotBlank(),
-                    onClick = { onComposer(composer) }
-                )
-            }
-        }
-
-        lyricistNames.forEach { lyricist ->
-            item(key = "lyricist_$lyricist") {
-                PlayerDetailActionRow(
-                    title = stringResource(R.string.player_detail_lyricist),
-                    summary = lyricist,
-                    enabled = lyricist.isNotBlank(),
-                    onClick = { onLyricist(lyricist) }
-                )
-            }
-        }
-
-        if (neteaseInfo?.hasDecodedContent == true) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .windowInsetsPadding(WindowInsets.navigationBars),
+            contentPadding = PaddingValues(horizontal = 28.dp, vertical = 36.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             item {
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.player_netease_section),
-                    color = Color.White.copy(alpha = 0.72f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
+                    text = stringResource(R.string.player_song_details),
+                    color = Color.White,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                PlayerDetailInfoLine(stringResource(R.string.player_detail_song), song?.title.orEmpty().ifBlank { stringResource(R.string.player_unknown_song) })
+                PlayerDetailInfoLine(stringResource(R.string.player_detail_artist), song?.artist.orEmpty().ifBlank { stringResource(R.string.player_unknown_artist) })
+                PlayerDetailInfoLine(stringResource(R.string.player_detail_album), song?.album.orEmpty().ifBlank { stringResource(R.string.player_unknown_album) })
+                tagInfo?.displayComment?.takeIf { it.isNotBlank() }?.let {
+                    PlayerDetailInfoLine(stringResource(R.string.player_detail_comment), it)
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+            }
+
+            item {
+                PlayerDetailActionRow(
+                    title = stringResource(R.string.player_detail_album_section),
+                    summary = song?.album.orEmpty().ifBlank { stringResource(R.string.player_no_album_info) },
+                    enabled = (song?.albumIdentityId() ?: 0L) > 0L,
+                    onClick = onAlbum
                 )
             }
-            if (neteaseInfo.musicId.isNotBlank()) {
-                item {
+
+            composerNames.forEach { composer ->
+                item(key = "composer_$composer") {
                     PlayerDetailActionRow(
-                        title = stringResource(R.string.player_netease_song_page),
-                        summary = neteaseInfo.musicName.ifBlank { neteaseInfo.musicId },
-                        onClick = onNeteaseSong
+                        title = stringResource(R.string.player_detail_composer),
+                        summary = composer,
+                        enabled = composer.isNotBlank(),
+                        onClick = { onComposer(composer) }
                     )
                 }
             }
-            neteaseInfo.artists
-                .joinToString(" / ") { it.name.ifBlank { it.id } }
-                .takeIf { it.isNotBlank() }
-                ?.let { artistSummary ->
-                    item(key = "netease_artists") {
+
+            lyricistNames.forEach { lyricist ->
+                item(key = "lyricist_$lyricist") {
+                    PlayerDetailActionRow(
+                        title = stringResource(R.string.player_detail_lyricist),
+                        summary = lyricist,
+                        enabled = lyricist.isNotBlank(),
+                        onClick = { onLyricist(lyricist) }
+                    )
+                }
+            }
+
+            if (neteaseInfo?.hasDecodedContent == true) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.player_netease_section),
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                if (neteaseInfo.musicId.isNotBlank()) {
+                    item {
                         PlayerDetailActionRow(
-                            title = stringResource(R.string.player_netease_artist_page),
-                            summary = artistSummary,
-                            enabled = neteaseArtists.isNotEmpty(),
-                            onClick = {
-                                if (neteaseArtists.size == 1) {
-                                    onNeteaseArtist(neteaseArtists.first().id)
-                                } else {
-                                    showNeteaseArtistPicker = true
-                                }
-                            }
+                            title = stringResource(R.string.player_netease_song_page),
+                            summary = neteaseInfo.musicName.ifBlank { neteaseInfo.musicId },
+                            onClick = onNeteaseSong
                         )
                     }
                 }
-            if (neteaseInfo.albumId.isNotBlank()) {
-                item {
-                    PlayerDetailActionRow(
-                        title = stringResource(R.string.player_netease_album_page),
-                        summary = neteaseInfo.albumName.ifBlank { neteaseInfo.albumId },
-                        onClick = onNeteaseAlbum
-                    )
+                neteaseInfo.artists
+                    .joinToString(" / ") { it.name.ifBlank { it.id } }
+                    .takeIf { it.isNotBlank() }
+                    ?.let { artistSummary ->
+                        item(key = "netease_artists") {
+                            PlayerDetailActionRow(
+                                title = stringResource(R.string.player_netease_artist_page),
+                                summary = artistSummary,
+                                enabled = neteaseArtists.isNotEmpty(),
+                                onClick = {
+                                    if (neteaseArtists.size == 1) {
+                                        onNeteaseArtist(neteaseArtists.first().id)
+                                    } else {
+                                        showNeteaseArtistPicker = true
+                                    }
+                                }
+                            )
+                        }
+                    }
+                if (neteaseInfo.albumId.isNotBlank()) {
+                    item {
+                        PlayerDetailActionRow(
+                            title = stringResource(R.string.player_netease_album_page),
+                            summary = neteaseInfo.albumName.ifBlank { neteaseInfo.albumId },
+                            onClick = onNeteaseAlbum
+                        )
+                    }
                 }
             }
         }
@@ -2558,6 +2629,7 @@ private fun LandscapeLyricsOverlay(
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
     fontWeight: FontWeight,
+    showTotalDuration: Boolean,
     palette: PlayerPalette,
     flowEffectMode: Int,
     isPlaying: Boolean,
@@ -2636,6 +2708,8 @@ private fun LandscapeLyricsOverlay(
                         currentPosition = currentPosition,
                         duration = duration,
                         palette = palette,
+                        allowTapSeek = false,
+                        showTotalDuration = showTotalDuration,
                         onSeek = onSeek
                     )
                     LandscapeTransportControls(
@@ -3076,6 +3150,8 @@ private fun LandscapeProgressRow(
     currentPosition: Long,
     duration: Long,
     palette: PlayerPalette,
+    allowTapSeek: Boolean,
+    showTotalDuration: Boolean,
     onSeek: (Float) -> Unit
 ) {
     Row(
@@ -3094,12 +3170,17 @@ private fun LandscapeProgressRow(
             value = if (duration > 0) currentPosition.toFloat() / duration.toFloat() else 0f,
             onSeek = onSeek,
             accent = palette.accent,
+            allowTapSeek = allowTapSeek,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 12.dp)
         )
         Text(
-            text = "-${formatTime((duration - currentPosition).coerceAtLeast(0L))}",
+            text = if (showTotalDuration) {
+                formatTime(duration.coerceAtLeast(0L))
+            } else {
+                "-${formatTime((duration - currentPosition).coerceAtLeast(0L))}"
+            },
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White.copy(alpha = 0.72f)
@@ -3444,6 +3525,8 @@ private fun PlayerProgressBlock(
     audioInfo: AudioInfo?,
     bluetoothDeviceName: String?,
     palette: PlayerPalette,
+    allowTapSeek: Boolean,
+    showTotalDuration: Boolean,
     onSeek: (Float) -> Unit
 ) {
     val context = LocalContext.current
@@ -3463,6 +3546,7 @@ private fun PlayerProgressBlock(
             value = if (duration > 0) currentPosition.toFloat() / duration.toFloat() else 0f,
             onSeek = onSeek,
             accent = palette.accent,
+            allowTapSeek = allowTapSeek,
             modifier = Modifier.fillMaxWidth()
         )
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -3498,7 +3582,11 @@ private fun PlayerProgressBlock(
                 )
             }
             Text(
-                text = "-${formatTime((duration - currentPosition).coerceAtLeast(0L))}",
+                text = if (showTotalDuration) {
+                    formatTime(duration.coerceAtLeast(0L))
+                } else {
+                    "-${formatTime((duration - currentPosition).coerceAtLeast(0L))}"
+                },
                 fontSize = 14.sp,
                 color = Color.White.copy(alpha = 0.56f),
                 modifier = Modifier.align(Alignment.CenterEnd)
@@ -5735,7 +5823,8 @@ internal fun AlbumArtView(
                     .fillMaxSize()
                     .clip(RoundedCornerShape(cornerRadius)),
                 contentScale = ContentScale.Fit,
-                sizePx = 768
+                sizePx = 768,
+                showDefaultPlaceholder = false
             )
         } else {
             DefaultAlbumCover(modifier = Modifier.fillMaxSize())
@@ -5860,6 +5949,7 @@ private fun GlowSeekBar(
     value: Float,
     onSeek: (Float) -> Unit,
     accent: Color,
+    allowTapSeek: Boolean,
     modifier: Modifier = Modifier
 ) {
     val safeProgress = value.coerceIn(0f, 1f)
@@ -5892,6 +5982,12 @@ private fun GlowSeekBar(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .pointerInput(allowTapSeek) {
+                    if (!allowTapSeek) return@pointerInput
+                    detectTapGestures { offset ->
+                        onSeek(progressAt(size.width.toFloat(), offset.x))
+                    }
+                }
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
@@ -6037,15 +6133,40 @@ private fun adaptiveTitleFontSize(text: String, maxSize: TextUnit): TextUnit {
     return (maxSize.value * scale).sp
 }
 
-private fun String.toPlayerLyricFontFamily(weight: Int): FontFamily? {
+private fun String.toPlayerLyricFontFamily(weight: Int, italic: Boolean): FontFamily? {
     if (isBlank()) return null
     val file = File(this)
     if (!file.exists() || !file.canRead()) return null
     return runCatching {
         val baseTypeface = Typeface.createFromFile(file)
-        val weightedTypeface = Typeface.create(baseTypeface, weight.coerceIn(100, 900), false)
+        val weightedTypeface = Typeface.create(baseTypeface, weight.coerceIn(100, 900), italic)
         FontFamily(weightedTypeface)
     }.getOrNull()
+}
+
+private fun ensureBundledMiSansSemiboldPath(context: Context): String {
+    val bundledDir = File(context.filesDir, "lyric_builtin_fonts").apply { mkdirs() }
+    val target = File(bundledDir, "MiSans-Semibold.ttf")
+    if (!target.exists() || target.length() <= 0L) {
+        runCatching {
+            context.assets.open("fonts/MiSans-Semibold.ttf").use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+        }.onFailure {
+            if (target.exists() && target.length() <= 0L) target.delete()
+        }
+    }
+    return target.takeIf { it.exists() && it.canRead() && it.length() > 0L }?.absolutePath.orEmpty()
+}
+
+private fun isXiaomiFamilyPlayerDevice(): Boolean {
+    val brand = Build.BRAND.orEmpty()
+    val manufacturer = Build.MANUFACTURER.orEmpty()
+    return listOf(brand, manufacturer).any { value ->
+        value.contains("xiaomi", ignoreCase = true) ||
+            value.contains("redmi", ignoreCase = true) ||
+            value.contains("poco", ignoreCase = true)
+    }
 }
 
 private fun String.isMusicSymbolOnly(): Boolean {

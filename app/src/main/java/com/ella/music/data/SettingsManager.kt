@@ -79,6 +79,8 @@ class SettingsManager(private val context: Context) {
         val KEY_MINI_PLAYER_LYRICS_ENABLED = booleanPreferencesKey("mini_player_lyrics_enabled")
         val KEY_MINI_PLAYER_RIGHT_BUTTON = intPreferencesKey("mini_player_right_button")
         val KEY_TRANSPORT_BUTTON_OUTLINES = booleanPreferencesKey("transport_button_outlines")
+        val KEY_PLAYER_TAP_SEEK_ENABLED = booleanPreferencesKey("player_tap_seek_enabled")
+        val KEY_PLAYER_SHOW_TOTAL_DURATION = booleanPreferencesKey("player_show_total_duration")
         val KEY_PLAYER_HDR_GLOW = booleanPreferencesKey("player_hdr_glow")
         val KEY_PLAYER_IMMERSIVE_COVER = booleanPreferencesKey("player_immersive_cover")
         val KEY_PLAYER_DYNAMIC_FLOW_ENABLED = booleanPreferencesKey("player_dynamic_flow_enabled")
@@ -93,6 +95,7 @@ class SettingsManager(private val context: Context) {
         val KEY_HI_RES_LOGO_ENABLED = booleanPreferencesKey("hi_res_logo_enabled")
         val KEY_HI_RES_LOGO_URI = stringPreferencesKey("hi_res_logo_uri")
         val KEY_PLAYLIST_SPECIAL_ENTRIES_VISIBLE = booleanPreferencesKey("playlist_special_entries_visible")
+        val KEY_PLAYLIST_CUSTOM_ORDER = stringPreferencesKey("playlist_custom_order")
         val KEY_SHOW_PLAY_NEXT_IN_LISTS = booleanPreferencesKey("show_play_next_in_lists")
         val KEY_LYRIC_SHARE_CUSTOM_INFO = stringPreferencesKey("lyric_share_custom_info")
         val KEY_SHOW_ALBUM_ARTISTS = booleanPreferencesKey("show_album_artists")
@@ -123,6 +126,8 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_FONT_PATH = stringPreferencesKey("lyric_font_path")
         val KEY_LYRIC_FONT_WEIGHT = intPreferencesKey("lyric_font_weight")
         val KEY_LYRIC_FONT_SCALE = intPreferencesKey("lyric_font_scale")
+        val KEY_LYRIC_FONT_ITALIC = booleanPreferencesKey("lyric_font_italic")
+        val KEY_LYRIC_FONT_APPLY_TO_PAGE = booleanPreferencesKey("lyric_font_apply_to_page")
         val KEY_LYRIC_PERSPECTIVE_EFFECT = booleanPreferencesKey("lyric_perspective_effect")
         val KEY_SCAN_INCLUDE_FOLDERS = stringPreferencesKey("scan_include_folders")
         val KEY_SCAN_EXCLUDE_FOLDERS = stringPreferencesKey("scan_exclude_folders")
@@ -150,6 +155,7 @@ class SettingsManager(private val context: Context) {
         val KEY_HOME_LIBRARY_TILE_ORDER = stringPreferencesKey("home_library_tile_order")
         val KEY_HOME_HIDDEN_LIBRARY_TILES = stringPreferencesKey("home_hidden_library_tiles")
         val KEY_HOME_TILE_PIN_BUTTONS_VISIBLE = booleanPreferencesKey("home_tile_pin_buttons_visible")
+        val KEY_NOTIFICATION_PERMISSION_PROMPT_HANDLED = booleanPreferencesKey("notification_permission_prompt_handled")
 
         val KEY_BLUETOOTH_LYRIC_ENABLED = booleanPreferencesKey("bluetooth_lyric_enabled")
         val KEY_BLUETOOTH_LYRIC_TRANSLATION = booleanPreferencesKey("bluetooth_lyric_translation")
@@ -233,7 +239,7 @@ class SettingsManager(private val context: Context) {
     val lyriconEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_ENABLED] ?: false }
     val lyriconTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_TRANSLATION] ?: true }
     val lyriconPronunciation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_PRONUNCIATION] ?: false }
-    val autoScan: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_SCAN] ?: true }
+    val autoScan: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_SCAN] ?: false }
     val gaplessPlayback: Flow<Boolean> = context.dataStore.data.map { it[KEY_GAPLESS] ?: true }
     val themeMode: Flow<Int> = context.dataStore.data.map { it[KEY_THEME_MODE] ?: 0 }
     val appLanguage: Flow<String> =
@@ -293,7 +299,7 @@ class SettingsManager(private val context: Context) {
     val lyricPageTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PAGE_TRANSLATION] ?: true }
     val lyricPageKeepScreenOn: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] ?: false }
-    val smoothLyricView: Flow<Boolean> = context.dataStore.data.map { it[KEY_SMOOTH_LYRIC_VIEW] ?: false }
+    val smoothLyricView: Flow<Boolean> = context.dataStore.data.map { it[KEY_SMOOTH_LYRIC_VIEW] ?: true }
     val miniPlayerLyricTranslation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] ?: true }
     val miniPlayerLyricSecondary: Flow<Int> = context.dataStore.data.map {
@@ -313,6 +319,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_MINI_PLAYER_RIGHT_BUTTON] ?: MINI_PLAYER_RIGHT_NEXT }
     val transportButtonOutlines: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_TRANSPORT_BUTTON_OUTLINES] ?: false }
+    val playerTapSeekEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_PLAYER_TAP_SEEK_ENABLED] ?: true }
+    val playerShowTotalDuration: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_PLAYER_SHOW_TOTAL_DURATION] ?: false }
     val playerHdrGlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PLAYER_HDR_GLOW] ?: false }
     val playerImmersiveCover: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_PLAYER_IMMERSIVE_COVER] ?: true }
@@ -390,6 +400,8 @@ class SettingsManager(private val context: Context) {
     val lyricFontPath: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_PATH] ?: "" }
     val lyricFontWeight: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_WEIGHT] ?: 800 }
     val lyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_SCALE] ?: 100 }
+    val lyricFontItalic: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_ITALIC] ?: false }
+    val lyricFontApplyToPage: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_APPLY_TO_PAGE] ?: true }
     val lyricPerspectiveEffect: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PERSPECTIVE_EFFECT] ?: false }
     val scanIncludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_INCLUDE_FOLDERS] ?: "" }
     val scanExcludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_EXCLUDE_FOLDERS] ?: "" }
@@ -397,6 +409,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_USE_ANDROID_MEDIA_LIBRARY] ?: true }
     val initialScanPromptHandled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_INITIAL_SCAN_PROMPT_HANDLED] ?: false }
+    val notificationPermissionPromptHandled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_NOTIFICATION_PERMISSION_PROMPT_HANDLED] ?: false }
     val artistSeparators: Flow<String> = context.dataStore.data.map { it[KEY_ARTIST_SEPARATORS] ?: "" }
     val artistProtectedNames: Flow<String> = context.dataStore.data.map { it[KEY_ARTIST_PROTECTED_NAMES] ?: "" }
     val genreSeparators: Flow<String> = context.dataStore.data.map { it[KEY_GENRE_SEPARATORS] ?: "" }
@@ -411,6 +425,13 @@ class SettingsManager(private val context: Context) {
     val folderListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_FOLDER_LIST] ?: 0 }
     val folderDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_FOLDER_DETAIL_SONG] ?: 0 }
     val playlistListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_PLAYLIST_LIST] ?: 2 }
+    val playlistCustomOrder: Flow<List<String>> = context.dataStore.data.map {
+        it[KEY_PLAYLIST_CUSTOM_ORDER]
+            .orEmpty()
+            .split('\n')
+            .map(String::trim)
+            .filter(String::isNotBlank)
+    }
     val playlistDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_PLAYLIST_DETAIL_SONG] ?: 2 }
     val categoryGridColumns: Flow<Int> = context.dataStore.data.map {
         val tablet = context.resources.configuration.smallestScreenWidthDp >= 600
@@ -942,6 +963,22 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_LYRIC_FONT_SCALE] = scale.coerceIn(75, 130) }
     }
 
+    suspend fun setLyricFontItalic(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_LYRIC_FONT_ITALIC] = enabled }
+    }
+
+    suspend fun setLyricFontApplyToPage(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_LYRIC_FONT_APPLY_TO_PAGE] = enabled }
+    }
+
+    suspend fun setPlayerTapSeekEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_PLAYER_TAP_SEEK_ENABLED] = enabled }
+    }
+
+    suspend fun setPlayerShowTotalDuration(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_PLAYER_SHOW_TOTAL_DURATION] = enabled }
+    }
+
     suspend fun setLibrarySongSortIndex(index: Int) {
         context.dataStore.edit { it[KEY_SORT_LIBRARY_SONG] = index.coerceAtLeast(0) }
     }
@@ -972,6 +1009,15 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setPlaylistListSortIndex(index: Int) {
         context.dataStore.edit { it[KEY_SORT_PLAYLIST_LIST] = index.coerceAtLeast(0) }
+    }
+
+    suspend fun setPlaylistCustomOrder(ids: List<String>) {
+        context.dataStore.edit {
+            it[KEY_PLAYLIST_CUSTOM_ORDER] = ids
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .joinToString(separator = "\n")
+        }
     }
 
     suspend fun setPlaylistDetailSongSortIndex(index: Int) {
@@ -1029,6 +1075,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setInitialScanPromptHandled(handled: Boolean) {
         context.dataStore.edit { it[KEY_INITIAL_SCAN_PROMPT_HANDLED] = handled }
+    }
+
+    suspend fun setNotificationPermissionPromptHandled(handled: Boolean) {
+        context.dataStore.edit { it[KEY_NOTIFICATION_PERMISSION_PROMPT_HANDLED] = handled }
     }
 
     suspend fun setArtistSeparators(separators: String) {
@@ -1096,6 +1146,8 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_LYRIC_PAGE_TRANSLATION)
             setBoolean(KEY_LYRIC_PAGE_KEEP_SCREEN_ON)
             setBoolean(KEY_SMOOTH_LYRIC_VIEW)
+            setBoolean(KEY_LYRIC_FONT_ITALIC)
+            setBoolean(KEY_LYRIC_FONT_APPLY_TO_PAGE)
             setBoolean(KEY_LYRIC_PERSPECTIVE_EFFECT)
             setBoolean(KEY_MINI_PLAYER_LYRIC_TRANSLATION)
             setInt(KEY_MINI_PLAYER_RIGHT_BUTTON)
@@ -1111,6 +1163,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_HOME_TILE_PIN_BUTTONS_VISIBLE)
             setBoolean(KEY_USE_ANDROID_MEDIA_LIBRARY)
             setBoolean(KEY_INITIAL_SCAN_PROMPT_HANDLED)
+            setBoolean(KEY_NOTIFICATION_PERMISSION_PROMPT_HANDLED)
             setBoolean(KEY_TAG_IGNORE_CASE)
             setBoolean(KEY_BLUETOOTH_LYRIC_ENABLED)
             setBoolean(KEY_BLUETOOTH_LYRIC_TRANSLATION)

@@ -372,6 +372,12 @@ fun MetadataCategoryDetailScreen(
     val sortedAlbums = remember(detailAlbums, albumSortMode, albumDurations) {
         detailAlbums.sortedForMetadataAlbumDetail(albumSortMode, albumDurations)
     }
+    val albumArtUrisByAlbumId = remember(sortedAlbums) {
+        sortedAlbums.associate { album -> album.id to mainViewModel.getAlbumArtUri(album.artAlbumId) }
+    }
+    val albumArtUrisBySongId = remember(sortedSongs) {
+        sortedSongs.associate { song -> song.id to mainViewModel.getAlbumArtUri(song.albumId) }
+    }
     val hasSameNameArtist = remember(type, name, librarySongs) {
         (type == "composer" || type == "lyricist") && mainViewModel.getSongsForArtist(name).isNotEmpty()
     }
@@ -648,7 +654,7 @@ fun MetadataCategoryDetailScreen(
                         MetadataAlbumRow(
                             album = album,
                             duration = albumDurations[album.id] ?: 0L,
-                            albumArtUri = mainViewModel.getAlbumArtUri(album.artAlbumId),
+                            albumArtUri = albumArtUrisByAlbumId[album.id],
                             onClick = { onAlbumClick(album.id) }
                         )
                     }
@@ -658,12 +664,12 @@ fun MetadataCategoryDetailScreen(
                         SongItem(
                             song = song,
                             isCurrent = currentSong?.id == song.id,
-                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
-                                loadCoverArt = mainViewModel::getCoverArtBitmap,
-                                loadAudioInfo = mainViewModel::getAudioInfo,
-                                isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
-                                loadSongRating = mainViewModel::getSongRating,
-                                selectionMode = selectionMode,
+                            albumArtUri = albumArtUrisBySongId[song.id],
+                            loadCoverArt = mainViewModel::getCoverArtBitmap,
+                            loadAudioInfo = mainViewModel::getAudioInfo,
+                            isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
+                            loadSongRating = mainViewModel::getSongRating,
+                            selectionMode = selectionMode,
                             selected = selected,
                             onLongClick = {
                                 selectionMode = true
@@ -1000,7 +1006,8 @@ private fun MetadataCategoryCard(
                     model = coverModel,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    sizePx = if (useSmallCover) 128 else 220
+                    sizePx = if (useSmallCover) 128 else 220,
+                    showDefaultPlaceholder = false
                 )
             }
             Box(
@@ -1083,7 +1090,8 @@ private fun FolderCategoryRow(
                     model = coverModel,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    sizePx = 160
+                    sizePx = 160,
+                    showDefaultPlaceholder = false
                 )
             } else {
                 FolderOutlineIcon(
@@ -1151,7 +1159,8 @@ private fun PersonCategoryRow(
                         .size(54.dp)
                         .clip(CircleShape),
                     contentScale = ContentScale.Crop,
-                    sizePx = 128
+                    sizePx = 128,
+                    showDefaultPlaceholder = false
                 )
             } else {
                 Icon(
@@ -1394,7 +1403,8 @@ private fun MetadataAlbumRow(
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
-                    sizePx = 128
+                    sizePx = 128,
+                    showDefaultPlaceholder = false
                 )
             } else {
                 DefaultAlbumCover(modifier = Modifier.fillMaxSize())

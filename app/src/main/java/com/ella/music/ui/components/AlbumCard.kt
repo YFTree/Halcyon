@@ -86,7 +86,8 @@ fun AlbumCard(
                     contentDescription = album.name,
                     modifier = Modifier.matchParentSize(),
                     contentScale = ContentScale.Crop,
-                    sizePx = 384
+                    sizePx = 384,
+                    showDefaultPlaceholder = false
                 )
             } else {
                 DefaultAlbumCover(modifier = Modifier.matchParentSize())

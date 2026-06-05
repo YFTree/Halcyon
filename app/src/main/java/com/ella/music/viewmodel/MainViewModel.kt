@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ella.music.data.PlaylistBatchImportResult
+import com.ella.music.data.PlaylistBatchExportResult
 import com.ella.music.data.PlaylistExportResult
 import com.ella.music.data.PlaylistExportFormat
 import com.ella.music.data.PlaylistImportResult
@@ -404,6 +405,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.clearRemoteMetadataCache()
     }
 
+    suspend fun prefetchWebDavMetadataHeaders(songs: List<Song>, maxItems: Int = 80) {
+        repository.prefetchWebDavMetadataHeaders(songs, maxItems)
+    }
+
     suspend fun songMatchesSearchSnapshot(song: Song, query: String): Boolean =
         repository.songMatchesSearchSnapshot(song, query)
 
@@ -434,6 +439,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { playlistStore.deletePlaylist(id) }
     }
 
+    fun deletePlaylists(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch { playlistStore.deletePlaylists(ids) }
+    }
+
     fun removeSongFromPlaylist(playlistId: String, songKey: String) {
         viewModelScope.launch { playlistStore.removeSongFromPlaylist(playlistId, songKey) }
     }
@@ -451,6 +461,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun reorderPlaylistSongs(playlistId: String, orderedKeys: List<String>) {
         if (orderedKeys.isEmpty()) return
         viewModelScope.launch { playlistStore.reorderPlaylistSongs(playlistId, orderedKeys) }
+    }
+
+    fun reorderPlaylists(orderedIds: List<String>) {
+        if (orderedIds.isEmpty()) return
+        viewModelScope.launch { playlistStore.reorderPlaylists(orderedIds) }
     }
 
     fun importLocalPlaylist(uri: Uri, onResult: (Result<PlaylistImportResult>) -> Unit) {
@@ -479,6 +494,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             val result = runCatching { playlistStore.exportLocalPlaylist(playlist, uri, format) }
+            onResult(result)
+        }
+    }
+
+    fun exportLocalPlaylists(
+        playlists: List<UserPlaylist>,
+        treeUri: Uri,
+        format: PlaylistExportFormat = PlaylistExportFormat.PlainText,
+        onResult: (Result<PlaylistBatchExportResult>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = runCatching { playlistStore.exportLocalPlaylists(playlists, treeUri, format) }
             onResult(result)
         }
     }

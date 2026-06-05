@@ -61,6 +61,7 @@ import com.ella.music.ui.components.requestPinnedEllaShortcut
 import com.ella.music.ui.navigation.Screen
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -94,6 +95,12 @@ fun ArtistListScreen(
     val sortMode = ArtistSortMode.entries.getOrElse(sortIndex) { ArtistSortMode.Name }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var scrollToTopRequest by remember { mutableStateOf(0) }
+    var listCoversEnabled by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(220L)
+        listCoversEnabled = true
+    }
 
     val artists = remember(songs, albums, showAlbumArtists, tagIgnoreCase) { mainViewModel.getArtists(showAlbumArtists) }
     val representativeSongsByArtist = remember(songs, showAlbumArtists, tagIgnoreCase) {
@@ -277,6 +284,7 @@ fun ArtistListScreen(
                             artist = artist,
                             representativeSong = representativeSongsByArtist[artistKey],
                             mainViewModel = mainViewModel,
+                            coversEnabled = listCoversEnabled,
                             summary = artist.summaryForSort(
                                 sortMode = sortMode,
                                 duration = artistDurations[artistKey] ?: 0L,
@@ -339,6 +347,7 @@ private fun ArtistRow(
     artist: Artist,
     representativeSong: Song?,
     mainViewModel: MainViewModel,
+    coversEnabled: Boolean,
     summary: String,
     onClick: () -> Unit,
     onLongClick: () -> Unit
@@ -358,9 +367,15 @@ private fun ArtistRow(
             null
         }
     }
+    val albumArtUri = remember(coversEnabled, representativeSong?.albumId) {
+        representativeSong
+            ?.albumId
+            ?.takeIf { coversEnabled && it > 0L }
+            ?.let(mainViewModel::getAlbumArtUri)
+    }
     val coverModel: Any? = representativeSong?.coverUrl?.takeIf { it.isNotBlank() }
         ?: embeddedCover
-        ?: representativeSong?.let { mainViewModel.getAlbumArtUri(it.albumId) }
+        ?: albumArtUri
 
     Row(
         modifier = Modifier
@@ -388,7 +403,8 @@ private fun ArtistRow(
                         .size(54.dp)
                         .clip(CircleShape),
                     contentScale = ContentScale.Crop,
-                    sizePx = 128
+                    sizePx = 128,
+                    showDefaultPlaceholder = false
                 )
             } else {
                 Icon(

@@ -172,6 +172,8 @@ class RawsLyricView @JvmOverloads constructor(
     private var isUserScrolling = false
     private var autoScrollResumeTime = 0L
     private var isDragging = false
+    private var downTouchX = 0f
+    private var downTouchY = 0f
     private var lastTouchY = 0f
     private var longPressHandled = false
     private var velocityTracker: VelocityTracker? = null
@@ -1595,7 +1597,6 @@ class RawsLyricView @JvmOverloads constructor(
         word: LyricWord,
         position: Long
     ) {
-        if (!text.isCjkKanaHangulOnlyLyricWord()) return
         val duration = word.duration
         if (duration < 900L || width <= 0f) return
         val elapsed = (position - word.begin).coerceIn(0L, duration)
@@ -1620,29 +1621,6 @@ class RawsLyricView @JvmOverloads constructor(
         sustainPaint.color = glowColor
         canvas.drawText(text, x, baseline, sustainPaint)
         canvas.restore()
-    }
-
-    private fun String.isCjkKanaHangulOnlyLyricWord(): Boolean {
-        var hasTarget = false
-        for (char in this) {
-            if (char.isWhitespace()) continue
-            val block = Character.UnicodeBlock.of(char)
-            val cjk = block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
-                    block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A ||
-                    block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B ||
-                    block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
-                    block == Character.UnicodeBlock.HIRAGANA ||
-                    block == Character.UnicodeBlock.KATAKANA ||
-                    block == Character.UnicodeBlock.HANGUL_SYLLABLES ||
-                    block == Character.UnicodeBlock.HANGUL_JAMO ||
-                    block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
-            if (cjk) {
-                hasTarget = true
-            } else if (char.isLetterOrDigit()) {
-                return false
-            }
-        }
-        return hasTarget
     }
 
     private fun calculateSweepFraction(entry: LineEntry, pos: Long, words: List<LyricWord>): Float {
@@ -1724,24 +1702,36 @@ class RawsLyricView @JvmOverloads constructor(
                 scroller.abortAnimation()
                 isDragging = false
                 longPressHandled = false
+                downTouchX = event.x
+                downTouchY = event.y
                 lastTouchY = event.y
                 velocityTracker?.recycle()
                 velocityTracker = VelocityTracker.obtain()
                 velocityTracker?.addMovement(event)
-                parent.requestDisallowInterceptTouchEvent(true)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 velocityTracker?.addMovement(event)
-                val dy = event.y - lastTouchY
-                if (!isDragging && abs(dy) > touchSlop) {
-                    scrollAnimator?.cancel()
-                    scroller.abortAnimation()
-                    isDragging = true
-                    isUserScrolling = true
-                    postFrame()
+                if (!isDragging) {
+                    val totalDx = event.x - downTouchX
+                    val totalDy = event.y - downTouchY
+                    if (abs(totalDx) > touchSlop || abs(totalDy) > touchSlop) {
+                        if (abs(totalDx) > abs(totalDy)) {
+                            parent.requestDisallowInterceptTouchEvent(false)
+                            velocityTracker?.recycle()
+                            velocityTracker = null
+                            return false
+                        }
+                        scrollAnimator?.cancel()
+                        scroller.abortAnimation()
+                        isDragging = true
+                        isUserScrolling = true
+                        parent.requestDisallowInterceptTouchEvent(true)
+                        postFrame()
+                    }
                 }
                 if (isDragging) {
+                    val dy = event.y - lastTouchY
                     scrollY -= dy
                     clampScroll()
                     lastTouchY = event.y

@@ -118,6 +118,19 @@ fun WebDavScreen(
         load(startUrl)
     }
 
+    LaunchedEffect(currentUrl, items, savedUrl, savedUser, savedPassword) {
+        if (savedUrl.isBlank() || items.isEmpty()) return@LaunchedEffect
+        val songsToPrefetch = items
+            .asSequence()
+            .filterNot { it.isDirectory }
+            .filter { WebDavClient.isAudioFile(it.name) }
+            .map { it.toRemoteSong() }
+            .take(80)
+            .toList()
+        if (songsToPrefetch.isEmpty()) return@LaunchedEffect
+        mainViewModel.prefetchWebDavMetadataHeaders(songsToPrefetch, maxItems = 80)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()

@@ -152,7 +152,8 @@ fun SongItem(
                     contentDescription = null,
                     modifier = Modifier.size(48.dp),
                     contentScale = ContentScale.Crop,
-                    sizePx = 128
+                    sizePx = 128,
+                    showDefaultPlaceholder = false
                 )
             } else {
                 DefaultAlbumCover(modifier = Modifier.size(48.dp))

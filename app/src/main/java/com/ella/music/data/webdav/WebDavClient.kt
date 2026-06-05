@@ -169,6 +169,56 @@ object WebDavClient {
         return target
     }
 
+    fun downloadHeaderToFile(
+        url: String,
+        config: WebDavConfig,
+        target: File,
+        maxBytes: Long = 512 * 1024L
+    ): File? {
+        val safeMaxBytes = maxBytes.coerceAtLeast(16 * 1024L)
+        val requestUrl = normalizeRequestUrl(url)
+        val request = Request.Builder()
+            .url(requestUrl)
+            .get()
+            .tag(WebDavConfig::class.java, config)
+            .header("Range", "bytes=0-${safeMaxBytes - 1}")
+            .apply { applyPreemptiveBasicAuth(config) }
+            .build()
+
+        return runCatching {
+            httpClient.newCall(request).execute().use { response ->
+                when (response.code) {
+                    200, 206 -> Unit
+                    401, 403, 404, 416 -> {
+                        Log.w(TAG, "WebDAV header prefetch skipped url=${requestUrl.safeLogUrl()} code=${response.code}")
+                        return@use null
+                    }
+                    else -> {
+                        Log.w(TAG, "WebDAV header prefetch failed url=${requestUrl.safeLogUrl()} code=${response.code}")
+                        return@use null
+                    }
+                }
+                val body = response.body ?: return@use null
+                target.parentFile?.mkdirs()
+                target.outputStream().use { output ->
+                    body.byteStream().use { input ->
+                        input.copyToBounded(output, safeMaxBytes)
+                    }
+                }
+                if (target.length() <= 0L) {
+                    target.delete()
+                    null
+                } else {
+                    target
+                }
+            }
+        }.getOrElse { error ->
+            Log.w(TAG, "WebDAV header prefetch failed url=${requestUrl.safeLogUrl()}", error)
+            target.delete()
+            null
+        }
+    }
+
     private fun parseItems(xml: String, baseUrl: String): List<WebDavItem> {
         return runCatching {
             val document = DocumentBuilderFactory.newInstance().apply {
@@ -186,6 +236,9 @@ object WebDavClient {
                 val isDirectory = resourceType.length > 0 || itemUrl.endsWith("/")
                 val size = response.firstText("getcontentlength").toLongOrNull() ?: 0L
                 val mimeType = response.firstText("getcontenttype")
+                    .substringBefore(';')
+                    .trim()
+                    .lowercase(Locale.ROOT)
                 WebDavItem(
                     name = Html.fromHtml(name, Html.FROM_HTML_MODE_LEGACY).toString(),
                     url = itemUrl,
@@ -461,6 +514,22 @@ object WebDavClient {
                 URI(uri.scheme, "***", uri.host, uri.port, uri.path, uri.query, uri.fragment).toString()
             }
         }.getOrDefault(this)
+    }
+
+    private fun java.io.InputStream.copyToBounded(
+        output: java.io.OutputStream,
+        maxBytes: Long
+    ): Long {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0L
+        while (total < maxBytes) {
+            val allowed = minOf(buffer.size.toLong(), maxBytes - total).toInt()
+            val read = read(buffer, 0, allowed)
+            if (read <= 0) break
+            output.write(buffer, 0, read)
+            total += read
+        }
+        return total
     }
 
     private fun Element.firstText(localName: String): String {

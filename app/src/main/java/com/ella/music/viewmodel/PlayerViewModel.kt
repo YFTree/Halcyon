@@ -998,7 +998,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun startSleepTimer(minutes: Int) {
+    fun startSleepTimer(
+        minutes: Int,
+        stopAfterCurrentWhenExpired: Boolean = false
+    ) {
         sleepTimerJob?.cancel()
         if (minutes <= 0) {
             _sleepTimerEndRealtimeMs.value = null
@@ -1008,6 +1011,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         sleepTimerJob = viewModelScope.launch {
             delay(minutes * 60_000L)
             _sleepTimerEndRealtimeMs.value = null
+            sleepTimerJob = null
+            if (stopAfterCurrentWhenExpired) {
+                val current = currentSong.value
+                if (current != null) {
+                    _stopAfterCurrentEnabled.value = true
+                    stopAfterCurrentSongId = current.id
+                    return@launch
+                }
+            }
             playerManager.pause()
         }
     }

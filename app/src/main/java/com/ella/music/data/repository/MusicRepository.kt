@@ -38,12 +38,16 @@ import com.ella.music.data.webdav.WebDavConfig
 import java.io.File
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -118,6 +122,7 @@ class MusicRepository(private val context: Context) {
     @Volatile
     private var searchSnapshotLoaded = false
     private val remoteAudioCacheDir = File(context.cacheDir, "webdav_audio")
+    private val remoteMetadataHeaderCacheDir = File(context.cacheDir, "webdav_metadata_headers")
 
     suspend fun scanMusic(
         minDurationMs: Long = 0,
@@ -692,6 +697,9 @@ class MusicRepository(private val context: Context) {
     }
 
     private suspend fun writeSongTags(song: Song, tags: AudioTagInfo): Result<Unit> {
+        if (song.isWebDavRemoteSong()) {
+            return Result.failure(IllegalArgumentException("Online / WebDAV songs are not supported for tag editing"))
+        }
         val path = song.effectiveLocalPathForMetadata()
         val writableUri = song.writableAudioUri()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && writableUri != null) {
@@ -778,23 +786,34 @@ class MusicRepository(private val context: Context) {
         }
         synchronized(coverArtLock) {
             coverArtCache.get(cacheKey)?.let { return it }
+            val metadataPath = song.effectiveLocalPathForMetadata()
+            val shouldPersistFailureState = !(song.isWebDavRemoteSong() && metadataPath == song.path)
             val art = try {
-                val metadataPath = song.effectiveLocalPathForMetadata()
-                audioTagRepository.readEmbeddedCoverDataBlocking(metadataPath)
-                    ?: readEmbeddedPictureWithRetriever(metadataPath)
+                if (song.isWebDavRemoteSong() && metadataPath == song.path) {
+                    null
+                } else {
+                    audioTagRepository.readEmbeddedCoverDataBlocking(metadataPath)
+                        ?: if (metadataPath.startsWith("http://", ignoreCase = true) || metadataPath.startsWith("https://", ignoreCase = true)) {
+                            null
+                        } else {
+                            readEmbeddedPictureWithRetriever(metadataPath)
+                        }
+                }
             } catch (error: Throwable) {
                 if (error is OutOfMemoryError) {
                     coverArtCache.evictAll()
                     coverBitmapCache.evictAll()
                 }
                 Log.w("MusicRepo", "Failed to extract cover art for ${song.path}", error)
-                coverDataStates[cacheKey] = CoverDataState.Error(error.message)
+                if (shouldPersistFailureState) {
+                    coverDataStates[cacheKey] = CoverDataState.Error(error.message)
+                }
                 null
             }
             if (art != null) {
                 coverArtCache.put(cacheKey, art)
                 coverDataStates[cacheKey] = CoverDataState.Found
-            } else {
+            } else if (shouldPersistFailureState) {
                 coverDataStates.putIfAbsent(cacheKey, CoverDataState.Missing)
             }
             return art
@@ -980,6 +999,10 @@ class MusicRepository(private val context: Context) {
         searchTextCache.keys.removeAll { it == song.searchSnapshotKey() || it.startsWith("${song.id}|") }
         saveSearchSnapshot()
         audioTagRepository.clear(song.effectiveLocalPathForMetadata())
+        if (song.isWebDavRemoteSong()) {
+            song.webDavHeaderCacheFile().delete()
+            song.webDavFullCacheFile().delete()
+        }
         val keyPrefix = song.coverCacheKey()
         coverDataStates.keys.removeAll { it.startsWith(keyPrefix) }
         coverArtCache.remove(song.coverDataCacheKey())
@@ -999,24 +1022,56 @@ class MusicRepository(private val context: Context) {
             if (remoteAudioCacheDir.exists()) {
                 remoteAudioCacheDir.deleteRecursively()
             }
+            if (remoteMetadataHeaderCacheDir.exists()) {
+                remoteMetadataHeaderCacheDir.deleteRecursively()
+            }
         }.onFailure {
             Log.w("MusicRepo", "Failed to clear online metadata cache", it)
         }
     }
 
-    private fun Song.effectiveLocalPathForMetadata(): String {
-        if (!path.startsWith("http://") && !path.startsWith("https://")) return path
-        val target = File(remoteAudioCacheDir, "${path.sha256()}.${fileName.substringAfterLast('.', "audio")}")
-        if (target.exists() && target.length() > 0L) return target.absolutePath
-        return runCatching {
-            val config = runBlocking(Dispatchers.IO) {
-                WebDavConfig(
-                    url = settingsManager.webDavUrl.first(),
-                    username = settingsManager.webDavUsername.first(),
-                    password = settingsManager.webDavPassword.first()
-                )
+    suspend fun prefetchWebDavMetadataHeaders(songs: List<Song>, maxItems: Int = 80) = coroutineScope {
+        val targets = songs
+            .asSequence()
+            .filter { it.isWebDavRemoteSong() }
+            .distinctBy { it.path }
+            .take(maxItems.coerceIn(1, 100))
+            .toList()
+        if (targets.isEmpty()) return@coroutineScope
+        val config = loadWebDavConfig() ?: return@coroutineScope
+        val semaphore = Semaphore(3)
+        targets.forEach { song ->
+            launch(Dispatchers.IO) {
+                semaphore.withPermit {
+                    val headerFile = song.webDavHeaderCacheFile()
+                    if (headerFile.exists() && headerFile.length() > 0L) {
+                        Log.d("MusicRepo", "WebDAV header prefetch hit cache url=${song.path.webDavSafeLogUrl()}")
+                        return@withPermit
+                    }
+                    Log.d("MusicRepo", "WebDAV header prefetch start url=${song.path.webDavSafeLogUrl()}")
+                    val cached = downloadWebDavMetadataHeader(song, config)
+                    if (cached != null) {
+                        Log.d("MusicRepo", "WebDAV header prefetch success url=${song.path.webDavSafeLogUrl()} bytes=${headerFile.length()}")
+                    } else {
+                        Log.d("MusicRepo", "WebDAV header prefetch skipped url=${song.path.webDavSafeLogUrl()}")
+                    }
+                }
             }
-            WebDavClient.downloadToFile(path, config, target).absolutePath
+        }
+    }
+
+    private fun Song.effectiveLocalPathForMetadata(allowFullDownload: Boolean = false): String {
+        if (path.startsWith("content://", ignoreCase = true)) return path
+        if (!isWebDavRemoteSong()) return path
+        val fullCache = webDavFullCacheFile()
+        if (fullCache.exists() && fullCache.length() > 0L) return fullCache.absolutePath
+        val headerCache = webDavHeaderCacheFile()
+        if (headerCache.exists() && headerCache.length() > 0L) return headerCache.absolutePath
+        val config = runBlocking(Dispatchers.IO) { loadWebDavConfig() } ?: return path
+        downloadWebDavMetadataHeader(this, config)?.let { return it.absolutePath }
+        if (!allowFullDownload) return path
+        return runCatching {
+            WebDavClient.downloadToFile(path, config, fullCache).absolutePath
         }.getOrElse {
             Log.w("MusicRepo", "Failed to cache remote metadata file for $path", it)
             path
@@ -1027,6 +1082,46 @@ class MusicRepository(private val context: Context) {
         val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
     }
+
+    private suspend fun loadWebDavConfig(): WebDavConfig? {
+        val url = settingsManager.webDavUrl.first().trim()
+        if (url.isBlank()) return null
+        return WebDavConfig(
+            url = url,
+            username = settingsManager.webDavUsername.first(),
+            password = settingsManager.webDavPassword.first()
+        )
+    }
+
+    private fun Song.isWebDavRemoteSong(): Boolean =
+        (path.startsWith("http://", ignoreCase = true) ||
+            path.startsWith("https://", ignoreCase = true)) &&
+            onlineSource.isBlank()
+
+    private fun Song.webDavCacheExtension(): String =
+        fileName.substringAfterLast('.', "audio").ifBlank { "audio" }
+
+    private fun Song.webDavFullCacheFile(): File =
+        File(remoteAudioCacheDir, "${path.sha256()}.${webDavCacheExtension()}")
+
+    private fun Song.webDavHeaderCacheFile(): File =
+        File(remoteMetadataHeaderCacheDir, "${path.sha256()}.${webDavCacheExtension()}")
+
+    private fun downloadWebDavMetadataHeader(song: Song, config: WebDavConfig): File? {
+        val target = song.webDavHeaderCacheFile()
+        if (target.exists() && target.length() > 0L) return target
+        return WebDavClient.downloadHeaderToFile(song.path, config, target)
+    }
+
+    private fun String.webDavSafeLogUrl(): String =
+        runCatching {
+            val uri = java.net.URI(this)
+            if (uri.userInfo == null) {
+                this
+            } else {
+                java.net.URI(uri.scheme, "***", uri.host, uri.port, uri.path, uri.query, uri.fragment).toString()
+            }
+        }.getOrDefault(this)
 
     private fun MediaFormat.getIntOrZero(key: String): Int {
         return if (containsKey(key)) runCatching { getInteger(key) }.getOrDefault(0) else 0

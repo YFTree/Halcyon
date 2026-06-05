@@ -94,6 +94,7 @@ fun SmoothLyricView(
     fontScale: Float = 1f,
     fontPath: String = "",
     fontWeight: FontWeight = FontWeight.ExtraBold,
+    italic: Boolean = false,
     onLineClick: (LyricLine) -> Unit = {},
     onLineDoubleClick: () -> Unit = {},
     onLineLongClick: (LyricLine) -> Unit = {}
@@ -113,11 +114,15 @@ fun SmoothLyricView(
     val lyriconSong = remember(songId, songTitle, songArtist, lyrics) {
         lyrics.toLyriconSong(songId, songTitle, songArtist)
     }
-    val lyricTypeface = remember(fontPath, fontWeight) {
-        fontPath.toAndroidTypeface(fontWeight.weight, boldFallback = true)
+    val lyricTypeface = remember(fontPath, fontWeight, italic) {
+        fontPath.toAndroidTypeface(fontWeight.weight, italic = italic, boldFallback = true)
     }
-    val secondaryTypeface = remember(fontPath, fontWeight) {
-        fontPath.toAndroidTypeface((fontWeight.weight - 200).coerceIn(100, 900), boldFallback = false)
+    val secondaryTypeface = remember(fontPath, fontWeight, italic) {
+        fontPath.toAndroidTypeface(
+            weight = (fontWeight.weight - 200).coerceIn(100, 900),
+            italic = italic,
+            boldFallback = false
+        )
     }
     val style = remember(fontScale, density.fontScale, lyricTypeface, secondaryTypeface) {
         RichLyricLineConfig(
@@ -183,7 +188,7 @@ fun SmoothLyricView(
     )
 }
 
-private fun String.toAndroidTypeface(weight: Int, boldFallback: Boolean): android.graphics.Typeface {
+private fun String.toAndroidTypeface(weight: Int, italic: Boolean, boldFallback: Boolean): android.graphics.Typeface {
     val safeWeight = weight.coerceIn(100, 900)
     val base = if (isNotBlank()) {
         runCatching {
@@ -193,7 +198,7 @@ private fun String.toAndroidTypeface(weight: Int, boldFallback: Boolean): androi
     } else {
         null
     } ?: if (boldFallback) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
-    return android.graphics.Typeface.create(base, safeWeight, false)
+    return android.graphics.Typeface.create(base, safeWeight, italic)
 }
 
 @Composable
@@ -790,7 +795,6 @@ private fun buildWordTimedAnnotatedString(
 }
 
 private fun LyricWord.sustainShadowAt(positionMs: Long): Shadow? {
-    if (!text.lineBreakSafeText().hasCjkKanaOrHangul()) return null
     val duration = endMs - startMs
     if (duration < 900L || positionMs !in startMs..endMs) return null
     val triggerDelay = minOf(420L, (duration * 0.36f).toLong().coerceAtLeast(1L))

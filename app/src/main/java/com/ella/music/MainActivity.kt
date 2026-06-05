@@ -275,6 +275,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun isVivoFamilyDevice(): Boolean {
+    val manufacturer = Build.MANUFACTURER.orEmpty().lowercase()
+    val brand = Build.BRAND.orEmpty().lowercase()
+    return manufacturer.contains("vivo") ||
+        brand.contains("vivo") ||
+        manufacturer.contains("iqoo") ||
+        brand.contains("iqoo")
+}
+
 @Composable
 fun EllaApp(
     mainViewModel: MainViewModel,
@@ -381,7 +390,7 @@ fun EllaApp(
             scope.launch {
                 settingsManager.setUseAndroidMediaLibrary(false)
                 settingsManager.setScanIncludeFolders(folderPath)
-                settingsManager.setAutoScan(true)
+                settingsManager.setAutoScan(false)
                 mainViewModel.scanMusic()
             }
             Toast.makeText(context, context.getString(R.string.scan_folder_added), Toast.LENGTH_SHORT).show()
@@ -456,7 +465,11 @@ fun EllaApp(
     val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     val startupPosterEnabled by settingsManager.startupPosterEnabled.collectAsState(initial = false)
     val startupPosterUri by settingsManager.startupPosterUri.collectAsState(initial = "")
+    val notificationPermissionPromptHandled by settingsManager.notificationPermissionPromptHandled.collectAsState(initial = false)
     var showStartupPoster by rememberSaveable { mutableStateOf(true) }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     LaunchedEffect(startupPosterEnabled, startupPosterUri) {
         if (startupPosterEnabled && startupPosterUri.isNotBlank() && showStartupPoster) {
@@ -527,6 +540,15 @@ fun EllaApp(
 
     val wallpaperVisible = appWallpaperEnabled && appWallpaperUri.isNotBlank()
     val startupPosterVisible = startupPosterEnabled && startupPosterUri.isNotBlank() && showStartupPoster
+    LaunchedEffect(startupPosterVisible, notificationPermissionPromptHandled) {
+        if (startupPosterVisible) return@LaunchedEffect
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
+        if (notificationPermissionPromptHandled || !isVivoFamilyDevice()) return@LaunchedEffect
+        scope.launch { settingsManager.setNotificationPermissionPromptHandled(true) }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val contentModifier = Modifier
         .fillMaxSize()
         .then(if (wallpaperVisible) Modifier else Modifier.background(MiuixTheme.colorScheme.background))
@@ -709,7 +731,7 @@ fun EllaApp(
                     scope.launch {
                         settingsManager.setInitialScanPromptHandled(true)
                         settingsManager.setUseAndroidMediaLibrary(true)
-                        settingsManager.setAutoScan(true)
+                        settingsManager.setAutoScan(false)
                         mainViewModel.scanMusic()
                     }
                 }

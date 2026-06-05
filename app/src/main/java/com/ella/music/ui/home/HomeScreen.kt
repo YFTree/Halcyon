@@ -278,6 +278,13 @@ fun LibraryScreen(
     }
     val sortedSongs = sortedResult?.songs.orEmpty()
     val sortKeysBySongId = sortedResult?.sortKeysBySongId.orEmpty()
+    val albumArtUrisBySongId = remember(sortedSongs, listCoversEnabled) {
+        if (!listCoversEnabled) {
+            emptyMap()
+        } else {
+            sortedSongs.associate { song -> song.id to mainViewModel.getAlbumArtUri(song.albumId) }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -287,7 +294,7 @@ fun LibraryScreen(
     ) {
         Box {
             EllaSmallTopAppBar(
-                title = stringResource(R.string.tab_library),
+                title = "",
                 color = ellaPageBackground(),
                 titleStartPadding = if (!selectionMode && songs.isNotEmpty()) 156.dp else 20.dp,
                 titleEndPadding = if (selectionMode) 170.dp else 152.dp,
@@ -594,7 +601,7 @@ fun LibraryScreen(
                             SongItem(
                                 song = song,
                                 isCurrent = currentSong?.id == song.id,
-                                albumArtUri = if (listCoversEnabled) mainViewModel.getAlbumArtUri(song.albumId) else null,
+                                albumArtUri = albumArtUrisBySongId[song.id],
                                 loadCoverArt = mainViewModel::getCoverArtBitmap,
                                 loadAudioInfo = mainViewModel::getAudioInfo,
                                 isFavorite = song.playlistIdentityKey() in favoriteSongKeys,

@@ -110,6 +110,7 @@ import top.yukonga.miuix.kmp.icon.extended.Share
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -132,22 +133,42 @@ fun PlaylistScreen(
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val playlistSortIndex by mainViewModel.settingsManager.playlistListSortIndex.collectAsState(initial = 2)
+    val playlistCustomOrderIds by mainViewModel.settingsManager.playlistCustomOrder.collectAsState(initial = emptyList())
     val specialPlaylistEntriesVisible by mainViewModel.settingsManager.playlistSpecialEntriesVisible.collectAsState(initial = false)
     val playlistSortMode = PlaylistSortMode.entries.getOrElse(playlistSortIndex) { PlaylistSortMode.UpdatedAt }
     var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var showImportModeSheet by remember { mutableStateOf(false) }
     var playlistPendingDelete by remember { mutableStateOf<UserPlaylist?>(null) }
+    var playlistsPendingDelete by remember { mutableStateOf<List<UserPlaylist>>(emptyList()) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedPlaylistIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var showExportAllFormatSheet by remember { mutableStateOf(false) }
+    var pendingExportAllFormat by remember { mutableStateOf<PlaylistExportFormat?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val favorites = playlists.firstOrNull { it.id == FAVORITES_PLAYLIST_ID }
-    val customPlaylists = remember(playlists, playlistSortMode) {
-        playlists
-            .filterNot { it.id == FAVORITES_PLAYLIST_ID || it.id == FIVE_STAR_PLAYLIST_ID }
-            .sortedForPlaylistList(playlistSortMode)
+    val storedCustomPlaylists = remember(playlists) {
+        playlists.filterNot { it.id == FAVORITES_PLAYLIST_ID || it.id == FIVE_STAR_PLAYLIST_ID }
     }
-    val displayedCustomPlaylists = remember(customPlaylists, searchQuery) {
+    val orderedCustomPlaylists = remember(storedCustomPlaylists, playlistCustomOrderIds) {
+        storedCustomPlaylists.applyPlaylistCustomOrder(playlistCustomOrderIds)
+    }
+    var manualCustomPlaylists by remember(orderedCustomPlaylists) { mutableStateOf(orderedCustomPlaylists) }
+    LaunchedEffect(orderedCustomPlaylists) {
+        manualCustomPlaylists = orderedCustomPlaylists
+    }
+    val customPlaylists = remember(storedCustomPlaylists, orderedCustomPlaylists, playlistSortMode) {
+        when (playlistSortMode) {
+            PlaylistSortMode.Custom -> orderedCustomPlaylists
+            PlaylistSortMode.CustomDesc -> orderedCustomPlaylists.asReversed()
+            else -> storedCustomPlaylists.sortedForPlaylistList(playlistSortMode)
+        }
+    }
+    val reorderEnabled = selectionMode && playlistSortMode == PlaylistSortMode.Custom && searchQuery.isBlank()
+    val customPlaylistsSource = if (reorderEnabled) manualCustomPlaylists else customPlaylists
+    val displayedCustomPlaylists = remember(customPlaylistsSource, searchQuery) {
         val query = searchQuery.trim()
-        if (query.isBlank()) customPlaylists else customPlaylists.filter { it.matchesPlaylistSearch(query) }
+        if (query.isBlank()) customPlaylistsSource else customPlaylistsSource.filter { it.matchesPlaylistSearch(query) }
     }
     val playlistCoverModels = remember(playlists, librarySongs) {
         playlists.associate { playlist ->
@@ -174,6 +195,38 @@ fun PlaylistScreen(
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         pendingImportUris = uris
         showImportModeSheet = true
+    }
+    val exportAllFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val format = pendingExportAllFormat
+        pendingExportAllFormat = null
+        if (uri == null || format == null) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        }
+        mainViewModel.exportLocalPlaylists(storedCustomPlaylists, uri, format) { result ->
+            result
+                .onSuccess { exportResult ->
+                    Toast.makeText(
+                        context,
+                        context.getString(
+                            R.string.playlist_export_all_done,
+                            exportResult.exportedPlaylists,
+                            exportResult.exportedSongs
+                        ),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                .onFailure {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.playlist_export_failed, it.message.orEmpty()),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+        }
     }
     fun importPendingPlaylists(mode: PlaylistImportMode) {
         val uris = pendingImportUris
@@ -227,8 +280,32 @@ fun PlaylistScreen(
                 }
         }
     }
-    BackHandler(enabled = sortExpanded || searchExpanded) {
+    fun finishSelectionMode() {
+        selectionMode = false
+        selectedPlaylistIds = emptySet()
+    }
+    fun togglePlaylistSelection(playlist: UserPlaylist) {
+        val next = if (playlist.id in selectedPlaylistIds) selectedPlaylistIds - playlist.id else selectedPlaylistIds + playlist.id
+        selectedPlaylistIds = next
+        if (next.isEmpty()) selectionMode = false
+    }
+    val playlistListHeaderCount = (if (showFavorites) 1 else 0) + (if (showFiveStar) 1 else 0) + 1
+    val reorderableLazyListState = rememberReorderableLazyListState(
+        lazyListState = listState,
+        onMove = { from, to ->
+            if (!reorderEnabled) return@rememberReorderableLazyListState
+            val fromIndex = from.index - playlistListHeaderCount
+            val toIndex = to.index - playlistListHeaderCount
+            if (fromIndex !in manualCustomPlaylists.indices || toIndex !in manualCustomPlaylists.indices) return@rememberReorderableLazyListState
+            manualCustomPlaylists = manualCustomPlaylists.toMutableList().apply {
+                add(toIndex, removeAt(fromIndex))
+            }
+        }
+    )
+
+    BackHandler(enabled = selectionMode || sortExpanded || searchExpanded) {
         when {
+            selectionMode -> finishSelectionMode()
             searchExpanded -> {
                 searchExpanded = false
                 searchQuery = ""
@@ -245,10 +322,14 @@ fun PlaylistScreen(
     ) {
         Box {
             EllaSmallTopAppBar(
-                title = stringResource(R.string.playlist_title),
+                title = if (selectionMode) {
+                    stringResource(R.string.playlist_selected_count, selectedPlaylistIds.size)
+                } else {
+                    stringResource(R.string.playlist_title)
+                },
                 color = ellaPageBackground(),
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (selectionMode) finishSelectionMode() else onBack() }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Back,
                             contentDescription = stringResource(R.string.common_back),
@@ -257,51 +338,65 @@ fun PlaylistScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Sort,
-                            contentDescription = stringResource(R.string.common_sort),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = {
-                        searchExpanded = !searchExpanded
-                        if (!searchExpanded) searchQuery = ""
-                    }) {
-                        Icon(
-                            imageVector = MiuixIcons.Basic.Search,
-                            contentDescription = stringResource(R.string.common_search),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = {
-                        importLauncher.launch(
-                            arrayOf(
-                                "audio/x-mpegurl",
-                                "audio/mpegurl",
-                                "application/vnd.apple.mpegurl",
-                                "text/plain",
-                                "application/octet-stream",
-                                "*/*"
+                    if (selectionMode) {
+                        IconButton(onClick = {
+                            val targets = storedCustomPlaylists.filter { it.id in selectedPlaylistIds }
+                            if (targets.isNotEmpty()) playlistsPendingDelete = targets
+                        }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Delete,
+                                contentDescription = stringResource(R.string.common_delete),
+                                tint = Color(0xFFE5484D),
+                                modifier = Modifier.size(24.dp)
                             )
-                        )
-                    }) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Download,
-                            contentDescription = stringResource(R.string.playlist_import_title),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = { showCreateDialog = true }) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Add,
-                            contentDescription = stringResource(R.string.playlist_create_title),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        }
+                    } else {
+                        IconButton(onClick = { sortExpanded = !sortExpanded }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Sort,
+                                contentDescription = stringResource(R.string.common_sort),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        IconButton(onClick = {
+                            searchExpanded = !searchExpanded
+                            if (!searchExpanded) searchQuery = ""
+                        }) {
+                            Icon(
+                                imageVector = MiuixIcons.Basic.Search,
+                                contentDescription = stringResource(R.string.common_search),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        IconButton(onClick = {
+                            importLauncher.launch(
+                                arrayOf(
+                                    "audio/x-mpegurl",
+                                    "audio/mpegurl",
+                                    "application/vnd.apple.mpegurl",
+                                    "text/plain",
+                                    "application/octet-stream",
+                                    "*/*"
+                                )
+                            )
+                        }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Download,
+                                contentDescription = stringResource(R.string.playlist_import_title),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        IconButton(onClick = { showExportAllFormatSheet = true }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Share,
+                                contentDescription = stringResource(R.string.playlist_export_all_title),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             )
@@ -393,16 +488,36 @@ fun PlaylistScreen(
             }
 
             item {
-                Text(
-                    text = stringResource(
-                        R.string.playlist_list_summary,
-                        displayedCustomPlaylists.size,
-                        stringResource(playlistSortMode.labelRes)
-                    ),
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(
+                            R.string.playlist_list_summary,
+                            displayedCustomPlaylists.size,
+                            stringResource(playlistSortMode.labelRes)
+                        ),
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!selectionMode) {
+                        PlaylistToolbarChip(
+                            icon = MiuixIcons.Regular.Add,
+                            label = stringResource(R.string.playlist_create_title),
+                            onClick = { showCreateDialog = true }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        PlaylistToolbarChip(
+                            icon = MiuixIcons.Regular.SelectAll,
+                            label = stringResource(R.string.common_multi_select),
+                            onClick = { selectionMode = true }
+                        )
+                    }
+                }
             }
 
             if (displayedCustomPlaylists.isEmpty()) {
@@ -415,31 +530,69 @@ fun PlaylistScreen(
                     )
                 }
             } else {
-                items(displayedCustomPlaylists, key = { it.id }) { playlist ->
-                    PlaylistRow(
-                        playlist = playlist,
-                        coverModel = playlistCoverModels[playlist.id],
-                        onClick = { onPlaylistClick(playlist.id) },
-                        onLongClick = {
-                            val route = Screen.PlaylistDetail.createRoute(playlist.id)
-                            val created = requestPinnedEllaShortcut(
-                                context = context,
-                                id = "playlist_${playlist.id}",
-                                label = playlist.name,
-                                route = route
-                            )
-                            Toast.makeText(
-                                context,
-                                if (created) {
-                                    context.getString(R.string.playlist_shortcut_requested, playlist.name)
+                itemsIndexed(displayedCustomPlaylists, key = { _, playlist -> playlist.id }) { _, playlist ->
+                    ReorderableItem(
+                        state = reorderableLazyListState,
+                        key = playlist.id
+                    ) { isDragging ->
+                        val dragHandleModifier = Modifier.draggableHandle(
+                            onDragStopped = {
+                                val orderedIds = manualCustomPlaylists.map { it.id }
+                                scope.launch { mainViewModel.settingsManager.setPlaylistCustomOrder(orderedIds) }
+                                mainViewModel.reorderPlaylists(orderedIds)
+                            }
+                        )
+                        PlaylistRow(
+                            playlist = playlist,
+                            coverModel = playlistCoverModels[playlist.id],
+                            selectionMode = selectionMode,
+                            selected = playlist.id in selectedPlaylistIds,
+                            onClick = {
+                                if (selectionMode) {
+                                    togglePlaylistSelection(playlist)
                                 } else {
-                                    context.getString(R.string.playlist_shortcut_unsupported)
-                                },
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        onDelete = { playlistPendingDelete = playlist }
-                    )
+                                    onPlaylistClick(playlist.id)
+                                }
+                            },
+                            onLongClick = {
+                                if (selectionMode) {
+                                    togglePlaylistSelection(playlist)
+                                } else {
+                                    selectionMode = true
+                                    selectedPlaylistIds = selectedPlaylistIds + playlist.id
+                                }
+                            },
+                            onDelete = if (selectionMode) null else { { playlistPendingDelete = playlist } },
+                            trailingContent = if (reorderEnabled) {
+                                {
+                                    Box(
+                                        modifier = Modifier
+                                            .then(dragHandleModifier)
+                                            .size(32.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(
+                                                if (isDragging) {
+                                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                                } else {
+                                                    Color.Transparent
+                                                }
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "\u2630",
+                                            fontSize = 16.sp,
+                                            color = if (isDragging) {
+                                                MiuixTheme.colorScheme.primary
+                                            } else {
+                                                MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                            }
+                                        )
+                                    }
+                                }
+                            } else null
+                        )
+                    }
                 }
             }
 
@@ -476,6 +629,30 @@ fun PlaylistScreen(
             onConfirm = {
                 mainViewModel.deletePlaylist(playlist.id)
                 playlistPendingDelete = null
+            }
+        )
+    }
+    if (playlistsPendingDelete.isNotEmpty()) {
+        ConfirmDangerDialog(
+            show = true,
+            title = stringResource(R.string.playlist_delete_title),
+            message = stringResource(R.string.playlist_delete_multiple_message, playlistsPendingDelete.size),
+            confirmText = stringResource(R.string.common_delete),
+            onDismiss = { playlistsPendingDelete = emptyList() },
+            onConfirm = {
+                mainViewModel.deletePlaylists(playlistsPendingDelete.mapTo(mutableSetOf()) { it.id })
+                playlistsPendingDelete = emptyList()
+                finishSelectionMode()
+            }
+        )
+    }
+    if (showExportAllFormatSheet) {
+        ExportPlaylistFormatSheet(
+            onDismiss = { showExportAllFormatSheet = false },
+            onFormatSelected = { format ->
+                showExportAllFormatSheet = false
+                pendingExportAllFormat = format
+                exportAllFolderLauncher.launch(null)
             }
         )
     }
@@ -1242,14 +1419,67 @@ private enum class PlaylistSortMode(val labelRes: Int) {
 
 private fun List<UserPlaylist>.sortedForPlaylistList(mode: PlaylistSortMode): List<UserPlaylist> {
     return when (mode) {
-        PlaylistSortMode.Custom -> sortedByDescending { it.createdAt }
-        PlaylistSortMode.CustomDesc -> sortedBy { it.createdAt }
-        PlaylistSortMode.UpdatedAt -> sortedByDescending { it.updatedAt }
-        PlaylistSortMode.CreatedAt -> sortedByDescending { it.createdAt }
-        PlaylistSortMode.CreatedAtAsc -> sortedBy { it.createdAt }
-        PlaylistSortMode.Name -> sortedBy { it.name.lowercase() }
-        PlaylistSortMode.SongCount -> sortedByDescending { it.songs.size }
-        PlaylistSortMode.Duration -> sortedByDescending { playlist -> playlist.songs.sumOf { it.duration } }
+        PlaylistSortMode.Custom -> this
+        PlaylistSortMode.CustomDesc -> asReversed()
+        PlaylistSortMode.UpdatedAt -> sortedWith(
+            compareByDescending<UserPlaylist> { it.updatedAt }
+                .thenByDescending { it.createdAt }
+                .thenBy { it.name.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+        PlaylistSortMode.CreatedAt -> sortedWith(
+            compareByDescending<UserPlaylist> { it.createdAt }
+                .thenByDescending { it.updatedAt }
+                .thenBy { it.name.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+        PlaylistSortMode.CreatedAtAsc -> sortedWith(
+            compareBy<UserPlaylist> { it.createdAt }
+                .thenByDescending { it.updatedAt }
+                .thenBy { it.name.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+        PlaylistSortMode.Name -> sortedWith(
+            compareBy<UserPlaylist> { it.name.lowercase(Locale.ROOT) }
+                .thenByDescending { it.createdAt }
+                .thenBy { it.id }
+        )
+        PlaylistSortMode.SongCount -> sortedWith(
+            compareByDescending<UserPlaylist> { it.songs.size }
+                .thenByDescending { it.updatedAt }
+                .thenByDescending { it.createdAt }
+                .thenBy { it.name.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+        PlaylistSortMode.Duration -> sortedWith(
+            compareByDescending<UserPlaylist> { playlist -> playlist.songs.sumOf { it.duration } }
+                .thenByDescending { it.updatedAt }
+                .thenByDescending { it.createdAt }
+                .thenBy { it.name.lowercase(Locale.ROOT) }
+                .thenBy { it.id }
+        )
+    }
+}
+
+private fun List<UserPlaylist>.applyPlaylistCustomOrder(orderedIds: List<String>): List<UserPlaylist> {
+    if (isEmpty()) return emptyList()
+    val fallbackComparator =
+        compareByDescending<UserPlaylist> { it.createdAt }
+            .thenByDescending { it.updatedAt }
+            .thenBy { it.name.lowercase(Locale.ROOT) }
+            .thenBy { it.id }
+    if (orderedIds.isEmpty()) return sortedWith(fallbackComparator)
+
+    val playlistsById = associateBy(UserPlaylist::id)
+    val consumedIds = linkedSetOf<String>()
+    return buildList {
+        orderedIds.forEach { id ->
+            playlistsById[id]?.let { playlist ->
+                consumedIds += id
+                add(playlist)
+            }
+        }
+        addAll(filterNot { it.id in consumedIds }.sortedWith(fallbackComparator))
     }
 }
 
@@ -1327,6 +1557,35 @@ private fun Song?.playlistCoverModel(): Any? {
         ?: song.albumId.takeIf { it > 0L }?.let { Uri.parse("content://media/external/audio/albumart/$it") }
 }
 
+@Composable
+private fun PlaylistToolbarChip(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .clickable(onClick = onClick)
+            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = MiuixTheme.colorScheme.onSurface
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PlaylistRow(
@@ -1335,9 +1594,12 @@ private fun PlaylistRow(
     countOverride: Int? = null,
     durationOverride: Long? = null,
     accent: Boolean = false,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    trailingContent: (@Composable (() -> Unit))? = null
 ) {
     Card(
         modifier = Modifier
@@ -1348,7 +1610,13 @@ private fun PlaylistRow(
                 onLongClick = onLongClick
             ),
         cornerRadius = 16.dp,
-        colors = CardDefaults.defaultColors(color = wallpaperAwarePlaylistCardColor())
+        colors = CardDefaults.defaultColors(
+            color = if (selected) {
+                MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)
+            } else {
+                wallpaperAwarePlaylistCardColor()
+            }
+        )
     ) {
         Row(
             modifier = Modifier
@@ -1356,6 +1624,23 @@ private fun PlaylistRow(
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (selectionMode) {
+                Box(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(
+                            if (selected) MiuixTheme.colorScheme.primary
+                            else MiuixTheme.colorScheme.surfaceContainer
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (selected) {
+                        Text(text = "✓", fontSize = 13.sp, color = Color.White)
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+            }
             Box(
                 modifier = Modifier
                     .size(52.dp)
@@ -1434,6 +1719,8 @@ private fun PlaylistRow(
                         .clickable(onClick = onDelete)
                         .padding(8.dp)
                 )
+            } else if (trailingContent != null) {
+                trailingContent()
             }
         }
     }

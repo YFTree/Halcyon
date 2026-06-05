@@ -56,6 +56,7 @@ import com.ella.music.ui.navigation.Screen
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -95,8 +96,12 @@ fun AlbumScreen(
     }
     val scope = rememberCoroutineScope()
     var scrollToTopRequest by remember { mutableStateOf(0) }
+    var gridCoversEnabled by remember { mutableStateOf(false) }
     val albumDurations = remember(songs) {
         songs.groupBy { it.albumIdentityId() }.mapValues { (_, albumSongs) -> albumSongs.sumOf { it.duration } }
+    }
+    val representativeSongsByAlbumId = remember(songs) {
+        songs.groupBy { it.albumIdentityId() }.mapValues { (_, albumSongs) -> albumSongs.firstOrNull() }
     }
 
     val filteredAlbums = remember(albums, searchQuery) {
@@ -128,6 +133,11 @@ fun AlbumScreen(
             }
             sortExpanded -> sortExpanded = false
         }
+    }
+
+    LaunchedEffect(Unit) {
+        delay(220L)
+        gridCoversEnabled = true
     }
 
     Column(
@@ -288,10 +298,16 @@ fun AlbumScreen(
                             items = sortedAlbums,
                             key = { it.id }
                         ) { album ->
+                            val representativeSong = representativeSongsByAlbumId[album.id]
+                            val albumArtUri = remember(gridCoversEnabled, album.artAlbumId) {
+                                album.artAlbumId
+                                    .takeIf { gridCoversEnabled && it > 0L }
+                                    ?.let(mainViewModel::getAlbumArtUri)
+                            }
                             AlbumCard(
                                 album = album,
-                                albumArtUri = mainViewModel.getAlbumArtUri(album.artAlbumId),
-                                representativeSong = mainViewModel.getSongsForAlbum(album.id).firstOrNull(),
+                                albumArtUri = albumArtUri,
+                                representativeSong = representativeSong,
                                 loadCoverArt = mainViewModel::getAlbumCoverArtBitmap,
                                 summary = album.summaryForSort(context, sortMode, albumDurations[album.id] ?: 0L),
                                 onClick = { onAlbumClick(album.id) },

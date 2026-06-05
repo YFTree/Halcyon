@@ -259,8 +259,8 @@ fun FolderScreen(
                         mainViewModel.settingsManager.setScanExcludeFolders(
                             (blockedFolders + folderPath).distinct().joinToString("；")
                         )
-                        mainViewModel.scanMusic()
                     }
+                    Toast.makeText(context, R.string.folder_scan_manual_needed, Toast.LENGTH_SHORT).show()
                     folderToBlock = null
                 }
             )
@@ -414,6 +414,11 @@ fun ScanSettingsScreen(
     val blockedFolderKeys = remember(blockedFolders) {
         blockedFolders.map { it.normalizeFolderPath().lowercase(Locale.ROOT) }.toSet()
     }
+    val showManualScanHint = remember(context) {
+        {
+            Toast.makeText(context, R.string.folder_scan_manual_needed, Toast.LENGTH_SHORT).show()
+        }
+    }
     var showBlockedDialog by remember { mutableStateOf(false) }
     var pendingRemoveScanFolder by remember { mutableStateOf<String?>(null) }
 
@@ -437,9 +442,8 @@ fun ScanSettingsScreen(
                     mainViewModel.settingsManager.setScanIncludeFolders(
                         (savedFolders + folderPath).distinct().joinToString("；")
                     )
-                    mainViewModel.scanMusic()
                 }
-                Toast.makeText(context, R.string.scan_folder_added, Toast.LENGTH_SHORT).show()
+                showManualScanHint()
             }
         }
     }
@@ -521,8 +525,8 @@ fun ScanSettingsScreen(
                                 }
                             }
                             mainViewModel.settingsManager.setScanExcludeFolders(nextBlockedFolders.joinToString("；"))
-                            mainViewModel.scanMusic()
                         }
+                        showManualScanHint()
                     },
                     onRemove = { folderPath ->
                         pendingRemoveScanFolder = folderPath
@@ -550,14 +554,14 @@ fun ScanSettingsScreen(
                         mainViewModel.settingsManager.setScanExcludeFolders(
                             blockedFolders.filterNot { it == folderPath }.joinToString("；")
                         )
-                        mainViewModel.scanMusic()
                     }
+                    showManualScanHint()
                 },
                 onClear = {
                     scope.launch {
                         mainViewModel.settingsManager.setScanExcludeFolders("")
-                        mainViewModel.scanMusic()
                     }
+                    showManualScanHint()
                     showBlockedDialog = false
                 }
             )
@@ -583,8 +587,8 @@ fun ScanSettingsScreen(
                                 it.normalizeFolderPath().equals(normalizedPath, ignoreCase = true)
                             }.joinToString("；")
                         )
-                        mainViewModel.scanMusic()
                     }
+                    showManualScanHint()
                     pendingRemoveScanFolder = null
                 }
             )
@@ -1147,7 +1151,7 @@ internal fun WebDavItem.toRemoteSong(): Song {
         path = url,
         fileName = name,
         fileSize = size,
-        mimeType = mimeType
+        mimeType = mimeType.substringBefore(';').trim().lowercase(Locale.ROOT)
     )
 }
 

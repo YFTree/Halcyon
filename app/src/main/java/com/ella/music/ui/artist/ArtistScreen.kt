@@ -163,6 +163,14 @@ fun ArtistScreen(
     val sortedReleaseAlbums = remember(releaseAlbums, albumSortMode, albumDurations) {
         releaseAlbums.sortedForArtistAlbumDetail(albumSortMode, albumDurations)
     }
+    val albumArtUrisBySongId = remember(sortedArtistSongs) {
+        sortedArtistSongs.associate { song -> song.id to mainViewModel.getAlbumArtUri(song.albumId) }
+    }
+    val albumArtUrisByAlbumId = remember(sortedParticipatedAlbums, sortedReleaseAlbums) {
+        (sortedParticipatedAlbums + sortedReleaseAlbums)
+            .distinctBy { it.id }
+            .associate { album -> album.id to mainViewModel.getAlbumArtUri(album.artAlbumId) }
+    }
     val hasComposerCategory = remember(songs, artistName) {
         mainViewModel.hasMetadataCategory("composer", artistName)
     }
@@ -266,7 +274,7 @@ fun ArtistScreen(
                         SongItem(
                             song = song,
                             isCurrent = currentSong?.id == song.id,
-                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                            albumArtUri = albumArtUrisBySongId[song.id],
                             loadCoverArt = mainViewModel::getCoverArtBitmap,
                             loadAudioInfo = mainViewModel::getAudioInfo,
                             isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
@@ -297,7 +305,7 @@ fun ArtistScreen(
                         ArtistAlbumRow(
                             album = album,
                             duration = albumDurations[album.id] ?: 0L,
-                            albumArtUri = mainViewModel.getAlbumArtUri(album.artAlbumId),
+                            albumArtUri = albumArtUrisByAlbumId[album.id],
                             onClick = { onAlbumClick(album.id) }
                         )
                     }
@@ -319,7 +327,7 @@ fun ArtistScreen(
                         ArtistAlbumRow(
                             album = album,
                             duration = albumDurations[album.id] ?: 0L,
-                            albumArtUri = mainViewModel.getAlbumArtUri(album.artAlbumId),
+                            albumArtUri = albumArtUrisByAlbumId[album.id],
                             onClick = { onAlbumClick(album.id) }
                         )
                     }
@@ -1147,7 +1155,8 @@ private fun ArtistAlbumRow(
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
-                    sizePx = 256
+                    sizePx = 256,
+                    showDefaultPlaceholder = false
                 )
             } else {
                 DefaultAlbumCover(modifier = Modifier.fillMaxSize())
