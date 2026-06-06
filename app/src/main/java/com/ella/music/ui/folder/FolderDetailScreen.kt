@@ -118,6 +118,7 @@ fun FolderDetailScreen(
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = false)
+    val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val scanExcludeFolders by mainViewModel.settingsManager.scanExcludeFolders.collectAsState(initial = "")
     val blockedFolders = remember(scanExcludeFolders) { scanExcludeFolders.toFolderSettingList() }
     val scope = rememberCoroutineScope()
@@ -473,6 +474,7 @@ fun FolderDetailScreen(
                                 albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
                                 loadCoverArt = mainViewModel::getCoverArtBitmap,
                                 loadAudioInfo = mainViewModel::getAudioInfo,
+                                showPlayNextInLists = showPlayNextInLists,
                                 isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                                 loadSongRating = mainViewModel::getSongRating,
                                 selectionMode = selectionMode,

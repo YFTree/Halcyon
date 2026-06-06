@@ -101,8 +101,8 @@ class TickerBridge(private val context: Context) {
                 putExtra("content", text)
                 putExtra("ticker_package", context.packageName)
                 putExtra("package", context.packageName)
-                putExtra("ticker_app_name", "Ella Music")
-                putExtra("app_name", "Ella Music")
+                putExtra("ticker_app_name", context.getString(R.string.app_name))
+                putExtra("app_name", context.getString(R.string.app_name))
                 if (effectiveTranslation != null) {
                     putExtra("translation", effectiveTranslation)
                 }

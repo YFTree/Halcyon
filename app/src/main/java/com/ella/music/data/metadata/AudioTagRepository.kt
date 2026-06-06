@@ -357,11 +357,16 @@ class LyricoAudioTagReaderWriter : AudioTagReader, AudioTagWriter {
         discNumber?.let { put("DISCNUMBER", it.toString()) }
         comment?.let { put("COMMENT", it) }
         lyrics?.let { put("LYRICS", it) }
-        rating?.let { put("RATING", it.coerceIn(0, 5).toString()) }
+        rating?.let { put("RATING", it.toStandardTagRatingValue().toString()) }
         customTags.forEach { (key, values) ->
             if (key.isNotBlank() && values.isNotEmpty()) put(key, values.joinToString("; "))
         }
     }
+}
+
+private fun Int.toStandardTagRatingValue(): Int {
+    val safe = coerceIn(0, 5)
+    return if (safe <= 0) 0 else safe * 20
 }
 
 private fun Map<String, List<String>>.bestTtmlLyrics(): String? =

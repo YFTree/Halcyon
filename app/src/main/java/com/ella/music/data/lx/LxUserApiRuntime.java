@@ -39,7 +39,7 @@ import okhttp3.RequestBody;
 public final class LxUserApiRuntime implements AutoCloseable {
     private static final String TAG = "LxUserApiRuntime";
     private static final String USER_AGENT =
-            "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 EllaMusic/1.0";
+            "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Halcyon/1.0";
 
     private final Context context;
     private final OkHttpClient client;

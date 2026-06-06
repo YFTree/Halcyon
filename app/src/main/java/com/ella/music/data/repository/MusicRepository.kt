@@ -1598,7 +1598,7 @@ class MusicRepository(private val context: Context) {
             comment = comment.orEmpty(),
             copyright = copyright.orEmpty(),
             neteaseKey = neteaseKey.orEmpty(),
-            rating = rating ?: 0,
+            rating = rating.normalizeTagRatingToStars(),
             customTagText = customTags.flattenForSearch()
         )
 
@@ -1617,6 +1617,17 @@ class MusicRepository(private val context: Context) {
             .distinct()
             .take(80)
             .joinToString(" ")
+
+    private fun Int?.normalizeTagRatingToStars(): Int {
+        val raw = this ?: return 0
+        return when {
+            raw <= 0 -> 0
+            raw <= 5 -> raw
+            raw <= 100 -> kotlin.math.round(raw / 20f).toInt()
+            raw <= 255 -> kotlin.math.round(raw / 255f * 5f).toInt()
+            else -> 0
+        }.coerceIn(0, 5)
+    }
 
     private fun String.isIgnoredSearchTagKey(): Boolean {
         val normalized = trim().lowercase()

@@ -49,6 +49,7 @@ import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -66,7 +67,7 @@ fun LyricSharePicker(
     annotation: String = "",
     customInfo: String = "",
     onDismiss: () -> Unit,
-    onShare: (List<LyricLine>) -> Unit
+    onShare: (List<LyricLine>, Boolean) -> Unit
 ) {
     BackHandler(onBack = onDismiss)
 
@@ -77,6 +78,7 @@ fun LyricSharePicker(
             ?: 0
     }
     var selectedIndexes by remember(lyrics, initialIndex) { mutableStateOf(setOf(initialIndex)) }
+    var includeTranslation by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(initialIndex) {
@@ -152,7 +154,7 @@ fun LyricSharePicker(
                             .sorted()
                             .mapNotNull(lyrics::getOrNull)
                             .takeIf { it.isNotEmpty() }
-                            ?.let(onShare)
+                            ?.let { onShare(it, includeTranslation) }
                     }
                 ) {
                     Icon(
@@ -170,10 +172,39 @@ fun LyricSharePicker(
                 cover = cover,
                 colors = colors,
                 lines = selectedLines,
+                includeTranslation = includeTranslation,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 12.dp)
             )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 4.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.White.copy(alpha = 0.10f))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.lyric_share_include_translation),
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(R.string.lyric_share_include_translation_summary),
+                        color = Color.White.copy(alpha = 0.56f),
+                        fontSize = 12.sp
+                    )
+                }
+                Switch(
+                    checked = includeTranslation,
+                    onCheckedChange = { includeTranslation = it }
+                )
+            }
 
             LazyColumn(
                 state = listState,
@@ -275,18 +306,22 @@ private fun LyricSharePreviewCard(
     cover: Bitmap?,
     colors: List<Color>,
     lines: List<LyricLine>,
+    includeTranslation: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val backgroundPalette = remember(colors) { colors.map(Color::toArgb) }
-    val content = remember(song, annotation, customInfo, lines, backgroundPalette) {
+    val backgroundPalette = remember(colors, cover) {
+        resolveLyricShareBackgroundColors(cover, colors.map(Color::toArgb))
+    }
+    val content = remember(song, annotation, customInfo, lines, backgroundPalette, includeTranslation) {
         buildLyricShareCardContent(
             context = context,
             song = song,
             lines = lines,
             backgroundColors = backgroundPalette,
             annotation = annotation,
-            customInfo = customInfo
+            customInfo = customInfo,
+            includeTranslation = includeTranslation
         )
     }
     val layout = remember(content) {

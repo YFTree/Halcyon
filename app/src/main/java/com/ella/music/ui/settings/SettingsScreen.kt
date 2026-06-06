@@ -1,8 +1,10 @@
 package com.ella.music.ui.settings
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -11,6 +13,7 @@ import android.webkit.MimeTypeMap
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.ella.music.BuildConfig
 import com.ella.music.R
 import com.ella.music.data.BottomBarGlassEffect
@@ -63,9 +67,7 @@ import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import android.widget.Toast
 import org.json.JSONObject
@@ -187,7 +189,7 @@ fun SettingsScreen(
                     )
                     ArrowPreference(
                         title = stringResource(R.string.about),
-                        summary = "Ella Music v${BuildConfig.VERSION_NAME}",
+                        summary = "${context.getString(R.string.app_name)} v${BuildConfig.VERSION_NAME}",
                         onClick = onNavigateToAbout
                     )
                 }
@@ -413,6 +415,7 @@ fun BackupSettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val backupScope = remember(context, scope) { context.findComponentActivity()?.lifecycleScope ?: scope }
     val settingsManager = remember { SettingsManager(context) }
     val playbackStatsStore = remember { PlaybackStatsStore.getInstance(context) }
     val librarySongs by mainViewModel?.songs?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -420,21 +423,26 @@ fun BackupSettingsScreen(
     var playbackExportFormat by remember { mutableStateOf(PlaybackExportFormat.Ella) }
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
+    suspend fun writeBackupText(uri: Uri, text: String) = withContext(Dispatchers.IO) {
+        context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
+            output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                writer.write(text)
+                writer.flush()
+            }
+            output.flush()
+        } ?: error(context.getString(R.string.settings_backup_open_failed))
+    }
     val settingsExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
+        backupScope.launch {
             runCatching {
                 val backup = JSONObject()
                     .put("version", 1)
                     .put("exportedAt", System.currentTimeMillis())
                     .put("settings", settingsManager.exportSettingsJson())
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        output.write(backup.toString(2).toByteArray(Charsets.UTF_8))
-                    } ?: error(context.getString(R.string.settings_backup_open_failed))
-                }
+                writeBackupText(uri, backup.toString(2))
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_export_success), Toast.LENGTH_SHORT).show()
             }.onFailure {
@@ -446,7 +454,7 @@ fun BackupSettingsScreen(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
+        backupScope.launch {
             runCatching {
                 val exported = playbackStatsStore.exportJson(librarySongs)
                 val backup = when (playbackExportFormat) {
@@ -459,11 +467,7 @@ fun BackupSettingsScreen(
                         .put("exportedAtMs", System.currentTimeMillis())
                         .put("sessions", exported.optJSONArray("sessions") ?: org.json.JSONArray())
                 }
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        output.write(backup.toString(2).toByteArray(Charsets.UTF_8))
-                    } ?: error(context.getString(R.string.settings_backup_open_failed))
-                }
+                writeBackupText(uri, backup.toString(2))
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_export_success), Toast.LENGTH_SHORT).show()
             }.onFailure {
@@ -475,7 +479,7 @@ fun BackupSettingsScreen(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
+        backupScope.launch {
             runCatching {
                 val text = withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use { input ->
@@ -495,7 +499,7 @@ fun BackupSettingsScreen(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
+        backupScope.launch {
             runCatching {
                 val text = withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use { input ->
@@ -622,6 +626,12 @@ fun BackupSettingsScreen(
 private enum class PlaybackExportFormat {
     Ella,
     Sollin
+}
+
+private tailrec fun Context.findComponentActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is ContextWrapper -> baseContext.findComponentActivity()
+    else -> null
 }
 
 @Composable
@@ -2147,12 +2157,7 @@ private data class LyricSourcePreferenceItem(
 
 @Composable
 private fun <T> Flow<T>.collectSettingsState(initialValue: T): State<T> {
-    val initial = remember(this) {
-        runCatching {
-            runBlocking(Dispatchers.IO) { first() }
-        }.getOrDefault(initialValue)
-    }
-    return collectAsState(initial = initial)
+    return collectAsState(initial = initialValue)
 }
 
 @Composable

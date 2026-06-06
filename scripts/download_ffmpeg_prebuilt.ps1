@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Tag = "1.1.7"
-$ArchiveUrl = "https://codeload.github.com/Kifranei/Ella/zip/refs/tags/$Tag"
+$ArchiveUrl = "https://codeload.github.com/Kifranei/Halcyon/zip/refs/tags/$Tag"
 $ExpectedSha256 = "4D3491D429677C22DB9782AEC1C61BB82E7F2C68A99B4C14D956A3D058004A4C"
 $TempRoot = Join-Path $RepoRoot ".tmp\ffmpeg-prebuilt"
 $ArchivePath = Join-Path $TempRoot "Ella-$Tag.zip"

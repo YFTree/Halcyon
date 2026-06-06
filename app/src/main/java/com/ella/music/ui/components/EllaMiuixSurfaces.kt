@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TextFieldDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import top.yukonga.miuix.kmp.window.WindowDialog
@@ -90,7 +91,9 @@ fun EllaMiuixTextField(
         useLabelAsPlaceholder = true,
         singleLine = singleLine,
         insideMargin = DpSize(14.dp, 11.dp),
-        backgroundColor = MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.84f),
+        colors = TextFieldDefaults.textFieldColors(
+            backgroundColor = MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.84f),
+        ),
         cornerRadius = 14.dp,
         textStyle = textStyle,
         modifier = modifier

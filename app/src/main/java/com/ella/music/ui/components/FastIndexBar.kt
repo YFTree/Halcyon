@@ -251,4 +251,4 @@ private fun ScrollIndicator(
     }
 }
 
-private const val SCROLL_THUMB_DRAG_THROTTLE_MS = 16L
+private const val SCROLL_THUMB_DRAG_THROTTLE_MS = 24L

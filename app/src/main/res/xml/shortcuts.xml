@@ -11,6 +11,7 @@
             android:targetPackage="com.ella.music"
             android:targetClass="com.ella.music.MainActivity">
             <extra android:name="ella_shortcut_route" android:value="library" />
+            <extra android:name="halcyon_shortcut_route" android:value="library" />
         </intent>
     </shortcut>
 
@@ -25,6 +26,7 @@
             android:targetPackage="com.ella.music"
             android:targetClass="com.ella.music.MainActivity">
             <extra android:name="ella_shortcut_route" android:value="library_search" />
+            <extra android:name="halcyon_shortcut_route" android:value="library_search" />
         </intent>
     </shortcut>
 
@@ -39,6 +41,7 @@
             android:targetPackage="com.ella.music"
             android:targetClass="com.ella.music.MainActivity">
             <extra android:name="ella_shortcut_action" android:value="play" />
+            <extra android:name="halcyon_shortcut_action" android:value="play" />
         </intent>
     </shortcut>
 
@@ -53,6 +56,7 @@
             android:targetPackage="com.ella.music"
             android:targetClass="com.ella.music.MainActivity">
             <extra android:name="ella_shortcut_action" android:value="shuffle_all" />
+            <extra android:name="halcyon_shortcut_action" android:value="shuffle_all" />
         </intent>
     </shortcut>
 

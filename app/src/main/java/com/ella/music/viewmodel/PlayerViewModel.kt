@@ -861,6 +861,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerManager.removeFromPlaylist(index)
     }
 
+    fun movePlaylistItem(fromIndex: Int, toIndex: Int) {
+        lazyOnlineQueue = null
+        playerManager.movePlaylistItem(fromIndex, toIndex)
+    }
+
     fun clearPlaylist() {
         lazyOnlineQueue = null
         playerManager.clearPlaylist()

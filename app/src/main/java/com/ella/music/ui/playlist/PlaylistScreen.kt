@@ -128,6 +128,7 @@ fun PlaylistScreen(
     val playlists by mainViewModel.playlists.collectAsState()
     val librarySongs by mainViewModel.songs.collectAsState()
     val ratingRevision by mainViewModel.ratingRevision.collectAsState()
+    val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     var showCreateDialog by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -677,6 +678,7 @@ fun PlaylistDetailScreen(
     val ratingRevision by mainViewModel.ratingRevision.collectAsState()
     val playbackStats by mainViewModel.playbackStats.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = false)
+    val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val isFiveStarPlaylist = playlistId == FIVE_STAR_PLAYLIST_ID
     val storedPlaylist = playlists.firstOrNull { it.id == playlistId }
     val fiveStarSongs by produceState(initialValue = emptyList(), isFiveStarPlaylist, librarySongs, ratingRevision) {
@@ -1049,6 +1051,7 @@ fun PlaylistDetailScreen(
                             isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                             loadSongRating = mainViewModel::getSongRating,
                             ratingRevision = ratingRevision,
+                            showPlayNextInLists = showPlayNextInLists,
                             onClick = {
                                 if (selectionMode) {
                                     toggleSelection(song)
@@ -1240,7 +1243,7 @@ fun PlaylistDetailScreen(
             onFormatSelected = { format ->
                 val extension = when (format) {
                     PlaylistExportFormat.PlainText -> "txt"
-                    PlaylistExportFormat.M3u -> "m3u"
+                    PlaylistExportFormat.M3u -> "m3u8"
                 }
                 showExportFormatSheet = false
                 val fileName = "${playlist.name.safePlaylistFileName()}.$extension"
@@ -1254,7 +1257,7 @@ fun PlaylistDetailScreen(
 }
 
 private fun String.safePlaylistFileName(): String =
-    replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "Ella Playlist" }
+    replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "Halcyon Playlist" }
 
 @Composable
 private fun PlaylistDetailHero(

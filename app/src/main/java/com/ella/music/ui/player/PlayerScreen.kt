@@ -183,7 +183,6 @@ import com.ella.music.ui.components.ArtistPickerSheet
 import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SmoothLyricView
-import com.ella.music.ui.components.WordLyricView
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.CoverLoadLimiter
 import com.ella.music.ui.components.LyricSharePicker
@@ -209,6 +208,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.io.File
 import java.net.URL
 import kotlin.math.abs
@@ -496,7 +497,7 @@ fun PlayerScreen(
     fun openLyricSharePicker(line: LyricLine) {
         lyricShareInitialLine = line
     }
-    fun shareSelectedLyrics(lines: List<LyricLine>) {
+    fun shareSelectedLyrics(lines: List<LyricLine>, includeTranslation: Boolean) {
         shareLyricCard(
             context = context,
             song = song,
@@ -508,7 +509,8 @@ fun PlayerScreen(
                 palette.bottom.toArgb()
             ),
             annotation = songAnnotation,
-            customInfo = lyricShareCustomInfo
+            customInfo = lyricShareCustomInfo,
+            includeTranslation = includeTranslation
         )
         lyricShareInitialLine = null
     }
@@ -593,7 +595,9 @@ fun PlayerScreen(
             showTranslation = showLyricTranslation,
             showPronunciation = showLyricPronunciation,
             fontFamily = lyricFontFamily,
+            fontPath = effectiveLyricFontPath,
             fontWeight = lyricFontWeight,
+            fontScale = lyricFontScale,
             playerTapSeekEnabled = playerTapSeekEnabled,
             playerShowTotalDuration = playerShowTotalDuration,
             menuExpanded = menuExpanded,
@@ -626,6 +630,9 @@ fun PlayerScreen(
             },
             onRemoveQueueSong = { index ->
                 playerViewModel.removeFromPlaylist(index)
+            },
+            onMoveQueueSong = { fromIndex, toIndex ->
+                playerViewModel.movePlaylistItem(fromIndex, toIndex)
             },
             onClearQueue = {
                 queueExpanded = false
@@ -810,7 +817,6 @@ fun PlayerScreen(
             showTranslation = showLyricTranslation,
             showPronunciation = showLyricPronunciation,
             keepScreenOn = lyricPageKeepScreenOn,
-            smoothLyricView = smoothLyricView,
             lyricFormatAvailability = lyricFormatAvailability,
             preferTtmlLyrics = preferTtmlLyrics,
             lyricSourceMode = lyricSourceMode,
@@ -1102,7 +1108,9 @@ fun PlayerScreen(
                         showTranslation = showLyricTranslation,
                         showPronunciation = showLyricPronunciation,
                         fontFamily = lyricFontFamily,
+                        fontPath = effectiveLyricFontPath,
                         fontWeight = lyricFontWeight,
+                        fontScale = lyricFontScale,
                         queueExpanded = queueExpanded,
                         playlist = playlist,
                         audioSessionId = audioSessionId,
@@ -1128,6 +1136,9 @@ fun PlayerScreen(
                             playerViewModel.playQueueIndex(index)
                         },
                         onRemoveQueueSong = { index -> playerViewModel.removeFromPlaylist(index) },
+                        onMoveQueueSong = { fromIndex, toIndex ->
+                            playerViewModel.movePlaylistItem(fromIndex, toIndex)
+                        },
                         onClearQueue = {
                             queueExpanded = false
                             playerViewModel.clearPlaylist()
@@ -1155,7 +1166,9 @@ fun PlayerScreen(
                         showTranslation = showLyricTranslation,
                         showPronunciation = showLyricPronunciation,
                         fontFamily = lyricFontFamily,
+                        fontPath = effectiveLyricFontPath,
                         fontWeight = lyricFontWeight,
+                        fontScale = lyricFontScale,
                         showTotalDuration = playerShowTotalDuration,
                         palette = palette,
                         flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
@@ -1369,7 +1382,9 @@ private fun CoverPlayerPage(
     showTranslation: Boolean,
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
+    fontPath: String,
     fontWeight: FontWeight,
+    fontScale: Float,
     playerTapSeekEnabled: Boolean,
     playerShowTotalDuration: Boolean,
     menuExpanded: Boolean,
@@ -1403,6 +1418,7 @@ private fun CoverPlayerPage(
     onNext: () -> Unit,
     onQueueSongClick: (Int) -> Unit,
     onRemoveQueueSong: (Int) -> Unit,
+    onMoveQueueSong: (Int, Int) -> Unit,
     onClearQueue: () -> Unit,
     onAlbum: () -> Unit,
     onArtist: () -> Unit,
@@ -1473,7 +1489,9 @@ private fun CoverPlayerPage(
                 showTranslation = showTranslation,
                 showPronunciation = showPronunciation,
                 fontFamily = fontFamily,
+                fontPath = fontPath,
                 fontWeight = fontWeight,
+                fontScale = fontScale,
                 showTotalDuration = playerShowTotalDuration,
                 queueExpanded = queueExpanded,
                 playlist = playlist,
@@ -1495,6 +1513,7 @@ private fun CoverPlayerPage(
                 onNext = onNext,
                 onQueueSongClick = onQueueSongClick,
                 onRemoveQueueSong = onRemoveQueueSong,
+                onMoveQueueSong = onMoveQueueSong,
                 onClearQueue = onClearQueue,
                 onLineClick = onShowLyrics,
                 onArtist = onArtist,
@@ -1588,21 +1607,24 @@ private fun CoverPlayerPage(
                         }
 
                         if (effectiveMiniLyricLine != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             MiniLyricsPreview(
+                                songId = song?.id ?: 0L,
+                                songTitle = song?.title.orEmpty(),
+                                songArtist = song?.artist.orEmpty(),
                                 lyrics = lyrics,
                                 currentIndex = currentLyricIndex,
                                 showTranslation = showTranslation,
                                 showPronunciation = showPronunciation,
                                 currentPositionMs = currentPosition,
                                 isPlaying = isPlaying,
-                                fontFamily = fontFamily,
+                                fontPath = fontPath,
                                 fontWeight = fontWeight,
+                                fontScale = fontScale,
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(miniLyricsPreviewHeight(effectiveMiniLyricLine, showTranslation, showPronunciation))
-                                    .padding(vertical = 2.dp)
                             )
                         }
 
@@ -1634,6 +1656,7 @@ private fun CoverPlayerPage(
                             onDismissQueue = onDismissQueue,
                             onQueueSongClick = onQueueSongClick,
                             onRemoveQueueSong = onRemoveQueueSong,
+                            onMoveQueueSong = onMoveQueueSong,
                             onClearQueue = onClearQueue,
                             modifier = Modifier.height(76.dp)
                         )
@@ -1706,21 +1729,24 @@ private fun CoverPlayerPage(
                         }
 
                         if (effectiveMiniLyricLine != null) {
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             MiniLyricsPreview(
+                                songId = song?.id ?: 0L,
+                                songTitle = song?.title.orEmpty(),
+                                songArtist = song?.artist.orEmpty(),
                                 lyrics = lyrics,
                                 currentIndex = currentLyricIndex,
                                 showTranslation = showTranslation,
                                 showPronunciation = showPronunciation,
                                 currentPositionMs = currentPosition,
                                 isPlaying = isPlaying,
-                                fontFamily = fontFamily,
+                                fontPath = fontPath,
                                 fontWeight = fontWeight,
+                                fontScale = fontScale,
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(miniLyricsPreviewHeight(effectiveMiniLyricLine, showTranslation, showPronunciation))
-                                    .padding(vertical = 2.dp)
+                                    .height(miniLyricsPreviewHeight(effectiveMiniLyricLine, showTranslation, showPronunciation, compact = true))
                             )
                         } else {
                             Spacer(modifier = Modifier.height(12.dp))
@@ -1763,6 +1789,7 @@ private fun CoverPlayerPage(
                             onDismissQueue = onDismissQueue,
                             onQueueSongClick = onQueueSongClick,
                             onRemoveQueueSong = onRemoveQueueSong,
+                            onMoveQueueSong = onMoveQueueSong,
                             onClearQueue = onClearQueue,
                             modifier = Modifier.height(92.dp)
                         )
@@ -1838,7 +1865,9 @@ private fun LandscapeCoverPlayerPage(
     showTranslation: Boolean,
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
+    fontPath: String,
     fontWeight: FontWeight,
+    fontScale: Float,
     showTotalDuration: Boolean,
     queueExpanded: Boolean,
     playlist: List<Song>,
@@ -1863,6 +1892,7 @@ private fun LandscapeCoverPlayerPage(
     onNext: () -> Unit,
     onQueueSongClick: (Int) -> Unit,
     onRemoveQueueSong: (Int) -> Unit,
+    onMoveQueueSong: (Int, Int) -> Unit,
     onClearQueue: () -> Unit,
     onLineClick: () -> Unit,
     onArtist: () -> Unit,
@@ -1958,19 +1988,23 @@ private fun LandscapeCoverPlayerPage(
                     PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                WordLyricView(
+                SmoothLyricView(
+                    songId = song?.id ?: 0L,
+                    songTitle = song?.title.orEmpty(),
+                    songArtist = song?.artist.orEmpty(),
                     lyrics = lyrics,
                     currentIndex = currentLyricIndex,
                     currentPositionMs = currentPosition,
                     isPlaying = isPlaying,
                     showTranslation = showTranslation,
                     showPronunciation = showPronunciation,
-                    fontScale = 0.74f,
-                    fontFamily = fontFamily,
+                    fontScale = fontScale,
+                    fontPath = fontPath,
                     fontWeight = fontWeight,
-                    topSpacer = 24.dp,
-                    bottomSpacer = 72.dp,
-                    horizontalPadding = 6.dp,
+                    primaryTextSizeSp = 28f,
+                    secondaryTextSizeSp = 14f,
+                    anchorOffsetRatio = -0.08f,
+                    topContentPadding = 8.dp,
                     onLineClick = onLyricLineClick,
                     onLineLongClick = onLyricLineLongClick,
                     modifier = Modifier
@@ -2004,6 +2038,7 @@ private fun LandscapeCoverPlayerPage(
                     onDismissQueue = onDismissQueue,
                     onQueueSongClick = onQueueSongClick,
                     onRemoveQueueSong = onRemoveQueueSong,
+                    onMoveQueueSong = onMoveQueueSong,
                     onClearQueue = onClearQueue
                 )
             }
@@ -2041,7 +2076,9 @@ private fun LandscapeCoverPlaybackOverlay(
     showTranslation: Boolean,
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
+    fontPath: String,
     fontWeight: FontWeight,
+    fontScale: Float,
     queueExpanded: Boolean,
     playlist: List<Song>,
     audioSessionId: Int,
@@ -2062,6 +2099,7 @@ private fun LandscapeCoverPlaybackOverlay(
     onNext: () -> Unit,
     onQueueSongClick: (Int) -> Unit,
     onRemoveQueueSong: (Int) -> Unit,
+    onMoveQueueSong: (Int, Int) -> Unit,
     onClearQueue: () -> Unit,
     onArtist: () -> Unit,
     onDismiss: () -> Unit,
@@ -2140,7 +2178,7 @@ private fun LandscapeCoverPlaybackOverlay(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = song?.title?.takeIf { it.isNotBlank() } ?: "Ella Music",
+                text = song?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.app_name),
                 color = Color.White.copy(alpha = 0.96f),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.ExtraBold,
@@ -2299,7 +2337,6 @@ private fun LyricsPlayerPage(
     showTranslation: Boolean,
     showPronunciation: Boolean,
     keepScreenOn: Boolean,
-    smoothLyricView: Boolean,
     lyricFormatAvailability: MusicRepository.LyricFormatAvailability,
     preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
@@ -2425,48 +2462,25 @@ private fun LyricsPlayerPage(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                if (smoothLyricView) {
-                    SmoothLyricView(
-                        songId = song?.id ?: 0L,
-                        songTitle = song?.title.orEmpty(),
-                        songArtist = song?.artist.orEmpty(),
-                        lyrics = lyrics,
-                        currentIndex = currentLyricIndex,
-                        currentPositionMs = currentPositionMs,
-                        isPlaying = isPlaying,
-                        showTranslation = showTranslation,
-                        showPronunciation = showPronunciation,
-                        fontScale = fontScale,
-                        fontPath = fontPath,
-                        fontWeight = fontWeight,
-                        italic = italic,
-                        onLineClick = onLineClick,
-                        onLineDoubleClick = onLineDoubleClick,
-                        onLineLongClick = onLineLongClick,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    WordLyricView(
-                        lyrics = lyrics,
-                        currentIndex = currentLyricIndex,
-                        currentPositionMs = currentPositionMs,
-                        isPlaying = isPlaying,
-                        showTranslation = showTranslation,
-                        showPronunciation = showPronunciation,
-                        fontScale = fontScale,
-                        fontFamily = fontFamily,
-                        fontWeight = fontWeight,
-                        topSpacer = 64.dp,
-                        bottomSpacer = if (visualizerEnabled) 150.dp else 166.dp,
-                        horizontalPadding = 0.dp,
-                        lineHorizontalPadding = 0.dp,
-                        perspectiveEffect = perspectiveEffect,
-                        onLineClick = onLineClick,
-                        onLineDoubleClick = onLineDoubleClick,
-                        onLineLongClick = onLineLongClick,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                SmoothLyricView(
+                    songId = song?.id ?: 0L,
+                    songTitle = song?.title.orEmpty(),
+                    songArtist = song?.artist.orEmpty(),
+                    lyrics = lyrics,
+                    currentIndex = currentLyricIndex,
+                    currentPositionMs = currentPositionMs,
+                    isPlaying = isPlaying,
+                    showTranslation = showTranslation,
+                    showPronunciation = showPronunciation,
+                    fontScale = fontScale,
+                    fontPath = fontPath,
+                    fontWeight = fontWeight,
+                    italic = italic,
+                    onLineClick = onLineClick,
+                    onLineDoubleClick = onLineDoubleClick,
+                    onLineLongClick = onLineLongClick,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
 
@@ -2794,7 +2808,9 @@ private fun LandscapeLyricsOverlay(
     showTranslation: Boolean,
     showPronunciation: Boolean,
     fontFamily: FontFamily?,
+    fontPath: String,
     fontWeight: FontWeight,
+    fontScale: Float,
     showTotalDuration: Boolean,
     palette: PlayerPalette,
     flowEffectMode: Int,
@@ -2856,14 +2872,23 @@ private fun LandscapeLyricsOverlay(
                         annotation = annotation,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    LandscapeLyricShowcase(
+                    SmoothLyricView(
+                        songId = song?.id ?: 0L,
+                        songTitle = song?.title.orEmpty(),
+                        songArtist = song?.artist.orEmpty(),
                         lyrics = lyrics,
                         currentIndex = currentLyricIndex,
                         currentPositionMs = currentPosition,
+                        isPlaying = isPlaying,
                         showTranslation = showTranslation,
                         showPronunciation = showPronunciation,
-                        fontFamily = fontFamily,
+                        fontScale = fontScale,
+                        fontPath = fontPath,
                         fontWeight = fontWeight,
+                        primaryTextSizeSp = 30f,
+                        secondaryTextSizeSp = 15f,
+                        anchorOffsetRatio = -0.06f,
+                        topContentPadding = 12.dp,
                         onLineClick = onLineClick,
                         onLineLongClick = onLineLongClick,
                         modifier = Modifier
@@ -2958,7 +2983,7 @@ private fun LandscapeSongTitle(
         titleFontSize = 28.sp,
         artistFontSize = 16.sp,
         artistAlpha = 0.50f,
-        fallbackTitle = "Ella Music",
+        fallbackTitle = stringResource(R.string.app_name),
         modifier = modifier.padding(end = 16.dp)
     )
 }
@@ -3794,6 +3819,7 @@ private fun PlayerTransportControls(
     onDismissQueue: () -> Unit,
     onQueueSongClick: (Int) -> Unit,
     onRemoveQueueSong: (Int) -> Unit,
+    onMoveQueueSong: (Int, Int) -> Unit,
     onClearQueue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -3858,6 +3884,7 @@ private fun PlayerTransportControls(
                         currentSongId = currentSongId,
                         onSongClick = onQueueSongClick,
                         onRemoveSong = onRemoveQueueSong,
+                        onMoveSong = onMoveQueueSong,
                         onClearQueue = onClearQueue,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -4481,19 +4508,52 @@ internal fun PlayerQueueMenu(
     currentSongId: Long?,
     onSongClick: (Int) -> Unit,
     onRemoveSong: (Int) -> Unit,
+    onMoveSong: (Int, Int) -> Unit,
     onClearQueue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    data class QueueEntry(
+        val stableKey: String,
+        val song: Song
+    )
+
+    fun buildQueueEntries(items: List<Song>): List<QueueEntry> {
+        val occurrenceByIdentity = linkedMapOf<String, Int>()
+        return items.map { song ->
+            val identity = song.playlistIdentityKey()
+            val occurrence = (occurrenceByIdentity[identity] ?: 0) + 1
+            occurrenceByIdentity[identity] = occurrence
+            QueueEntry(
+                stableKey = "$identity|queue#$occurrence",
+                song = song
+            )
+        }
+    }
+
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val currentIndex = remember(playlist, currentSongId) {
-        playlist.indexOfFirst { it.id == currentSongId }
+    var manualPlaylist by remember(playlist) { mutableStateOf(buildQueueEntries(playlist)) }
+    var pendingMoveStart by remember(playlist) { mutableStateOf<Int?>(null) }
+    var pendingMoveTarget by remember(playlist) { mutableStateOf<Int?>(null) }
+    val currentIndex = remember(manualPlaylist, currentSongId) {
+        manualPlaylist.indexOfFirst { it.song.id == currentSongId }
     }
     LaunchedEffect(currentIndex) {
         if (currentIndex >= 0) {
             listState.scrollToItem(currentIndex)
         }
     }
+    val reorderableLazyListState = rememberReorderableLazyListState(
+        lazyListState = listState,
+        onMove = { from, to ->
+            if (from.index !in manualPlaylist.indices || to.index !in manualPlaylist.indices) return@rememberReorderableLazyListState
+            manualPlaylist = manualPlaylist.toMutableList().apply {
+                add(to.index, removeAt(from.index))
+            }
+            if (pendingMoveStart == null) pendingMoveStart = from.index
+            pendingMoveTarget = to.index
+        }
+    )
 
     Column(
         modifier = modifier
@@ -4554,57 +4614,101 @@ internal fun PlayerQueueMenu(
                 state = listState,
                 modifier = Modifier.heightIn(max = 420.dp)
             ) {
-                itemsIndexed(playlist, key = { index, item -> "${item.id}:${item.path}:$index" }) { index, item ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                if (item.id == currentSongId) MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                else Color.Transparent
-                            )
-                            .clickable { onSongClick(index) }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        AlbumArtView(
-                            song = item,
-                            embeddedCover = null,
-                            cornerRadius = 10.dp,
-                            modifier = Modifier.size(40.dp)
+                itemsIndexed(manualPlaylist, key = { _, item -> item.stableKey }) { index, item ->
+                    ReorderableItem(
+                        state = reorderableLazyListState,
+                        key = item.stableKey
+                    ) { isDragging ->
+                        val dragHandleModifier = Modifier.draggableHandle(
+                            onDragStopped = {
+                                val fromIndex = pendingMoveStart
+                                val toIndex = pendingMoveTarget
+                                if (fromIndex != null && toIndex != null && fromIndex != toIndex) {
+                                    onMoveSong(fromIndex, toIndex)
+                                }
+                                pendingMoveStart = null
+                                pendingMoveTarget = null
+                            }
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = item.title,
-                                fontSize = 13.sp,
-                                fontWeight = if (item.id == currentSongId) FontWeight.Bold else FontWeight.Medium,
-                                color = if (item.id == currentSongId) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = item.artist,
-                                fontSize = 11.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
+                        val queueSong = item.song
+                        Row(
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(CircleShape)
-                                .playerNoIndicationClick { onRemoveSong(index) },
-                            contentAlignment = Alignment.Center
+                                .fillMaxWidth()
+                                .heightIn(min = 60.dp)
+                                .zIndex(if (isDragging) 1f else 0f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    when {
+                                        isDragging -> MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                        queueSong.id == currentSongId -> MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                        else -> Color.Transparent
+                                    }
+                                )
+                                .clickable { onSongClick(index) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_delete),
-                                contentDescription = stringResource(R.string.player_remove_from_queue),
-                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.size(18.dp)
+                            AlbumArtView(
+                                song = queueSong,
+                                embeddedCover = null,
+                                cornerRadius = 10.dp,
+                                modifier = Modifier.size(40.dp)
                             )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = queueSong.title,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (queueSong.id == currentSongId) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (queueSong.id == currentSongId) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = queueSong.artist,
+                                    fontSize = 11.sp,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .then(dragHandleModifier)
+                                    .size(30.dp)
+                                    .clip(RoundedCornerShape(15.dp))
+                                    .background(
+                                        if (isDragging) MiuixTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                        else Color.Transparent
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "\u2630",
+                                    fontSize = 15.sp,
+                                    color = if (isDragging) {
+                                        MiuixTheme.colorScheme.primary
+                                    } else {
+                                        MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                    }
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .clip(CircleShape)
+                                    .playerNoIndicationClick { onRemoveSong(index) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_delete),
+                                    contentDescription = stringResource(R.string.player_remove_from_queue),
+                                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -4616,128 +4720,55 @@ internal fun PlayerQueueMenu(
 private fun miniLyricsPreviewHeight(
     line: LyricLine?,
     showTranslation: Boolean,
-    showPronunciation: Boolean
+    showPronunciation: Boolean,
+    compact: Boolean = false
 ) = when (line?.miniVisiblePartCount(showTranslation, showPronunciation) ?: 1) {
-    0, 1 -> 154.dp
-    2 -> 184.dp
-    3 -> 220.dp
-    else -> 252.dp
+    0, 1 -> if (compact) 116.dp else 150.dp
+    2 -> if (compact) 132.dp else 176.dp
+    3 -> if (compact) 146.dp else 194.dp
+    else -> if (compact) 154.dp else 206.dp
 }
 
 @Composable
 private fun MiniLyricsPreview(
+    songId: Long,
+    songTitle: String,
+    songArtist: String,
     lyrics: List<com.ella.music.data.model.LyricLine>,
     currentIndex: Int,
     showTranslation: Boolean,
     showPronunciation: Boolean,
     currentPositionMs: Long,
     isPlaying: Boolean,
-    fontFamily: FontFamily? = null,
+    fontPath: String = "",
     fontWeight: FontWeight = FontWeight.ExtraBold,
+    fontScale: Float = 1f,
     onLineClick: (com.ella.music.data.model.LyricLine) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val safeIndex = currentIndex.takeIf { it in lyrics.indices }
         ?: lyrics.indexOfFirst { it.hasMiniLyric() }.takeIf { it >= 0 }
         ?: return
-    val usesBilingualPreview = showTranslation && lyrics.any {
-        !it.translation.isNullOrBlank() || !it.backgroundTranslation.isNullOrBlank()
-    }
-    val sideLineCount = if (usesBilingualPreview) 1 else 2
-    val previousIndices = lyrics.indices
-        .asSequence()
-        .filter { it < safeIndex && lyrics[it].hasMiniLyric() }
-        .toList()
-        .takeLast(sideLineCount)
-    val nextIndices = lyrics.indices
-        .asSequence()
-        .filter { it > safeIndex && lyrics[it].hasMiniLyric() }
-        .take(sideLineCount)
-        .toList()
-    val previewItems = previousIndices + safeIndex + nextIndices
-    val smoothPositionMs = rememberSmoothMiniLyricPosition(
+    SmoothLyricView(
+        songId = songId,
+        songTitle = songTitle,
+        songArtist = songArtist,
+        lyrics = lyrics,
+        currentIndex = safeIndex,
         currentPositionMs = currentPositionMs,
         isPlaying = isPlaying,
-        anchorKey = lyrics.getOrNull(safeIndex)?.miniLyricRenderKey() ?: safeIndex
+        showTranslation = showTranslation,
+        showPronunciation = showPronunciation,
+        fontScale = fontScale * 0.82f,
+        fontPath = fontPath,
+        fontWeight = fontWeight,
+        primaryTextSizeSp = 16.5f,
+        secondaryTextSizeSp = 10.5f,
+        anchorOffsetRatio = -0.01f,
+        topContentPadding = 0.dp,
+        onLineClick = onLineClick,
+        modifier = modifier.fillMaxWidth()
     )
-
-    val maxVisiblePartCount = previewItems.maxOfOrNull { index ->
-        lyrics[index].miniVisiblePartCount(
-            showTranslation = showTranslation,
-            showPronunciation = showPronunciation
-        )
-    } ?: 1
-
-    val miniLineSpacing = when {
-        maxVisiblePartCount <= 2 -> 5.dp
-        maxVisiblePartCount == 3 -> 7.dp
-        else -> 9.dp
-    }
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .graphicsLayer {
-                compositingStrategy = CompositingStrategy.Offscreen
-            }
-            .drawWithCache {
-                val fade = Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.10f to Color.Black,
-                    0.90f to Color.Black,
-                    1f to Color.Transparent
-                )
-                onDrawWithContent {
-                    drawContent()
-                    drawRect(fade, blendMode = BlendMode.DstIn)
-                }
-            },
-        verticalArrangement = Arrangement.spacedBy(
-            space = miniLineSpacing,
-            alignment = Alignment.CenterVertically
-        )
-    ) {
-        previewItems.forEach { index ->
-            val line = lyrics[index]
-            val isActive = index == safeIndex
-
-            val distance = kotlin.math.abs(index - safeIndex)
-            val alpha by animateFloatAsState(
-                targetValue = when {
-                    distance == 0 -> 0.86f
-                    distance == 1 -> 0.66f
-                    else -> 0.42f
-                },
-                animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing),
-                label = "mini_lyric_alpha"
-            )
-            val scale by animateFloatAsState(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 240, easing = LinearOutSlowInEasing),
-                label = "mini_lyric_scale"
-            )
-
-            MiniLyricBlock(
-                line = line,
-                showTranslation = showTranslation,
-                showPronunciation = showPronunciation,
-                currentPositionMs = smoothPositionMs,
-                active = isActive,
-                isPlaying = isPlaying,
-                fontFamily = fontFamily,
-                fontWeight = fontWeight,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer {
-                        this.alpha = alpha
-                        scaleX = scale
-                        scaleY = scale
-                    }
-                    .clickable { onLineClick(line) }
-                    .padding(vertical = 1.dp)
-            )
-        }
-    }
 }
 
 @Composable
@@ -5181,14 +5212,14 @@ private fun PlayerActionMenu(
     val context = LocalContext.current
     val artistEntryLabel = remember(song?.artist) {
         context.getString(
-            R.string.player_view_named,
+            R.string.player_view_artist_named,
             song?.artist?.ifBlank { context.getString(R.string.player_unknown_artist) }
                 ?: context.getString(R.string.player_unknown_artist)
         )
     }
     val albumEntryLabel = remember(song?.album) {
         context.getString(
-            R.string.player_view_named,
+            R.string.player_view_album_named,
             song?.album?.ifBlank { context.getString(R.string.player_unknown_album) }
                 ?: context.getString(R.string.player_unknown_album)
         )
@@ -6473,7 +6504,7 @@ private fun enqueuePlayerDownload(context: Context, song: Song) {
         .replace(Regex("""[\\/:*?"<>|]"""), "_")
         .replace(Regex("""\s+"""), " ")
         .trim()
-        .ifBlank { "Ella Music.mp3" }
+        .ifBlank { "Halcyon.mp3" }
     val request = DownloadManager.Request(Uri.parse(song.path))
         .setTitle(fileName)
         .setDescription("${song.title} - ${song.artist}")

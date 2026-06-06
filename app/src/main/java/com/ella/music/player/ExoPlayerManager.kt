@@ -377,6 +377,25 @@ class ExoPlayerManager(private val context: Context) {
         savePlaybackQueue(force = true)
     }
 
+    fun movePlaylistItem(fromIndex: Int, toIndex: Int) {
+        if (fromIndex !in playlist.indices || toIndex !in playlist.indices || fromIndex == toIndex) return
+        virtualPlaylistCurrentIndex = null
+        playlistBeforeShuffle = null
+        val movedSong = playlist.removeAt(fromIndex)
+        playlist.add(toIndex, movedSong)
+        _playlist.value = playlist.toList()
+        mediaController?.let { controller ->
+            if (fromIndex < controller.mediaItemCount && toIndex < controller.mediaItemCount) {
+                controller.moveMediaItem(fromIndex, toIndex)
+            }
+            updateCurrentSong()
+        } ?: run {
+            _currentSong.value = playlist.firstOrNull()
+            _duration.value = _currentSong.value?.duration ?: 0L
+        }
+        savePlaybackQueue(force = true)
+    }
+
     fun clearPlaylist() {
         virtualPlaylistCurrentIndex = null
         playlistBeforeShuffle = null
@@ -814,17 +833,21 @@ class ExoPlayerManager(private val context: Context) {
         if (playlistBeforeShuffle == null) {
             playlistBeforeShuffle = playlist.toList()
         }
-
-        val currentIndex = controller.currentMediaItemIndex
-            .takeIf { it in playlist.indices }
-            ?: playlist.indexOfFirst { it.isSamePlaybackIdentity(_currentSong.value) }
-                .takeIf { it >= 0 }
+        val sourceOrder = playlistBeforeShuffle ?: playlist.toList()
+        val current = resolveCurrentPlaybackSong(controller) ?: return
+        val currentIndex = sourceOrder.indexOfFirst { it.isSamePlaybackIdentity(current) }
+            .takeIf { it >= 0 }
             ?: return
-        val current = playlist[currentIndex]
-        val shuffled = playlist
+        val currentSong = sourceOrder[currentIndex]
+        val shuffleSeed = if (shuffleMode == SettingsManager.SHUFFLE_MODE_TRUE_RANDOM) {
+            SystemClock.elapsedRealtimeNanos()
+        } else {
+            buildPseudoShuffleSeed(sourceOrder, currentSong)
+        }
+        val shuffled = sourceOrder
             .filterIndexed { index, _ -> index != currentIndex }
-            .shuffled(Random(SystemClock.elapsedRealtimeNanos()))
-        val newPlaylist = listOf(current) + shuffled
+            .shuffled(Random(shuffleSeed))
+        val newPlaylist = listOf(currentSong) + shuffled
         val positionMs = controller.currentPosition.coerceAtLeast(0L)
         val wasPlaying = controller.isPlaying
 
@@ -861,7 +884,7 @@ class ExoPlayerManager(private val context: Context) {
         }
         if (reorderingPlaylistForShuffle) return
 
-        val current = _currentSong.value ?: controller.currentMediaItem?.toSong()
+        val current = resolveCurrentPlaybackSong(controller)
         val targetIndex = original.indexOfFirst { it.isSamePlaybackIdentity(current) }
             .takeIf { it >= 0 }
             ?: controller.currentMediaItemIndex.coerceIn(0, original.lastIndex)
@@ -887,6 +910,24 @@ class ExoPlayerManager(private val context: Context) {
         }
     }
 
+    private fun resolveCurrentPlaybackSong(controller: MediaController): Song? {
+        val controllerIndex = controller.currentMediaItemIndex
+        if (controllerIndex in playlist.indices) return playlist[controllerIndex]
+        return controller.currentMediaItem?.toSongFromMediaItemExtras()
+            ?: controller.currentMediaItem?.toSong()
+            ?: _currentSong.value
+    }
+
+    private fun buildPseudoShuffleSeed(sourceOrder: List<Song>, current: Song): Long {
+        var seed = 0x9E3779B97F4A7C15uL.toLong()
+        sourceOrder.forEachIndexed { index, song ->
+            val part = "${song.id}|${song.path}|${song.dateModified}|${song.fileSize}|$index".hashCode().toLong()
+            seed = seed xor (part + 0x9E3779B97F4A7C15uL.toLong() + (seed shl 6) + (seed ushr 2))
+        }
+        seed = seed xor "${current.id}|${current.path}".hashCode().toLong()
+        return seed
+    }
+
     private fun applyControllerPlaylistOrder(
         controller: MediaController,
         targetOrder: List<Song>,
@@ -896,6 +937,25 @@ class ExoPlayerManager(private val context: Context) {
     ) {
         if (targetOrder.isEmpty()) return
         val safeIndex = targetIndex.coerceIn(targetOrder.indices)
+        val currentItems = List(controller.mediaItemCount) { index -> controller.getMediaItemAt(index) }
+        val canReorderInPlace = currentItems.size == targetOrder.size &&
+                targetOrder.all { song -> currentItems.any { it.matchesSong(song) } }
+        if (canReorderInPlace) {
+            val mutableItems = currentItems.toMutableList()
+            targetOrder.forEachIndexed { desiredIndex, desiredSong ->
+                val currentIndex = mutableItems.indexOfFirst { it.matchesSong(desiredSong) }
+                if (currentIndex < 0 || currentIndex == desiredIndex) return@forEachIndexed
+                controller.moveMediaItem(currentIndex, desiredIndex)
+                val moved = mutableItems.removeAt(currentIndex)
+                mutableItems.add(desiredIndex, moved)
+            }
+            if (controller.currentMediaItem?.matchesSong(targetOrder[safeIndex]) != true) {
+                controller.seekTo(safeIndex, positionMs)
+            }
+            if (controller.playbackState == Player.STATE_IDLE) controller.prepare()
+            if (wasPlaying && !controller.isPlaying) controller.play()
+            return
+        }
         controller.setMediaItems(targetOrder.map(::songToMediaItem), safeIndex, positionMs)
         if (controller.playbackState == Player.STATE_IDLE) controller.prepare()
         if (wasPlaying) controller.play()

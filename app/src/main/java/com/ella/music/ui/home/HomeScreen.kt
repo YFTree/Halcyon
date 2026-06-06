@@ -116,7 +116,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Refresh
@@ -148,6 +147,7 @@ fun LibraryScreen(
     val context = LocalContext.current
     val settingsManager = remember(context) { SettingsManager(context) }
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = false)
+    val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
 
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -407,14 +407,6 @@ fun LibraryScreen(
                             )
                         }
                     }
-                    IconButton(onClick = onNavigateToSearch) {
-                        Icon(
-                            imageVector = MiuixIcons.Basic.Search,
-                            contentDescription = stringResource(R.string.common_search),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
                 }
             )
             DoubleTapScrollOverlay(
@@ -605,6 +597,7 @@ fun LibraryScreen(
                                 loadAudioInfo = mainViewModel::getAudioInfo,
                                 isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                                 loadSongRating = mainViewModel::getSongRating,
+                                showPlayNextInLists = showPlayNextInLists,
                                 selectionMode = selectionMode,
                                 selected = selected,
                                 onLongClick = {

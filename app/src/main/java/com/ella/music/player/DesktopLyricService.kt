@@ -675,7 +675,7 @@ class DesktopLyricService : Service() {
             setShadowLayer(7f, 0f, 2f, Color.argb(180, 0, 0, 0))
         }
 
-        private var lyricText = "Ella Music"
+        private var lyricText = "Halcyon"
         private var pronunciation = ""
         private var translation = ""
         private var agent = ""

@@ -349,7 +349,7 @@ class PlaylistStore private constructor(context: Context) {
         }
         val extension = when (format) {
             PlaylistExportFormat.PlainText -> "txt"
-            PlaylistExportFormat.M3u -> "m3u"
+            PlaylistExportFormat.M3u -> "m3u8"
         }
         var exportedPlaylists = 0
         var exportedSongs = 0
@@ -541,7 +541,7 @@ class PlaylistStore private constructor(context: Context) {
     }
 
     private fun String.safePlaylistFileName(): String =
-        replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "Ella Playlist" }
+        replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().ifBlank { "Halcyon Playlist" }
 
     private fun DocumentFile.createUniqueChildFile(
         mimeType: String,

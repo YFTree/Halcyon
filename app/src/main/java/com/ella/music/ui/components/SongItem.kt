@@ -17,23 +17,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
-import com.ella.music.data.SettingsManager
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
@@ -67,15 +63,13 @@ fun SongItem(
     isFavorite: Boolean = false,
     loadSongRating: ((Song) -> Int)? = null,
     ratingRevision: Int = 0,
+    showPlayNextInLists: Boolean = false,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
     showTrailingContentInSelectionMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val unknown = stringResource(R.string.common_unknown)
     val unknownArtist = stringResource(R.string.player_unknown_artist)
-    val settingsManager = remember { SettingsManager(context) }
-    val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song.id, loadAudioInfo) {
         value = withContext(Dispatchers.IO) { loadAudioInfo?.invoke(song) }
     }
@@ -92,7 +86,7 @@ fun SongItem(
         }
     }
     val qualityTag = audioInfo?.let { audioQualitySummary(it).listTag }
-    val rating by produceState(initialValue = 0, song.id, song.dateModified, ratingRevision, loadSongRating) {
+    val rating by produceState<Int>(initialValue = 0, song.id, song.dateModified, ratingRevision, loadSongRating) {
         value = withContext(Dispatchers.IO) { loadSongRating?.invoke(song) ?: 0 }
     }
     val coverModel = song.coverUrl.takeIf { it.isNotBlank() }

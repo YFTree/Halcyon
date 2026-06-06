@@ -94,7 +94,7 @@ fun MiniPlayer(
     onShowQueue: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val coverModel = rememberMiniPlayerCoverModel(song, albumArtUri, loadCoverArt)
+    val coverState = rememberMiniPlayerCoverModel(song, albumArtUri, loadCoverArt)
     val shape = RoundedCornerShape(if (liquidGlass) 32.dp else 0.dp)
     val glassBackdrop = if (liquidGlass) backdrop else null
     val useGlassLayout = liquidGlass
@@ -200,7 +200,7 @@ fun MiniPlayer(
         verticalAlignment = Alignment.CenterVertically
     ) {
         MiniPlayerCoverProgress(
-            coverModel = coverModel,
+            coverState = coverState,
             isPlaying = isPlaying,
             progress = progress,
             coverRotationEnabled = coverRotationEnabled,
@@ -293,7 +293,7 @@ fun CompactMiniPlayer(
     onSkipNext: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val coverModel = rememberMiniPlayerCoverModel(song, albumArtUri, loadCoverArt)
+    val coverState = rememberMiniPlayerCoverModel(song, albumArtUri, loadCoverArt)
     val textState = rememberMiniPlayerTextState(song, lyricText, lyricTranslation)
     var transitionDirection by remember { mutableIntStateOf(1) }
 
@@ -321,7 +321,7 @@ fun CompactMiniPlayer(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 MiniPlayerCoverProgress(
-                    coverModel = coverModel,
+                    coverState = coverState,
                     isPlaying = isPlaying,
                     progress = progress,
                     coverRotationEnabled = coverRotationEnabled,
@@ -431,7 +431,7 @@ private fun MiniPlayerAnimatedText(
 
 @Composable
 private fun MiniPlayerCoverProgress(
-    coverModel: Any?,
+    coverState: MiniPlayerCoverState,
     isPlaying: Boolean,
     progress: Float,
     coverRotationEnabled: Boolean,
@@ -439,6 +439,7 @@ private fun MiniPlayerCoverProgress(
     ringSize: Dp,
     modifier: Modifier = Modifier
 ) {
+    val coverModel = coverState.model
     var coverRotation by remember(coverModel) { mutableFloatStateOf(0f) }
 
     LaunchedEffect(coverModel, isPlaying, coverRotationEnabled) {
@@ -479,9 +480,10 @@ private fun MiniPlayerCoverProgress(
                         .size(coverSize)
                         .clip(CircleShape),
                     contentScale = ContentScale.Crop,
-                    sizePx = 128
+                    sizePx = 128,
+                    showDefaultPlaceholder = false
                 )
-            } else {
+            } else if (coverState.showDefaultCover) {
                 DefaultAlbumCover(modifier = Modifier.size(coverSize))
             }
         }
@@ -531,32 +533,48 @@ private fun rememberMiniPlayerCoverModel(
     song: Song,
     albumArtUri: Uri?,
     loadCoverArt: ((Song) -> Bitmap?)?
-): Any? {
+): MiniPlayerCoverState {
     val preferEmbeddedCover = song.fileName.substringAfterLast('.', song.path.substringAfterLast('.'))
         .lowercase() in setOf("m4a", "mp4", "alac", "flac", "wav", "aiff", "aif")
     val shouldLoadEmbeddedCover = song.coverUrl.isBlank() &&
         loadCoverArt != null &&
         (albumArtUri == null || preferEmbeddedCover)
-    val embeddedCover by produceState<Bitmap?>(
-        initialValue = null,
+    val initialModel = song.coverUrl.takeIf { it.isNotBlank() }
+        ?: albumArtUri
+    val coverState by produceState(
+        initialValue = MiniPlayerCoverState(
+            model = initialModel,
+            showDefaultCover = initialModel == null && !shouldLoadEmbeddedCover
+        ),
         song.id,
         song.dateModified,
         song.fileSize,
         shouldLoadEmbeddedCover
     ) {
-        value = if (!shouldLoadEmbeddedCover) {
-            null
+        if (!shouldLoadEmbeddedCover) {
+            value = MiniPlayerCoverState(
+                model = initialModel,
+                showDefaultCover = initialModel == null
+            )
         } else {
-            withContext(Dispatchers.IO) {
+            val embeddedCover = withContext(Dispatchers.IO) {
                 runCatching {
                     CoverLoadLimiter.run { loadCoverArt.invoke(song) }
                 }.getOrNull()
             }
+            value = MiniPlayerCoverState(
+                model = if (preferEmbeddedCover) embeddedCover ?: albumArtUri else albumArtUri ?: embeddedCover,
+                showDefaultCover = embeddedCover == null && albumArtUri == null
+            )
         }
     }
-    return song.coverUrl.takeIf { it.isNotBlank() }
-        ?: if (preferEmbeddedCover) embeddedCover ?: albumArtUri else albumArtUri ?: embeddedCover
+    return coverState
 }
+
+private data class MiniPlayerCoverState(
+    val model: Any?,
+    val showDefaultCover: Boolean
+)
 
 private fun rememberMiniPlayerTextState(
     song: Song,

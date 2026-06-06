@@ -1,5 +1,7 @@
 package com.ella.music.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -125,14 +127,28 @@ fun RowScope.LiquidGlassBottomBarItem(
     } else {
         Color.White.copy(alpha = 0.08f)
     }
+    val animatedScale by animateFloatAsState(
+        targetValue = if (isPressed) 1.08f else 1f,
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 620f),
+        label = "BottomBarItemScale"
+    )
+    val backgroundColor = when {
+        isPressed -> if (selected) selectedColor.copy(alpha = selectedColor.alpha + 0.06f) else pressedColor
+        selected -> selectedColor
+        else -> Color.Transparent
+    }
 
     Column(
         modifier = Modifier
             .weight(1f)
             .height(56.dp)
             .clip(RoundedCornerShape(28.dp))
+            .graphicsLayer {
+                scaleX = animatedScale
+                scaleY = animatedScale
+            }
             .background(
-                color = if (isPressed) pressedColor else Color.Transparent,
+                color = backgroundColor,
                 shape = RoundedCornerShape(28.dp)
             )
             .pointerInput(Unit) {

@@ -1,16 +1,16 @@
 <!--suppress ALL -->
 
-<h1 align="center">Ella Music</h1>
+<h1 align="center">Halcyon</h1>
 
 <p align="center">
-  <b>An Android Music Player Inspired by MIUI / HyperOS</b>
+  <b>formerly Ella Music, an Android Music Player Inspired by MIUI / HyperOS</b>
 </p>
 
 <p align="center">
-  <a href="https://github.com/Kifranei/Ella/releases"><img src="https://img.shields.io/github/v/release/Kifranei/Ella?style=flat&color=6750A4" alt="Version"></a>
-  <a href="https://github.com/Kifranei/Ella/releases"><img src="https://img.shields.io/github/downloads/Kifranei/Ella/total?style=flat&color=orange" alt="Downloads"></a>
-  <a href="https://github.com/Kifranei/Ella/commits"><img src="https://img.shields.io/github/last-commit/Kifranei/Ella?style=flat" alt="Last Commit"></a>
-  <a href="https://github.com/Kifranei/Ella/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Kifranei/Ella?style=flat" alt="License"></a>
+  <a href="https://github.com/Kifranei/Halcyon/releases"><img src="https://img.shields.io/github/v/release/Kifranei/Halcyon?style=flat&color=6750A4" alt="Version"></a>
+  <a href="https://github.com/Kifranei/Halcyon/releases"><img src="https://img.shields.io/github/downloads/Kifranei/Halcyon/total?style=flat&color=orange" alt="Downloads"></a>
+  <a href="https://github.com/Kifranei/Halcyon/commits"><img src="https://img.shields.io/github/last-commit/Kifranei/Halcyon?style=flat" alt="Last Commit"></a>
+  <a href="https://github.com/Kifranei/Halcyon/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Kifranei/Halcyon?style=flat" alt="License"></a>
   <a href="README.md"><img src="https://img.shields.io/badge/Document-Chinese-red.svg" alt="CN"></a>
 </p>
 
@@ -22,7 +22,7 @@
 
 ## ✨ Overview
 
-**Ella Music** is an Android local music player built with **Jetpack Compose, Miuix, and AndroidX Media3**.
+**Halcyon** (formerly **Ella Music**) is an Android local music player built with **Jetpack Compose, Miuix, and AndroidX Media3**.
 
 It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, word-by-word lyrics, floating lyrics, status-bar lyrics, dynamic covers, WebDAV remote libraries, LX Music API sources, library analytics, and a highly customizable player experience.
 
@@ -91,11 +91,11 @@ It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, 
 
 ## 📦 Download
 
-Download the latest version from [Releases](https://github.com/Kifranei/Ella/releases).
+Download the latest version from [Releases](https://github.com/Kifranei/Halcyon/releases).
 
 Recommended first-time setup:
 
-1. Install Ella Music.
+1. Install Halcyon.
 2. Grant music file access permission and choose a scanning mode (media library scanning or custom folder scanning).
 3. After scanning completes, the app is ready to use. To display lyrics on other pages, enable the option in the settings page.
 4. Configure WebDAV manually if using a remote library.
@@ -148,16 +148,16 @@ Actual matching order depends on the implementation: it usually checks the song'
 ## 🛠 Build
 
 ```bash
-git clone https://github.com/Kifranei/Ella.git
-cd Ella
+git clone https://github.com/Kifranei/Halcyon.git
+cd Halcyon
 ./gradlew :app:assembleDebug -PellaAbi=arm64-v8a
 ```
 
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/Kifranei/Ella.git
-cd Ella
+git clone https://github.com/Kifranei/Halcyon.git
+cd Halcyon
 .\gradlew.bat :app:assembleDebug -PellaAbi=arm64-v8a
 ```
 
@@ -211,7 +211,7 @@ Normal `assembleDebug` builds do not rebuild native code by default. Before rele
 
 ## 🧱 Open Source & Licenses
 
-The Ella Music main project is licensed under **Apache-2.0**. Third-party components retain their own licenses; see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+The Halcyon main project is licensed under **Apache-2.0**. Third-party components retain their own licenses; see [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ---
 
@@ -222,18 +222,18 @@ The Ella Music main project is licensed under **Apache-2.0**. Third-party compon
 - **Lyrico** — Reference for external tag editor adaptation and log page interaction.
 - **LX Music Mobile** — Provides LX Music API compatibility implementation and testing reference.
 - **Light Cone Music** — Interface design and feature implementation reference.
-- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, LyricGetter-API, lyrico-audiotag / Lyrico, TagLib, 163KeyDecrypter, Kyant Backdrop, Coil, OkHttp, accompanist-lyrics-core, accompanist-lyrics-ui, and other open source projects used by Ella Music.
+- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, LyricGetter-API, lyrico-audiotag / Lyrico, TagLib, 163KeyDecrypter, Kyant Backdrop, Coil, OkHttp, accompanist-lyrics-core, accompanist-lyrics-ui, and other open source projects used by Halcyon.
 
 ---
 
 ## ⭐ Star History
 
 <p align="center">
-  <a href="https://www.star-history.com/#Kifranei/Ella&Date">
+  <a href="https://www.star-history.com/#Kifranei/Halcyon&Date">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Kifranei/Ella&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Kifranei/Ella&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Kifranei/Ella&type=Date" width="600" />
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Kifranei/Halcyon&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Kifranei/Halcyon&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Kifranei/Halcyon&type=Date" width="600" />
     </picture>
   </a>
 </p>
@@ -243,5 +243,5 @@ The Ella Music main project is licensed under **Apache-2.0**. Third-party compon
 ## 👀 Visitor Count
 
 <p align="center">
-  <img src="https://count.getloli.com/get/@kifranei_ella?theme=capoo-2" alt="Visitor Count" />
+  <img src="https://count.getloli.com/get/@kifranei_halcyon?theme=capoo-2" alt="Visitor Count" />
 </p>

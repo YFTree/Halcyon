@@ -602,7 +602,7 @@ private fun UpdateUiState.updateButtonTargetUrl(): String? = when (this) {
     }
 }
 
-private const val GITHUB_RELEASES_URL = "https://github.com/Kifranei/Ella/releases"
+private const val GITHUB_RELEASES_URL = "https://github.com/Kifranei/Halcyon/releases"
 
 private fun fetchLatestRelease(): GithubRelease {
     val client = OkHttpClient.Builder()
@@ -611,9 +611,9 @@ private fun fetchLatestRelease(): GithubRelease {
         .addInterceptor(AppNetworkLoggingInterceptor("UpdateCheck"))
         .build()
     val request = Request.Builder()
-        .url("https://api.github.com/repos/Kifranei/Ella/releases/latest")
+        .url("https://api.github.com/repos/Kifranei/Halcyon/releases/latest")
         .header("Accept", "application/vnd.github+json")
-        .header("User-Agent", "Ella-Music/${BuildConfig.VERSION_NAME}")
+        .header("User-Agent", "Halcyon/${BuildConfig.VERSION_NAME}")
         .build()
     client.newCall(request).execute().use { response ->
         if (!response.isSuccessful) error("GitHub returned HTTP ${response.code}")
@@ -631,7 +631,7 @@ private fun fetchLatestRelease(): GithubRelease {
             tagName = json.optString("tag_name").ifBlank { json.optString("name") },
             title = json.optString("name").ifBlank { json.optString("tag_name") },
             body = json.optString("body"),
-            htmlUrl = json.optString("html_url").ifBlank { "https://github.com/Kifranei/Ella/releases" },
+            htmlUrl = json.optString("html_url").ifBlank { "https://github.com/Kifranei/Halcyon/releases" },
             downloadUrl = apkUrl,
             publishedAt = json.optString("published_at").take(10)
         )

@@ -67,7 +67,7 @@ class RawsLyricView @JvmOverloads constructor(
         private const val TRANS_GAP_DP = 6f
         private const val FEATHER_WIDTH_DP = 30f
         private const val SCROLL_ANIM_MS = 400L
-        private const val AUTO_SCROLL_RESUME_MS = 4000L
+        private const val AUTO_SCROLL_RESUME_MS = 3000L
         private const val INTERLUDE_FADE_MS = 600L
         private const val INTERLUDE_MIN_GAP_MS = 7000L
         private const val INTERLUDE_DOT_SIZE_DP = 10f
@@ -143,6 +143,7 @@ class RawsLyricView @JvmOverloads constructor(
     private var continuousFrameUpdatesEnabled = true
     private var lineAlphaAnimationsEnabled = true
     private var pronunciationAboveMainEnabled = false
+    private var autoScrollResumeEnabled = true
     private var placeholderFormat = PlaceholderFormat.NAME_ARTIST
     private var currentStyleConfig: RichLyricLineConfig? = null
     private var songName: String? = null
@@ -181,6 +182,7 @@ class RawsLyricView @JvmOverloads constructor(
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var scrollAnimator: ValueAnimator? = null
     private var positionInitialized = false
+    private var secondaryVisibilitySignature = 0
 
     private val popPathUp = PathInterpolator(0.25f, 0.1f, 0.25f, 1.0f)
     private val popPathDown = PathInterpolator(0.25f, 0.0f, 1.0f, 0.2f)
@@ -269,11 +271,12 @@ class RawsLyricView @JvmOverloads constructor(
 
     private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean = true
-        override fun onSingleTapUp(e: MotionEvent): Boolean {
+        override fun onSingleTapUp(e: MotionEvent): Boolean = true
+        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
             val tapY = e.y + scrollY
-            for (i in entries.indices) {
-                val entry = entries[i]
+            for (entry in entries) {
                 if (tapY in entry.yTop..(entry.yTop + entry.totalH)) {
+                    onLineClickListener?.onLineClick(entry.begin)
                     return true
                 }
             }
@@ -323,6 +326,7 @@ class RawsLyricView @JvmOverloads constructor(
     fun setPosition(positionMs: Long) {
         currentPosMs = positionMs
         lastPositionWallTime = SystemClock.elapsedRealtime()
+        updateSecondaryVisibilityIfNeeded()
         val newIndex = findCurrentLine(positionMs + lineOffsetMs)
         if (newIndex != currentIndex) {
             onLineChanged(currentIndex, newIndex)
@@ -358,6 +362,7 @@ class RawsLyricView @JvmOverloads constructor(
     }
 
     fun updateAnchorOffset(offset: Float) {
+        if (abs(anchorOffsetPx - offset) < 0.5f) return
         anchorOffsetPx = offset
         scrollToCurrentLine(false)
         invalidate()
@@ -402,7 +407,18 @@ class RawsLyricView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun setAutoScrollResumeEnabled(enabled: Boolean) {
+        if (autoScrollResumeEnabled == enabled) return
+        autoScrollResumeEnabled = enabled
+        if (!enabled) {
+            autoScrollResumeTime = Long.MAX_VALUE
+        } else if (isUserScrolling) {
+            autoScrollResumeTime = SystemClock.uptimeMillis() + AUTO_SCROLL_RESUME_MS
+        }
+    }
+
     fun setTopContentPadding(paddingPx: Float) {
+        if (abs(topContentPadding - paddingPx) < 0.5f) return
         topContentPadding = paddingPx
         rebuildEntries()
         scrollToCurrentLine(false)
@@ -486,6 +502,7 @@ class RawsLyricView @JvmOverloads constructor(
         currentIndex = -1
         currentPosMs = 0L
         lineOffsetMs = LINE_OFFSET_MIN_MS
+        secondaryVisibilitySignature = 0
         lineAlphas.clear()
         lineScales.clear()
         clearBlurCache()
@@ -523,12 +540,21 @@ class RawsLyricView @JvmOverloads constructor(
             val secondaryBlock = line.secondary?.splitSecondaryBlock()
             val secondaryText = secondaryBlock?.first?.takeIf { it.isNotBlank() }
             val secondaryTranslationText = secondaryBlock?.second?.takeIf { displayTranslation && it.isNotBlank() }
-            val secondaryH = secondaryText?.let {
-                max(measureTransHeight(it), measureWordsHeight(line.secondaryWords, transPaint)) + transGapPx
-            } ?: 0f
-            val secondaryTranslationH = secondaryTranslationText?.let { measureTransHeight(it) + transGapPx } ?: 0f
             val secondaryStart = line.secondaryWords?.minOfOrNull { it.begin }
             val secondaryEnd = line.secondaryWords?.maxOfOrNull { it.end }
+            val secondaryVisible = secondaryText != null && isSecondaryVisible(secondaryStart, secondaryEnd, line.end, currentPosMs)
+            val secondaryH = if (secondaryVisible) {
+                secondaryText?.let {
+                    max(measureTransHeight(it), measureWordsHeight(line.secondaryWords, transPaint)) + transGapPx
+                } ?: 0f
+            } else {
+                0f
+            }
+            val secondaryTranslationH = if (secondaryVisible) {
+                secondaryTranslationText?.let { measureTransHeight(it) + transGapPx } ?: 0f
+            } else {
+                0f
+            }
             var transH = 0f
             var transText: String? = null
             var romaText: String? = null
@@ -570,6 +596,32 @@ class RawsLyricView @JvmOverloads constructor(
         totalHeight = y
         val bottomPad = if (height > 0) height * BOTTOM_OFFSET_RATIO else 0f
         maxScrollY = max(0f, totalHeight + bottomPad - height)
+    }
+
+    private fun updateSecondaryVisibilityIfNeeded() {
+        val signature = computeSecondaryVisibilitySignature(currentPosMs)
+        if (signature == secondaryVisibilitySignature) return
+        secondaryVisibilitySignature = signature
+        val browsing = isUserScrolling
+        rebuildEntries()
+        if (positionInitialized && !browsing) {
+            scrollToCurrentLine(false)
+        } else {
+            clampScroll()
+        }
+    }
+
+    private fun computeSecondaryVisibilitySignature(positionMs: Long): Int {
+        var result = 17
+        lyrics.forEachIndexed { index, line ->
+            val hasSecondary = line.secondary?.splitSecondaryBlock()?.first?.isNotBlank() == true
+            if (!hasSecondary) return@forEachIndexed
+            val start = line.secondaryWords?.minOfOrNull { it.begin }
+            val end = line.secondaryWords?.maxOfOrNull { it.end }
+            result = 31 * result + index
+            result = 31 * result + if (isSecondaryVisible(start, end, line.end, positionMs)) 1 else 0
+        }
+        return result
     }
 
     private fun measureMainHeight(text: String): Float {
@@ -755,7 +807,7 @@ class RawsLyricView @JvmOverloads constructor(
                 clampScroll()
             }
         }
-        if (isUserScrolling && SystemClock.uptimeMillis() > autoScrollResumeTime) {
+        if (autoScrollResumeEnabled && isUserScrolling && SystemClock.uptimeMillis() > autoScrollResumeTime) {
             isUserScrolling = false
             scrollToCurrentLine(true)
         }
@@ -801,6 +853,7 @@ class RawsLyricView @JvmOverloads constructor(
 
     private fun postFrame() {
         val needFrame = (playbackActive && continuousFrameUpdatesEnabled && lyrics.any { it.words?.isNotEmpty() == true || it.secondaryWords?.isNotEmpty() == true }) ||
+                (autoScrollResumeEnabled && isUserScrolling) ||
                 !scroller.isFinished ||
                 popAnimators.isNotEmpty() ||
                 isInterludeActive() ||
@@ -968,8 +1021,7 @@ class RawsLyricView @JvmOverloads constructor(
             secondaryBaseY += entry.transH
         }
         val shouldDrawSecondary = entry.secondaryText != null && entry.isSecondaryVisible(currentPosMs)
-        if (entry.secondaryText != null) {
-            if (!shouldDrawSecondary) return
+        if (entry.secondaryText != null && shouldDrawSecondary) {
             val secondaryBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
             val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
             if (!entry.secondaryWords.isNullOrEmpty() && isCurrent) {
@@ -979,7 +1031,7 @@ class RawsLyricView @JvmOverloads constructor(
             }
             secondaryBaseY += entry.secondaryH
         }
-        if (entry.secondaryTranslationText != null) {
+        if (entry.secondaryTranslationText != null && shouldDrawSecondary) {
             val secondaryTranslationBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
             val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
             drawTextAligned(canvas, entry.secondaryTranslationText, tPaint, textStartX, secondaryTranslationBaseline, entry.alignedRight, farBlur)
@@ -988,9 +1040,13 @@ class RawsLyricView @JvmOverloads constructor(
     }
 
     private fun LineEntry.isSecondaryVisible(positionMs: Long): Boolean {
-        val start = secondaryStart ?: return true
-        val end = secondaryEnd ?: this.end
-        return positionMs in start..end
+        return isSecondaryVisible(secondaryStart, secondaryEnd, end, positionMs)
+    }
+
+    private fun isSecondaryVisible(start: Long?, end: Long?, fallbackEnd: Long, positionMs: Long): Boolean {
+        val actualStart = start ?: return true
+        val actualEnd = end ?: fallbackEnd
+        return positionMs in actualStart..actualEnd
     }
 
     private fun LineEntry.pivotX(): Float =
@@ -1744,20 +1800,6 @@ class RawsLyricView @JvmOverloads constructor(
                 velocityTracker?.addMovement(event)
                 velocityTracker?.computeCurrentVelocity(1000)
                 val vy = velocityTracker?.yVelocity ?: 0f
-                if (!isDragging && !longPressHandled && event.actionMasked == MotionEvent.ACTION_UP) {
-                    val tapY = event.y + scrollY
-                    for (i in entries.indices) {
-                        val entry = entries[i]
-                        if (tapY in entry.yTop..(entry.yTop + entry.totalH)) {
-                            onLineClickListener?.onLineClick(entry.begin)
-                            isUserScrolling = false
-                            currentIndex = i
-                            scrollToCurrentLine(true)
-                            invalidate()
-                            break
-                        }
-                    }
-                }
                 if (isDragging && abs(vy) > 500f) {
                     scroller.fling(
                         0, scrollY.toInt(), 0, -vy.toInt(),

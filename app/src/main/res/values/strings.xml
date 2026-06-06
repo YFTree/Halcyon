@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Ella Music</string>
+    <string name="app_name">Halcyon</string>
     <string name="tab_home">首页</string>
     <string name="tab_library">音乐库</string>
     <string name="tab_album">专辑</string>
@@ -38,7 +38,7 @@
     <string name="theme_follow_system">跟随系统</string>
     <string name="theme_light">浅色</string>
     <string name="theme_dark">深色</string>
-    <string name="about_app_name">Ella Music</string>
+    <string name="about_app_name">Halcyon</string>
     <string name="about_version_name">版本 %1$s</string>
     <string name="about_device_info">设备信息</string>
     <string name="about_device_name">设备名称</string>
@@ -166,10 +166,10 @@
     <string name="logs_search_label">搜索日志、Tag、错误信息</string>
     <string name="logs_summary_title">运行日志</string>
     <string name="logs_detail_title">日志详情</string>
-    <string name="logs_share_subject">Ella Music 运行日志</string>
-    <string name="logs_share_text">Ella Music 运行日志，生成时间：%1$s</string>
+    <string name="logs_share_subject">Halcyon 运行日志</string>
+    <string name="logs_share_text">Halcyon 运行日志，生成时间：%1$s</string>
     <string name="logs_share_chooser_title">分享运行日志</string>
-    <string name="logs_clip_label">Ella Music 日志</string>
+    <string name="logs_clip_label">Halcyon 日志</string>
     <string name="logs_copied">日志已复制</string>
     <string name="logs_cleared">日志已清空</string>
     <string name="logs_retention_days">%1$d 天</string>
@@ -225,9 +225,11 @@
     <string name="lyric_share_selected_count">已选择 %1$d / %2$d 句</string>
     <string name="lyric_share_chooser_title">分享歌词</string>
     <string name="lyric_share_failed">分享歌词失败</string>
+    <string name="lyric_share_include_translation">显示翻译</string>
+    <string name="lyric_share_include_translation_summary">关闭后分享卡片和预览都只显示原文</string>
     <string name="lyric_share_unknown_song">未知歌曲</string>
     <string name="lyric_share_unknown_artist">未知艺术家</string>
-    <string name="lyric_share_footer_default">Ella Music</string>
+    <string name="lyric_share_footer_default">Halcyon</string>
     <string name="lyric_share_footer_custom">by @%1$s</string>
     <string name="aspect_pro_requires_local_audio">Aspect Pro 需要本地音频文件</string>
     <string name="aspect_pro_open_failed">未能打开 Aspect Pro，请确认已安装</string>
@@ -237,7 +239,7 @@
     <string name="player_no_artist_jump">这首歌没有可跳转的歌手信息</string>
     <string name="player_no_album_jump">这首歌没有可跳转的专辑信息</string>
     <string name="player_no_netease_jump">没有可跳转的网易云信息</string>
-    <string name="player_download_started">已开始下载到 Music/Ella</string>
+    <string name="player_download_started">已开始下载</string>
     <string name="player_no_share_song">当前没有可分享的歌曲</string>
     <string name="player_pause_after_current_on">当前歌曲播放完后暂停</string>
     <string name="player_pause_after_current_off">已关闭播完当前暂停</string>
@@ -248,9 +250,11 @@
     <string name="player_song_info">歌曲信息</string>
     <string name="player_lyrics_display">歌词显示</string>
     <string name="player_landscape_lyrics">横屏歌词</string>
-    <string name="player_view_album">查看专辑页</string>
-    <string name="player_view_artist">查看歌手页</string>
+    <string name="player_view_album">查看专辑</string>
+    <string name="player_view_artist">查看艺术家</string>
     <string name="player_view_named">查看：%1$s</string>
+    <string name="player_view_album_named">查看专辑：%1$s</string>
+    <string name="player_view_artist_named">查看艺术家：%1$s</string>
     <string name="player_edit_metadata">编辑元数据</string>
     <string name="player_lyric_timing">歌词打轴</string>
     <string name="player_download_lx_song">下载 LX 歌曲</string>
@@ -274,7 +278,7 @@
     <string name="update_empty_changelog">此版本没有填写更新日志。</string>
     <string name="update_unavailable">暂时无法获取更新</string>
     <string name="update_found_version">发现 %1$s</string>
-    <string name="update_connecting_github">正在连接 GitHub，获取 Ella Music 最新发布版本。</string>
+    <string name="update_connecting_github">正在连接 GitHub，获取 Halcyon（formerly Ella Music）最新发布版本。</string>
     <string name="update_has_update_summary">当前版本 v%1$s，点击查看最新安装包和更新日志。</string>
     <string name="update_no_update_summary">当前版本 v%1$s，暂时没有比它更新的发布版本。</string>
     <string name="update_view_github">查看 GitHub</string>
@@ -472,10 +476,10 @@
     <string name="settings_backup_export_playback_title">导出听歌历史</string>
     <string name="settings_backup_export_playback_summary">导出播放历史、排行和日历统计，兼容 Sollin/Aurora sessions</string>
     <string name="settings_backup_restore_playback_title">导入听歌历史</string>
-    <string name="settings_backup_restore_playback_summary">导入 Ella 或 Sollin/Aurora 听歌统计 JSON</string>
+    <string name="settings_backup_restore_playback_summary">导入 Halcyon 或 Sollin/Aurora 听歌统计 JSON</string>
     <string name="settings_backup_export_format_title">选择导出格式</string>
-    <string name="settings_backup_export_format_ella">Ella 格式</string>
-    <string name="settings_backup_export_format_ella_summary">包含播放历史、排行和日历统计，适合在 Ella 中恢复</string>
+    <string name="settings_backup_export_format_ella">Halcyon 格式</string>
+    <string name="settings_backup_export_format_ella_summary">包含播放历史、排行和日历统计，适合在 Halcyon 中恢复</string>
     <string name="settings_backup_export_format_sollin">Sollin 兼容格式</string>
     <string name="settings_backup_export_format_sollin_summary">导出为 Aurora/Sollin 的 sessions JSON，可用于其他兼容应用</string>
     <string name="settings_backup_open_failed">无法打开备份文件</string>
@@ -493,7 +497,7 @@
     <string name="tag_editor_lunabeat_metadata_summary">打开 LunaBeat 的歌曲元数据编辑页面</string>
     <string name="tag_editor_lunabeat_lyric_timing_summary">打开 LunaBeat 的歌词打轴页面</string>
     <string name="tag_editor_music_tag_summary">通过 content Uri 交给音乐标签编辑</string>
-    <string name="tag_editor_builtin_custom_tag_summary">用 Ella 编辑歌曲元数据</string>
+    <string name="tag_editor_builtin_custom_tag_summary">用 Halcyon 编辑歌曲元数据</string>
     <string name="tag_editor_open_failed">无法打开标签编辑器</string>
     <string name="settings_color_white">白色</string>
     <string name="settings_color_silver_gray">银灰</string>
@@ -597,7 +601,7 @@
     <string name="settings_dynamic_cover_permission_grant">请在系统设置中授予视频权限后再开启动态封面</string>
     <string name="settings_dynamic_cover_permission_denied">未授予视频权限，动态封面已关闭</string>
     <string name="settings_startup_poster">开屏海报</string>
-    <string name="settings_startup_poster_summary">开启并选择图片后，每次打开 Ella 时显示约 3 秒</string>
+    <string name="settings_startup_poster_summary">开启并选择图片后，每次打开 Halcyon 时显示约 3 秒</string>
     <string name="settings_startup_poster_image">选择开屏海报图片</string>
     <string name="settings_app_wallpaper">全局自定义壁纸</string>
     <string name="settings_app_wallpaper_summary">在音乐库、专辑、歌单、文件夹等页面背后显示自定义壁纸</string>
@@ -612,7 +616,7 @@
     <string name="settings_custom_image_selected">已选择自定义图片</string>
     <string name="settings_custom_image_not_selected">未选择图片</string>
     <string name="settings_custom_image_remove">移除自定义图片</string>
-    <string name="settings_custom_image_remove_summary">恢复为未选择状态，并删除 Ella 内保存的图片副本</string>
+    <string name="settings_custom_image_remove_summary">恢复为未选择状态，并删除 Halcyon 内保存的图片副本</string>
     <string name="settings_custom_image_save_failed">保存自定义图片失败</string>
     <string name="settings_player_immersive_cover">沉浸专辑封面</string>
     <string name="settings_player_immersive_cover_summary">开启后播放页封面延伸到顶部；关闭后使用收敛的圆角封面布局</string>
@@ -656,7 +660,7 @@
     <string name="settings_openai_model_summary">例如 %1$s；可按账号可用模型自行修改</string>
     <string name="settings_lyric_share_card">歌词卡片分享</string>
     <string name="settings_lyric_share_custom_info">自定义信息</string>
-    <string name="settings_lyric_share_custom_info_summary">留空显示 Ella Music；填写名称后显示为 by @名称</string>
+    <string name="settings_lyric_share_custom_info_summary">留空显示 Halcyon；填写名称后显示为 by @名称</string>
     <string name="settings_tag_scraping">音乐标签刮削</string>
     <string name="settings_metadata_editor">元数据编辑软件</string>
     <string name="settings_lyric_timing_editor">歌词打轴软件</string>
@@ -890,8 +894,9 @@
     <string name="playlist_import_merge_keep_summary">同名歌单只追加不存在的歌曲</string>
     <string name="playlist_export_txt">导出为 TXT</string>
     <string name="playlist_export_txt_summary">逐行导出本地歌曲路径</string>
-    <string name="playlist_export_m3u">导出为 M3U</string>
-    <string name="playlist_export_m3u_summary">导出 #EXTM3U 播放列表，包含歌曲信息和本地路径</string>
+    <string name="playlist_export_m3u">导出为 M3U8</string>
+    <string name="playlist_export_m3u_summary">导出 UTF-8 编码的 #EXTM3U 播放列表，包含歌曲信息和本地路径</string>
+    <string name="notification_permission_denied_hint">拒绝通知权限不影响使用；如果 vivo / iQOO 系统不显示通知，请自行到系统设置里授权。</string>
     <string name="playlist_import_none">没有可导入的歌曲</string>
     <string name="playlist_import_missing_paths">，保留 %1$d 首未匹配路径</string>
     <string name="playlist_import_duplicates">，跳过 %1$d 条重复</string>

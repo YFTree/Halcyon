@@ -126,6 +126,7 @@ fun ArtistScreen(
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = false)
+    val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val showAlbumArtists by mainViewModel.settingsManager.showAlbumArtists.collectAsState(initial = false)
     var sortExpanded by remember { mutableStateOf(false) }
     val sortIndex by mainViewModel.settingsManager.artistDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.artistDetailSongSortIndex)
@@ -279,6 +280,7 @@ fun ArtistScreen(
                             loadAudioInfo = mainViewModel::getAudioInfo,
                             isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                             loadSongRating = mainViewModel::getSongRating,
+                            showPlayNextInLists = showPlayNextInLists,
                             onClick = {
                                 playerViewModel.setPlaylist(sortedArtistSongs, index)
                                 if (openPlayerOnPlay) onNavigateToPlayer()

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.lx.LxOnlineService
 import com.ella.music.data.lx.LxOnlineSong
@@ -83,6 +84,7 @@ fun LxOnlineScreen(
         sources.firstOrNull { it.id == selectedSourceId } ?: sources.firstOrNull()
     }
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = false)
+    val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val currentSourceId = selectedSource?.id.orEmpty()
     var observedSourceId by remember { mutableStateOf<String?>(null) }
     var actionItem by remember { mutableStateOf<LxOnlineSong?>(null) }
@@ -236,6 +238,7 @@ fun LxOnlineScreen(
                         SongItem(
                             song = item.song,
                             albumArtUri = item.coverUrl.takeIf { it.isNotBlank() }?.let(Uri::parse),
+                            showPlayNextInLists = showPlayNextInLists,
                             onClick = {
                                 scope.launch {
                                     state.isBusy = true
@@ -269,7 +272,7 @@ fun LxOnlineScreen(
                                     runCatching {
                                         val playable = service.resolvePlayableSong(item, selectedSource?.script.orEmpty())
                                         enqueueDownload(context, playable)
-                                        showToast("已开始下载到 Music/Ella")
+                                        showToast(context.getString(R.string.player_download_started))
                                     }.onFailure {
                                         state.message = it.localizedMessage ?: "下载失败"
                                         showToast(state.message)
@@ -318,5 +321,5 @@ private fun String.sanitizeFileName(): String {
     return replace(Regex("""[\\/:*?"<>|]"""), "_")
         .replace(Regex("""\s+"""), " ")
         .trim()
-        .ifBlank { "Ella Music.mp3" }
+        .ifBlank { "Halcyon.mp3" }
 }

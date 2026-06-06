@@ -209,7 +209,7 @@ object AppLogStore {
     fun buildDetailedReport(context: Context, entries: List<AppLogEntry> = read(context)): String {
         val appContext = context.applicationContext
         return buildString {
-            appendLine("Ella Music diagnostic info")
+            appendLine("Halcyon diagnostic info")
             appendLine("Generated: ${formatTime(System.currentTimeMillis())}")
             appendLine("App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
             appendLine("Build time: ${BuildConfig.BUILD_TIME}")

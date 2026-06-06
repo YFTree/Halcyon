@@ -81,6 +81,7 @@ fun LibrarySearchScreen(
     val albums by mainViewModel.albums.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val lyricSourceMode by mainViewModel.settingsManager.lyricSourceMode.collectAsState(initial = SettingsManager.LYRIC_SOURCE_AUTO)
+    val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     var query by remember(initialQuery) { mutableStateOf(initialQuery.orEmpty()) }
     var filter by remember(initialFilterType) { mutableStateOf(SearchFilter.fromRouteType(initialFilterType)) }
     var actionSong by remember { mutableStateOf<Song?>(null) }
@@ -280,6 +281,7 @@ fun LibrarySearchScreen(
                                 isCurrent = currentSong?.id == result.song.id,
                                 loadCoverArt = mainViewModel::getCoverArtBitmap,
                                 loadAudioInfo = mainViewModel::getAudioInfo,
+                                showPlayNextInLists = showPlayNextInLists,
                                 onClick = {
                                     val playbackSongs = songResults.map { it.song }
                                     val index = playbackSongs.indexOfFirst { it.id == result.song.id && it.path == result.song.path }.coerceAtLeast(0)

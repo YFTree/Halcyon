@@ -19,6 +19,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,6 +30,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,6 +70,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -101,12 +105,15 @@ import com.ella.music.ui.components.LiquidGlassBottomBarItem
 import com.ella.music.ui.components.MiniPlayer
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.TagEditorEditTracker
+import com.ella.music.ui.components.simpleLuminance
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import com.ella.music.ui.components.updateEllaDynamicShortcuts
 import com.ella.music.ui.navigation.AppNavigation
 import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ROUTE
+import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ROUTE_NEW
 import com.ella.music.ui.navigation.Screen
 import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ACTION
+import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ACTION_NEW
 import com.ella.music.ui.navigation.SHORTCUT_ACTION_PLAY
 import com.ella.music.ui.navigation.SHORTCUT_ACTION_SHUFFLE_ALL
 import com.ella.music.ui.player.PlayerScreen
@@ -120,6 +127,7 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Playlist
 import top.yukonga.miuix.kmp.icon.extended.Settings
@@ -130,6 +138,12 @@ private enum class BottomDockMode {
     Expanded,
     Compact
 }
+
+private data class BottomDockTab(
+    val route: String,
+    val label: String,
+    val icon: ImageVector
+)
 
 class MainActivity : ComponentActivity() {
 
@@ -311,7 +325,9 @@ fun EllaApp(
     var showInitialScanPrompt by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         val activity = context as? Activity
-        val shortcutAction = activity?.intent?.getStringExtra(EXTRA_SHORTCUT_ACTION).orEmpty()
+        val shortcutAction = activity?.intent?.getStringExtra(EXTRA_SHORTCUT_ACTION)
+            ?: activity?.intent?.getStringExtra(EXTRA_SHORTCUT_ACTION_NEW)
+            .orEmpty()
         when (shortcutAction) {
             SHORTCUT_ACTION_PLAY -> {
                 when {
@@ -340,16 +356,7 @@ fun EllaApp(
             }
         }
 
-        val shortcutRoute = when {
-            activity?.intent?.data?.scheme == "ella" &&
-                activity.intent?.data?.host == "search" -> {
-                Screen.LibrarySearch.createRoute(
-                    type = activity.intent?.data?.getQueryParameter("type"),
-                    keyword = activity.intent?.data?.getQueryParameter("keyword")
-                )
-            }
-            else -> activity?.intent?.getStringExtra(EXTRA_SHORTCUT_ROUTE).orEmpty()
-        }
+        val shortcutRoute = activity?.intent?.resolveShortcutRoute().orEmpty()
         if (shortcutRoute.isNotBlank()) {
             runCatching {
                 navController.navigate(shortcutRoute) {
@@ -359,7 +366,9 @@ fun EllaApp(
             }
         }
         activity?.intent?.removeExtra(EXTRA_SHORTCUT_ACTION)
+        activity?.intent?.removeExtra(EXTRA_SHORTCUT_ACTION_NEW)
         activity?.intent?.removeExtra(EXTRA_SHORTCUT_ROUTE)
+        activity?.intent?.removeExtra(EXTRA_SHORTCUT_ROUTE_NEW)
         activity?.intent?.setData(null)
     }
 
@@ -410,12 +419,7 @@ fun EllaApp(
         }
     }
 
-    val bottomBarScreens = listOf(
-        Screen.Home.route,
-        Screen.Library.route,
-        Screen.Settings.route
-    )
-    val showBottomBar = currentRoute in bottomBarScreens
+    val showBottomBar = currentRoute.isBottomDockRoute()
     val canCompactBottomDock = showBottomBar
     var bottomDockMode by rememberSaveable { mutableStateOf(BottomDockMode.Expanded) }
 
@@ -469,7 +473,16 @@ fun EllaApp(
     var showStartupPoster by rememberSaveable { mutableStateOf(true) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { }
+    ) { granted ->
+        scope.launch { settingsManager.setNotificationPermissionPromptHandled(true) }
+        if (!granted) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.notification_permission_denied_hint),
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     LaunchedEffect(startupPosterEnabled, startupPosterUri) {
         if (startupPosterEnabled && startupPosterUri.isNotBlank() && showStartupPoster) {
@@ -531,12 +544,11 @@ fun EllaApp(
     val backdrop = rememberLayerBackdrop()
     val useGlass = true
     val tabs = listOf(
-        Triple(Screen.Home.route, stringResource(R.string.tab_home), MiuixIcons.Regular.Music),
-        Triple(Screen.Library.route, stringResource(R.string.tab_library), MiuixIcons.Regular.Playlist),
-        Triple(Screen.Settings.route, stringResource(R.string.tab_settings), MiuixIcons.Regular.Settings),
+        BottomDockTab(Screen.Home.route, stringResource(R.string.tab_home), MiuixIcons.Regular.Music),
+        BottomDockTab(Screen.Library.route, stringResource(R.string.tab_library), MiuixIcons.Regular.Playlist),
+        BottomDockTab(Screen.Settings.route, stringResource(R.string.tab_settings), MiuixIcons.Regular.Settings),
     )
     val currentTabRoute = currentRoute.toCurrentTabRoute()
-    val currentTab = tabs.firstOrNull { it.first == currentTabRoute } ?: tabs.first()
 
     val wallpaperVisible = appWallpaperEnabled && appWallpaperUri.isNotBlank()
     val startupPosterVisible = startupPosterEnabled && startupPosterUri.isNotBlank() && showStartupPoster
@@ -544,8 +556,9 @@ fun EllaApp(
         if (startupPosterVisible) return@LaunchedEffect
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return@LaunchedEffect
         if (notificationPermissionPromptHandled || !isVivoFamilyDevice()) return@LaunchedEffect
-        scope.launch { settingsManager.setNotificationPermissionPromptHandled(true) }
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            scope.launch { settingsManager.setNotificationPermissionPromptHandled(true) }
+        } else {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -638,7 +651,7 @@ fun EllaApp(
                     lyricProgress = miniPlayerLyricProgress,
                     miniPlayerRightButton = miniPlayerRightButton,
                     tabs = tabs,
-                    currentTab = currentTab,
+                    currentTabRoute = currentTabRoute,
                     currentRoute = currentRoute,
                     bottomDockMode = bottomDockMode,
                     canCompact = canCompactBottomDock,
@@ -648,13 +661,26 @@ fun EllaApp(
                     playerViewModel = playerViewModel,
                     onNavigate = { route ->
                         bottomDockMode = BottomDockMode.Expanded
-                        if (currentRoute != route) {
+                        if (!currentRoute.matchesRoute(route)) {
                             navController.navigate(route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = false
+                                    saveState = true
                                 }
                                 launchSingleTop = true
-                                restoreState = false
+                                restoreState = true
+                            }
+                        }
+                    },
+                    onNavigateSearch = {
+                        bottomDockMode = BottomDockMode.Expanded
+                        val route = Screen.LibrarySearch.createRoute()
+                        if (!currentRoute.matchesRoute(route)) {
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
                         }
                     },
@@ -740,6 +766,25 @@ fun EllaApp(
     }
 }
 
+private fun Intent.resolveShortcutRoute(): String {
+    val uri = data
+    if (uri != null && uri.scheme in setOf("ella", "halcyon")) {
+        val host = uri.host.orEmpty()
+        if (host == "search") {
+            return Screen.LibrarySearch.createRoute(
+                type = uri.getQueryParameter("type"),
+                keyword = uri.getQueryParameter("keyword")
+            )
+        }
+        uri.getQueryParameter("route")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { return it }
+    }
+    return getStringExtra(EXTRA_SHORTCUT_ROUTE)
+        ?: getStringExtra(EXTRA_SHORTCUT_ROUTE_NEW)
+        ?: ""
+}
+
 @Composable
 private fun InitialScanPromptDialog(
     show: Boolean,
@@ -811,8 +856,8 @@ private fun FloatingBottomControls(
     lyricTranslation: String?,
     lyricProgress: Float,
     miniPlayerRightButton: Int = 0,
-    tabs: List<Triple<String, String, ImageVector>>,
-    currentTab: Triple<String, String, ImageVector>,
+    tabs: List<BottomDockTab>,
+    currentTabRoute: String?,
     currentRoute: String?,
     bottomDockMode: BottomDockMode,
     canCompact: Boolean,
@@ -821,6 +866,7 @@ private fun FloatingBottomControls(
     mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
     onNavigate: (String) -> Unit,
+    onNavigateSearch: () -> Unit,
     onNavigatePlayer: () -> Unit,
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
@@ -852,12 +898,15 @@ private fun FloatingBottomControls(
                 coverRotationEnabled = coverRotationEnabled,
                 albumArtUri = mainViewModel.getAlbumArtUri(currentSong.albumId),
                 loadCoverArt = mainViewModel::getCoverArtBitmap,
-                currentTab = currentTab,
                 backdrop = if (useGlass) backdrop else null,
                 glassEffect = glassEffect,
+                isHomeSelected = currentTabRoute == Screen.Home.route,
+                isSearchSelected = currentRoute.isSearchRoute(),
                 onOpenPlayer = onNavigatePlayer,
                 onPlayPause = { playerViewModel.togglePlayPause() },
                 onSkipNext = { playerViewModel.skipToNext() },
+                onNavigateHome = { onNavigate(Screen.Home.route) },
+                onNavigateSearch = onNavigateSearch,
                 onExpand = onExpand
             )
         } else {
@@ -892,37 +941,56 @@ private fun FloatingBottomControls(
                 }
 
                 AnimatedVisibility(visible = showBottomBar) {
-                    if (useGlass) {
-                        LiquidGlassBottomBar(
-                            backdrop = backdrop,
-                            isBlurEnabled = true,
-                            glassEffect = glassEffect
-                        ) {
-                            tabs.forEach { (route, label, icon) ->
-                                LiquidGlassBottomBarItem(
-                                    selected = currentTab.first == route,
-                                    onClick = { onNavigate(route) },
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (useGlass) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                LiquidGlassBottomBar(
                                     backdrop = backdrop,
                                     isBlurEnabled = true,
-                                    icon = {
-                                        Icon(
-                                            imageVector = icon,
-                                            contentDescription = label,
-                                            tint = if (currentTab.first == route) MiuixTheme.colorScheme.primary
-                                            else MiuixTheme.colorScheme.onSurface,
-                                            modifier = Modifier
-                                        )
-                                    },
-                                    label = {
-                                        top.yukonga.miuix.kmp.basic.Text(
-                                            text = label,
-                                            fontSize = 11.sp,
-                                            color = if (currentTab.first == route) MiuixTheme.colorScheme.primary
-                                            else MiuixTheme.colorScheme.onSurface
+                                    glassEffect = glassEffect
+                                ) {
+                                    tabs.forEach { tab ->
+                                        LiquidGlassBottomBarItem(
+                                            selected = currentTabRoute == tab.route,
+                                            onClick = { onNavigate(tab.route) },
+                                            backdrop = backdrop,
+                                            isBlurEnabled = true,
+                                            icon = {
+                                                Icon(
+                                                    imageVector = tab.icon,
+                                                    contentDescription = tab.label,
+                                                    tint = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
+                                                    else MiuixTheme.colorScheme.onSurface,
+                                                    modifier = Modifier
+                                                )
+                                            },
+                                            label = {
+                                                top.yukonga.miuix.kmp.basic.Text(
+                                                    text = tab.label,
+                                                    fontSize = 11.sp,
+                                                    color = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
+                                                    else MiuixTheme.colorScheme.onSurface
+                                                )
+                                            }
                                         )
                                     }
-                                )
+                                }
                             }
+                            BottomDockActionPill(
+                                icon = MiuixIcons.Basic.Search,
+                                label = stringResource(R.string.common_search),
+                                selected = currentRoute.isSearchRoute(),
+                                onClick = onNavigateSearch,
+                                backdrop = backdrop,
+                                glassEffect = glassEffect,
+                                modifier = Modifier.width(60.dp)
+                            )
                         }
                     }
                 }
@@ -945,6 +1013,7 @@ private fun FloatingBottomControls(
                     playerViewModel.playQueueIndex(index)
                 },
                 onRemoveSong = { index -> playerViewModel.removeFromPlaylist(index) },
+                onMoveSong = { fromIndex, toIndex -> playerViewModel.movePlaylistItem(fromIndex, toIndex) },
                 onClearQueue = {
                     queueSheetExpanded = false
                     playerViewModel.clearPlaylist()
@@ -966,12 +1035,15 @@ private fun CompactBottomDock(
     coverRotationEnabled: Boolean,
     albumArtUri: Uri?,
     loadCoverArt: ((Song) -> android.graphics.Bitmap?)?,
-    currentTab: Triple<String, String, ImageVector>,
     backdrop: com.kyant.backdrop.Backdrop?,
     glassEffect: BottomBarGlassEffect,
+    isHomeSelected: Boolean,
+    isSearchSelected: Boolean,
     onOpenPlayer: () -> Unit,
     onPlayPause: () -> Unit,
     onSkipNext: () -> Unit,
+    onNavigateHome: () -> Unit,
+    onNavigateSearch: () -> Unit,
     onExpand: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -988,13 +1060,22 @@ private fun CompactBottomDock(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        BottomDockActionPill(
+            icon = MiuixIcons.Regular.Music,
+            label = stringResource(R.string.tab_home),
+            selected = isHomeSelected,
+            onClick = onNavigateHome,
+            backdrop = backdrop,
+            glassEffect = glassEffect,
+            modifier = Modifier.width(60.dp)
+        )
         CompactMiniPlayer(
             song = song,
             isPlaying = isPlaying,
             progress = progress,
-            lyricText = lyricText,
-            lyricTranslation = lyricTranslation,
-            lyricProgress = lyricProgress,
+            lyricText = null,
+            lyricTranslation = null,
+            lyricProgress = 0f,
             coverRotationEnabled = coverRotationEnabled,
             albumArtUri = albumArtUri,
             loadCoverArt = loadCoverArt,
@@ -1005,26 +1086,51 @@ private fun CompactBottomDock(
             onSkipNext = onSkipNext,
             modifier = Modifier.weight(1f)
         )
-        CurrentTabPill(
-            icon = currentTab.third,
-            label = currentTab.second,
-            onClick = onExpand,
+        BottomDockActionPill(
+            icon = MiuixIcons.Basic.Search,
+            label = stringResource(R.string.common_search),
+            selected = isSearchSelected,
+            onClick = onNavigateSearch,
             backdrop = backdrop,
             glassEffect = glassEffect,
-            modifier = Modifier.width(68.dp)
+            modifier = Modifier.width(60.dp)
         )
     }
 }
 
 @Composable
-private fun CurrentTabPill(
+private fun BottomDockActionPill(
     icon: ImageVector,
     label: String,
+    selected: Boolean,
     onClick: () -> Unit,
     backdrop: com.kyant.backdrop.Backdrop?,
     glassEffect: BottomBarGlassEffect,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pillScale by animateFloatAsState(
+        targetValue = if (pressed) 1.06f else 1f,
+        animationSpec = spring(dampingRatio = 0.82f, stiffness = 620f),
+        label = "BottomDockActionPillScale"
+    )
+    val overlayAlpha by animateFloatAsState(
+        targetValue = when {
+            pressed -> 1f
+            selected -> 0.72f
+            else -> 0f
+        },
+        animationSpec = spring(dampingRatio = 0.88f, stiffness = 700f),
+        label = "BottomDockActionPillOverlay"
+    )
+    val isLight = MiuixTheme.colorScheme.background.simpleLuminance() > 0.5f
+    val overlayColor = when {
+        selected -> MiuixTheme.colorScheme.primary.copy(alpha = if (isLight) 0.14f else 0.22f)
+        isLight -> ComposeColor.White.copy(alpha = 0.26f)
+        else -> ComposeColor.White.copy(alpha = 0.12f)
+    }
+
     GlassPill(
         backdrop = backdrop,
         modifier = modifier.height(64.dp),
@@ -1034,8 +1140,17 @@ private fun CurrentTabPill(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(4.dp)
+                .graphicsLayer {
+                    scaleX = pillScale
+                    scaleY = pillScale
+                }
+                .background(
+                    color = overlayColor.copy(alpha = overlayColor.alpha * overlayAlpha),
+                    shape = RoundedCornerShape(28.dp)
+                )
                 .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
+                    interactionSource = interactionSource,
                     indication = null,
                     onClick = onClick
                 ),
@@ -1044,14 +1159,14 @@ private fun CurrentTabPill(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = MiuixTheme.colorScheme.primary,
+                tint = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.size(26.dp)
             )
         }
     }
 }
 
-private fun String?.toCurrentTabRoute(): String {
+private fun String?.toCurrentTabRoute(): String? {
     return when (this) {
         null,
         Screen.Home.route -> Screen.Home.route
@@ -1066,7 +1181,31 @@ private fun String?.toCurrentTabRoute(): String {
         Screen.About.route,
         Screen.Update.route -> Screen.Settings.route
 
-        else -> Screen.Library.route
+        Screen.Library.route -> Screen.Library.route
+        else -> null
+    }
+}
+
+private fun String?.isSearchRoute(): Boolean {
+    return this?.startsWith(Screen.LibrarySearch.baseRoute) == true ||
+        this == Screen.LibrarySearch.route
+}
+
+private fun String?.isBottomDockRoute(): Boolean {
+    return when {
+        this == null -> false
+        this.isSearchRoute() -> true
+        this == Screen.Home.route -> true
+        this == Screen.Library.route -> true
+        this == Screen.Settings.route -> true
+        else -> false
+    }
+}
+
+private fun String?.matchesRoute(route: String): Boolean {
+    return when {
+        route.startsWith(Screen.LibrarySearch.baseRoute) -> this.isSearchRoute()
+        else -> this == route
     }
 }
 

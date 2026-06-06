@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Ella Music</string>
+    <string name="app_name">Halcyon</string>
     <string name="tab_home">Home</string>
     <string name="tab_library">Library</string>
     <string name="tab_album">Albums</string>
@@ -38,7 +38,7 @@
     <string name="theme_follow_system">Follow system</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
-    <string name="about_app_name">Ella Music</string>
+    <string name="about_app_name">Halcyon</string>
     <string name="about_version_name">Version %1$s</string>
     <string name="about_device_info">Device info</string>
     <string name="about_device_name">Device name</string>
@@ -163,16 +163,16 @@
     <string name="logs_search_label">Search logs, tags, or errors</string>
     <string name="logs_summary_title">Runtime logs</string>
     <string name="logs_detail_title">Log details</string>
-    <string name="logs_share_subject">Ella Music runtime logs</string>
-    <string name="logs_share_text">Ella Music runtime logs, generated at: %1$s</string>
+    <string name="logs_share_subject">Halcyon runtime logs</string>
+    <string name="logs_share_text">Halcyon runtime logs, generated at: %1$s</string>
     <string name="logs_share_chooser_title">Share runtime logs</string>
-    <string name="logs_clip_label">Ella Music log</string>
+    <string name="logs_clip_label">Halcyon log</string>
     <string name="logs_copied">Log copied</string>
     <string name="logs_cleared">Logs cleared</string>
     <string name="logs_retention_days">%1$d days</string>
     <string name="logs_retention_removed">Removed %1$d old logs</string>
     <string name="logs_retention_set">Keeping logs for %1$d days</string>
-    <string name="logs_summary">%1$d logs, showing %2$d; errors %3$d, warnings %4$d. Ella automatically captures this process logcat, network failures, and key playback, lyric, and scan logs, keeping at most the last %5$d days and 3000 records.</string>
+    <string name="logs_summary">%1$d logs, showing %2$d; errors %3$d, warnings %4$d. Halcyon automatically captures this process logcat, network failures, and key playback, lyric, and scan logs, keeping at most the last %5$d days and 3000 records.</string>
     <string name="logs_empty">No logs</string>
     <string name="logs_empty_filtered">No matching logs</string>
     <string name="logs_clear_message">This will clear all %1$d persisted logs. This cannot be undone.</string>
@@ -222,9 +222,11 @@
     <string name="lyric_share_selected_count">Selected %1$d / %2$d lines</string>
     <string name="lyric_share_chooser_title">Share lyrics</string>
     <string name="lyric_share_failed">Failed to share lyrics</string>
+    <string name="lyric_share_include_translation">Show translation</string>
+    <string name="lyric_share_include_translation_summary">Turn off to preview and share the original lyrics only</string>
     <string name="lyric_share_unknown_song">Unknown song</string>
     <string name="lyric_share_unknown_artist">Unknown artist</string>
-    <string name="lyric_share_footer_default">Ella Music</string>
+    <string name="lyric_share_footer_default">Halcyon</string>
     <string name="lyric_share_footer_custom">by @%1$s</string>
     <string name="aspect_pro_requires_local_audio">Aspect Pro requires a local audio file</string>
     <string name="aspect_pro_open_failed">Could not open Aspect Pro. Make sure it is installed</string>
@@ -234,7 +236,7 @@
     <string name="player_no_artist_jump">This song has no artist information to open</string>
     <string name="player_no_album_jump">This song has no album information to open</string>
     <string name="player_no_netease_jump">No NetEase Cloud Music information available</string>
-    <string name="player_download_started">Download started to Music/Ella</string>
+    <string name="player_download_started">Download started</string>
     <string name="player_no_share_song">No song available to share</string>
     <string name="player_pause_after_current_on">Playback will pause after the current song</string>
     <string name="player_pause_after_current_off">Pause after current song disabled</string>
@@ -248,6 +250,8 @@
     <string name="player_view_album">View album</string>
     <string name="player_view_artist">View artist</string>
     <string name="player_view_named">View: %1$s</string>
+    <string name="player_view_album_named">View album: %1$s</string>
+    <string name="player_view_artist_named">View artist: %1$s</string>
     <string name="player_edit_metadata">Edit metadata</string>
     <string name="player_lyric_timing">Lyric timing</string>
     <string name="player_download_lx_song">Download LX song</string>
@@ -271,7 +275,7 @@
     <string name="update_empty_changelog">This release does not include a changelog.</string>
     <string name="update_unavailable">Updates are temporarily unavailable</string>
     <string name="update_found_version">Found %1$s</string>
-    <string name="update_connecting_github">Connecting to GitHub to fetch the latest Ella Music release.</string>
+    <string name="update_connecting_github">Connecting to GitHub to fetch the latest Halcyon (formerly Ella Music) release.</string>
     <string name="update_has_update_summary">Current version v%1$s. Tap to view the latest APK and changelog.</string>
     <string name="update_no_update_summary">Current version v%1$s. No newer release is available right now.</string>
     <string name="update_view_github">View GitHub</string>
@@ -372,7 +376,7 @@
     <string name="player_add_to_playlist">Add to playlist</string>
     <string name="player_cancel_sleep_timer">Cancel sleep timer</string>
     <string name="player_no_song_playing">Nothing is playing right now</string>
-    <string name="player_visualizer_permission_summary">When enabled, Ella requests microphone permission to read the current playback spectrum.</string>
+    <string name="player_visualizer_permission_summary">When enabled, Halcyon requests microphone permission to read the current playback spectrum.</string>
     <string name="desktop_lyric_pin_top">Pin to top</string>
     <string name="settings_current_value">Current: %1$s</string>
     <string name="settings_audio_screen_title">Audio</string>
@@ -473,7 +477,7 @@
     <string name="tag_editor_lunabeat_metadata_summary">Open LunaBeat song metadata editor</string>
     <string name="tag_editor_lunabeat_lyric_timing_summary">Open LunaBeat lyric timing editor</string>
     <string name="tag_editor_music_tag_summary">Send a content Uri to Music Tag for editing</string>
-    <string name="tag_editor_builtin_custom_tag_summary">Edit song metadata in Ella</string>
+    <string name="tag_editor_builtin_custom_tag_summary">Edit song metadata in Halcyon</string>
     <string name="tag_editor_open_failed">Unable to open tag editor</string>
     <string name="settings_color_white">White</string>
     <string name="settings_color_silver_gray">Silver gray</string>
@@ -536,7 +540,7 @@
     <string name="song_more_metadata_copyright">Copyright</string>
     <string name="song_more_metadata_comment">Comment</string>
     <string name="player_no_lyric_timing_editor_found">LunaBeat lyric timing was not found. Install it and try again.</string>
-    <string name="player_editor_launch_hint">Ella passes the current song path to the selected app and refreshes this song after you return.</string>
+    <string name="player_editor_launch_hint">Halcyon passes the current song path to the selected app and refreshes this song after you return.</string>
     <string name="category_genre">Genres</string>
     <string name="category_year">Years</string>
     <string name="category_composer">Composers</string>
@@ -577,7 +581,7 @@
     <string name="settings_dynamic_cover_permission_grant">Grant video permission in system settings before enabling dynamic cover</string>
     <string name="settings_dynamic_cover_permission_denied">Video permission not granted, dynamic cover was disabled</string>
     <string name="settings_startup_poster">Startup poster</string>
-    <string name="settings_startup_poster_summary">After enabling and choosing an image, show it for about 3 seconds whenever Ella opens</string>
+    <string name="settings_startup_poster_summary">After enabling and choosing an image, show it for about 3 seconds whenever Halcyon opens</string>
     <string name="settings_startup_poster_image">Choose startup poster image</string>
     <string name="settings_app_wallpaper">Global custom wallpaper</string>
     <string name="settings_app_wallpaper_summary">Show a custom wallpaper behind library, album, playlist, folder, and similar pages</string>
@@ -592,7 +596,7 @@
     <string name="settings_custom_image_selected">Custom image selected</string>
     <string name="settings_custom_image_not_selected">No image selected</string>
     <string name="settings_custom_image_remove">Remove custom image</string>
-    <string name="settings_custom_image_remove_summary">Restore the unselected state and delete the image copy saved in Ella</string>
+    <string name="settings_custom_image_remove_summary">Restore the unselected state and delete the image copy saved in Halcyon</string>
     <string name="settings_custom_image_save_failed">Failed to save custom image</string>
     <string name="settings_player_immersive_cover">Immersive album cover</string>
     <string name="settings_player_immersive_cover_summary">Extend the album cover to the top of the player; disable it to use the compact rounded cover layout</string>
@@ -636,7 +640,7 @@
     <string name="settings_openai_model_summary">For example %1$s; change it to any model available to your account</string>
     <string name="settings_lyric_share_card">Lyric share card</string>
     <string name="settings_lyric_share_custom_info">Custom info</string>
-    <string name="settings_lyric_share_custom_info_summary">Leave blank to show Ella Music; fill a name to show by @name</string>
+    <string name="settings_lyric_share_custom_info_summary">Leave blank to show Halcyon; fill a name to show by @name</string>
     <string name="settings_tag_scraping">Music tag scraping</string>
     <string name="settings_metadata_editor">Metadata editor app</string>
     <string name="settings_lyric_timing_editor">Lyric timing app</string>
@@ -718,7 +722,7 @@
     <string name="settings_hide_flyme_ticker_notification_summary">Reuse the playback notification and update only the ticker to avoid showing an extra lyric notification in the shade.</string>
     <string name="settings_samsung_floating_translation">Samsung floating lyric translation</string>
     <string name="settings_samsung_floating_translation_summary">Write the translation into the notification body so Samsung floating notifications can try to show two lines.</string>
-    <string name="settings_samsung_floating_translation_summary_blocked">When the FLYme lyric notification is hidden, Ella reuses the playback notification and cannot also write into the Samsung floating notification body.</string>
+    <string name="settings_samsung_floating_translation_summary_blocked">When the FLYme lyric notification is hidden, Halcyon reuses the playback notification and cannot also write into the Samsung floating notification body.</string>
     <string name="settings_status_bar_phonetic_secondary">Show pronunciation or secondary line in status bar</string>
     <string name="settings_status_bar_phonetic_secondary_summary">Send the pronunciation or translation secondary line as the second line of the status bar lyric.</string>
     <string name="settings_heads_up_lyric_secondary">Heads-up lyric secondary line</string>
@@ -867,8 +871,9 @@
     <string name="playlist_import_merge_keep_summary">For same-name playlists, append only songs that are not already present</string>
     <string name="playlist_export_txt">Export as TXT</string>
     <string name="playlist_export_txt_summary">Export local song paths line by line</string>
-    <string name="playlist_export_m3u">Export as M3U</string>
-    <string name="playlist_export_m3u_summary">Export an #EXTM3U playlist including song info and local paths</string>
+    <string name="playlist_export_m3u">Export as M3U8</string>
+    <string name="playlist_export_m3u_summary">Export a UTF-8 #EXTM3U playlist including song info and local paths</string>
+    <string name="notification_permission_denied_hint">Denying notification permission will not affect playback. If notifications do not appear on vivo / iQOO, please enable it manually in system settings.</string>
     <string name="playlist_import_none">No songs available to import</string>
     <string name="playlist_import_missing_paths">, kept %1$d unmatched paths</string>
     <string name="playlist_import_duplicates">, skipped %1$d duplicates</string>

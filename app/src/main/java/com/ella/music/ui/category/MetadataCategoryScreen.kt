@@ -345,6 +345,7 @@ fun MetadataCategoryDetailScreen(
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val locateCurrentSongRequest by playerViewModel.locateCurrentSongRequest.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = false)
+    val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val songs = remember(type, name, librarySongs) { mainViewModel.getSongsForMetadataCategory(type, name) }
     var sortExpanded by remember { mutableStateOf(false) }
     val detailSongSortIndexFlow = remember(type) { mainViewModel.settingsManager.metadataCategoryDetailSongSortIndex(type) }
@@ -667,6 +668,7 @@ fun MetadataCategoryDetailScreen(
                             albumArtUri = albumArtUrisBySongId[song.id],
                             loadCoverArt = mainViewModel::getCoverArtBitmap,
                             loadAudioInfo = mainViewModel::getAudioInfo,
+                            showPlayNextInLists = showPlayNextInLists,
                             isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                             loadSongRating = mainViewModel::getSongRating,
                             selectionMode = selectionMode,

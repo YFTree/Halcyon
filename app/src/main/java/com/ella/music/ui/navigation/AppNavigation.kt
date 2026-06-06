@@ -130,10 +130,10 @@ fun AppNavigation(
         fun navigateTopLevel(route: String) {
             navController.navigate(route) {
                 popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = false
+                    saveState = true
                 }
                 launchSingleTop = true
-                restoreState = false
+                restoreState = true
             }
         }
 

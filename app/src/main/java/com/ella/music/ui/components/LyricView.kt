@@ -64,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
@@ -95,6 +96,10 @@ fun SmoothLyricView(
     fontPath: String = "",
     fontWeight: FontWeight = FontWeight.ExtraBold,
     italic: Boolean = false,
+    primaryTextSizeSp: Float = 28f,
+    secondaryTextSizeSp: Float = 15f,
+    anchorOffsetRatio: Float = -0.12f,
+    topContentPadding: Dp = 0.dp,
     onLineClick: (LyricLine) -> Unit = {},
     onLineDoubleClick: () -> Unit = {},
     onLineLongClick: (LyricLine) -> Unit = {}
@@ -124,15 +129,22 @@ fun SmoothLyricView(
             boldFallback = false
         )
     }
-    val style = remember(fontScale, density.fontScale, lyricTypeface, secondaryTypeface) {
+    val style = remember(
+        fontScale,
+        density.fontScale,
+        lyricTypeface,
+        secondaryTypeface,
+        primaryTextSizeSp,
+        secondaryTextSizeSp
+    ) {
         RichLyricLineConfig(
             primary = TextConfig(
-                textSize = with(density) { (28.sp * fontScale).toPx() },
+                textSize = with(density) { (primaryTextSizeSp.sp * fontScale).toPx() },
                 textColor = intArrayOf(android.graphics.Color.WHITE),
                 typeface = lyricTypeface
             ),
             secondary = TextConfig(
-                textSize = with(density) { (15.sp * fontScale).toPx() },
+                textSize = with(density) { (secondaryTextSizeSp.sp * fontScale).toPx() },
                 textColor = intArrayOf(android.graphics.Color.argb(190, 255, 255, 255)),
                 typeface = secondaryTypeface
             ),
@@ -168,7 +180,9 @@ fun SmoothLyricView(
             view.setContinuousFrameUpdatesEnabled(true)
             view.setPlaybackActive(isPlaying)
             view.setPronunciationAboveMainEnabled(true)
-            view.updateAnchorOffset(-view.height * 0.12f)
+            view.setAutoScrollResumeEnabled(false)
+            view.updateAnchorOffset(view.height * anchorOffsetRatio)
+            view.setTopContentPadding(with(density) { topContentPadding.toPx() })
             view.updateDisplayTranslation(showTranslation, showPronunciation)
             view.onLineClickListener = object : RawsLyricView.OnLineClickListener {
                 override fun onLineClick(beginMs: Long) {

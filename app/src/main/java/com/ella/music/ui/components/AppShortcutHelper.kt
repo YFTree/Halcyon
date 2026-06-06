@@ -10,7 +10,9 @@ import com.ella.music.MainActivity
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ACTION
+import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ACTION_NEW
 import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ROUTE
+import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ROUTE_NEW
 import com.ella.music.ui.navigation.Screen
 import com.ella.music.ui.navigation.SHORTCUT_ACTION_PLAY
 import com.ella.music.ui.navigation.SHORTCUT_ACTION_SHUFFLE_ALL
@@ -94,11 +96,13 @@ fun requestPinnedEllaShortcut(
     val intent = Intent(context, MainActivity::class.java).apply {
         action = Intent.ACTION_VIEW
         putExtra(EXTRA_SHORTCUT_ROUTE, route)
+        putExtra(EXTRA_SHORTCUT_ROUTE_NEW, route)
     }
     val shortcutLabel = label.shortcutLabelForRoute(route)
+    val appName = context.getString(R.string.app_name)
     val shortcut = ShortcutInfo.Builder(context, id.toShortcutId())
-        .setShortLabel(shortcutLabel.take(10).ifBlank { "Ella Music" })
-        .setLongLabel(shortcutLabel.ifBlank { "Ella Music" })
+        .setShortLabel(shortcutLabel.take(10).ifBlank { appName })
+        .setLongLabel(shortcutLabel.ifBlank { appName })
         .setIcon(Icon.createWithResource(context, shortcutIconForRoute(route)))
         .setIntent(intent)
         .build()
@@ -116,14 +120,16 @@ private fun Context.buildEllaShortcut(
     iconRes: Int,
     rank: Int
 ): ShortcutInfo {
+    val appName = getString(R.string.app_name)
     return ShortcutInfo.Builder(this, id)
-        .setShortLabel(label.take(10).ifBlank { "Ella Music" })
-        .setLongLabel(label.ifBlank { "Ella Music" })
+        .setShortLabel(label.take(10).ifBlank { appName })
+        .setLongLabel(label.ifBlank { appName })
         .setIcon(Icon.createWithResource(this, iconRes))
         .setIntent(
             Intent(this, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
                 putExtra(EXTRA_SHORTCUT_ROUTE, route)
+                putExtra(EXTRA_SHORTCUT_ROUTE_NEW, route)
             }
         )
         .setRank(rank)
@@ -137,14 +143,16 @@ private fun Context.buildEllaActionShortcut(
     iconRes: Int,
     rank: Int
 ): ShortcutInfo {
+    val appName = getString(R.string.app_name)
     return ShortcutInfo.Builder(this, id)
-        .setShortLabel(label.take(10).ifBlank { "Ella Music" })
-        .setLongLabel(label.ifBlank { "Ella Music" })
+        .setShortLabel(label.take(10).ifBlank { appName })
+        .setLongLabel(label.ifBlank { appName })
         .setIcon(Icon.createWithResource(this, iconRes))
         .setIntent(
             Intent(this, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
                 putExtra(EXTRA_SHORTCUT_ACTION, shortcutAction)
+                putExtra(EXTRA_SHORTCUT_ACTION_NEW, shortcutAction)
             }
         )
         .setRank(rank)

@@ -69,7 +69,7 @@ class OpenAiSongInterpreter(
             .url(endpoint)
             .header("Authorization", "Bearer $apiKey")
             .header("Content-Type", "application/json")
-            .header("User-Agent", "Ella Music")
+            .header("User-Agent", "Halcyon")
             .post(requestBody.toString().toRequestBody(jsonMediaType))
             .build()
 

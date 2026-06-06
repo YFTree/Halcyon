@@ -112,7 +112,8 @@ fun shareLyricCard(
     cover: Bitmap?,
     backgroundColors: List<Int>,
     annotation: String = "",
-    customInfo: String = ""
+    customInfo: String = "",
+    includeTranslation: Boolean = true
 ) {
     shareLyricCard(
         context = context,
@@ -121,7 +122,8 @@ fun shareLyricCard(
         cover = cover,
         backgroundColors = backgroundColors,
         annotation = annotation,
-        customInfo = customInfo
+        customInfo = customInfo,
+        includeTranslation = includeTranslation
     )
 }
 
@@ -132,7 +134,8 @@ fun shareLyricCard(
     cover: Bitmap?,
     backgroundColors: List<Int>,
     annotation: String = "",
-    customInfo: String = ""
+    customInfo: String = "",
+    includeTranslation: Boolean = true
 ) {
     runCatching {
         val bitmap = createLyricShareCard(
@@ -142,7 +145,8 @@ fun shareLyricCard(
             cover = cover,
             backgroundColors = backgroundColors,
             annotation = annotation,
-            customInfo = customInfo
+            customInfo = customInfo,
+            includeTranslation = includeTranslation
         )
         val uri = writeLyricShareCard(context, bitmap)
         bitmap.recycle()
@@ -151,7 +155,7 @@ fun shareLyricCard(
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra("com.mocharealm.compound.EXTRA_SOURCE_NAME", context.getString(R.string.app_name))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            clipData = ClipData.newUri(context.contentResolver, "Ella Music Lyric Card", uri)
+            clipData = ClipData.newUri(context.contentResolver, "${context.getString(R.string.app_name)} Lyric Card", uri)
         }
         context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.lyric_share_chooser_title)))
     }.onFailure {
@@ -165,11 +169,12 @@ internal fun buildLyricShareCardContent(
     lines: List<LyricLine>,
     backgroundColors: List<Int>,
     annotation: String,
-    customInfo: String
+    customInfo: String,
+    includeTranslation: Boolean = true
 ): LyricShareCardContent {
     val blocks = lines
         .filter { it.sharePrimaryText().isNotBlank() }
-        .mapNotNull { it.toShareLyricBlock() }
+        .mapNotNull { it.toShareLyricBlock(includeTranslation = includeTranslation) }
         .ifEmpty { listOf(ShareLyricBlock("\u266a", emptyList())) }
         .take(SHARE_CARD_MAX_BLOCKS)
 
@@ -347,15 +352,18 @@ private fun createLyricShareCard(
     cover: Bitmap?,
     backgroundColors: List<Int>,
     annotation: String,
-    customInfo: String
+    customInfo: String,
+    includeTranslation: Boolean
 ): Bitmap {
+    val resolvedBackgroundColors = resolveLyricShareBackgroundColors(cover, backgroundColors)
     val content = buildLyricShareCardContent(
         context = context,
         song = song,
         lines = lines,
-        backgroundColors = cover.extractSharePalette(backgroundColors),
+        backgroundColors = resolvedBackgroundColors,
         annotation = annotation,
-        customInfo = customInfo
+        customInfo = customInfo,
+        includeTranslation = includeTranslation
     )
     val layout = calculateLyricShareLayout(content)
     return renderLyricShareCardBitmap(content, layout, cover)
@@ -736,15 +744,20 @@ internal fun LyricLine.sharePrimaryText(): String {
     }
 }
 
-internal fun LyricLine.toShareLyricBlock(): ShareLyricBlock? {
+internal fun LyricLine.toShareLyricBlock(includeTranslation: Boolean = true): ShareLyricBlock? {
     val primary = sharePrimaryText().takeIf { it.isNotBlank() } ?: return null
     val secondary = listOfNotNull(
-        translation?.trim()?.takeIf { it.isNotBlank() },
+        translation?.trim()?.takeIf { includeTranslation && it.isNotBlank() },
         backgroundText?.trim()?.takeIf { it.isNotBlank() && it != primary },
-        backgroundTranslation?.trim()?.takeIf { it.isNotBlank() }
+        backgroundTranslation?.trim()?.takeIf { includeTranslation && it.isNotBlank() }
     ).distinct()
     return ShareLyricBlock(primary = primary, secondary = secondary)
 }
+
+internal fun resolveLyricShareBackgroundColors(
+    cover: Bitmap?,
+    fallbackColors: List<Int>
+): List<Int> = cover.extractSharePalette(fallbackColors)
 
 private fun baseShareLyricTextSize(blockCount: Int, longestLine: Int): Float {
     return when {
