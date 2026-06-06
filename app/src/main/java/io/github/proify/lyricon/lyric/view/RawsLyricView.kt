@@ -61,9 +61,9 @@ class RawsLyricView @JvmOverloads constructor(
         private const val BOTTOM_FADE_RATIO = 0.2775f
         private const val TOP_OFFSET_RATIO = 0.08f
         private const val BOTTOM_OFFSET_RATIO = 0.5f
-        private const val LINE_GAP_DP = 20f
+        private const val LINE_GAP_DP = 12f
         private const val LINE_PAD_TOP_DP = 2f
-        private const val LINE_PAD_BOTTOM_DP = 10f
+        private const val LINE_PAD_BOTTOM_DP = 6f
         private const val TRANS_GAP_DP = 6f
         private const val FEATHER_WIDTH_DP = 30f
         private const val SCROLL_ANIM_MS = 400L
@@ -140,6 +140,7 @@ class RawsLyricView @JvmOverloads constructor(
     private var edgeFadeEnabled = false
     private var fullLayerBlurEnabled = false
     private var nonCurrentLineBlurEnabled = false
+    private var nonCurrentLineBlurDistance = 2
     private var continuousFrameUpdatesEnabled = true
     private var lineAlphaAnimationsEnabled = true
     private var pronunciationAboveMainEnabled = false
@@ -378,6 +379,13 @@ class RawsLyricView @JvmOverloads constructor(
         if (nonCurrentLineBlurEnabled == enabled) return
         nonCurrentLineBlurEnabled = enabled
         if (!enabled) clearBlurCache()
+        invalidate()
+    }
+
+    fun setNonCurrentLineBlurDistance(distance: Int) {
+        val safeDistance = distance.coerceAtLeast(1)
+        if (nonCurrentLineBlurDistance == safeDistance) return
+        nonCurrentLineBlurDistance = safeDistance
         invalidate()
     }
 
@@ -936,7 +944,7 @@ class RawsLyricView @JvmOverloads constructor(
             val yExtra = if (expandOffset > 0f && i > interludePrevIdx) expandOffset else 0f
             val lineCenterY = entry.yTop + entry.totalH / 2f - scrollY + yExtra
             if (lineCenterY + entry.totalH < -50f || lineCenterY - entry.totalH > viewH + 50f) continue
-            val farBlur = nonCurrentLineBlurEnabled && !isUserScrolling && currentIndex >= 0 && abs(i - currentIndex) >= 2
+            val farBlur = nonCurrentLineBlurEnabled && !isUserScrolling && currentIndex >= 0 && abs(i - currentIndex) >= nonCurrentLineBlurDistance
             canvas.save()
             val pivotX = entry.pivotX()
             val pivotY = lineCenterY + entry.totalH / 2f

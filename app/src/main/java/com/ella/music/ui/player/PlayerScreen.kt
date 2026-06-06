@@ -486,6 +486,9 @@ fun PlayerScreen(
     val palette by produceState(initialValue = PlayerPalette.Default, paletteBitmap) {
         value = withContext(Dispatchers.Default) { PlayerPalette.from(paletteBitmap) }
     }
+    val lyricPalette by produceState(initialValue = PlayerPalette.Default, paletteBitmap) {
+        value = withContext(Dispatchers.Default) { PlayerPalette.fromLyricBackground(paletteBitmap) }
+    }
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
         value = withContext(Dispatchers.IO) { song?.let(playerViewModel::getAudioInfo) }
     }
@@ -586,7 +589,7 @@ fun PlayerScreen(
             shuffleEnabled = shuffleEnabled,
             repeatMode = repeatMode,
             audioInfo = audioInfo,
-            palette = palette,
+            palette = if (immersiveAlbumCover) palette else lyricPalette,
             flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
             dynamicFlowEnabled = false,
             lyrics = lyrics,
@@ -826,7 +829,7 @@ fun PlayerScreen(
             italic = false,
             fontScale = lyricFontScale,
             perspectiveEffect = lyricPerspectiveEffect,
-            palette = palette,
+            palette = lyricPalette,
             flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
             currentPositionMs = currentPosition,
             isPlaying = isPlaying,
@@ -1102,7 +1105,7 @@ fun PlayerScreen(
                         shuffleEnabled = shuffleEnabled,
                         repeatMode = repeatMode,
                         audioInfo = audioInfo,
-                        palette = palette,
+                        palette = lyricPalette,
                         lyrics = lyrics,
                         currentLyricIndex = currentLyricIndex,
                         showTranslation = showLyricTranslation,
@@ -1170,7 +1173,7 @@ fun PlayerScreen(
                         fontWeight = lyricFontWeight,
                         fontScale = lyricFontScale,
                         showTotalDuration = playerShowTotalDuration,
-                        palette = palette,
+                        palette = lyricPalette,
                         flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
                         isPlaying = isPlaying,
                         audioSessionId = audioSessionId,
@@ -4292,6 +4295,110 @@ private fun playerContentSurfaceBrush(
 }
 
 @Composable
+private fun NonImmersiveAlbumFlowBackground(
+    song: Song?,
+    embeddedCover: Bitmap?,
+    palette: PlayerPalette,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val transition = rememberInfiniteTransition(label = "non_immersive_album_flow")
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 28_000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "non_immersive_album_flow_drift"
+    )
+    val pulse = if (isPlaying) {
+        0.5f + 0.5f * kotlin.math.sin(drift * kotlin.math.PI.toFloat() * 2f)
+    } else {
+        0.28f
+    }
+
+    Box(modifier = modifier.background(palette.middle)) {
+        PlayerBlurBackground(
+            song = song,
+            embeddedCover = embeddedCover,
+            palette = palette,
+            motion = drift,
+            isPlaying = isPlaying,
+            modifier = Modifier.fillMaxSize()
+        )
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val t = drift * kotlin.math.PI.toFloat() * 2f
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        palette.top.copy(alpha = 0.78f),
+                        palette.middle.copy(alpha = 0.70f),
+                        palette.bottom.copy(alpha = 0.88f)
+                    )
+                )
+            )
+            val glows = listOf(
+                Triple(
+                    Offset((0.12f + 0.10f * kotlin.math.sin(t * 0.72f)) * w, (0.18f + 0.08f * kotlin.math.cos(t)) * h),
+                    palette.accent.lighten(0.18f).copy(alpha = 0.24f + pulse * 0.08f),
+                    0.56f
+                ),
+                Triple(
+                    Offset((0.88f + 0.08f * kotlin.math.cos(t * 0.62f)) * w, (0.28f + 0.10f * kotlin.math.sin(t * 0.9f)) * h),
+                    palette.top.lighten(0.30f).copy(alpha = 0.22f),
+                    0.48f
+                ),
+                Triple(
+                    Offset((0.50f + 0.12f * kotlin.math.sin(t * 0.45f)) * w, (0.82f + 0.05f * kotlin.math.cos(t * 0.8f)) * h),
+                    Color.White.copy(alpha = 0.08f + pulse * 0.04f),
+                    0.42f
+                )
+            )
+            glows.forEach { (center, color, radiusScale) ->
+                val radius = max(w, h) * radiusScale
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(color, Color.Transparent),
+                        center = center,
+                        radius = radius
+                    ),
+                    radius = radius,
+                    center = center
+                )
+            }
+            val sweepStart = Offset((-0.42f + drift * 1.72f) * w, -0.12f * h)
+            val sweepEnd = Offset((0.16f + drift * 1.72f) * w, 1.08f * h)
+            drawRect(
+                brush = Brush.linearGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color.Transparent,
+                        0.42f to Color.Transparent,
+                        0.50f to Color.White.copy(alpha = 0.11f),
+                        0.58f to Color.Transparent,
+                        1.0f to Color.Transparent
+                    ),
+                    start = sweepStart,
+                    end = sweepEnd
+                )
+            )
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color.Black.copy(alpha = 0.06f),
+                        0.42f to Color.Black.copy(alpha = 0.10f),
+                        0.74f to Color.Black.copy(alpha = 0.22f),
+                        1.0f to Color.Black.copy(alpha = 0.48f)
+                    )
+                )
+            )
+        }
+    }
+}
+
+@Composable
 private fun PlayerCustomBackground(
     uri: String,
     modifier: Modifier = Modifier
@@ -4759,14 +4866,16 @@ private fun MiniLyricsPreview(
         isPlaying = isPlaying,
         showTranslation = showTranslation,
         showPronunciation = showPronunciation,
-        fontScale = fontScale * 0.82f,
+        fontScale = fontScale * 0.92f,
         fontPath = fontPath,
         fontWeight = fontWeight,
-        primaryTextSizeSp = 16.5f,
-        secondaryTextSizeSp = 10.5f,
+        primaryTextSizeSp = 19f,
+        secondaryTextSizeSp = 12f,
         anchorOffsetRatio = -0.01f,
         topContentPadding = 0.dp,
         onLineClick = onLineClick,
+        nonCurrentLineBlurEnabled = false,
+        nonCurrentLineBlurDistance = Int.MAX_VALUE,
         modifier = modifier.fillMaxWidth()
     )
 }
@@ -6288,6 +6397,71 @@ private data class PlayerPalette(
                 accent = accent
             )
         }
+
+        fun fromLyricBackground(bitmap: Bitmap?): PlayerPalette {
+            if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) return Default
+            val sampleStep = (minOf(bitmap.width, bitmap.height) / 36).coerceAtLeast(1)
+            val buckets = linkedMapOf<Int, LongArray>()
+            val fallback = LongArray(4)
+            val hsv = FloatArray(3)
+
+            var y = 0
+            while (y < bitmap.height) {
+                var x = 0
+                while (x < bitmap.width) {
+                    val pixel = bitmap.getPixel(x, y)
+                    val alpha = AndroidColor.alpha(pixel)
+                    if (alpha > 24) {
+                        val r = AndroidColor.red(pixel)
+                        val g = AndroidColor.green(pixel)
+                        val b = AndroidColor.blue(pixel)
+                        AndroidColor.RGBToHSV(r, g, b, hsv)
+                        val saturation = hsv[1]
+                        val value = hsv[2]
+
+                        fallback[0]++
+                        fallback[1] += r.toLong()
+                        fallback[2] += g.toLong()
+                        fallback[3] += b.toLong()
+
+                        if (value > 0.08f && !(value > 0.94f && saturation < 0.20f)) {
+                            val key = ((r ushr 4) shl 8) or ((g ushr 4) shl 4) or (b ushr 4)
+                            val bucket = buckets.getOrPut(key) { LongArray(4) }
+                            bucket[0]++
+                            bucket[1] += r.toLong()
+                            bucket[2] += g.toLong()
+                            bucket[3] += b.toLong()
+                        }
+                    }
+                    x += sampleStep
+                }
+                y += sampleStep
+            }
+            if (fallback[0] == 0L) return Default
+
+            val best = buckets.values.maxByOrNull { bucket ->
+                val count = bucket[0].coerceAtLeast(1L)
+                val r = (bucket[1] / count).toInt()
+                val g = (bucket[2] / count).toInt()
+                val b = (bucket[3] / count).toInt()
+                AndroidColor.RGBToHSV(r, g, b, hsv)
+                val luminance = (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255f
+                val balance = 1f - abs(luminance - 0.50f).coerceIn(0f, 0.50f) * 1.25f
+                count.toFloat() * (0.55f + hsv[1] * 1.65f) * (0.75f + balance * 0.55f)
+            } ?: fallback
+
+            val count = best[0].coerceAtLeast(1L)
+            val r = (best[1] / count).toInt()
+            val g = (best[2] / count).toInt()
+            val b = (best[3] / count).toInt()
+            val accent = Color(r, g, b).toPlayerAccent()
+            return PlayerPalette(
+                top = accent.darken(0.42f),
+                middle = accent.darken(0.68f),
+                bottom = accent.darken(0.88f),
+                accent = accent
+            )
+        }
     }
 }
 
@@ -6429,6 +6603,18 @@ private fun Color.boosted(): Color {
         blue = (blue * scale).coerceAtMost(1f),
         alpha = 1f
     )
+}
+
+private fun Color.toPlayerAccent(): Color {
+    val r = (red * 255f).toInt().coerceIn(0, 255)
+    val g = (green * 255f).toInt().coerceIn(0, 255)
+    val b = (blue * 255f).toInt().coerceIn(0, 255)
+    val hsv = FloatArray(3)
+    AndroidColor.RGBToHSV(r, g, b, hsv)
+    if (hsv[1] < 0.12f) return Color(0xFF4D72B8)
+    hsv[1] = hsv[1].coerceAtLeast(0.34f)
+    hsv[2] = hsv[2].coerceIn(0.46f, 0.88f)
+    return Color(AndroidColor.HSVToColor(hsv))
 }
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {

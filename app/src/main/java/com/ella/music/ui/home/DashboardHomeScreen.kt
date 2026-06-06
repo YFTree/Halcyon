@@ -1,5 +1,6 @@
 package com.ella.music.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -24,7 +25,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +61,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -71,6 +76,7 @@ fun HomeScreen(
     onNavigateToLxOnline: () -> Unit,
     onNavigateToWebDav: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
+    onNavigateToAiChat: () -> Unit = {},
     onNavigateToMetadataCategory: (String) -> Unit,
     onNavigateToPlayer: () -> Unit,
     onNavigateToSettings: () -> Unit = {}
@@ -81,6 +87,7 @@ fun HomeScreen(
     val history by mainViewModel.playbackHistory.collectAsState()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val settingsManager = remember(context) { SettingsManager(context) }
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = false)
     val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = false)
@@ -92,6 +99,7 @@ fun HomeScreen(
     val homeHiddenLibraryTiles by settingsManager.homeHiddenLibraryTiles.collectAsState(initial = "")
     val homeTilePinButtonsVisible by settingsManager.homeTilePinButtonsVisible.collectAsState(initial = false)
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    var aiPlaylistLoading by remember { mutableStateOf(false) }
     val pageBackground = ellaPageBackground()
     val cardText = if (isDark) Color.White else Color(0xFF15151A)
     val featuredSongs = remember(songs) {
@@ -167,6 +175,52 @@ fun HomeScreen(
                         .padding(top = 8.dp)
                 )
             }
+
+            SectionTitle(stringResource(R.string.home_ai_section))
+            AiMixCard(
+                songCount = songs.size,
+                isLoading = aiPlaylistLoading,
+                onChat = onNavigateToAiChat,
+                onPlay = {
+                    if (aiPlaylistLoading) return@AiMixCard
+                    if (songs.isEmpty()) {
+                        Toast.makeText(context, context.getString(R.string.no_songs_found), Toast.LENGTH_SHORT).show()
+                        return@AiMixCard
+                    }
+                    scope.launch {
+                        aiPlaylistLoading = true
+                        try {
+                            runCatching { mainViewModel.recommendPlaylistWithOpenAi() }
+                                .onSuccess { recommendation ->
+                                    playerViewModel.setPlaylist(recommendation.songs, 0)
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(
+                                            R.string.home_ai_playlist_started,
+                                            recommendation.title,
+                                            recommendation.songs.size
+                                        ),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    if (openPlayerOnPlay) onNavigateToPlayer()
+                                }
+                                .onFailure { error ->
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(
+                                            R.string.home_ai_playlist_failed,
+                                            error.message ?: context.getString(R.string.common_unknown)
+                                        ),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                        } finally {
+                            aiPlaylistLoading = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
 
             val hiddenSections = remember(homeHiddenSections) { homeHiddenSections.csvIdSet() }
             val sectionOrder = remember(homeSectionOrder) {
@@ -245,6 +299,71 @@ fun HomeScreen(
             }
 
             Spacer(modifier = Modifier.height(160.dp))
+        }
+    }
+}
+
+@Composable
+private fun AiMixCard(
+    songCount: Int,
+    isLoading: Boolean,
+    onChat: () -> Unit,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        cornerRadius = 16.dp,
+        onClick = onPlay
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color(0xFF3A0CA3), Color(0xFF4361EE), Color(0xFF4CC9F0))
+                    )
+                )
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.home_ai_playlist),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1
+                )
+                Text(
+                    text = if (isLoading) {
+                        stringResource(R.string.home_ai_playlist_loading)
+                    } else {
+                        stringResource(R.string.home_ai_playlist_summary, songCount)
+                    },
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.82f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+            IconButton(onClick = onChat) {
+                Icon(
+                    imageVector = MiuixIcons.Regular.Settings,
+                    contentDescription = stringResource(R.string.home_ai_chat_open),
+                    tint = Color.White.copy(alpha = 0.92f),
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+            IconButton(onClick = onPlay) {
+                Icon(
+                    imageVector = MiuixIcons.Regular.Play,
+                    contentDescription = stringResource(R.string.home_ai_playlist_play),
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
         }
     }
 }

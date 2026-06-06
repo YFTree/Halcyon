@@ -100,6 +100,8 @@ fun SmoothLyricView(
     secondaryTextSizeSp: Float = 15f,
     anchorOffsetRatio: Float = -0.12f,
     topContentPadding: Dp = 0.dp,
+    nonCurrentLineBlurDistance: Int = 2,
+    nonCurrentLineBlurEnabled: Boolean = true,
     onLineClick: (LyricLine) -> Unit = {},
     onLineDoubleClick: () -> Unit = {},
     onLineLongClick: (LyricLine) -> Unit = {}
@@ -174,7 +176,8 @@ fun SmoothLyricView(
                 view.tag = lyriconSong
             }
             view.setStyle(style)
-            view.setNonCurrentLineBlurEnabled(true)
+            view.setNonCurrentLineBlurEnabled(nonCurrentLineBlurEnabled)
+            view.setNonCurrentLineBlurDistance(nonCurrentLineBlurDistance)
             view.setEdgeFadeEnabled(false)
             view.setLineAlphaAnimationsEnabled(false)
             view.setContinuousFrameUpdatesEnabled(true)

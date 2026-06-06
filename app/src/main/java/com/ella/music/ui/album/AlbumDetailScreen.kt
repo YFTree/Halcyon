@@ -7,8 +7,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,15 +53,19 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.Album
+import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.splitGenreNames
 import com.ella.music.ui.LibrarySortUiState
+import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.AppleStylePlayButton
 import com.ella.music.ui.components.ArtistPickerSheet
+import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
@@ -72,7 +78,9 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -94,6 +102,7 @@ fun AlbumDetailScreen(
     onNavigateToPlayer: () -> Unit
 ) {
     val albums by mainViewModel.albums.collectAsState()
+    val playlists by mainViewModel.playlists.collectAsState()
     val context = LocalContext.current
     val currentSong by playerViewModel.currentSong.collectAsState()
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
@@ -104,7 +113,11 @@ fun AlbumDetailScreen(
     val sortMode = AlbumDetailSongSortMode.entries.getOrElse(sortIndex) { AlbumDetailSongSortMode.Track }
     val scope = rememberCoroutineScope()
     var sortExpanded by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var actionSong by remember { mutableStateOf<Song?>(null) }
+    var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
     var albumArtistChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     val album = albums.find { it.id == albumId }
     val albumSongs = mainViewModel.getSongsForAlbum(albumId)
@@ -167,7 +180,19 @@ fun AlbumDetailScreen(
     }
     val listState = rememberLazyListState()
     var scrollToTopRequest by remember { mutableStateOf(0) }
-    val currentSongItemIndex = remember(sortedAlbumSongs, discGroups, useDiscSections, currentSong?.id) {
+    fun finishSelectionMode() {
+        selectionMode = false
+        selectedIds = emptySet()
+    }
+    fun toggleSelection(song: Song) {
+        val next = if (song.id in selectedIds) selectedIds - song.id else selectedIds + song.id
+        selectedIds = next
+        if (next.isEmpty()) selectionMode = false
+    }
+    fun selectedSongs(): List<Song> = sortedAlbumSongs.filter { it.id in selectedIds }
+
+    val currentSongItemIndex = remember(sortedAlbumSongs, discGroups, useDiscSections, currentSong?.id, selectionMode) {
+        if (selectionMode) return@remember -1
         val songIndex = sortedAlbumSongs.indexOfFirst { it.id == currentSong?.id }
         if (songIndex < 0) {
             -1
@@ -184,8 +209,8 @@ fun AlbumDetailScreen(
         }
     }
 
-    BackHandler(enabled = sortExpanded) {
-        sortExpanded = false
+    BackHandler(enabled = selectionMode || sortExpanded) {
+        if (selectionMode) finishSelectionMode() else sortExpanded = false
     }
 
     LaunchedEffect(scrollToTopRequest) {
@@ -270,6 +295,13 @@ fun AlbumDetailScreen(
                             playerViewModel = playerViewModel,
                             openPlayerOnPlay = openPlayerOnPlay,
                             onNavigateToPlayer = onNavigateToPlayer,
+                            selectionMode = selectionMode,
+                            selected = song.id in selectedIds,
+                            onLongClick = {
+                                selectionMode = true
+                                selectedIds = selectedIds + song.id
+                            },
+                            onSelectionClick = { toggleSelection(song) },
                             onMore = { actionSong = song }
                         )
                     }
@@ -288,6 +320,13 @@ fun AlbumDetailScreen(
                         playerViewModel = playerViewModel,
                         openPlayerOnPlay = openPlayerOnPlay,
                         onNavigateToPlayer = onNavigateToPlayer,
+                        selectionMode = selectionMode,
+                        selected = song.id in selectedIds,
+                        onLongClick = {
+                            selectionMode = true
+                            selectedIds = selectedIds + song.id
+                        },
+                        onSelectionClick = { toggleSelection(song) },
                         onMore = { actionSong = song }
                     )
                 }
@@ -316,7 +355,7 @@ fun AlbumDetailScreen(
         }
 
         IconButton(
-            onClick = onBack,
+            onClick = { if (selectionMode) finishSelectionMode() else onBack() },
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(start = 8.dp, top = 8.dp)
@@ -332,7 +371,32 @@ fun AlbumDetailScreen(
         }
 
         IconButton(
+            onClick = {
+                if (selectionMode) {
+                    val selected = selectedSongs()
+                    if (selected.isNotEmpty()) playlistPickerSongs = selected
+                } else {
+                    selectionMode = true
+                    selectedIds = sortedAlbumSongs.mapTo(mutableSetOf()) { it.id }
+                }
+            },
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(end = 64.dp, top = 8.dp)
+                .size(48.dp)
+                .align(Alignment.TopEnd)
+        ) {
+            Icon(
+                imageVector = if (selectionMode) MiuixIcons.Regular.Add else MiuixIcons.Regular.SelectAll,
+                contentDescription = if (selectionMode) stringResource(R.string.player_add_to_playlist) else stringResource(R.string.common_multi_select),
+                tint = MiuixTheme.colorScheme.onSurface,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        IconButton(
             onClick = { sortExpanded = !sortExpanded },
+            enabled = !selectionMode,
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(end = 8.dp, top = 8.dp)
@@ -342,7 +406,7 @@ fun AlbumDetailScreen(
             Icon(
                 imageVector = MiuixIcons.Regular.Sort,
                 contentDescription = stringResource(R.string.common_sort),
-                tint = MiuixTheme.colorScheme.onSurface,
+                tint = if (selectionMode) MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.38f) else MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -355,8 +419,21 @@ fun AlbumDetailScreen(
                 .fillMaxWidth()
                 .height(56.dp),
             startPadding = 64.dp,
-            endPadding = 64.dp
+            endPadding = 112.dp
         )
+
+        if (selectionMode) {
+            Text(
+                text = stringResource(R.string.library_selected_count, selectedIds.size),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(top = 22.dp)
+            )
+        }
 
         AnimatedVisibility(
             visible = sortExpanded,
@@ -426,6 +503,48 @@ fun AlbumDetailScreen(
                     onDismiss = { albumArtistChoices = emptyList() }
                 )
             }
+        }
+
+        playlistPickerSongs?.let { songsToAdd ->
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = stringResource(R.string.player_add_to_playlist),
+                onDismissRequest = { playlistPickerSongs = null }
+            ) {
+                AddToPlaylistSheet(
+                    playlists = playlists.sortedWith(
+                        compareByDescending<UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }
+                            .thenByDescending { it.createdAt }
+                    ),
+                    songCount = songsToAdd.size,
+                    onDismiss = { playlistPickerSongs = null },
+                    onCreatePlaylist = {
+                        createPlaylistSongs = songsToAdd
+                        playlistPickerSongs = null
+                    },
+                    onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
+                        selectedPlaylists.forEach { playlist ->
+                            mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd, appendToEnd)
+                        }
+                        playlistPickerSongs = null
+                        finishSelectionMode()
+                    }
+                )
+            }
+        }
+
+        createPlaylistSongs?.let { songsToAdd ->
+            CreatePlaylistAndAddSheet(
+                onDismiss = { createPlaylistSongs = null },
+                onCreate = { playlistName ->
+                    mainViewModel.createPlaylist(playlistName) { playlist ->
+                        if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                    }
+                    createPlaylistSongs = null
+                    finishSelectionMode()
+                }
+            )
         }
     }
 }
@@ -538,6 +657,10 @@ private fun AlbumSongRow(
     playerViewModel: PlayerViewModel,
     openPlayerOnPlay: Boolean,
     onNavigateToPlayer: () -> Unit,
+    selectionMode: Boolean,
+    selected: Boolean,
+    onLongClick: () -> Unit,
+    onSelectionClick: () -> Unit,
     onMore: () -> Unit
 ) {
     AlbumTrackRow(
@@ -548,7 +671,14 @@ private fun AlbumSongRow(
         loadSongRating = mainViewModel::getSongRating,
         ratingRevision = ratingRevision,
         leadingLabel = if (showTrackNumber) song.displayTrackNumber() else null,
+        selectionMode = selectionMode,
+        selected = selected,
+        onLongClick = onLongClick,
         onClick = {
+            if (selectionMode) {
+                onSelectionClick()
+                return@AlbumTrackRow
+            }
             val safeIndex = index.coerceAtLeast(0)
             playerViewModel.setPlaylist(sortedAlbumSongs, safeIndex)
             if (openPlayerOnPlay) onNavigateToPlayer()
@@ -559,6 +689,7 @@ private fun AlbumSongRow(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun AlbumTrackRow(
     song: Song,
     isCurrent: Boolean,
@@ -567,6 +698,9 @@ private fun AlbumTrackRow(
     loadSongRating: (Song) -> Int,
     ratingRevision: Int,
     leadingLabel: String?,
+    selectionMode: Boolean,
+    selected: Boolean,
+    onLongClick: () -> Unit,
     onClick: () -> Unit,
     onAddToQueue: () -> Unit,
     onMore: () -> Unit
@@ -582,10 +716,23 @@ private fun AlbumTrackRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .background(if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(start = 26.dp, end = 16.dp, top = 15.dp, bottom = 15.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selectionMode) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selected) Text(text = "✓", fontSize = 14.sp, color = Color.White)
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+        }
         Text(
             text = leadingLabel.orEmpty(),
             fontSize = 16.sp,

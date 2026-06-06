@@ -44,15 +44,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.model.Album
+import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
+import com.ella.music.data.model.Song
+import com.ella.music.data.model.UserPlaylist
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.AlbumCard
+import com.ella.music.ui.components.AddToPlaylistSheet
+import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.LazyGridScrollIndicator
 import com.ella.music.ui.components.ellaPageBackground
-import com.ella.music.ui.components.requestPinnedEllaShortcut
-import com.ella.music.ui.navigation.Screen
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Job
@@ -64,9 +67,12 @@ import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
+import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import android.icu.text.Transliterator
 import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.model.formatPlaybackDuration
@@ -82,9 +88,14 @@ fun AlbumScreen(
     val context = LocalContext.current
     val albums by mainViewModel.albums.collectAsState()
     val songs by mainViewModel.songs.collectAsState()
+    val playlists by mainViewModel.playlists.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedAlbumIds by remember { mutableStateOf(setOf<Long>()) }
+    var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
     val sortIndex by mainViewModel.settingsManager.albumListSortIndex.collectAsState(initial = LibrarySortUiState.albumListSortIndex)
     val sortMode = AlbumSortMode.entries.getOrElse(sortIndex) { AlbumSortMode.Name }
     val gridColumns by mainViewModel.settingsManager.categoryGridColumns.collectAsState(initial = 2)
@@ -125,8 +136,23 @@ fun AlbumScreen(
         }
     }
 
-    BackHandler(enabled = searchExpanded || sortExpanded) {
+    fun finishSelectionMode() {
+        selectionMode = false
+        selectedAlbumIds = emptySet()
+    }
+    fun toggleAlbumSelection(album: Album) {
+        val next = if (album.id in selectedAlbumIds) selectedAlbumIds - album.id else selectedAlbumIds + album.id
+        selectedAlbumIds = next
+        if (next.isEmpty()) selectionMode = false
+    }
+    fun selectedAlbumSongs(): List<Song> {
+        if (selectedAlbumIds.isEmpty()) return emptyList()
+        return songs.filter { song -> song.albumIdentityId() in selectedAlbumIds }.distinctBy { it.id }
+    }
+
+    BackHandler(enabled = selectionMode || searchExpanded || sortExpanded) {
         when {
+            selectionMode -> finishSelectionMode()
             searchExpanded -> {
                 searchExpanded = false
                 searchQuery = ""
@@ -161,6 +187,30 @@ fun AlbumScreen(
                     }
                 },
                 actions = {
+                    if (selectionMode) {
+                        IconButton(onClick = {
+                            val selectedSongs = selectedAlbumSongs()
+                            if (selectedSongs.isNotEmpty()) playlistPickerSongs = selectedSongs
+                        }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Add,
+                                contentDescription = stringResource(R.string.player_add_to_playlist),
+                                tint = MiuixTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    } else {
+                    IconButton(onClick = {
+                        selectionMode = true
+                        selectedAlbumIds = sortedAlbums.mapTo(mutableSetOf()) { it.id }
+                    }) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.SelectAll,
+                            contentDescription = stringResource(R.string.common_multi_select),
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     IconButton(onClick = { sortExpanded = !sortExpanded }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Sort,
@@ -176,6 +226,7 @@ fun AlbumScreen(
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
+                    }
                     }
                 }
             )
@@ -304,29 +355,25 @@ fun AlbumScreen(
                                     .takeIf { gridCoversEnabled && it > 0L }
                                     ?.let(mainViewModel::getAlbumArtUri)
                             }
+                            val selected = album.id in selectedAlbumIds
                             AlbumCard(
                                 album = album,
                                 albumArtUri = albumArtUri,
                                 representativeSong = representativeSong,
                                 loadCoverArt = mainViewModel::getAlbumCoverArtBitmap,
                                 summary = album.summaryForSort(context, sortMode, albumDurations[album.id] ?: 0L),
-                                onClick = { onAlbumClick(album.id) },
+                                selectionMode = selectionMode,
+                                selected = selected,
+                                onClick = {
+                                    if (selectionMode) toggleAlbumSelection(album) else onAlbumClick(album.id)
+                                },
                                 onLongClick = {
-                                    val ok = requestPinnedEllaShortcut(
-                                        context = context,
-                                        id = "album_${album.id}",
-                                        label = album.name,
-                                        route = Screen.AlbumDetail.createRoute(album.id)
-                                    )
-                                    Toast.makeText(
-                                        context,
-                                        if (ok) {
-                                            context.getString(R.string.playlist_shortcut_requested, album.name)
-                                        } else {
-                                            context.getString(R.string.playlist_shortcut_unsupported)
-                                        },
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    if (selectionMode) {
+                                        toggleAlbumSelection(album)
+                                        return@AlbumCard
+                                    }
+                                    selectionMode = true
+                                    selectedAlbumIds = selectedAlbumIds + album.id
                                 }
                             )
                         }
@@ -358,6 +405,48 @@ fun AlbumScreen(
                 }
             }
         }
+    }
+
+    playlistPickerSongs?.let { songsToAdd ->
+        WindowBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = stringResource(R.string.player_add_to_playlist),
+            onDismissRequest = { playlistPickerSongs = null }
+        ) {
+            AddToPlaylistSheet(
+                playlists = playlists.sortedWith(
+                    compareByDescending<UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }
+                        .thenByDescending { it.createdAt }
+                ),
+                songCount = songsToAdd.size,
+                onDismiss = { playlistPickerSongs = null },
+                onCreatePlaylist = {
+                    createPlaylistSongs = songsToAdd
+                    playlistPickerSongs = null
+                },
+                onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
+                    selectedPlaylists.forEach { playlist ->
+                        mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd, appendToEnd)
+                    }
+                    playlistPickerSongs = null
+                    finishSelectionMode()
+                }
+            )
+        }
+    }
+
+    createPlaylistSongs?.let { songsToAdd ->
+        CreatePlaylistAndAddSheet(
+            onDismiss = { createPlaylistSongs = null },
+            onCreate = { playlistName ->
+                mainViewModel.createPlaylist(playlistName) { playlist ->
+                    if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                }
+                createPlaylistSongs = null
+                finishSelectionMode()
+            }
+        )
     }
 }
 

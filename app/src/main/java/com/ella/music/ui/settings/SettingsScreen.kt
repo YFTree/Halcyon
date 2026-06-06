@@ -59,6 +59,7 @@ import com.ella.music.BuildConfig
 import com.ella.music.R
 import com.ella.music.data.BottomBarGlassEffect
 import com.ella.music.data.PlaybackStatsStore
+import com.ella.music.data.PlaylistStore
 import com.ella.music.data.SettingsManager
 import com.ella.music.player.DesktopLyricService
 import com.ella.music.ui.components.TagEditorOptionIds
@@ -427,6 +428,7 @@ fun BackupSettingsScreen(
     val backupScope = remember(context, scope) { context.findComponentActivity()?.lifecycleScope ?: scope }
     val settingsManager = remember { SettingsManager(context) }
     val playbackStatsStore = remember { PlaybackStatsStore.getInstance(context) }
+    val playlistStore = remember { PlaylistStore.getInstance(context) }
     val librarySongs by mainViewModel?.songs?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
     var showPlaybackExportFormatDialog by remember { mutableStateOf(false) }
     var playbackExportFormat by remember { mutableStateOf(PlaybackExportFormat.Ella) }
@@ -451,6 +453,7 @@ fun BackupSettingsScreen(
                     .put("version", 1)
                     .put("exportedAt", System.currentTimeMillis())
                     .put("settings", settingsManager.exportSettingsJson())
+                    .put("playlists", playlistStore.exportJson())
                 writeBackupText(uri, backup.toString(2))
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_export_success), Toast.LENGTH_SHORT).show()
@@ -497,6 +500,11 @@ fun BackupSettingsScreen(
                 }
                 val root = JSONObject(text)
                 settingsManager.restoreSettingsJson(root.optJSONObject("settings") ?: root)
+                val playlistPayload = root.optJSONObject("playlists")
+                    ?: root.takeIf { it.has("playlists") }
+                if (playlistPayload != null) {
+                    playlistStore.restoreJson(playlistPayload)
+                }
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_restore_success), Toast.LENGTH_SHORT).show()
             }.onFailure {

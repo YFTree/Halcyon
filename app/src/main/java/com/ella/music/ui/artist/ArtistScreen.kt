@@ -98,8 +98,10 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
+import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.MapAlbum
+import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -136,8 +138,12 @@ fun ArtistScreen(
     var selectedTabTarget by rememberSaveable(artistName) { mutableStateOf(ArtistTab.Songs) }
     var scrollToTopRequest by remember { mutableStateOf(0) }
     var actionSong by remember { mutableStateOf<Song?>(null) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var playlistPickerSong by remember { mutableStateOf<Song?>(null) }
     var createPlaylistSong by remember { mutableStateOf<Song?>(null) }
+    var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
     var tagEditorSong by remember { mutableStateOf<Song?>(null) }
     var songInfoSheetSong by remember { mutableStateOf<Song?>(null) }
     var aiInterpretationSong by remember { mutableStateOf<Song?>(null) }
@@ -191,7 +197,7 @@ fun ArtistScreen(
     val selectedArtistTab = selectedTabTarget.takeIf { it in tabs } ?: ArtistTab.Songs
     val listState = rememberLazyListState()
     val currentSongItemIndex = remember(sortedArtistSongs, currentSong?.id, selectedArtistTab) {
-        if (selectedArtistTab != ArtistTab.Songs) {
+        if (selectedArtistTab != ArtistTab.Songs || selectionMode) {
             -1
         } else {
             sortedArtistSongs.indexOfFirst { it.id == currentSong?.id }
@@ -206,8 +212,23 @@ fun ArtistScreen(
         ?.takeIf { it > 0L }
         ?.let { mainViewModel.getAlbumArtUri(it) }
 
-    BackHandler(enabled = sortExpanded) {
-        sortExpanded = false
+    fun finishSelectionMode() {
+        selectionMode = false
+        selectedIds = emptySet()
+    }
+    fun toggleSelection(song: Song) {
+        val next = if (song.id in selectedIds) selectedIds - song.id else selectedIds + song.id
+        selectedIds = next
+        if (next.isEmpty()) selectionMode = false
+    }
+    fun selectedSongs(): List<Song> = sortedArtistSongs.filter { it.id in selectedIds }
+
+    BackHandler(enabled = selectionMode || sortExpanded) {
+        if (selectionMode) finishSelectionMode() else sortExpanded = false
+    }
+
+    LaunchedEffect(selectedArtistTab) {
+        if (selectedArtistTab != ArtistTab.Songs && selectionMode) finishSelectionMode()
     }
 
     LaunchedEffect(scrollToTopRequest) {
@@ -272,6 +293,7 @@ fun ArtistScreen(
                     }
 
                     itemsIndexed(sortedArtistSongs) { index, song ->
+                        val selected = song.id in selectedIds
                         SongItem(
                             song = song,
                             isCurrent = currentSong?.id == song.id,
@@ -281,9 +303,19 @@ fun ArtistScreen(
                             isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
                             loadSongRating = mainViewModel::getSongRating,
                             showPlayNextInLists = showPlayNextInLists,
+                            selectionMode = selectionMode,
+                            selected = selected,
                             onClick = {
-                                playerViewModel.setPlaylist(sortedArtistSongs, index)
-                                if (openPlayerOnPlay) onNavigateToPlayer()
+                                if (selectionMode) {
+                                    toggleSelection(song)
+                                } else {
+                                    playerViewModel.setPlaylist(sortedArtistSongs, index)
+                                    if (openPlayerOnPlay) onNavigateToPlayer()
+                                }
+                            },
+                            onLongClick = {
+                                selectionMode = true
+                                selectedIds = selectedIds + song.id
                             },
                             onAddToQueue = { playerViewModel.addToPlaylist(song) },
                             onMore = { actionSong = song }
@@ -369,7 +401,32 @@ fun ArtistScreen(
         }
 
         IconButton(
+            onClick = {
+                if (selectionMode) {
+                    val selected = selectedSongs()
+                    if (selected.isNotEmpty()) playlistPickerSongs = selected
+                } else {
+                    selectionMode = true
+                    selectedIds = sortedArtistSongs.mapTo(mutableSetOf()) { it.id }
+                }
+            },
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(end = 64.dp, top = 8.dp)
+                .size(48.dp)
+                .align(Alignment.TopEnd)
+        ) {
+            Icon(
+                imageVector = if (selectionMode) MiuixIcons.Regular.Add else MiuixIcons.Regular.SelectAll,
+                contentDescription = if (selectionMode) "添加到歌单" else "多选",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        IconButton(
             onClick = { sortExpanded = !sortExpanded },
+            enabled = !selectionMode,
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(end = 8.dp, top = 8.dp)
@@ -379,7 +436,7 @@ fun ArtistScreen(
             Icon(
                 imageVector = MiuixIcons.Regular.Sort,
                 contentDescription = "排序",
-                tint = Color.White,
+                tint = if (selectionMode) Color.White.copy(alpha = 0.36f) else Color.White,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -392,8 +449,21 @@ fun ArtistScreen(
                 .fillMaxWidth()
                 .height(56.dp),
             startPadding = 64.dp,
-            endPadding = 64.dp
+            endPadding = 112.dp
         )
+
+        if (selectionMode) {
+            Text(
+                text = stringResource(R.string.library_selected_count, selectedIds.size),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(top = 22.dp)
+            )
+        }
 
         AnimatedVisibility(
             visible = sortExpanded,
@@ -503,6 +573,47 @@ fun ArtistScreen(
                         }
                     }
                     createPlaylistSong = null
+                }
+            )
+        }
+
+        playlistPickerSongs?.let { songsToAdd ->
+            WindowBottomSheet(
+                show = true,
+                enableNestedScroll = false,
+                title = "添加到歌单",
+                onDismissRequest = { playlistPickerSongs = null }
+            ) {
+                AddToPlaylistSheet(
+                    playlists = playlists
+                        .sortedWith(compareByDescending<com.ella.music.data.model.UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }.thenByDescending { it.createdAt }),
+                    songCount = songsToAdd.size,
+                    onDismiss = { playlistPickerSongs = null },
+                    onCreatePlaylist = {
+                        createPlaylistSongs = songsToAdd
+                        playlistPickerSongs = null
+                    },
+                    onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
+                        selectedPlaylists.forEach { playlist ->
+                            mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd, appendToEnd)
+                        }
+                        Toast.makeText(context, "已添加到 ${selectedPlaylists.size} 个歌单", Toast.LENGTH_SHORT).show()
+                        playlistPickerSongs = null
+                        finishSelectionMode()
+                    }
+                )
+            }
+        }
+
+        createPlaylistSongs?.let { songsToAdd ->
+            ArtistCreatePlaylistSheet(
+                onDismiss = { createPlaylistSongs = null },
+                onCreate = { name ->
+                    mainViewModel.createPlaylist(name) { playlist ->
+                        if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                    }
+                    createPlaylistSongs = null
+                    finishSelectionMode()
                 }
             )
         }

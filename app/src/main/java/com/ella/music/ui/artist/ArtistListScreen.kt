@@ -2,7 +2,6 @@ package com.ella.music.ui.artist
 
 import androidx.activity.compose.BackHandler
 import android.graphics.Bitmap
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -41,24 +40,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
+import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Artist
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.tagIdentityKey
 import com.ella.music.ui.LibrarySortUiState
+import com.ella.music.ui.components.AddToPlaylistSheet
+import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.ellaPageBackground
-import com.ella.music.ui.components.requestPinnedEllaShortcut
-import com.ella.music.ui.navigation.Screen
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -71,10 +74,13 @@ import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
+import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Music
+import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -86,9 +92,14 @@ fun ArtistListScreen(
     val context = LocalContext.current
     val songs by mainViewModel.songs.collectAsState()
     val albums by mainViewModel.albums.collectAsState()
+    val playlists by mainViewModel.playlists.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var searchExpanded by remember { mutableStateOf(false) }
     var sortExpanded by remember { mutableStateOf(false) }
+    var selectionMode by remember { mutableStateOf(false) }
+    var selectedArtistKeys by remember { mutableStateOf(setOf<String>()) }
+    var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
     val sortIndex by mainViewModel.settingsManager.artistListSortIndex.collectAsState(initial = LibrarySortUiState.artistListSortIndex)
     val showAlbumArtists by mainViewModel.settingsManager.showAlbumArtists.collectAsState(initial = false)
     val tagIgnoreCase by mainViewModel.settingsManager.tagIgnoreCase.collectAsState(initial = false)
@@ -153,8 +164,28 @@ fun ArtistListScreen(
         }
     }
 
-    BackHandler(enabled = searchExpanded || sortExpanded) {
+    fun finishSelectionMode() {
+        selectionMode = false
+        selectedArtistKeys = emptySet()
+    }
+    fun toggleArtistSelection(artist: Artist) {
+        val key = artist.name.tagIdentityKey()
+        val next = if (key in selectedArtistKeys) selectedArtistKeys - key else selectedArtistKeys + key
+        selectedArtistKeys = next
+        if (next.isEmpty()) selectionMode = false
+    }
+    fun selectedArtistSongs(): List<Song> {
+        if (selectedArtistKeys.isEmpty()) return emptyList()
+        return songs.filter { song ->
+            val names = if (showAlbumArtists) splitArtistNames(song.artist) + splitArtistNames(song.albumArtist)
+            else splitArtistNames(song.artist)
+            names.any { it.tagIdentityKey() in selectedArtistKeys }
+        }.distinctBy { it.id }
+    }
+
+    BackHandler(enabled = selectionMode || searchExpanded || sortExpanded) {
         when {
+            selectionMode -> finishSelectionMode()
             searchExpanded -> {
                 searchExpanded = false
                 searchQuery = ""
@@ -171,10 +202,10 @@ fun ArtistListScreen(
     ) {
         Box {
             EllaSmallTopAppBar(
-                title = "艺术家",
+                title = if (selectionMode) stringResource(R.string.library_selected_count, selectedArtistKeys.size) else "艺术家",
                 color = ellaPageBackground(),
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { if (selectionMode) finishSelectionMode() else onBack() }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Back,
                             contentDescription = "返回",
@@ -184,21 +215,46 @@ fun ArtistListScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Sort,
-                            contentDescription = "排序",
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                    IconButton(onClick = { searchExpanded = !searchExpanded }) {
-                        Icon(
-                            imageVector = MiuixIcons.Basic.Search,
-                            contentDescription = "搜索",
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
+                    if (selectionMode) {
+                        IconButton(onClick = {
+                            val selectedSongs = selectedArtistSongs()
+                            if (selectedSongs.isNotEmpty()) playlistPickerSongs = selectedSongs
+                        }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Add,
+                                contentDescription = stringResource(R.string.player_add_to_playlist),
+                                tint = MiuixTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = {
+                            selectionMode = true
+                            selectedArtistKeys = filteredArtists.mapTo(mutableSetOf()) { it.name.tagIdentityKey() }
+                        }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.SelectAll,
+                                contentDescription = stringResource(R.string.common_multi_select),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        IconButton(onClick = { sortExpanded = !sortExpanded }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Sort,
+                                contentDescription = "排序",
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        IconButton(onClick = { searchExpanded = !searchExpanded }) {
+                            Icon(
+                                imageVector = MiuixIcons.Basic.Search,
+                                contentDescription = "搜索",
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             )
@@ -280,29 +336,29 @@ fun ArtistListScreen(
                     }
                     items(filteredArtists, key = { it.name }) { artist ->
                         val artistKey = artist.name.tagIdentityKey()
+                        val selected = artistKey in selectedArtistKeys
                         ArtistRow(
                             artist = artist,
                             representativeSong = representativeSongsByArtist[artistKey],
                             mainViewModel = mainViewModel,
                             coversEnabled = listCoversEnabled,
+                            selectionMode = selectionMode,
+                            selected = selected,
                             summary = artist.summaryForSort(
                                 sortMode = sortMode,
                                 duration = artistDurations[artistKey] ?: 0L,
                                 releaseAlbumCount = releaseAlbumCounts[artistKey] ?: 0
                             ),
-                            onClick = { onArtistClick(artist.name) },
+                            onClick = {
+                                if (selectionMode) toggleArtistSelection(artist) else onArtistClick(artist.name)
+                            },
                             onLongClick = {
-                                val ok = requestPinnedEllaShortcut(
-                                    context = context,
-                                    id = "artist_${artist.name}",
-                                    label = artist.name,
-                                    route = Screen.ArtistDetail.createRoute(artist.name)
-                                )
-                                Toast.makeText(
-                                    context,
-                                    if (ok) "已请求添加桌面快捷方式" else "当前桌面不支持固定快捷方式",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                if (selectionMode) {
+                                    toggleArtistSelection(artist)
+                                    return@ArtistRow
+                                }
+                                selectionMode = true
+                                selectedArtistKeys = selectedArtistKeys + artistKey
                             }
                         )
                     }
@@ -334,6 +390,48 @@ fun ArtistListScreen(
             }
         }
     }
+
+    playlistPickerSongs?.let { songsToAdd ->
+        WindowBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = stringResource(R.string.player_add_to_playlist),
+            onDismissRequest = { playlistPickerSongs = null }
+        ) {
+            AddToPlaylistSheet(
+                playlists = playlists.sortedWith(
+                    compareByDescending<UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }
+                        .thenByDescending { it.createdAt }
+                ),
+                songCount = songsToAdd.size,
+                onDismiss = { playlistPickerSongs = null },
+                onCreatePlaylist = {
+                    createPlaylistSongs = songsToAdd
+                    playlistPickerSongs = null
+                },
+                onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
+                    selectedPlaylists.forEach { playlist ->
+                        mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd, appendToEnd)
+                    }
+                    playlistPickerSongs = null
+                    finishSelectionMode()
+                }
+            )
+        }
+    }
+
+    createPlaylistSongs?.let { songsToAdd ->
+        CreatePlaylistAndAddSheet(
+            onDismiss = { createPlaylistSongs = null },
+            onCreate = { playlistName ->
+                mainViewModel.createPlaylist(playlistName) { playlist ->
+                    if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                }
+                createPlaylistSongs = null
+                finishSelectionMode()
+            }
+        )
+    }
 }
 
 private fun Artist.indexLetter(): String {
@@ -348,6 +446,8 @@ private fun ArtistRow(
     representativeSong: Song?,
     mainViewModel: MainViewModel,
     coversEnabled: Boolean,
+    selectionMode: Boolean,
+    selected: Boolean,
     summary: String,
     onClick: () -> Unit,
     onLongClick: () -> Unit
@@ -380,6 +480,7 @@ private fun ArtistRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.10f) else androidx.compose.ui.graphics.Color.Transparent)
             .height(76.dp)
             .combinedClickable(
                 onClick = onClick,
@@ -388,6 +489,18 @@ private fun ArtistRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (selectionMode) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                if (selected) Text(text = "✓", fontSize = 14.sp, color = androidx.compose.ui.graphics.Color.White)
+            }
+            Spacer(modifier = Modifier.size(12.dp))
+        }
         Box(
             modifier = Modifier
                 .size(54.dp)

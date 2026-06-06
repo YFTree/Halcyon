@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,6 +20,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +42,8 @@ fun AlbumCard(
     representativeSong: Song? = null,
     loadCoverArt: ((Song) -> Bitmap?)? = null,
     summary: String? = null,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -91,6 +95,30 @@ fun AlbumCard(
                 )
             } else {
                 DefaultAlbumCover(modifier = Modifier.matchParentSize())
+            }
+            if (selectionMode) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.34f)
+                            else Color.Black.copy(alpha = 0.18f)
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (selected) MiuixTheme.colorScheme.primary
+                            else Color.White.copy(alpha = 0.28f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (selected) Text(text = "✓", fontSize = 14.sp, color = Color.White)
+                }
             }
         }
 

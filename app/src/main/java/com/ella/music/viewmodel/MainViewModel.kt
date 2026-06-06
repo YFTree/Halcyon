@@ -21,8 +21,12 @@ import com.ella.music.data.matchesArtistName
 import com.ella.music.data.neteaseAlbumUrl
 import com.ella.music.data.neteaseArtistUrl
 import com.ella.music.data.ai.OpenAiSongInterpretationConfig
+import com.ella.music.data.ai.OpenAiLibraryChatAssistant
+import com.ella.music.data.ai.OpenAiLibraryChatInput
 import com.ella.music.data.ai.OpenAiSongInterpretationInput
 import com.ella.music.data.ai.OpenAiSongInterpreter
+import com.ella.music.data.ai.OpenAiPlaylistRecommendationInput
+import com.ella.music.data.ai.OpenAiPlaylistRecommender
 import com.ella.music.data.detailedAudioInfo
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Artist
@@ -58,6 +62,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val playlistStore = PlaylistStore.getInstance(application)
     private val playbackStatsStore = PlaybackStatsStore.getInstance(application)
     private val openAiSongInterpreter = OpenAiSongInterpreter()
+    private val openAiPlaylistRecommender = OpenAiPlaylistRecommender()
+    private val openAiLibraryChatAssistant = OpenAiLibraryChatAssistant()
 
     val songs: StateFlow<List<Song>> = repository.songs
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -401,6 +407,79 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    suspend fun recommendPlaylistWithOpenAi(maxItems: Int = 30): AiPlaylistRecommendationResult = withContext(Dispatchers.IO) {
+        val librarySongs = songs.value
+        val currentStats = playbackStats.value
+        val currentHistory = playbackHistory.value
+        if (librarySongs.isEmpty()) error("曲库为空，请先扫描本地歌曲")
+
+        val candidates = buildOpenAiRecommendationCandidates(
+            library = librarySongs,
+            stats = currentStats,
+            history = currentHistory
+        )
+        val recommendation = openAiPlaylistRecommender.recommend(
+            config = OpenAiSongInterpretationConfig(
+                apiKey = settingsManager.openAiApiKey.first(),
+                baseUrl = settingsManager.openAiBaseUrl.first(),
+                model = settingsManager.openAiModel.first()
+            ),
+            input = OpenAiPlaylistRecommendationInput(
+                songs = candidates,
+                playbackStats = currentStats,
+                playbackHistory = currentHistory,
+                maxItems = maxItems.coerceIn(5, 50)
+            )
+        )
+        val libraryByKey = librarySongs.associateBy { it.playlistIdentityKey() }
+        val recommendedSongs = recommendation.songKeys
+            .mapNotNull { key -> libraryByKey[key] }
+            .distinctBy { it.playlistIdentityKey() }
+            .take(maxItems.coerceAtLeast(1))
+        if (recommendedSongs.isEmpty()) error("AI 没有返回可播放歌曲")
+
+        AiPlaylistRecommendationResult(
+            title = recommendation.title.ifBlank { "AI 推荐歌单" },
+            reason = recommendation.reason,
+            songs = recommendedSongs
+        )
+    }
+
+    suspend fun chatWithOpenAiLibraryAssistant(
+        message: String,
+        maxPlayableItems: Int = 30
+    ): AiLibraryChatResult = withContext(Dispatchers.IO) {
+        val librarySongs = songs.value
+        if (librarySongs.isEmpty()) error("曲库为空，请先扫描本地歌曲")
+        val candidates = buildOpenAiRecommendationCandidates(
+            library = librarySongs,
+            stats = playbackStats.value,
+            history = playbackHistory.value
+        )
+        val response = openAiLibraryChatAssistant.chat(
+            config = OpenAiSongInterpretationConfig(
+                apiKey = settingsManager.openAiApiKey.first(),
+                baseUrl = settingsManager.openAiBaseUrl.first(),
+                model = settingsManager.openAiModel.first()
+            ),
+            input = OpenAiLibraryChatInput(
+                songs = candidates,
+                playbackStats = playbackStats.value,
+                playbackHistory = playbackHistory.value,
+                userMessage = message,
+                maxPlayableItems = maxPlayableItems.coerceIn(1, 50)
+            )
+        )
+        val libraryByKey = librarySongs.associateBy { it.playlistIdentityKey() }
+        AiLibraryChatResult(
+            answer = response.answer,
+            songs = response.songKeys
+                .mapNotNull { key -> libraryByKey[key] }
+                .distinctBy { it.playlistIdentityKey() }
+                .take(maxPlayableItems.coerceAtLeast(1))
+        )
+    }
+
     fun clearOnlineMetadataCache() {
         repository.clearRemoteMetadataCache()
     }
@@ -537,7 +616,76 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .map { it.trim() }
             .filter { it.isNotBlank() }
     }
+
+    private fun buildOpenAiRecommendationCandidates(
+        library: List<Song>,
+        stats: List<SongPlaybackStats>,
+        history: List<PlaybackHistoryEntry>,
+        maxCandidates: Int = 160
+    ): List<Song> {
+        if (library.size <= maxCandidates) return library.distinctBy { it.playlistIdentityKey() }
+
+        val songsById = library.associateBy { it.id }
+        val selected = linkedMapOf<String, Song>()
+
+        fun add(song: Song) {
+            if (selected.size >= maxCandidates) return
+            selected.putIfAbsent(song.playlistIdentityKey(), song)
+        }
+
+        history
+            .mapNotNull { entry -> songsById[entry.songId] }
+            .take(60)
+            .forEach(::add)
+
+        stats
+            .sortedWith(
+                compareByDescending<SongPlaybackStats> { it.playCount }
+                    .thenByDescending { it.listenedMs }
+                    .thenByDescending { it.lastPlayedAt }
+            )
+            .mapNotNull { stat -> songsById[stat.songId] }
+            .take(60)
+            .forEach(::add)
+
+        stats
+            .sortedByDescending { it.lastPlayedAt }
+            .mapNotNull { stat -> songsById[stat.songId] }
+            .take(40)
+            .forEach(::add)
+
+        library
+            .sortedByDescending { it.dateModified }
+            .take(40)
+            .forEach(::add)
+
+        val remaining = maxCandidates - selected.size
+        if (remaining > 0) {
+            val sortedLibrary = library.sortedWith(
+                compareBy<Song, String>(String.CASE_INSENSITIVE_ORDER) { it.artist.ifBlank { it.albumArtist } }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.album }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title }
+            )
+            val step = (sortedLibrary.size / remaining.coerceAtLeast(1)).coerceAtLeast(1)
+            sortedLibrary.forEachIndexed { index, song ->
+                if (selected.size < maxCandidates && index % step == 0) add(song)
+            }
+        }
+
+        return selected.values.toList().ifEmpty { library.take(maxCandidates) }
+    }
 }
+
+data class AiPlaylistRecommendationResult(
+    val title: String,
+    val reason: String,
+    val songs: List<Song>
+)
+
+data class AiLibraryChatResult(
+    val answer: String,
+    val songs: List<Song>
+)
 
 data class MetadataCategoryItem(
     val name: String,

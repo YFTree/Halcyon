@@ -17,6 +17,7 @@ import com.ella.music.ui.about.UpdateScreen
 import com.ella.music.ui.analytics.AnalyticsScreen
 import com.ella.music.ui.analytics.LibraryAnalysisScreen
 import com.ella.music.ui.analytics.PlaybackHistoryScreen
+import com.ella.music.ui.ai.AiChatScreen
 import com.ella.music.ui.album.AlbumDetailScreen
 import com.ella.music.ui.album.AlbumScreen
 import com.ella.music.ui.artist.ArtistListScreen
@@ -96,6 +97,7 @@ sealed class Screen(val route: String) {
     data object LxOnline : Screen("lx_online")
     data object LxSourceSettings : Screen("lx_source_settings")
     data object Analytics : Screen("analytics")
+    data object AiChat : Screen("ai_chat")
     data object PlaybackHistory : Screen("playback_history")
     data object About : Screen("about")
     data object Update : Screen("update")
@@ -149,6 +151,7 @@ fun AppNavigation(
                 onNavigateToLxOnline = { navController.navigate(Screen.LxOnline.route) },
                 onNavigateToWebDav = { navController.navigate(Screen.WebDav.route) },
                 onNavigateToAnalytics = { navController.navigate(Screen.Analytics.route) },
+                onNavigateToAiChat = { navController.navigate(Screen.AiChat.route) },
                 onNavigateToMetadataCategory = { type -> navController.navigate(Screen.MetadataCategory.createRoute(type)) },
                 onNavigateToPlayer = onNavigateToPlayer,
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
@@ -480,6 +483,15 @@ fun AppNavigation(
                 mainViewModel = mainViewModel,
                 onBack = { navController.popBackStack() },
                 onNavigateToHistory = { navController.navigate(Screen.PlaybackHistory.route) }
+            )
+        }
+
+        composable(Screen.AiChat.route) {
+            AiChatScreen(
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToPlayer = onNavigateToPlayer
             )
         }
 

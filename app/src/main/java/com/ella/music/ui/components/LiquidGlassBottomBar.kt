@@ -59,7 +59,7 @@ fun LiquidGlassBottomBar(
     var dragCenterX by remember { mutableFloatStateOf(0f) }
     var isPressed by remember { mutableStateOf(false) }
     val validItemCount = itemCount.coerceAtLeast(0)
-    val enablePressBubble = glassEffect == BottomBarGlassEffect.LiquidGlass
+    val enablePressBubble = false // Temporarily disable the long-press liquid bubble effect.
     val sidePaddingPx = with(density) { 4.dp.toPx() }
     val bubbleHeight = 66.dp
     val bubbleHeightPx = with(density) { bubbleHeight.toPx() }

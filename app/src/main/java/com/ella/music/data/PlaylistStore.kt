@@ -75,6 +75,26 @@ class PlaylistStore private constructor(context: Context) {
             ?.mapTo(mutableSetOf()) { it.key }
             ?: emptySet()
 
+    suspend fun exportJson(): JSONObject = withContext(Dispatchers.IO) {
+        JSONObject()
+            .put("version", 1)
+            .put("playlists", JSONArray().also { array ->
+                playlists.value.ensureFavorites().forEach { array.put(it.toJson()) }
+            })
+    }
+
+    suspend fun restoreJson(payload: JSONObject) = withContext(Dispatchers.IO) {
+        val items = payload.optJSONArray("playlists") ?: return@withContext
+        val restored = List(items.length()) { index -> items.optJSONObject(index)?.toUserPlaylist() }
+            .filterNotNull()
+            .filter { it.id.isNotBlank() && it.name.isNotBlank() }
+            .ensureFavorites()
+        synchronized(lock) {
+            _playlists.value = restored
+            saveLocked(restored)
+        }
+    }
+
     fun isFavorite(song: Song): Boolean =
         song.playlistIdentityKey() in favoriteSongKeys()
 
