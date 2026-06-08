@@ -92,7 +92,22 @@ class AudioTagRepository(
     suspend fun readTags(path: String): AudioTagInfo? = withContext(Dispatchers.IO) {
         val key = cacheKey(path) ?: return@withContext null
         tagsCache.get(key)?.let { return@withContext it }
-        val tags = readWithFallback("tags", path) { it.readTags(path) }?.takeIf { it.hasUsefulTagData() }
+        var tags = readWithFallback("tags", path) { it.readTags(path) }?.takeIf { it.hasUsefulTagData() }
+        // For WAV files, always try to supplement missing fields from WavMetadataReader
+        // because LyricoAudioTagReader may return non-null but empty-tag AudioTagInfo
+        if (isWavFile(path)) {
+            val wavTags = WavMetadataReader.read(path)?.toAudioTagInfo()
+            if (wavTags != null) {
+                tags = if (tags != null) {
+                    tags.mergeMissingFieldsFrom(wavTags)
+                } else {
+                    wavTags.takeIf { it.hasUsefulTagData() }
+                }
+            }
+        }
+        if (tags == null) {
+            tags = WavMetadataReader.read(path)?.toAudioTagInfo()?.takeIf { it.hasUsefulTagData() }
+        }
         tags?.also { tagsCache.put(key, it) }
     }
 
@@ -139,7 +154,8 @@ class AudioTagRepository(
     fun readQualityInfoBlocking(path: String): AudioQualityInfo? {
         val key = cacheKey(path) ?: return null
         qualityCache.get(key)?.let { return it }
-        return runCatching {
+        val wavMetadata = WavMetadataReader.read(path)
+        val quality = runCatching {
             val extractor = MediaExtractor()
             try {
                 extractor.setDataSource(path)
@@ -152,20 +168,29 @@ class AudioTagRepository(
                         break
                     }
                 }
-                val format = audioFormat ?: return null
+                val format = audioFormat
+                    ?: return@runCatching wavMetadata?.takeIf { it.hasQuality }?.toAudioQualityInfo()
                 AudioQualityInfo(
-                    mimeType = format.getString(MediaFormat.KEY_MIME).orEmpty(),
-                    bitRate = format.getIntOrZero(MediaFormat.KEY_BIT_RATE),
-                    sampleRate = format.getIntOrZero(MediaFormat.KEY_SAMPLE_RATE),
-                    bitDepth = format.getIntOrZero("bits-per-sample"),
-                    channels = format.getIntOrZero(MediaFormat.KEY_CHANNEL_COUNT)
+                    mimeType = format.getString(MediaFormat.KEY_MIME).orEmpty().ifBlank {
+                        wavMetadata?.takeIf { it.hasQuality }?.let { "audio/wav" }.orEmpty()
+                    },
+                    bitRate = format.getIntOrZero(MediaFormat.KEY_BIT_RATE).takeIf { it > 0 }
+                        ?: wavMetadata?.bitRate ?: 0,
+                    sampleRate = format.getIntOrZero(MediaFormat.KEY_SAMPLE_RATE).takeIf { it > 0 }
+                        ?: wavMetadata?.sampleRate ?: 0,
+                    bitDepth = format.getIntOrZero("bits-per-sample").takeIf { it > 0 }
+                        ?: wavMetadata?.bitDepth ?: 0,
+                    channels = format.getIntOrZero(MediaFormat.KEY_CHANNEL_COUNT).takeIf { it > 0 }
+                        ?: wavMetadata?.channels ?: 0
                 )
             } finally {
                 extractor.release()
             }
-        }.onFailure {
+        }.getOrElse {
             Log.w(TAG, "Failed to read quality info for $path", it)
-        }.getOrNull()?.also { qualityCache.put(key, it) }
+            wavMetadata?.takeIf { metadata -> metadata.hasQuality }?.toAudioQualityInfo()
+        }
+        return quality?.also { qualityCache.put(key, it) }
     }
 
     fun clear(path: String) {
@@ -225,6 +250,46 @@ class AudioTagRepository(
             discNumber != null ||
             rating != null ||
             customTags.isNotEmpty()
+
+    private fun AudioTagInfo.mergeMissingFieldsFrom(other: AudioTagInfo): AudioTagInfo =
+        copy(
+            title = title.takeIf { !it.isNullOrBlank() } ?: other.title,
+            artist = artist.takeIf { !it.isNullOrBlank() } ?: other.artist,
+            album = album.takeIf { !it.isNullOrBlank() } ?: other.album,
+            albumArtist = albumArtist.takeIf { !it.isNullOrBlank() } ?: other.albumArtist,
+            composer = composer.takeIf { !it.isNullOrBlank() } ?: other.composer,
+            lyricist = lyricist.takeIf { !it.isNullOrBlank() } ?: other.lyricist,
+            genre = genre.takeIf { !it.isNullOrBlank() } ?: other.genre,
+            year = year.takeIf { !it.isNullOrBlank() } ?: other.year,
+            trackNumber = trackNumber ?: other.trackNumber,
+            discNumber = discNumber ?: other.discNumber
+        )
+
+    private fun isWavFile(path: String): Boolean =
+        path.lowercase().let { it.endsWith(".wav") || it.endsWith(".wave") }
+
+    private fun WavMetadata.toAudioTagInfo(): AudioTagInfo =
+        AudioTagInfo(
+            title = title,
+            artist = artist,
+            album = album,
+            albumArtist = albumArtist,
+            composer = composer,
+            lyricist = lyricist,
+            genre = genre,
+            year = year,
+            trackNumber = trackNumber,
+            discNumber = discNumber
+        )
+
+    private fun WavMetadata.toAudioQualityInfo(): AudioQualityInfo =
+        AudioQualityInfo(
+            mimeType = "audio/wav",
+            bitRate = bitRate,
+            sampleRate = sampleRate,
+            bitDepth = bitDepth,
+            channels = channels
+        )
 
     private fun MediaFormat?.getIntOrZero(key: String): Int =
         runCatching { if (this != null && containsKey(key)) getInteger(key) else 0 }.getOrDefault(0)

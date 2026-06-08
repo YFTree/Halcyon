@@ -362,6 +362,7 @@ fun PlayerScreen(
         ?.takeIf { it.hasMiniLyric() }
         ?: lyrics.firstOrNull { it.hasMiniLyric() }
     var menuExpanded by remember { mutableStateOf(false) }
+    var dynamicCoverSheetSong by remember { mutableStateOf<Song?>(null) }
     var songInfoExpanded by remember { mutableStateOf(false) }
     var queueExpanded by remember { mutableStateOf(false) }
     var artistChoices by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -611,6 +612,10 @@ fun PlayerScreen(
             sleepTimerCustomMinutes = sleepTimerCustomMinutes,
             sleepTimerStopAfterCurrent = sleepTimerStopAfterCurrent,
             onDynamicCoverFailed = { dynamicCoverFailedPath = it },
+            onMatchDynamicCover = {
+                menuExpanded = false
+                dynamicCoverSheetSong = song
+            },
             onToggleMenu = {
                 actionMenuInitialPage = PlayerActionSheetPage.Main
                 menuExpanded = !menuExpanded
@@ -884,6 +889,7 @@ fun PlayerScreen(
                 if (albumId > 0L) onNavigateToAlbum(albumId)
                 else Toast.makeText(context, context.getString(R.string.player_no_album_jump), Toast.LENGTH_SHORT).show()
             },
+            onArtist = { name -> onNavigateToArtist(name) },
             onComposer = { name -> onNavigateToMetadataCategory("composer", name) },
             onLyricist = { name -> onNavigateToMetadataCategory("lyricist", name) },
             onNeteaseSong = { openNetease(neteaseInfo?.musicId?.takeIf { it.isNotBlank() }?.let(::neteaseSongUrl)) },
@@ -1077,6 +1083,14 @@ fun PlayerScreen(
                         onDismiss = { songInfoExpanded = false }
                     )
                 }
+            }
+
+            if (dynamicCoverSheetSong != null) {
+                DynamicCoverWebViewSheet(
+                    show = true,
+                    song = dynamicCoverSheetSong,
+                    onDismissRequest = { dynamicCoverSheetSong = null }
+                )
             }
 
             if (landscapeExpanded) {
@@ -1406,6 +1420,7 @@ private fun CoverPlayerPage(
     lyricTimingEditorId: String,
     onVisualizerEnabled: (Boolean) -> Unit,
     onDynamicCoverFailed: (String) -> Unit,
+    onMatchDynamicCover: () -> Unit,
     onToggleMenu: () -> Unit,
     onToggleFavorite: () -> Unit,
     onDismissMenu: () -> Unit,
@@ -1836,6 +1851,7 @@ private fun CoverPlayerPage(
                     onAiInterpret = onAiInterpret,
                     onSpectrum = onSpectrum,
                     onDeleteSong = onDeleteSong,
+                    onMatchDynamicCover = onMatchDynamicCover,
                     onStopAfterCurrent = onStopAfterCurrent,
                     onTimer = onTimer,
                     onCustomTimerMinutes = onCustomTimerMinutes,
@@ -2550,6 +2566,7 @@ private fun PlayerDetailPage(
     neteaseInfo: NeteaseKeyInfo?,
     customBackgroundUri: String,
     onAlbum: () -> Unit,
+    onArtist: (String) -> Unit,
     onComposer: (String) -> Unit,
     onLyricist: (String) -> Unit,
     onNeteaseSong: () -> Unit,
@@ -2562,6 +2579,10 @@ private fun PlayerDetailPage(
     }
     val lyricistNames = remember(tagInfo?.lyricist, song?.lyricist) {
         splitArtistNames(tagInfo?.lyricist?.ifBlank { song?.lyricist.orEmpty() }.orEmpty())
+    }
+    val artistNames = remember(tagInfo?.artist, song?.artist) {
+        splitArtistNames(tagInfo?.artist?.ifBlank { song?.artist.orEmpty() }.orEmpty())
+            .filterNot { it.equals("Unknown", ignoreCase = true) }
     }
     var showNeteaseArtistPicker by remember(neteaseInfo) { mutableStateOf(false) }
     val neteaseArtists = remember(neteaseInfo) {
@@ -2624,17 +2645,41 @@ private fun PlayerDetailPage(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 PlayerDetailInfoLine(stringResource(R.string.player_detail_song), song?.title.orEmpty().ifBlank { stringResource(R.string.player_unknown_song) })
-                PlayerDetailInfoLine(stringResource(R.string.player_detail_artist), song?.artist.orEmpty().ifBlank { stringResource(R.string.player_unknown_artist) })
-                PlayerDetailInfoLine(stringResource(R.string.player_detail_album), song?.album.orEmpty().ifBlank { stringResource(R.string.player_unknown_album) })
+                neteaseInfo?.aliases?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { alias ->
+                    PlayerDetailInfoLine(stringResource(R.string.player_detail_alias), alias)
+                }
                 tagInfo?.displayComment?.takeIf { it.isNotBlank() }?.let {
                     PlayerDetailInfoLine(stringResource(R.string.player_detail_comment), it)
                 }
                 Spacer(modifier = Modifier.height(18.dp))
             }
 
+            if (artistNames.isNotEmpty()) {
+                artistNames.forEach { name ->
+                    item(key = "artist_$name") {
+                        PlayerDetailActionRow(
+                            title = stringResource(R.string.player_detail_artist_label),
+                            summary = name,
+                            onClick = { onArtist(name) }
+                        )
+                    }
+                }
+            } else {
+                val artistText = song?.artist.orEmpty()
+                if (artistText.isNotBlank()) {
+                    item {
+                        PlayerDetailActionRow(
+                            title = stringResource(R.string.player_detail_artist_label),
+                            summary = artistText,
+                            onClick = { onArtist(artistText) }
+                        )
+                    }
+                }
+            }
+
             item {
                 PlayerDetailActionRow(
-                    title = stringResource(R.string.player_detail_album_section),
+                    title = stringResource(R.string.player_detail_album),
                     summary = song?.album.orEmpty().ifBlank { stringResource(R.string.player_no_album_info) },
                     enabled = (song?.albumIdentityId() ?: 0L) > 0L,
                     onClick = onAlbum
@@ -5307,6 +5352,7 @@ private fun PlayerActionMenu(
     onAiInterpret: () -> Unit,
     onSpectrum: () -> Unit,
     onDeleteSong: () -> Unit,
+    onMatchDynamicCover: () -> Unit,
     onStopAfterCurrent: (Boolean) -> Unit,
     onTimer: (Int) -> Unit,
     onCustomTimerMinutes: (Int) -> Unit,
@@ -5383,6 +5429,7 @@ private fun PlayerActionMenu(
                 PlayerActionMenuItem(stringResource(R.string.song_more_ai_title), onAiInterpret)
                 PlayerActionMenuItem(stringResource(R.string.player_song_info), onSongInfo)
                 PlayerActionMenuItem(stringResource(R.string.song_more_set_rating), onSetRating)
+                PlayerActionMenuItem(stringResource(R.string.player_match_dynamic_cover), onMatchDynamicCover)
                 PlayerActionMenuItem(stringResource(R.string.player_edit_metadata), { openEditorPage(TagEditorOptionKind.Metadata, metadataEditorId) })
                 PlayerActionMenuItem(stringResource(R.string.player_lyric_timing), { openEditorPage(TagEditorOptionKind.LyricTiming, lyricTimingEditorId) })
                 if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
@@ -6537,6 +6584,11 @@ private fun adaptiveTitleFontSize(text: String, maxSize: TextUnit): TextUnit {
 
 private fun String.toPlayerLyricFontFamily(weight: Int, italic: Boolean): FontFamily? {
     if (isBlank()) return null
+    if (this == com.ella.music.ui.settings.SYSTEM_FONT_PATH) {
+        return runCatching {
+            FontFamily(Typeface.create(Typeface.DEFAULT, weight.coerceIn(100, 900), italic))
+        }.getOrNull()
+    }
     val file = File(this)
     if (!file.exists() || !file.canRead()) return null
     return runCatching {

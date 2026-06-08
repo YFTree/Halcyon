@@ -26,6 +26,9 @@
     <string name="no_lyrics">No lyrics</string>
     <string name="now_playing">Now playing</string>
     <string name="play_all">Play all</string>
+    <string name="album_play_all">Play all</string>
+    <string name="album_sort_summary">%1$d songs · %2$s · %3$s</string>
+    <string name="album_participating_artists_label">Credits</string>
     <string name="shuffle">Shuffle</string>
     <string name="repeat_off">Repeat off</string>
     <string name="repeat_all">Repeat all</string>
@@ -151,6 +154,9 @@
     <string name="settings_clear_online_cache">Clear artwork and lyric cache</string>
     <string name="settings_clear_online_cache_summary">Clear WebDAV and LX artwork, lyrics, and remote metadata cache</string>
     <string name="settings_clear_online_cache_done">Online artwork and lyric cache cleared</string>
+    <string name="settings_clear_library_snapshot_cache">Clear library cache snapshot</string>
+    <string name="settings_clear_library_snapshot_cache_summary">Clear library search and tag snapshots; they will be regenerated on the next search</string>
+    <string name="settings_clear_library_snapshot_cache_done">Library cache snapshot cleared</string>
     <string name="settings_logs">Logs</string>
     <string name="settings_logs_summary">View detailed logs, warnings, and crash records</string>
     <string name="logs_title">Log analysis</string>
@@ -258,6 +264,10 @@
     <string name="player_sleep_timer">Sleep timer</string>
     <string name="player_speed_pitch">Speed and pitch</string>
     <string name="player_visualizer_settings">Visualizer settings</string>
+    <string name="player_match_dynamic_cover">Match dynamic cover</string>
+    <string name="player_dynamic_cover_downloading">Downloading dynamic cover…</string>
+    <string name="player_dynamic_cover_downloaded">Dynamic cover saved</string>
+    <string name="player_dynamic_cover_download_failed">Download failed</string>
 
     <string name="about_project">Project</string>
     <string name="about_update">Software update</string>
@@ -317,6 +327,9 @@
     <string name="ai_chat_added_to_queue">Added to queue: %1$d songs</string>
     <string name="ai_chat_playlist_name">Ella recommended playlist</string>
     <string name="ai_chat_playlist_created">Created "%1$s": %2$d songs</string>
+    <string name="ai_chat_new_session">New chat</string>
+    <string name="ai_chat_delete_session">Delete session</string>
+    <string name="ai_chat_delete_session_confirm">Delete this session?</string>
     <string name="category_artist">Artists</string>
     <string name="category_album">Albums</string>
     <string name="category_folder">Folders</string>
@@ -362,6 +375,12 @@
     <string name="folder_library_analysis_summary">Overview, audio format, and quality stats</string>
     <string name="folder_local_scan_directories">Local scan directories</string>
     <string name="folder_local_scan_directories_summary">%1$d directories; use the plus button to add more</string>
+    <string name="folder_usb_directories">USB / External storage directories</string>
+    <string name="folder_usb_directories_summary">%1$d USB directories added</string>
+    <string name="folder_usb_added">USB directory added</string>
+    <string name="folder_usb_removed">USB directory removed</string>
+    <string name="folder_remove_usb_folder_title">Remove USB directory</string>
+    <string name="folder_remove_usb_folder_message">Remove this USB directory? Files on the USB drive will not be deleted.</string>
     <string name="folder_show_folder">Show folder</string>
     <string name="folder_hide_folder">Hide folder</string>
     <string name="folder_remove_scan_folder_title">Remove scan directory</string>
@@ -394,6 +413,23 @@
     <string name="webdav_url">URL</string>
     <string name="webdav_username">Username</string>
     <string name="webdav_password">Password</string>
+    <string name="webdav_please_enter_address">Please enter a WebDAV address first</string>
+    <string name="webdav_connection_succeeded">WebDAV connection succeeded</string>
+    <string name="webdav_file_download_failed">WebDAV file download failed</string>
+    <string name="webdav_http_400">HTTP 400: WebDAV request format rejected by server. Make sure the address points to a WebDAV root or subdirectory</string>
+    <string name="webdav_http_401">HTTP 401: Incorrect username or password</string>
+    <string name="webdav_http_403">HTTP 403: Access denied</string>
+    <string name="webdav_http_404">HTTP 404: Path does not exist. Please verify the WebDAV address</string>
+    <string name="webdav_http_405">HTTP 405: Server does not allow PROPFIND. Make sure you entered a WebDAV address</string>
+    <string name="webdav_http_redirect">HTTP %1$d: Unexpected server redirect. Check whether the WebDAV address needs a trailing slash</string>
+    <string name="webdav_http_server_error">HTTP %1$d: WebDAV server returned an error</string>
+    <string name="webdav_http_server_error_detail">HTTP %1$d: %2$s</string>
+    <string name="webdav_address_format_invalid">Invalid WebDAV address format</string>
+    <string name="webdav_host_unresolvable">Cannot resolve host. Please check the address or network</string>
+    <string name="webdav_connection_timeout">Connection timed out. Please check the server address and network</string>
+    <string name="webdav_tls_handshake_failed">TLS/certificate verification failed. Please check the HTTPS certificate</string>
+    <string name="webdav_cleartext_blocked">Plaintext HTTP connection blocked by the system. Please reinstall and try again</string>
+    <string name="webdav_network_failed">Network connection failed</string>
     <string name="analytics_audio_format_stats">Audio format stats</string>
     <string name="analytics_audio_quality_stats">Audio quality stats</string>
     <string name="analytics_loading_audio_formats">Analyzing audio formats...</string>
@@ -483,16 +519,54 @@
     <string name="settings_mini_player_right_queue">Playlist</string>
     <string name="settings_transport_button_outlines">Player button outlines</string>
     <string name="settings_transport_button_outlines_summary">Show semi-transparent circular outlines on playback control buttons in non-immersive mode</string>
+    <string name="settings_home_tile_pin_buttons">Show shortcut buttons on home screen</string>
+    <string name="settings_home_tile_pin_buttons_summary">Show a + button on the top-right of home section cards to add desktop shortcuts</string>
     <string name="settings_backup_export_title">Export settings and listening stats</string>
     <string name="settings_backup_export_summary">Export settings, listening history, and heatmap ranking data</string>
     <string name="settings_backup_restore_title">Restore settings and listening stats</string>
     <string name="settings_backup_restore_summary">Restore settings, history, and stats from a backup JSON</string>
+    <string name="settings_backup_settings_section">Settings</string>
+    <string name="settings_backup_playback_section">Listening history</string>
+    <string name="settings_backup_export_settings_title">Export settings</string>
+    <string name="settings_backup_export_settings_summary">Export app settings and preferences only</string>
+    <string name="settings_backup_restore_settings_title">Restore settings</string>
+    <string name="settings_backup_restore_settings_summary">Restore app settings from a backup JSON</string>
+    <string name="settings_backup_export_playback_title">Export listening history</string>
+    <string name="settings_backup_export_playback_summary">Export play history, rankings, and calendar stats; compatible with Prism Music sessions</string>
+    <string name="settings_backup_restore_playback_title">Import listening history</string>
+    <string name="settings_backup_restore_playback_summary">Import Halcyon or Prism Music listening stats JSON</string>
+    <string name="settings_backup_export_format_title">Select export format</string>
+    <string name="settings_backup_export_format_ella">Halcyon format</string>
+    <string name="settings_backup_export_format_ella_summary">Includes play history, rankings, and calendar stats; suitable for restoring in Halcyon</string>
+    <string name="settings_backup_export_format_sollin">Prism Music-compatible format</string>
+    <string name="settings_backup_export_format_sollin_summary">Export as Prism Music sessions JSON for use with other compatible apps</string>
     <string name="settings_backup_open_failed">Unable to open the backup file</string>
     <string name="settings_backup_read_failed">Unable to read the backup file</string>
     <string name="settings_backup_export_success">Backup exported</string>
     <string name="settings_backup_export_failed">Backup export failed</string>
     <string name="settings_backup_restore_success">Backup restored</string>
     <string name="settings_backup_restore_failed">Backup restore failed</string>
+    <string name="settings_backup_webdav_section">WebDAV Cloud Backup</string>
+    <string name="settings_backup_webdav_url_label">WebDAV Server URL</string>
+    <string name="settings_backup_webdav_url_summary">e.g. https://dav.example.com/remote.php/dav/files/user/</string>
+    <string name="settings_backup_webdav_username_label">Username</string>
+    <string name="settings_backup_webdav_username_summary">Login username for the WebDAV server</string>
+    <string name="settings_backup_webdav_password_label">Password</string>
+    <string name="settings_backup_webdav_password_summary">Login password for the WebDAV server</string>
+    <string name="settings_backup_webdav_path_label">Cloud Backup Path</string>
+    <string name="settings_backup_webdav_path_summary">Path on the WebDAV server to save backups</string>
+    <string name="settings_backup_webdav_upload">Backup to WebDAV</string>
+    <string name="settings_backup_webdav_upload_summary">Upload settings and playlists to a WebDAV server</string>
+    <string name="settings_backup_webdav_download">Restore from WebDAV</string>
+    <string name="settings_backup_webdav_download_summary">Download and restore settings and playlists from a WebDAV server</string>
+    <string name="settings_backup_webdav_uploading">Uploading backup…</string>
+    <string name="settings_backup_webdav_upload_success">WebDAV backup uploaded successfully</string>
+    <string name="settings_backup_webdav_upload_failed">WebDAV backup upload failed</string>
+    <string name="settings_backup_webdav_downloading">Downloading backup from WebDAV…</string>
+    <string name="settings_backup_webdav_download_success">WebDAV backup restored successfully</string>
+    <string name="settings_backup_webdav_download_failed">WebDAV backup restore failed</string>
+    <string name="settings_backup_webdav_not_configured">Please configure a WebDAV server URL first</string>
+    <string name="settings_backup_webdav_file_not_found">Backup file not found on the WebDAV server</string>
     <string name="settings_editor_ask_every_time">Ask every time</string>
     <string name="settings_editor_builtin_custom_tag">Built-in metadata editor</string>
     <string name="settings_editor_lunabeat_metadata">LunaBeat (metadata editor)</string>
@@ -650,6 +724,7 @@
     <string name="settings_lyric_font_source_builtin">Built-in</string>
     <string name="settings_lyric_font_source_imported">Imported</string>
     <string name="settings_lyric_font_source_system">System</string>
+    <string name="settings_lyric_font_system_default">System default</string>
     <string name="settings_lyric_font_applied">Applied %1$s</string>
     <string name="settings_lyric_font_import_failed">Failed to import the font</string>
     <string name="settings_lyric_font_deleted">Font deleted</string>
@@ -658,6 +733,8 @@
     <string name="settings_home_customize">Home customization</string>
     <string name="settings_daily_mix">Daily featured</string>
     <string name="settings_daily_mix_summary">Control the top featured card on the home page</string>
+    <string name="settings_ai_mix">AI recommended playlist</string>
+    <string name="settings_ai_mix_summary">Control the AI recommendation card on the home page</string>
     <string name="settings_ai_interpretation">AI interpretation</string>
     <string name="settings_openai_api_key_summary">Used for song AI interpretation and stored only on this device</string>
     <string name="settings_openai_base_url_summary">OpenAI-compatible Chat Completions endpoint; /chat/completions is appended automatically</string>
@@ -849,6 +926,8 @@
     <string name="player_detail_artist">Artist</string>
     <string name="player_detail_album">Album</string>
     <string name="player_detail_comment">Annotation</string>
+    <string name="player_detail_alias">Alias</string>
+    <string name="player_detail_artist_label">Artist</string>
     <string name="player_unknown_song">Unknown song</string>
     <string name="player_unknown_artist">Unknown artist</string>
     <string name="player_unknown_album">Unknown album</string>
@@ -1014,4 +1093,183 @@
         <item>$syllable</item>
         <item>$translation</item>
     </string-array>
+
+    <!-- i18n: Artist screen -->
+    <string name="artist_tab_songs">Songs</string>
+    <string name="artist_tab_participated_albums">Participated albums</string>
+    <string name="artist_tab_release_albums">Release albums</string>
+    <string name="artist_song_count_sorted">%1$d songs · %2$s</string>
+    <string name="artist_participated_album_count_sorted">%1$d participated albums · %2$s</string>
+    <string name="artist_release_album_count_sorted">%1$d release albums · %2$s</string>
+    <string name="artist_no_albums">No albums yet</string>
+    <string name="artist_composer_page">Composer page</string>
+    <string name="artist_lyricist_page">Lyricist page</string>
+    <string name="artist_netease_artist_page">NetEase artist page</string>
+    <string name="artist_sort_title">Song title</string>
+    <string name="artist_sort_album_track">Album track order</string>
+    <string name="artist_sort_file_name">File name</string>
+    <string name="artist_sort_duration">Duration</string>
+    <string name="artist_sort_date_added">Date added</string>
+    <string name="artist_sort_date_added_asc">Date added ascending</string>
+    <string name="artist_sort_date_modified">Date modified</string>
+    <string name="artist_sort_date_modified_asc">Date modified ascending</string>
+    <string name="artist_sort_year_asc">Release date ascending</string>
+    <string name="artist_sort_year_desc">Release date descending</string>
+    <string name="artist_sort_song_count">Song count</string>
+    <string name="artist_sort_album_name">Album name</string>
+    <string name="artist_album_song_summary">%1$d albums · %2$d songs</string>
+    <string name="artist_album_song_summary_detail">%1$d songs</string>
+    <string name="artist_info_audio">Audio</string>
+
+    <!-- i18n: Artist list screen -->
+    <string name="artist_list_search_placeholder">Search artists</string>
+    <string name="artist_list_empty">No artists found</string>
+    <string name="artist_list_summary">%1$d artists · %2$s</string>
+    <string name="artist_list_sort_name">Name</string>
+    <string name="artist_list_sort_song_count">Song count</string>
+    <string name="artist_list_sort_album_count">Albums appeared</string>
+    <string name="artist_list_sort_release_album_count">Release albums</string>
+    <string name="artist_list_sort_duration">Duration</string>
+    <string name="artist_list_summary_duration">%1$s · %2$d albums appeared</string>
+    <string name="artist_list_summary_release_album">%1$d songs · %2$d release albums</string>
+    <string name="artist_list_summary_default">%1$d songs · %2$d albums appeared</string>
+
+    <!-- i18n: Metadata category screen -->
+    <string name="category_search_placeholder">Search %1$s</string>
+    <string name="category_empty_hint">No %1$s info yet. Refresh the library and try again.</string>
+    <string name="category_no_match">No matching %1$s</string>
+    <string name="category_selected_count">%1$d selected</string>
+    <string name="category_album_summary">%1$d albums · %2$s · %3$s</string>
+    <string name="category_song_summary">%1$d songs · %2$s · %3$s</string>
+    <string name="category_artist_page">Artist page</string>
+    <string name="category_composer_page">Composer page</string>
+    <string name="category_lyricist_page">Lyricist page</string>
+    <string name="category_selected_songs">Selected %1$d songs</string>
+    <string name="category_song_count_card">%1$d songs</string>
+    <string name="category_general">Categories</string>
+    <string name="category_count_genres">%1$d genres</string>
+    <string name="category_count_composers">%1$d composers</string>
+    <string name="category_count_lyricists">%1$d lyricists</string>
+    <string name="category_count_folders">%1$d folders</string>
+    <string name="category_count_years">%1$d years</string>
+    <string name="category_count_general">%1$d categories</string>
+    <string name="category_sort_name">Name</string>
+    <string name="category_sort_year_desc">Year descending</string>
+    <string name="category_sort_year_asc">Year ascending</string>
+    <string name="category_sort_album_count">Album count</string>
+    <string name="category_sort_participating_albums">Participating albums</string>
+    <string name="category_sort_album_track">Album track order</string>
+    <string name="category_sort_date_added_asc">Date added ascending</string>
+    <string name="category_sort_date_modified_asc">Date modified ascending</string>
+    <string name="category_sort_album_name">Album name</string>
+    <string name="category_album_count_detail">%1$d albums</string>
+    <string name="category_person_sort">%1$d songs · %2$d participating albums</string>
+    <string name="category_person_sort_duration">%1$s · %2$d participating albums</string>
+
+    <!-- i18n: LX online source settings -->
+    <string name="lx_source_title">LX source manager</string>
+    <string name="lx_source_import_hint">Import an LX source to search on the LX Music page</string>
+    <string name="lx_source_imported_named">Imported %1$s</string>
+    <string name="lx_source_import_local_failed">Local import failed</string>
+    <string name="lx_source_processing">Processing…</string>
+    <string name="lx_source_url_empty_hint">Enter a source URL first</string>
+    <string name="lx_source_import_failed">Import failed</string>
+    <string name="lx_source_empty">No LX sources imported yet</string>
+    <string name="lx_source_switched_named">Switched to %1$s</string>
+    <string name="lx_source_removed_named">Removed %1$s</string>
+    <string name="lx_source_import_section">Import</string>
+    <string name="lx_source_local_js">Local JS</string>
+    <string name="lx_source_url_import">URL import</string>
+    <string name="lx_source_imported_section">Imported</string>
+    <string name="lx_source_current_suffix">%1$s (current)</string>
+
+    <!-- i18n: Common -->
+    <string name="song_more_copied">Copied %1$s</string>
+
+    <!-- i18n: LX online screen -->
+    <string name="lx_online_source_switched">Switched to %1$s</string>
+    <string name="lx_online_please_import_source">Import or select a source first</string>
+    <string name="lx_online_queue_song_expired">Queue songs are no longer valid</string>
+    <string name="lx_online_queue_obtained">Obtained %1$d queue songs…</string>
+    <string name="lx_online_song_expired">Online song is no longer valid</string>
+    <string name="lx_online_source_management">Source management</string>
+    <string name="lx_online_no_source_selected">No LX source selected</string>
+    <string name="lx_online_no_source_hint">Tap the gear icon to import or select an LX source</string>
+    <string name="lx_online_no_songs_found">No songs found</string>
+    <string name="lx_online_songs_found">Found %1$d songs</string>
+    <string name="lx_online_search_failed">Search failed</string>
+    <string name="lx_online_search_placeholder">Search online songs, artists</string>
+    <string name="lx_online_processing">Processing…</string>
+    <string name="lx_online_import_hint">Import an LX source to search online songs</string>
+    <string name="lx_online_search_hint">Search and tap a song to play online</string>
+    <string name="lx_online_playback_failed">Playback failed</string>
+    <string name="lx_online_added_to_queue">Added to queue</string>
+    <string name="lx_online_add_to_queue_failed">Failed to add to queue</string>
+    <string name="lx_online_download_failed">Download failed</string>
+
+    <!-- i18n: AI data-layer errors -->
+    <string name="error_library_empty">Library is empty. Please scan local songs first.</string>
+    <string name="error_ai_no_playable_songs">AI did not return any playable songs</string>
+    <string name="ai_default_playlist_title">AI recommended playlist</string>
+    <string name="error_openai_missing_api_key">Please enter the OpenAI API key in settings first.</string>
+    <string name="error_ai_chat_empty_message">Please enter a question.</string>
+    <string name="error_openai_request_failed">OpenAI request failed (HTTP %1$d) %2$s</string>
+    <string name="error_openai_api_error_separator">: </string>
+    <string name="error_openai_empty_response">OpenAI returned an empty response</string>
+    <string name="error_ai_disallowed_action">AI returned a disallowed action: %1$s</string>
+
+    <!-- i18n: Settings defaults (non-const, resolved via Context) -->
+    <string name="settings_default_lx_source_name">LX source</string>
+    <string name="settings_default_custom_font_name">Custom font</string>
+
+    <!-- i18n: About screen acknowledgements and open-source project summaries -->
+    <string name="about_summary_betterlyrics">Reference for player cover blur background and lyric visual effects</string>
+    <string name="about_summary_splayer">Reference for player animations and lyric experience</string>
+    <string name="about_title_lightcone">Lightcone Music</string>
+    <string name="about_summary_lightcone">Reference for some UI visuals and effects</string>
+    <string name="about_summary_miuix">MIUI/HyperOS-style Compose UI component library (Apache-2.0)</string>
+    <string name="about_summary_media3">Playback, media session, and ExoPlayer extensions (Apache-2.0)</string>
+    <string name="about_summary_ffmpeg">Software decoding for ALAC and other audio formats (LGPL-2.1)</string>
+    <string name="about_summary_lyricon">Subtitle Provider API and status bar lyrics (Apache-2.0)</string>
+    <string name="about_summary_superlyricapi">SuperLyric lyric publishing API (LGPL-2.1)</string>
+    <string name="about_summary_lyricgetter">Lyric Getter original lyric delivery API (LGPL-2.1)</string>
+    <string name="about_summary_lyrico">Reference for song tag reading and app log page (Apache-2.0)</string>
+    <string name="about_summary_accompanist_lyrics_ui">Per-word karaoke lyric rendering and animation effects (Apache-2.0)</string>
+    <string name="about_summary_163keydecrypter">Reference for NetEase Cloud Music 163 key decryption (MIT)</string>
+    <string name="about_summary_kyant_backdrop">Liquid glass and background blur effects (Apache-2.0)</string>
+    <string name="about_summary_coil">Kotlin image loading library (Apache-2.0)</string>
+    <string name="about_summary_quickjs">LX Music API JavaScript runtime (Apache-2.0)</string>
+    <string name="about_summary_lxmusic">Online music source and API adaptation reference (Apache-2.0)</string>
+    <string name="about_summary_accompanist_lyrics_core">Lyric parsing and TTML/LRC structure reference (Apache-2.0)</string>
+
+    <!-- i18n: LX online service errors -->
+    <string name="lx_service_import_failed_http">Import failed: HTTP %1$d</string>
+    <string name="lx_service_source_script_abnormal">Source script content is invalid</string>
+    <string name="lx_service_source_init_failed">Source initialization failed</string>
+    <string name="lx_service_select_source_first">Please select an LX source first</string>
+    <string name="lx_service_search_failed_http">Search failed: HTTP %1$d</string>
+    <string name="lx_service_resolve_url_failed_http">Failed to resolve playback URL: HTTP %1$d</string>
+    <string name="lx_service_resolve_url_failed">Failed to resolve playback URL</string>
+    <string name="lx_service_source_resolve_failed_http">Source resolution failed: HTTP %1$d</string>
+    <string name="lx_service_source_no_playback_url">Source did not return a playback URL</string>
+    <string name="lx_service_source_resolve_ip_restricted">Source resolution failed: IP restricted</string>
+    <string name="lx_service_source_resolve_url_fetch_failed">Source resolution failed: could not obtain playback URL</string>
+    <string name="lx_service_source_resolve_internal_error">Source resolution failed: internal server error</string>
+    <string name="lx_service_source_resolve_too_frequent">Source resolution failed: too many requests</string>
+    <string name="lx_service_source_resolve_param_error">Source resolution failed: invalid parameters</string>
+    <string name="lx_service_source_resolve_failed">Source resolution failed</string>
+    <string name="lx_service_default_source_name">LX source</string>
+
+    <!-- i18n: Playlist store -->
+    <string name="playlist_export_open_directory_failed">Cannot open export directory</string>
+    <string name="playlist_export_create_file_failed">Cannot create export file</string>
+    <string name="playlist_export_open_file_failed">Cannot open export file</string>
+    <string name="playlist_favorites_default_name">My Favorites</string>
+    <string name="playlist_import_default_name">Imported playlist</string>
+
+    <!-- MCP Server -->
+    <string name="settings_mcp_server">MCP server</string>
+    <string name="settings_mcp_server_summary">Allow AI assistants (like Claude) to control music playback via MCP protocol</string>
+    <string name="settings_mcp_server_running">Listening on port %1$d</string>
+    <string name="about_summary_reorderable">Drag-to-reorder list component (Apache-2.0)</string>
 </resources>

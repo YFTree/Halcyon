@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 android {
@@ -29,8 +30,8 @@ android {
         applicationId = "com.ella.music"
         minSdk = 29
         targetSdk = 37
-        versionCode = 22
-        versionName = "1.1.92"
+        versionCode = 23
+        versionName = "1.1.93"
 
         val buildTime = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
@@ -132,4 +133,12 @@ dependencies {
     implementation(libs.miuix.icons)
     implementation(libs.miuix.blur)
     implementation(libs.miuix.preference)
+    implementation("androidx.webkit:webkit:1.12.1")
+
+    // MCP Server
+    implementation(libs.mcp.server)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.kotlinx.serialization.json)
 }

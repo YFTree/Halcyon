@@ -29,10 +29,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
 import com.ella.music.data.LxSourceConfig
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.lx.LxOnlineService
@@ -67,7 +69,7 @@ fun LxSourceSettingsScreen(onBack: () -> Unit) {
     val selectedId by settingsManager.selectedLxSourceId.collectAsState(initial = "")
     var importUrl by remember { mutableStateOf("") }
     var isBusy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("导入 LX 源后即可在 LX Music 页面搜索") }
+    var message by remember { mutableStateOf(context.getString(R.string.lx_source_import_hint)) }
 
     fun showToast(text: String) {
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
@@ -85,9 +87,9 @@ fun LxSourceSettingsScreen(onBack: () -> Unit) {
                 }
                 val (name, normalizedScript) = service.importSourceScript(script, allowRuntimeInspect = false)
                 settingsManager.setLxSource(uri.toString(), name, normalizedScript)
-                message = "已导入 $name"
+                message = context.getString(R.string.lx_source_imported_named, name)
             }.onFailure {
-                message = it.localizedMessage ?: "本地导入失败"
+                message = it.localizedMessage ?: context.getString(R.string.lx_source_import_local_failed)
                 showToast(message)
             }
             isBusy = false
@@ -95,9 +97,9 @@ fun LxSourceSettingsScreen(onBack: () -> Unit) {
     }
 
     SourceSettingsScaffold(
-        title = "LX 源管理",
+        title = stringResource(R.string.lx_source_title),
         onBack = onBack,
-        message = if (isBusy) "处理中..." else message,
+        message = if (isBusy) stringResource(R.string.lx_source_processing) else message,
         importUrl = importUrl,
         onImportUrlChange = { importUrl = it },
         importPlaceholder = "https://.../source.js",
@@ -115,7 +117,7 @@ fun LxSourceSettingsScreen(onBack: () -> Unit) {
         },
         onUrlImport = {
             if (importUrl.isBlank()) {
-                showToast("请先输入源地址")
+                showToast(context.getString(R.string.lx_source_url_empty_hint))
                 return@SourceSettingsScaffold
             }
             scope.launch {
@@ -124,9 +126,9 @@ fun LxSourceSettingsScreen(onBack: () -> Unit) {
                     val (name, script) = service.importSource(importUrl)
                     settingsManager.setLxSource(importUrl, name, script)
                     importUrl = ""
-                    message = "已导入 $name"
+                    message = context.getString(R.string.lx_source_imported_named, name)
                 }.onFailure {
-                    message = it.localizedMessage ?: "导入失败"
+                    message = it.localizedMessage ?: context.getString(R.string.lx_source_import_failed)
                     showToast(message)
                 }
                 isBusy = false
@@ -134,7 +136,7 @@ fun LxSourceSettingsScreen(onBack: () -> Unit) {
         }
     ) {
         if (sources.isEmpty()) {
-            EmptySourceText("还没有导入 LX 源")
+            EmptySourceText(stringResource(R.string.lx_source_empty))
         } else {
             sources.forEach { source ->
                 LxSourceManageRow(
@@ -144,13 +146,13 @@ fun LxSourceSettingsScreen(onBack: () -> Unit) {
                     onSelect = {
                         scope.launch {
                             settingsManager.selectLxSource(source.id)
-                            message = "已切换到 ${source.name}"
+                            message = context.getString(R.string.lx_source_switched_named, source.name)
                         }
                     },
                     onRemove = {
                         scope.launch {
                             settingsManager.removeLxSource(source.id)
-                            message = "已移除 ${source.name}"
+                            message = context.getString(R.string.lx_source_removed_named, source.name)
                         }
                     }
                 )
@@ -185,7 +187,7 @@ private fun SourceSettingsScaffold(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = "返回",
+                        contentDescription = stringResource(R.string.common_back),
                         tint = MiuixTheme.colorScheme.onSurface,
                         modifier = Modifier.size(24.dp)
                     )
@@ -200,7 +202,7 @@ private fun SourceSettingsScaffold(
                 .padding(horizontal = 12.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
-            SmallTitle(text = "导入")
+            SmallTitle(text = stringResource(R.string.lx_source_import_section))
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                     EllaMiuixTextField(
@@ -213,7 +215,7 @@ private fun SourceSettingsScaffold(
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Button(enabled = !isBusy, onClick = onLocalImport) {
-                            Text("本地 JS")
+                            Text(stringResource(R.string.lx_source_local_js))
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(enabled = !isBusy && importUrl.isNotBlank(), onClick = onUrlImport) {
@@ -223,7 +225,7 @@ private fun SourceSettingsScaffold(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("URL 导入")
+                            Text(stringResource(R.string.lx_source_url_import))
                         }
                     }
                 }
@@ -238,7 +240,7 @@ private fun SourceSettingsScaffold(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 10.dp)
             )
 
-            SmallTitle(text = "已导入")
+            SmallTitle(text = stringResource(R.string.lx_source_imported_section))
             content()
             Spacer(modifier = Modifier.height(120.dp))
         }
@@ -286,7 +288,7 @@ private fun SourceManageRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 BasicComponent(
-                    title = if (selected) "$title（当前）" else title,
+                    title = if (selected) stringResource(R.string.lx_source_current_suffix, title) else title,
                     summary = summary
                 )
             }
@@ -296,7 +298,7 @@ private fun SourceManageRow(
             ) {
                 Icon(
                     imageVector = MiuixIcons.Regular.Delete,
-                    contentDescription = "删除",
+                    contentDescription = stringResource(R.string.common_delete),
                     tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
                     modifier = Modifier.size(22.dp)
                 )

@@ -26,6 +26,9 @@
     <string name="no_lyrics">暂无歌词</string>
     <string name="now_playing">正在播放</string>
     <string name="play_all">全部播放</string>
+    <string name="album_play_all">播放全部</string>
+    <string name="album_sort_summary">%1$d 首歌曲 · %2$s · %3$s</string>
+    <string name="album_participating_artists_label">创作人员</string>
     <string name="shuffle">随机播放</string>
     <string name="repeat_off">关闭循环</string>
     <string name="repeat_all">列表循环</string>
@@ -261,6 +264,10 @@
     <string name="player_sleep_timer">定时关闭</string>
     <string name="player_speed_pitch">变速变调</string>
     <string name="player_visualizer_settings">可视化设置</string>
+    <string name="player_match_dynamic_cover">匹配动态封面</string>
+    <string name="player_dynamic_cover_downloading">正在下载动态封面…</string>
+    <string name="player_dynamic_cover_downloaded">动态封面已保存</string>
+    <string name="player_dynamic_cover_download_failed">下载失败</string>
 
     <string name="about_project">项目</string>
     <string name="about_update">软件更新</string>
@@ -320,6 +327,9 @@
     <string name="ai_chat_added_to_queue">已加入播放列表：%1$d 首</string>
     <string name="ai_chat_playlist_name">Ella 推荐歌单</string>
     <string name="ai_chat_playlist_created">已创建「%1$s」：%2$d 首</string>
+    <string name="ai_chat_new_session">新对话</string>
+    <string name="ai_chat_delete_session">删除会话</string>
+    <string name="ai_chat_delete_session_confirm">确定删除这个会话？</string>
     <string name="category_artist">艺术家</string>
     <string name="category_album">专辑</string>
     <string name="category_folder">文件夹</string>
@@ -365,6 +375,12 @@
     <string name="folder_library_analysis_summary">总览、音频格式和音质统计</string>
     <string name="folder_local_scan_directories">本地扫描目录</string>
     <string name="folder_local_scan_directories_summary">%1$d 个目录，右上角加号可继续添加</string>
+    <string name="folder_usb_directories">USB / 外部存储目录</string>
+    <string name="folder_usb_directories_summary">%1$d 个 USB 目录已添加</string>
+    <string name="folder_usb_added">USB 目录已添加</string>
+    <string name="folder_usb_removed">USB 目录已移除</string>
+    <string name="folder_remove_usb_folder_title">移除 USB 目录</string>
+    <string name="folder_remove_usb_folder_message">确定要移除这个 USB 目录吗？USB 驱动器上的文件不会被删除。</string>
     <string name="folder_show_folder">显示文件夹</string>
     <string name="folder_hide_folder">隐藏文件夹</string>
     <string name="folder_remove_scan_folder_title">移除扫描目录</string>
@@ -397,6 +413,23 @@
     <string name="webdav_url">地址</string>
     <string name="webdav_username">用户名</string>
     <string name="webdav_password">密码</string>
+    <string name="webdav_please_enter_address">请先输入 WebDAV 地址</string>
+    <string name="webdav_connection_succeeded">WebDAV 连接成功</string>
+    <string name="webdav_file_download_failed">WebDAV 文件下载失败</string>
+    <string name="webdav_http_400">HTTP 400：WebDAV 请求格式被服务器拒绝，请确认地址指向 WebDAV 根目录或子目录</string>
+    <string name="webdav_http_401">HTTP 401：用户名或密码错误</string>
+    <string name="webdav_http_403">HTTP 403：没有访问权限</string>
+    <string name="webdav_http_404">HTTP 404：路径不存在，请确认 WebDAV 地址</string>
+    <string name="webdav_http_405">HTTP 405：服务器不允许 PROPFIND，请确认填的是 WebDAV 地址</string>
+    <string name="webdav_http_redirect">HTTP %1$d：服务器重定向异常，请检查 WebDAV 地址是否需要末尾斜杠</string>
+    <string name="webdav_http_server_error">HTTP %1$d：WebDAV 服务器返回错误</string>
+    <string name="webdav_http_server_error_detail">HTTP %1$d：%2$s</string>
+    <string name="webdav_address_format_invalid">WebDAV 地址格式不正确</string>
+    <string name="webdav_host_unresolvable">无法解析主机，请检查地址或网络</string>
+    <string name="webdav_connection_timeout">连接超时，请检查服务器地址和网络</string>
+    <string name="webdav_tls_handshake_failed">TLS/证书验证失败，请检查 HTTPS 证书</string>
+    <string name="webdav_cleartext_blocked">HTTP 明文连接被系统拦截，请重新安装后再试</string>
+    <string name="webdav_network_failed">网络连接失败</string>
     <string name="analytics_audio_format_stats">音频格式统计</string>
     <string name="analytics_audio_quality_stats">音频音质统计</string>
     <string name="analytics_loading_audio_formats">正在分析音频格式...</string>
@@ -499,20 +532,41 @@
     <string name="settings_backup_restore_settings_title">恢复设置</string>
     <string name="settings_backup_restore_settings_summary">从备份 JSON 恢复应用设置</string>
     <string name="settings_backup_export_playback_title">导出听歌历史</string>
-    <string name="settings_backup_export_playback_summary">导出播放历史、排行和日历统计，兼容 Sollin/Aurora sessions</string>
+    <string name="settings_backup_export_playback_summary">导出播放历史、排行和日历统计，兼容 Prism Music sessions</string>
     <string name="settings_backup_restore_playback_title">导入听歌历史</string>
-    <string name="settings_backup_restore_playback_summary">导入 Halcyon 或 Sollin/Aurora 听歌统计 JSON</string>
+    <string name="settings_backup_restore_playback_summary">导入 Halcyon 或 Prism Music 听歌统计 JSON</string>
     <string name="settings_backup_export_format_title">选择导出格式</string>
     <string name="settings_backup_export_format_ella">Halcyon 格式</string>
     <string name="settings_backup_export_format_ella_summary">包含播放历史、排行和日历统计，适合在 Halcyon 中恢复</string>
-    <string name="settings_backup_export_format_sollin">Sollin 兼容格式</string>
-    <string name="settings_backup_export_format_sollin_summary">导出为 Aurora/Sollin 的 sessions JSON，可用于其他兼容应用</string>
+    <string name="settings_backup_export_format_sollin">Prism Music 兼容格式</string>
+    <string name="settings_backup_export_format_sollin_summary">导出为 Prism Music 的 sessions JSON，可用于其他兼容应用</string>
     <string name="settings_backup_open_failed">无法打开备份文件</string>
     <string name="settings_backup_read_failed">无法读取备份文件</string>
     <string name="settings_backup_export_success">备份已导出</string>
     <string name="settings_backup_export_failed">备份导出失败</string>
     <string name="settings_backup_restore_success">备份已恢复</string>
     <string name="settings_backup_restore_failed">备份恢复失败</string>
+    <string name="settings_backup_webdav_section">WebDAV 云备份</string>
+    <string name="settings_backup_webdav_url_label">WebDAV 服务器地址</string>
+    <string name="settings_backup_webdav_url_summary">例如 https://dav.example.com/remote.php/dav/files/user/</string>
+    <string name="settings_backup_webdav_username_label">用户名</string>
+    <string name="settings_backup_webdav_username_summary">WebDAV 服务器的登录用户名</string>
+    <string name="settings_backup_webdav_password_label">密码</string>
+    <string name="settings_backup_webdav_password_summary">WebDAV 服务器的登录密码</string>
+    <string name="settings_backup_webdav_path_label">云端备份路径</string>
+    <string name="settings_backup_webdav_path_summary">备份文件在 WebDAV 服务器上的保存路径</string>
+    <string name="settings_backup_webdav_upload">备份到 WebDAV</string>
+    <string name="settings_backup_webdav_upload_summary">将设置和歌单上传到 WebDAV 服务器</string>
+    <string name="settings_backup_webdav_download">从 WebDAV 恢复</string>
+    <string name="settings_backup_webdav_download_summary">从 WebDAV 服务器下载并恢复设置和歌单</string>
+    <string name="settings_backup_webdav_uploading">正在上传备份…</string>
+    <string name="settings_backup_webdav_upload_success">WebDAV 备份上传成功</string>
+    <string name="settings_backup_webdav_upload_failed">WebDAV 备份上传失败</string>
+    <string name="settings_backup_webdav_downloading">正在从 WebDAV 下载备份…</string>
+    <string name="settings_backup_webdav_download_success">WebDAV 备份恢复成功</string>
+    <string name="settings_backup_webdav_download_failed">WebDAV 备份恢复失败</string>
+    <string name="settings_backup_webdav_not_configured">请先配置 WebDAV 服务器地址</string>
+    <string name="settings_backup_webdav_file_not_found">未在 WebDAV 服务器上找到备份文件</string>
     <string name="settings_editor_ask_every_time">每次选择</string>
     <string name="settings_editor_builtin_custom_tag">内置元数据编辑器</string>
     <string name="settings_editor_lunabeat_metadata">LunaBeat（编辑元数据）</string>
@@ -670,6 +724,7 @@
     <string name="settings_lyric_font_source_builtin">内置</string>
     <string name="settings_lyric_font_source_imported">已导入</string>
     <string name="settings_lyric_font_source_system">系统</string>
+    <string name="settings_lyric_font_system_default">系统默认</string>
     <string name="settings_lyric_font_applied">已应用 %1$s</string>
     <string name="settings_lyric_font_import_failed">字体导入失败</string>
     <string name="settings_lyric_font_deleted">字体已删除</string>
@@ -678,6 +733,8 @@
     <string name="settings_home_customize">首页自定义</string>
     <string name="settings_daily_mix">每日精选</string>
     <string name="settings_daily_mix_summary">控制首页顶部每日精选大卡片显示</string>
+    <string name="settings_ai_mix">AI 推荐歌单</string>
+    <string name="settings_ai_mix_summary">控制首页 AI 推荐歌单卡片显示</string>
     <string name="settings_ai_interpretation">AI 解读</string>
     <string name="settings_openai_api_key_summary">用于歌曲 AI 解读；只保存在本机</string>
     <string name="settings_openai_base_url_summary">OpenAI 兼容 Chat Completions 地址；会自动补全 /chat/completions</string>
@@ -869,9 +926,11 @@
     <string name="player_sleep_timer_title">定时关闭</string>
     <string name="player_song_details">歌曲详情</string>
     <string name="player_detail_song">歌曲</string>
-    <string name="player_detail_artist">歌手</string>
+    <string name="player_detail_artist">艺术家</string>
     <string name="player_detail_album">专辑</string>
     <string name="player_detail_comment">注释</string>
+    <string name="player_detail_alias">别名</string>
+    <string name="player_detail_artist_label">艺术家</string>
     <string name="player_unknown_song">未知歌曲</string>
     <string name="player_unknown_artist">未知歌手</string>
     <string name="player_unknown_album">未知专辑</string>
@@ -1037,4 +1096,183 @@
         <item>$syllable</item>
         <item>$translation</item>
     </string-array>
+
+    <!-- i18n: Artist screen -->
+    <string name="artist_tab_songs">歌曲</string>
+    <string name="artist_tab_participated_albums">参与专辑</string>
+    <string name="artist_tab_release_albums">发行专辑</string>
+    <string name="artist_song_count_sorted">%1$d 首歌曲 · %2$s</string>
+    <string name="artist_participated_album_count_sorted">%1$d 个参与专辑 · %2$s</string>
+    <string name="artist_release_album_count_sorted">%1$d 个发行专辑 · %2$s</string>
+    <string name="artist_no_albums">暂无专辑</string>
+    <string name="artist_composer_page">作曲家页</string>
+    <string name="artist_lyricist_page">作词家页</string>
+    <string name="artist_netease_artist_page">网易云歌手页</string>
+    <string name="artist_sort_title">歌曲名称</string>
+    <string name="artist_sort_album_track">专辑曲序</string>
+    <string name="artist_sort_file_name">文件名</string>
+    <string name="artist_sort_duration">歌曲时长</string>
+    <string name="artist_sort_date_added">添加时间</string>
+    <string name="artist_sort_date_added_asc">添加时间升序</string>
+    <string name="artist_sort_date_modified">修改时间</string>
+    <string name="artist_sort_date_modified_asc">修改时间升序</string>
+    <string name="artist_sort_year_asc">发行时间正序</string>
+    <string name="artist_sort_year_desc">发行时间倒序</string>
+    <string name="artist_sort_song_count">歌曲数</string>
+    <string name="artist_sort_album_name">专辑名称</string>
+    <string name="artist_album_song_summary">%1$d 张专辑 · %2$d 首歌曲</string>
+    <string name="artist_album_song_summary_detail">%1$d 首歌曲</string>
+    <string name="artist_info_audio">音频</string>
+
+    <!-- i18n: Artist list screen -->
+    <string name="artist_list_search_placeholder">搜索艺术家</string>
+    <string name="artist_list_empty">未找到艺术家</string>
+    <string name="artist_list_summary">%1$d 位艺术家 · %2$s</string>
+    <string name="artist_list_sort_name">名称</string>
+    <string name="artist_list_sort_song_count">歌曲数</string>
+    <string name="artist_list_sort_album_count">参与专辑数</string>
+    <string name="artist_list_sort_release_album_count">发行专辑数</string>
+    <string name="artist_list_sort_duration">歌曲时长</string>
+    <string name="artist_list_summary_duration">%1$s · %2$d 张参与专辑</string>
+    <string name="artist_list_summary_release_album">%1$d 首歌曲 · %2$d 张发行专辑</string>
+    <string name="artist_list_summary_default">%1$d 首歌曲 · %2$d 张参与专辑</string>
+
+    <!-- i18n: Metadata category screen -->
+    <string name="category_search_placeholder">搜索%1$s</string>
+    <string name="category_empty_hint">暂无%1$s信息，刷新音乐库后再看看</string>
+    <string name="category_no_match">没有匹配的%1$s</string>
+    <string name="category_selected_count">已选择 %1$d 首</string>
+    <string name="category_album_summary">%1$d 张专辑 · %2$s · %3$s</string>
+    <string name="category_song_summary">%1$d 首歌曲 · %2$s · %3$s</string>
+    <string name="category_artist_page">艺术家页</string>
+    <string name="category_composer_page">作曲家页</string>
+    <string name="category_lyricist_page">作词家页</string>
+    <string name="category_selected_songs">已选择 %1$d 首歌曲</string>
+    <string name="category_song_count_card">%1$d 首歌曲</string>
+    <string name="category_general">分类</string>
+    <string name="category_count_genres">%1$d 种流派</string>
+    <string name="category_count_composers">%1$d 位作曲家</string>
+    <string name="category_count_lyricists">%1$d 位作词家</string>
+    <string name="category_count_folders">%1$d 个文件夹</string>
+    <string name="category_count_years">%1$d 个年份</string>
+    <string name="category_count_general">%1$d 个分类</string>
+    <string name="category_sort_name">名称</string>
+    <string name="category_sort_year_desc">年份倒序</string>
+    <string name="category_sort_year_asc">年份正序</string>
+    <string name="category_sort_album_count">专辑数</string>
+    <string name="category_sort_participating_albums">参与专辑数</string>
+    <string name="category_sort_album_track">专辑曲序</string>
+    <string name="category_sort_date_added_asc">添加时间升序</string>
+    <string name="category_sort_date_modified_asc">修改时间升序</string>
+    <string name="category_sort_album_name">专辑名称</string>
+    <string name="category_album_count_detail">%1$d 张专辑</string>
+    <string name="category_person_sort">%1$d 首歌曲 · %2$d 张参与专辑</string>
+    <string name="category_person_sort_duration">%1$s · %2$d 张参与专辑</string>
+
+    <!-- i18n: LX online source settings -->
+    <string name="lx_source_title">LX 源管理</string>
+    <string name="lx_source_import_hint">导入 LX 源后即可在 LX Music 页面搜索</string>
+    <string name="lx_source_imported_named">已导入 %1$s</string>
+    <string name="lx_source_import_local_failed">本地导入失败</string>
+    <string name="lx_source_processing">处理中…</string>
+    <string name="lx_source_url_empty_hint">请先输入源地址</string>
+    <string name="lx_source_import_failed">导入失败</string>
+    <string name="lx_source_empty">还没有导入 LX 源</string>
+    <string name="lx_source_switched_named">已切换到 %1$s</string>
+    <string name="lx_source_removed_named">已移除 %1$s</string>
+    <string name="lx_source_import_section">导入</string>
+    <string name="lx_source_local_js">本地 JS</string>
+    <string name="lx_source_url_import">URL 导入</string>
+    <string name="lx_source_imported_section">已导入</string>
+    <string name="lx_source_current_suffix">%1$s（当前）</string>
+
+    <!-- i18n: Common -->
+    <string name="song_more_copied">已复制 %1$s</string>
+
+    <!-- i18n: LX online screen -->
+    <string name="lx_online_source_switched">已切换到 %1$s</string>
+    <string name="lx_online_please_import_source">请先导入或选择一个源</string>
+    <string name="lx_online_queue_song_expired">队列歌曲已失效</string>
+    <string name="lx_online_queue_obtained">已获取 %1$d 首队列歌曲…</string>
+    <string name="lx_online_song_expired">在线歌曲已失效</string>
+    <string name="lx_online_source_management">源管理</string>
+    <string name="lx_online_no_source_selected">未选择 LX 源</string>
+    <string name="lx_online_no_source_hint">点右上角齿轮导入或选择 LX 源</string>
+    <string name="lx_online_no_songs_found">没有找到相关歌曲</string>
+    <string name="lx_online_songs_found">找到 %1$d 首歌曲</string>
+    <string name="lx_online_search_failed">搜索失败</string>
+    <string name="lx_online_search_placeholder">搜索在线歌曲、歌手</string>
+    <string name="lx_online_processing">处理中…</string>
+    <string name="lx_online_import_hint">导入 LX 源后可搜索在线歌曲</string>
+    <string name="lx_online_search_hint">搜索后点选歌曲即可在线播放</string>
+    <string name="lx_online_playback_failed">播放失败</string>
+    <string name="lx_online_added_to_queue">已加入到播放队列</string>
+    <string name="lx_online_add_to_queue_failed">加入队列失败</string>
+    <string name="lx_online_download_failed">下载失败</string>
+
+    <!-- i18n: AI data-layer errors -->
+    <string name="error_library_empty">曲库为空，请先扫描本地歌曲</string>
+    <string name="error_ai_no_playable_songs">AI 没有返回可播放歌曲</string>
+    <string name="ai_default_playlist_title">AI 推荐歌单</string>
+    <string name="error_openai_missing_api_key">请先在设置中填写 OpenAI API Key</string>
+    <string name="error_ai_chat_empty_message">请输入问题</string>
+    <string name="error_openai_request_failed">OpenAI 请求失败（HTTP %1$d）%2$s</string>
+    <string name="error_openai_api_error_separator">：</string>
+    <string name="error_openai_empty_response">OpenAI 返回为空</string>
+    <string name="error_ai_disallowed_action">AI 返回了不允许的操作：%1$s</string>
+
+    <!-- i18n: Settings defaults (non-const, resolved via Context) -->
+    <string name="settings_default_lx_source_name">LX源</string>
+    <string name="settings_default_custom_font_name">自定义字体</string>
+
+    <!-- i18n: About screen acknowledgements and open-source project summaries -->
+    <string name="about_summary_betterlyrics">播放页封面模糊背景和歌词视觉效果参考</string>
+    <string name="about_summary_splayer">播放页动效和歌词体验参考</string>
+    <string name="about_title_lightcone">光锥音乐</string>
+    <string name="about_summary_lightcone">部分界面视觉与 UI 效果参考</string>
+    <string name="about_summary_miuix">MIUI/HyperOS 风格 Compose UI 组件库（Apache-2.0）</string>
+    <string name="about_summary_media3">播放、媒体会话与 ExoPlayer 扩展（Apache-2.0）</string>
+    <string name="about_summary_ffmpeg">ALAC 等音频格式软件解码（LGPL-2.1）</string>
+    <string name="about_summary_lyricon">词幕 Provider API 与状态栏歌词（Apache-2.0）</string>
+    <string name="about_summary_superlyricapi">SuperLyric 歌词发布 API（LGPL-2.1）</string>
+    <string name="about_summary_lyricgetter">Lyric Getter 原文歌词传递 API（LGPL-2.1）</string>
+    <string name="about_summary_lyrico">歌曲标签读取与应用日志页面参考（Apache-2.0）</string>
+    <string name="about_summary_accompanist_lyrics_ui">逐字卡拉OK歌词渲染与动画效果（Apache-2.0）</string>
+    <string name="about_summary_163keydecrypter">网易云音乐 163 key 解密流程参考（MIT）</string>
+    <string name="about_summary_kyant_backdrop">液态玻璃与背景模糊效果（Apache-2.0）</string>
+    <string name="about_summary_coil">Kotlin 图片加载库（Apache-2.0）</string>
+    <string name="about_summary_quickjs">LX Music API JavaScript 运行时（Apache-2.0）</string>
+    <string name="about_summary_lxmusic">在线音乐源与 API 适配参考（Apache-2.0）</string>
+    <string name="about_summary_accompanist_lyrics_core">歌词解析与 TTML/LRC 结构参考（Apache-2.0）</string>
+
+    <!-- i18n: LX online service errors -->
+    <string name="lx_service_import_failed_http">导入失败: HTTP %1$d</string>
+    <string name="lx_service_source_script_abnormal">源脚本内容异常</string>
+    <string name="lx_service_source_init_failed">源初始化失败</string>
+    <string name="lx_service_select_source_first">请先选择一个 LX 源</string>
+    <string name="lx_service_search_failed_http">搜索失败: HTTP %1$d</string>
+    <string name="lx_service_resolve_url_failed_http">解析播放地址失败: HTTP %1$d</string>
+    <string name="lx_service_resolve_url_failed">解析播放地址失败</string>
+    <string name="lx_service_source_resolve_failed_http">源解析失败: HTTP %1$d</string>
+    <string name="lx_service_source_no_playback_url">源没有返回播放地址</string>
+    <string name="lx_service_source_resolve_ip_restricted">源解析失败: IP 被限制</string>
+    <string name="lx_service_source_resolve_url_fetch_failed">源解析失败: 获取播放地址失败</string>
+    <string name="lx_service_source_resolve_internal_error">源解析失败: 服务内部错误</string>
+    <string name="lx_service_source_resolve_too_frequent">源解析失败: 请求过于频繁</string>
+    <string name="lx_service_source_resolve_param_error">源解析失败: 参数错误</string>
+    <string name="lx_service_source_resolve_failed">源解析失败</string>
+    <string name="lx_service_default_source_name">LX源</string>
+
+    <!-- i18n: Playlist store -->
+    <string name="playlist_export_open_directory_failed">无法打开导出目录</string>
+    <string name="playlist_export_create_file_failed">无法创建导出文件</string>
+    <string name="playlist_export_open_file_failed">无法打开导出文件</string>
+    <string name="playlist_favorites_default_name">我喜欢的音乐</string>
+    <string name="playlist_import_default_name">导入歌单</string>
+
+    <!-- MCP Server -->
+    <string name="settings_mcp_server">MCP 服务器</string>
+    <string name="settings_mcp_server_summary">允许 AI 助手（如 Claude）通过 MCP 协议控制音乐播放</string>
+    <string name="settings_mcp_server_running">正在监听端口 %1$d</string>
+    <string name="about_summary_reorderable">可拖拽排序列表组件（Apache-2.0）</string>
 </resources>

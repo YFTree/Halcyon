@@ -58,6 +58,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -93,6 +94,7 @@ fun HomeScreen(
     val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = false)
     val tagIgnoreCase by settingsManager.tagIgnoreCase.collectAsState(initial = false)
     val homeDailyMixVisible by settingsManager.homeDailyMixVisible.collectAsState(initial = true)
+    val homeAiMixVisible by settingsManager.homeAiMixVisible.collectAsState(initial = true)
     val homeSectionOrder by settingsManager.homeSectionOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_SECTION_ORDER)
     val homeHiddenSections by settingsManager.homeHiddenSections.collectAsState(initial = "")
     val homeLibraryTileOrder by settingsManager.homeLibraryTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
@@ -176,51 +178,53 @@ fun HomeScreen(
                 )
             }
 
-            SectionTitle(stringResource(R.string.home_ai_section))
-            AiMixCard(
-                songCount = songs.size,
-                isLoading = aiPlaylistLoading,
-                onChat = onNavigateToAiChat,
-                onPlay = {
-                    if (aiPlaylistLoading) return@AiMixCard
-                    if (songs.isEmpty()) {
-                        Toast.makeText(context, context.getString(R.string.no_songs_found), Toast.LENGTH_SHORT).show()
-                        return@AiMixCard
-                    }
-                    scope.launch {
-                        aiPlaylistLoading = true
-                        try {
-                            runCatching { mainViewModel.recommendPlaylistWithOpenAi() }
-                                .onSuccess { recommendation ->
-                                    playerViewModel.setPlaylist(recommendation.songs, 0)
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(
-                                            R.string.home_ai_playlist_started,
-                                            recommendation.title,
-                                            recommendation.songs.size
-                                        ),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    if (openPlayerOnPlay) onNavigateToPlayer()
-                                }
-                                .onFailure { error ->
-                                    Toast.makeText(
-                                        context,
-                                        context.getString(
-                                            R.string.home_ai_playlist_failed,
-                                            error.message ?: context.getString(R.string.common_unknown)
-                                        ),
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                        } finally {
-                            aiPlaylistLoading = false
+            if (homeAiMixVisible) {
+                SectionTitle(stringResource(R.string.home_ai_section))
+                AiMixCard(
+                    songCount = songs.size,
+                    isLoading = aiPlaylistLoading,
+                    onChat = onNavigateToAiChat,
+                    onPlay = {
+                        if (aiPlaylistLoading) return@AiMixCard
+                        if (songs.isEmpty()) {
+                            Toast.makeText(context, context.getString(R.string.no_songs_found), Toast.LENGTH_SHORT).show()
+                            return@AiMixCard
                         }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
+                        scope.launch {
+                            aiPlaylistLoading = true
+                            try {
+                                runCatching { mainViewModel.recommendPlaylistWithOpenAi() }
+                                    .onSuccess { recommendation ->
+                                        playerViewModel.setPlaylist(recommendation.songs, 0)
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(
+                                                R.string.home_ai_playlist_started,
+                                                recommendation.title,
+                                                recommendation.songs.size
+                                            ),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        if (openPlayerOnPlay) onNavigateToPlayer()
+                                    }
+                                    .onFailure { error ->
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(
+                                                R.string.home_ai_playlist_failed,
+                                                error.message ?: context.getString(R.string.common_unknown)
+                                            ),
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                            } finally {
+                                aiPlaylistLoading = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             val hiddenSections = remember(homeHiddenSections) { homeHiddenSections.csvIdSet() }
             val sectionOrder = remember(homeSectionOrder) {
@@ -350,7 +354,7 @@ private fun AiMixCard(
             }
             IconButton(onClick = onChat) {
                 Icon(
-                    imageVector = MiuixIcons.Regular.Settings,
+                    imageVector = MiuixIcons.Regular.Messages,
                     contentDescription = stringResource(R.string.home_ai_chat_open),
                     tint = Color.White.copy(alpha = 0.92f),
                     modifier = Modifier.size(26.dp)
@@ -409,7 +413,7 @@ private fun HomeTileGrid(
                         val ok = requestPinnedEllaShortcut(context, "home_${tile.id}", tile.title, tile.route)
                         android.widget.Toast.makeText(
                             context,
-                            if (ok) "已请求添加桌面快捷方式" else "当前桌面不支持固定快捷方式",
+                            if (ok) context.getString(R.string.playlist_shortcut_requested, tile.title) else context.getString(R.string.playlist_shortcut_unsupported),
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
                         }

@@ -1,5 +1,7 @@
 package com.ella.music.data.ai
 
+import android.content.Context
+import com.ella.music.R
 import com.ella.music.data.AppNetworkLoggingInterceptor
 import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.SongPlaybackStats
@@ -27,6 +29,7 @@ data class OpenAiPlaylistRecommendation(
 )
 
 class OpenAiPlaylistRecommender(
+    private val context: Context,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -41,8 +44,8 @@ class OpenAiPlaylistRecommender(
         input: OpenAiPlaylistRecommendationInput
     ): OpenAiPlaylistRecommendation {
         val apiKey = config.apiKey.trim()
-        if (apiKey.isBlank()) error("请先在设置中填写 OpenAI API Key")
-        if (input.songs.isEmpty()) error("曲库为空，请先扫描本地歌曲")
+        if (apiKey.isBlank()) error(context.getString(R.string.error_openai_missing_api_key))
+        if (input.songs.isEmpty()) error(context.getString(R.string.error_library_empty))
 
         val endpoint = config.baseUrl.toChatCompletionsEndpoint()
         val requestBody = JSONObject()
@@ -79,11 +82,11 @@ class OpenAiPlaylistRecommender(
                 val message = runCatching {
                     JSONObject(body).optJSONObject("error")?.optString("message")
                 }.getOrNull().orEmpty()
-                error("OpenAI 请求失败（HTTP ${response.code}）${message.takeIf { it.isNotBlank() }?.let { "：$it" }.orEmpty()}")
+                error(context.getString(R.string.error_openai_request_failed, response.code, message.takeIf { it.isNotBlank() }?.let { "${context.getString(R.string.error_openai_api_error_separator)}$it" }.orEmpty()))
             }
 
             val text = parseResponseText(body)
-            if (text.isBlank()) error("OpenAI 返回为空")
+            if (text.isBlank()) error(context.getString(R.string.error_openai_empty_response))
             parseRecommendation(text, input.songs)
         }
     }
@@ -161,7 +164,7 @@ class OpenAiPlaylistRecommender(
         val root = JSONObject(text.toJsonObjectText())
         val action = root.optString("action", "play_playlist")
         if (action.isNotBlank() && action != "play_playlist") {
-            error("AI 返回了不允许的操作：$action")
+            error(context.getString(R.string.error_ai_disallowed_action, action))
         }
         val ids = root.optJSONArray("songIds")
             ?: root.optJSONArray("ids")
@@ -179,7 +182,7 @@ class OpenAiPlaylistRecommender(
         }
 
         return OpenAiPlaylistRecommendation(
-            title = root.optString("title").ifBlank { "AI 推荐歌单" },
+            title = root.optString("title").ifBlank { context.getString(R.string.ai_default_playlist_title) },
             reason = root.optString("reason"),
             songKeys = keys.distinct()
         )

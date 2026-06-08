@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.content.pm.PackageManager
 import android.net.Uri
+import java.net.URLDecoder
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
@@ -161,6 +162,9 @@ class MainActivity : ComponentActivity() {
 
     private var mainViewModel: MainViewModel? = null
     private var appliedLanguageTag: String? = null
+    var latestIntent: Intent? = null
+        private set
+    var onNewIntentCallback: ((Intent) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         applySavedAppLanguage()
@@ -284,6 +288,13 @@ class MainActivity : ComponentActivity() {
         return false
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        latestIntent = intent
+        onNewIntentCallback?.invoke(intent)
+    }
+
     private companion object {
         var startupPlaybackHandled = false
     }
@@ -312,6 +323,13 @@ fun EllaApp(
     val lifecycleOwner = LocalLifecycleOwner.current
     val settingsManager = remember { SettingsManager(context) }
     val scope = rememberCoroutineScope()
+    val activity = context as? Activity
+    val mainActivity = context as? MainActivity
+    val currentProcessingIntent = remember { mutableStateOf(activity?.intent) }
+    DisposableEffect(mainActivity) {
+        mainActivity?.onNewIntentCallback = { intent -> currentProcessingIntent.value = intent }
+        onDispose { mainActivity?.onNewIntentCallback = null }
+    }
     var showPlayerOverlay by remember { mutableStateOf(false) }
     var playerDismissProgress by remember { mutableFloatStateOf(0f) }
     var playerOverlayOpenToken by remember { mutableIntStateOf(0) }
@@ -323,10 +341,10 @@ fun EllaApp(
     val shortcutFolderLabel by settingsManager.shortcutFolderLabel.collectAsState(initial = SettingsManager.DEFAULT_SHORTCUT_FOLDER_LABEL)
     val isScanning by mainViewModel.isScanning.collectAsState()
     var showInitialScanPrompt by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(currentProcessingIntent.value) {
         val activity = context as? Activity
-        val shortcutAction = activity?.intent?.getStringExtra(EXTRA_SHORTCUT_ACTION)
-            ?: activity?.intent?.getStringExtra(EXTRA_SHORTCUT_ACTION_NEW)
+        val shortcutAction = currentProcessingIntent.value?.getStringExtra(EXTRA_SHORTCUT_ACTION)
+            ?: currentProcessingIntent.value?.getStringExtra(EXTRA_SHORTCUT_ACTION_NEW)
             .orEmpty()
         when (shortcutAction) {
             SHORTCUT_ACTION_PLAY -> {
@@ -356,7 +374,7 @@ fun EllaApp(
             }
         }
 
-        val shortcutRoute = activity?.intent?.resolveShortcutRoute().orEmpty()
+        val shortcutRoute = currentProcessingIntent.value?.resolveShortcutRoute().orEmpty()
         if (shortcutRoute.isNotBlank()) {
             runCatching {
                 navController.navigate(shortcutRoute) {
@@ -365,11 +383,11 @@ fun EllaApp(
                 }
             }
         }
-        activity?.intent?.removeExtra(EXTRA_SHORTCUT_ACTION)
-        activity?.intent?.removeExtra(EXTRA_SHORTCUT_ACTION_NEW)
-        activity?.intent?.removeExtra(EXTRA_SHORTCUT_ROUTE)
-        activity?.intent?.removeExtra(EXTRA_SHORTCUT_ROUTE_NEW)
-        activity?.intent?.setData(null)
+        currentProcessingIntent.value?.removeExtra(EXTRA_SHORTCUT_ACTION)
+        currentProcessingIntent.value?.removeExtra(EXTRA_SHORTCUT_ACTION_NEW)
+        currentProcessingIntent.value?.removeExtra(EXTRA_SHORTCUT_ROUTE)
+        currentProcessingIntent.value?.removeExtra(EXTRA_SHORTCUT_ROUTE_NEW)
+        currentProcessingIntent.value?.setData(null)
     }
 
     LaunchedEffect(shortcutLibraryLabel, shortcutPlaylistsLabel, shortcutFolderLabel) {
@@ -770,10 +788,16 @@ private fun Intent.resolveShortcutRoute(): String {
     if (uri != null && uri.scheme in setOf("ella", "halcyon")) {
         val host = uri.host.orEmpty()
         if (host == "search") {
+            val keyword = uri.getQueryParameter("keyword")
             return Screen.LibrarySearch.createRoute(
                 type = uri.getQueryParameter("type"),
-                keyword = uri.getQueryParameter("keyword")
+                keyword = keyword
             )
+        }
+        if (host == "shortcut") {
+            uri.getQueryParameter("route")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { return it }
         }
         uri.getQueryParameter("route")
             ?.takeIf { it.isNotBlank() }

@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -202,13 +203,13 @@ fun ArtistListScreen(
     ) {
         Box {
             EllaSmallTopAppBar(
-                title = if (selectionMode) stringResource(R.string.library_selected_count, selectedArtistKeys.size) else "艺术家",
+                title = if (selectionMode) stringResource(R.string.library_selected_count, selectedArtistKeys.size) else stringResource(R.string.category_artist),
                 color = ellaPageBackground(),
                 navigationIcon = {
                     IconButton(onClick = { if (selectionMode) finishSelectionMode() else onBack() }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -242,7 +243,7 @@ fun ArtistListScreen(
                         IconButton(onClick = { sortExpanded = !sortExpanded }) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Sort,
-                                contentDescription = "排序",
+                                contentDescription = stringResource(R.string.common_sort),
                                 tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -250,7 +251,7 @@ fun ArtistListScreen(
                         IconButton(onClick = { searchExpanded = !searchExpanded }) {
                             Icon(
                                 imageVector = MiuixIcons.Basic.Search,
-                                contentDescription = "搜索",
+                                contentDescription = stringResource(R.string.common_search),
                                 tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -274,7 +275,7 @@ fun ArtistListScreen(
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
                 ArtistSortMode.entries.forEach { mode ->
                     Text(
-                        text = mode.label,
+                        text = stringResource(mode.labelRes),
                         fontSize = 14.sp,
                         fontWeight = if (sortMode == mode) FontWeight.Bold else FontWeight.Normal,
                         color = if (sortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
@@ -297,7 +298,7 @@ fun ArtistListScreen(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
                 onSearch = { searchExpanded = false },
-                placeholder = "搜索艺术家",
+                placeholder = stringResource(R.string.artist_list_search_placeholder),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -306,7 +307,7 @@ fun ArtistListScreen(
 
         if (filteredArtists.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "未找到艺术家", color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                Text(text = stringResource(R.string.artist_list_empty), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
             }
         } else {
             val listState = rememberLazyListState()
@@ -328,7 +329,7 @@ fun ArtistListScreen(
                 ) {
                     item {
                         Text(
-                            text = "${filteredArtists.size} 位艺术家 · ${sortMode.label}",
+                            text = stringResource(R.string.artist_list_summary, filteredArtists.size, stringResource(sortMode.labelRes)),
                             fontSize = 13.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -347,7 +348,8 @@ fun ArtistListScreen(
                             summary = artist.summaryForSort(
                                 sortMode = sortMode,
                                 duration = artistDurations[artistKey] ?: 0L,
-                                releaseAlbumCount = releaseAlbumCounts[artistKey] ?: 0
+                                releaseAlbumCount = releaseAlbumCounts[artistKey] ?: 0,
+                                stringResolver = { resId, args -> context.getString(resId, *args) }
                             ),
                             onClick = {
                                 if (selectionMode) toggleArtistSelection(artist) else onArtistClick(artist.name)
@@ -531,7 +533,7 @@ private fun ArtistRow(
         Spacer(modifier = Modifier.size(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = artist.name.ifBlank { "未知歌手" },
+                text = artist.name.ifBlank { stringResource(R.string.player_unknown_artist) },
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MiuixTheme.colorScheme.onSurface,
@@ -549,23 +551,24 @@ private fun ArtistRow(
     }
 }
 
-private enum class ArtistSortMode(val label: String) {
-    Name("名称"),
-    SongCount("歌曲数"),
-    AlbumCount("参与专辑数"),
-    ReleaseAlbumCount("发行专辑数"),
-    Duration("歌曲时长")
+private enum class ArtistSortMode(@StringRes val labelRes: Int) {
+    Name(R.string.artist_list_sort_name),
+    SongCount(R.string.artist_list_sort_song_count),
+    AlbumCount(R.string.artist_list_sort_album_count),
+    ReleaseAlbumCount(R.string.artist_list_sort_release_album_count),
+    Duration(R.string.artist_list_sort_duration)
 }
 
 private fun Artist.summaryForSort(
     sortMode: ArtistSortMode,
     duration: Long,
-    releaseAlbumCount: Int
+    releaseAlbumCount: Int,
+    stringResolver: (Int, Array<Any>) -> String
 ): String {
     return when (sortMode) {
-        ArtistSortMode.Duration -> "${duration.formatArtistDuration()} · ${albumCount} 张参与专辑"
-        ArtistSortMode.ReleaseAlbumCount -> "$songCount 首歌曲 · $releaseAlbumCount 张发行专辑"
-        else -> "$songCount 首歌曲 · $albumCount 张参与专辑"
+        ArtistSortMode.Duration -> stringResolver(R.string.artist_list_summary_duration, arrayOf(duration.formatArtistDuration(), albumCount))
+        ArtistSortMode.ReleaseAlbumCount -> stringResolver(R.string.artist_list_summary_release_album, arrayOf(songCount, releaseAlbumCount))
+        else -> stringResolver(R.string.artist_list_summary_default, arrayOf(songCount, albumCount))
     }
 }
 

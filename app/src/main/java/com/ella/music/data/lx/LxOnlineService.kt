@@ -1,6 +1,7 @@
 package com.ella.music.data.lx
 
 import android.content.Context
+import com.ella.music.R
 import com.ella.music.data.AppNetworkLoggingInterceptor
 import com.ella.music.data.model.Song
 import com.ella.music.data.LxSourceConfig
@@ -33,7 +34,7 @@ class LxOnlineService(private val context: Context) {
             .header("User-Agent", USER_AGENT)
             .build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("导入失败: HTTP ${response.code}")
+            if (!response.isSuccessful) error(context.getString(R.string.lx_service_import_failed_http, response.code))
             val script = response.body?.string().orEmpty()
             importSourceScript(script, allowRuntimeInspect = false)
         }
@@ -41,12 +42,12 @@ class LxOnlineService(private val context: Context) {
 
     fun importSourceScript(script: String, allowRuntimeInspect: Boolean = true): Pair<String, String> {
         val normalized = script.trim()
-        if (normalized.length !in 50..9_000_000) error("源脚本内容异常")
+        if (normalized.length !in 50..9_000_000) error(context.getString(R.string.lx_service_source_script_abnormal))
         val name = extractSourceName(normalized)
         if (allowRuntimeInspect) {
             LxUserApiRuntime(context, client).use { runtime ->
                 runtime.load(normalized, normalized.hashCode().toString(), name, "")
-                    ?: error("源初始化失败")
+                    ?: error(context.getString(R.string.lx_service_source_init_failed))
             }
         }
         return name to normalized
@@ -57,7 +58,7 @@ class LxOnlineService(private val context: Context) {
         sourceConfig: LxSourceConfig?,
         page: Int = 1
     ): List<LxOnlineSong> = withContext(Dispatchers.IO) {
-        if (sourceConfig == null) error("请先选择一个 LX 源")
+        if (sourceConfig == null) error(context.getString(R.string.lx_service_select_source_first))
         val encoded = URLEncoder.encode(keyword.trim(), "UTF-8")
         val url = "http://search.kuwo.cn/r.s?client=kt&all=$encoded&pn=${(page - 1).coerceAtLeast(0)}&rn=30" +
             "&uid=794762570&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newver=1" +
@@ -67,7 +68,7 @@ class LxOnlineService(private val context: Context) {
             .header("User-Agent", USER_AGENT)
             .build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("搜索失败: HTTP ${response.code}")
+            if (!response.isSuccessful) error(context.getString(R.string.lx_service_search_failed_http, response.code))
             val body = response.body?.string().orEmpty()
             val root = JSONObject(body)
             val list = root.optJSONArray("abslist") ?: return@withContext emptyList()
@@ -125,10 +126,10 @@ class LxOnlineService(private val context: Context) {
             .header("User-Agent", USER_AGENT)
             .build()
         val playableUrl = client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("解析播放地址失败: HTTP ${response.code}")
+            if (!response.isSuccessful) error(context.getString(R.string.lx_service_resolve_url_failed_http, response.code))
             response.body?.string()?.trim().orEmpty()
         }
-        if (!playableUrl.startsWith("http")) error("解析播放地址失败")
+        if (!playableUrl.startsWith("http")) error(context.getString(R.string.lx_service_resolve_url_failed))
         item.song.copy(path = playableUrl, fileName = "${item.song.title}.${if (format == "flac") "flac" else "mp3"}")
     }
 
@@ -153,17 +154,17 @@ class LxOnlineService(private val context: Context) {
             .header("X-Request-Key", config.apiKey)
             .build()
         return client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) error("源解析失败: HTTP ${response.code}")
+            if (!response.isSuccessful) error(context.getString(R.string.lx_service_source_resolve_failed_http, response.code))
             val body = response.body?.string().orEmpty()
             val root = JSONObject(body)
             when (root.optInt("code", -1)) {
-                0 -> root.optString("url").takeIf { it.startsWith("http") } ?: error("源没有返回播放地址")
-                1 -> error("源解析失败: IP 被限制")
-                2 -> error("源解析失败: 获取播放地址失败")
-                4 -> error("源解析失败: 服务内部错误")
-                5 -> error("源解析失败: 请求过于频繁")
-                6 -> error("源解析失败: 参数错误")
-                else -> error(root.optString("msg").ifBlank { "源解析失败" })
+                0 -> root.optString("url").takeIf { it.startsWith("http") } ?: error(context.getString(R.string.lx_service_source_no_playback_url))
+                1 -> error(context.getString(R.string.lx_service_source_resolve_ip_restricted))
+                2 -> error(context.getString(R.string.lx_service_source_resolve_url_fetch_failed))
+                4 -> error(context.getString(R.string.lx_service_source_resolve_internal_error))
+                5 -> error(context.getString(R.string.lx_service_source_resolve_too_frequent))
+                6 -> error(context.getString(R.string.lx_service_source_resolve_param_error))
+                else -> error(root.optString("msg").ifBlank { context.getString(R.string.lx_service_source_resolve_failed) })
             }
         }
     }
@@ -171,7 +172,7 @@ class LxOnlineService(private val context: Context) {
     private fun extractSourceName(script: String): String {
         val currentInfoName = Regex("""name\s*:\s*['"]([^'"]+)['"]""").find(script)?.groupValues?.getOrNull(1)
         val commentName = Regex("""@name\s+(.+)""").find(script)?.groupValues?.getOrNull(1)?.trim()
-        return currentInfoName ?: commentName ?: "LX源"
+        return currentInfoName ?: commentName ?: context.getString(R.string.lx_service_default_source_name)
     }
 
     private fun pickQuality(raw: String): String {

@@ -30,6 +30,7 @@ import com.ella.music.data.model.searchableTagValues
 import com.ella.music.data.metadata.AudioTagInfo
 import com.ella.music.data.metadata.AudioTagRepository
 import com.ella.music.data.metadata.LyricoAudioTagReaderWriter
+import com.ella.music.data.metadata.WavMetadataReader
 import com.ella.music.data.parser.LrcParser
 import com.ella.music.data.scanner.MediaStoreAudioItem
 import com.ella.music.data.scanner.MusicScanner
@@ -171,6 +172,66 @@ class MusicRepository(private val context: Context) {
                 context,
                 "MusicScanner",
                 "Scan failed: ${error.message ?: error.javaClass.name}",
+                error,
+                AppLogType.LIBRARY
+            )
+            throw error
+        } finally {
+            _isScanning.value = false
+        }
+    }
+
+    /**
+     * Scan USB folders via SAF and merge the results into the current library.
+     */
+    suspend fun scanUsbFolders(
+        usbUris: List<android.net.Uri>,
+        minDurationMs: Long = 0,
+        deepMetadata: Boolean = false
+    ): Int {
+        if (usbUris.isEmpty()) return _songs.value.size
+        _isScanning.value = true
+        _scanProgress.value = 0
+        try {
+            val existingSongs = _songs.value
+            val existingPaths = existingSongs.map { it.path }.toSet()
+            val usbSongs = mutableListOf<Song>()
+            for (uri in usbUris) {
+                val accessible = scanner.isUsbUriAccessible(uri)
+                if (!accessible) {
+                    AppLogStore.info(
+                        context,
+                        "MusicScanner",
+                        "USB URI not accessible, skipping: $uri",
+                        AppLogType.LIBRARY
+                    )
+                    continue
+                }
+                val found = scanner.scanUsbFolder(
+                    treeUri = uri,
+                    minDurationMs = minDurationMs,
+                    deepMetadata = deepMetadata
+                ) { count -> _scanProgress.value = count }
+                usbSongs.addAll(found.filter { it.path !in existingPaths })
+            }
+            if (usbSongs.isNotEmpty()) {
+                val merged = existingSongs + usbSongs
+                _songs.value = merged
+                _albums.value = merged.toAlbums()
+                saveLibraryCache(merged, _albums.value)
+                AppLogStore.info(
+                    context,
+                    "MusicScanner",
+                    "USB scan finished: ${usbSongs.size} new songs from ${usbUris.size} folders, total=${merged.size}",
+                    AppLogType.LIBRARY
+                )
+            }
+            return _songs.value.size
+        } catch (error: Throwable) {
+            AppLogStore.error(
+                context,
+                "MusicScanner",
+                "USB scan failed: ${error.message ?: error.javaClass.name}",
                 error,
                 AppLogType.LIBRARY
             )
@@ -439,7 +500,8 @@ class MusicRepository(private val context: Context) {
 
     suspend fun reloadLyrics(song: Song, sourceMode: Int): List<LyricLine> = withContext(Dispatchers.IO) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
-        lyricsCache.remove("${song.id}:$safeMode")
+        val sourcePriority = settingsManager.lyricSourcePriority.first()
+        lyricsCache.remove("${song.id}:$safeMode:$sourcePriority")
         getLyrics(song, safeMode)
     }
 
@@ -508,9 +570,25 @@ class MusicRepository(private val context: Context) {
     fun getAudioInfo(song: Song): AudioInfo {
         audioInfoCache[song.id]?.let { return it }
         val replayGainDb = getReplayGain(song)
-        audioTagRepository.readQualityInfoBlocking(song.effectiveLocalPathForMetadata())?.let { quality ->
+        val metadataPath = song.effectiveLocalPathForMetadata()
+        val wavMetadata = WavMetadataReader.read(metadataPath)
+        audioTagRepository.readQualityInfoBlocking(metadataPath)?.let { quality ->
             val info = AudioInfo(
                 format = song.audioFormatLabel(quality.mimeType),
+                bitRate = quality.bitRate.takeIf { it > 0 }
+                    ?: wavMetadata?.bitRate?.takeIf { it > 0 }
+                    ?: song.estimatedBitRate(),
+                sampleRate = quality.sampleRate.takeIf { it > 0 } ?: wavMetadata?.sampleRate ?: 0,
+                bitDepth = quality.bitDepth.takeIf { it > 0 } ?: wavMetadata?.bitDepth ?: 0,
+                channels = quality.channels.takeIf { it > 0 } ?: wavMetadata?.channels ?: 0,
+                replayGainDb = replayGainDb
+            )
+            audioInfoCache[song.id] = info
+            return info
+        }
+        wavMetadata?.takeIf { it.hasQuality }?.let { quality ->
+            val info = AudioInfo(
+                format = song.audioFormatLabel("audio/wav"),
                 bitRate = quality.bitRate.takeIf { it > 0 } ?: song.estimatedBitRate(),
                 sampleRate = quality.sampleRate,
                 bitDepth = quality.bitDepth,
@@ -523,7 +601,7 @@ class MusicRepository(private val context: Context) {
         val info = runCatching {
             val extractor = MediaExtractor()
             try {
-                extractor.setDataSource(song.effectiveLocalPathForMetadata())
+                extractor.setDataSource(metadataPath)
                 var audioFormat: MediaFormat? = null
                 for (index in 0 until extractor.trackCount) {
                     val format = extractor.getTrackFormat(index)
@@ -541,9 +619,12 @@ class MusicRepository(private val context: Context) {
                 AudioInfo(
                     format = formatLabel,
                     bitRate = bitRate,
-                    sampleRate = format?.getIntOrZero(MediaFormat.KEY_SAMPLE_RATE) ?: 0,
-                    bitDepth = format?.getIntOrZero("bits-per-sample") ?: 0,
-                    channels = format?.getIntOrZero(MediaFormat.KEY_CHANNEL_COUNT) ?: 0,
+                    sampleRate = (format?.getIntOrZero(MediaFormat.KEY_SAMPLE_RATE) ?: 0)
+                        .takeIf { it > 0 } ?: wavMetadata?.sampleRate ?: 0,
+                    bitDepth = (format?.getIntOrZero("bits-per-sample") ?: 0)
+                        .takeIf { it > 0 } ?: wavMetadata?.bitDepth ?: 0,
+                    channels = (format?.getIntOrZero(MediaFormat.KEY_CHANNEL_COUNT) ?: 0)
+                        .takeIf { it > 0 } ?: wavMetadata?.channels ?: 0,
                     replayGainDb = replayGainDb
                 )
             } finally {
@@ -1032,7 +1113,7 @@ class MusicRepository(private val context: Context) {
 
     suspend fun resolveSongForPlayback(song: Song): Song = withContext(Dispatchers.IO) {
         runCatching {
-            song.withRepositoryTags()
+            song.withRepositoryTags(allowFullDownload = song.isWebDavRemoteSong() && song.isLikelyWavAudio())
         }.getOrElse { error ->
             Log.w("MusicRepo", "Failed to resolve playback song for ${song.path}", error)
             song
@@ -1108,7 +1189,13 @@ class MusicRepository(private val context: Context) {
             onlineSource.isBlank()
 
     private fun Song.webDavCacheExtension(): String =
-        fileName.substringAfterLast('.', "audio").ifBlank { "audio" }
+        fileName.substringAfterLast('.', path.substringBefore('?').substringBefore('#').substringAfterLast('.', "audio"))
+            .ifBlank { "audio" }
+
+    private fun Song.isLikelyWavAudio(): Boolean =
+        webDavCacheExtension().lowercase() in setOf("wav", "wave") ||
+            mimeType.contains("wav", ignoreCase = true) ||
+            mimeType.contains("wave", ignoreCase = true)
 
     private fun Song.webDavFullCacheFile(): File =
         File(remoteAudioCacheDir, "${path.sha256()}.${webDavCacheExtension()}")
@@ -1138,7 +1225,9 @@ class MusicRepository(private val context: Context) {
 
     private fun Song.audioFormatLabel(mime: String?): String {
         val source = (mime ?: mimeType).lowercase()
-        val extension = fileName.substringAfterLast('.', path.substringAfterLast('.')).lowercase()
+        val extensionSource = fileName.takeIf { it.substringAfterLast('.', "").isNotBlank() }
+            ?: path.substringBefore('?').substringBefore('#')
+        val extension = extensionSource.substringAfterLast('.', "").lowercase()
         return when {
             "flac" in source || extension == "flac" -> "FLAC"
             "mpeg" in source || "mp3" in source || extension == "mp3" -> "MP3"
@@ -1189,37 +1278,44 @@ class MusicRepository(private val context: Context) {
             )
     }
 
-    private fun Song.withRepositoryTags(): Song {
+    private fun Song.withRepositoryTags(allowFullDownload: Boolean = false): Song {
+        val metadataPath = effectiveLocalPathForMetadata(allowFullDownload)
         val tagInfo = runCatching {
-            audioTagRepository.readTagsBlocking(effectiveLocalPathForMetadata())
+            audioTagRepository.readTagsBlocking(metadataPath)
         }.getOrElse { error ->
             Log.w("MusicRepo", "Failed to refresh library tags for $path", error)
             null
-        } ?: return withFinalLibraryFallbacks()
+        }
+        val wavMetadata = runCatching { WavMetadataReader.read(metadataPath) }
+            .getOrNull()
 
-        val mergedArtist = tagInfo.artist.takeIf { it.isUsableTagText() }
+        val mergedArtist = tagInfo?.artist.takeIf { it.isUsableTagText() }
+            ?: wavMetadata?.artist.takeIf { it.isUsableTagText() }
             ?: artist.takeIf { it.isUsableTagText() }
             ?: "Unknown Artist"
-        val mergedAlbum = tagInfo.album.takeIf { it.isUsableAlbumText() }
+        val mergedAlbum = tagInfo?.album.takeIf { it.isUsableAlbumText() }
+            ?: wavMetadata?.album.takeIf { it.isUsableAlbumText() }
             ?: album.takeIf { it.isUsableAlbumText() && !it.looksLikeLastFolderName(path) }
             ?: "Unknown Album"
-        val mergedAlbumArtist = tagInfo.albumArtist.takeIf { it.isUsableTagText() }
+        val mergedAlbumArtist = tagInfo?.albumArtist.takeIf { it.isUsableTagText() }
+            ?: wavMetadata?.albumArtist.takeIf { it.isUsableTagText() }
             ?: albumArtist.takeIf { it.isUsableTagText() && !it.isUnknownArtistValue() }
             ?: ""
 
         return copy(
-            title = tagInfo.title.takeIf { it.isUsableTagText() }
+            title = tagInfo?.title.takeIf { it.isUsableTagText() }
+                ?: wavMetadata?.title.takeIf { it.isUsableTagText() }
                 ?: title.takeIf { it.isUsableTagText() }
                 ?: fileName.substringBeforeLast('.').ifBlank { path.substringAfterLast('/') },
             artist = mergedArtist,
             album = mergedAlbum,
             albumArtist = mergedAlbumArtist,
-            genre = tagInfo.genre.takeIf { it.isUsableTagText() } ?: genre,
-            year = tagInfo.year.takeIf { it.isUsableTagText() } ?: year,
-            composer = tagInfo.composer.takeIf { it.isUsableTagText() } ?: composer,
-            lyricist = tagInfo.lyricist.takeIf { it.isUsableTagText() } ?: lyricist,
-            trackNumber = tagInfo.trackNumber ?: trackNumber,
-            discNumber = tagInfo.discNumber ?: discNumber
+            genre = tagInfo?.genre.takeIf { it.isUsableTagText() } ?: wavMetadata?.genre.takeIf { it.isUsableTagText() } ?: genre,
+            year = tagInfo?.year.takeIf { it.isUsableTagText() } ?: wavMetadata?.year.takeIf { it.isUsableTagText() } ?: year,
+            composer = tagInfo?.composer.takeIf { it.isUsableTagText() } ?: wavMetadata?.composer.takeIf { it.isUsableTagText() } ?: composer,
+            lyricist = tagInfo?.lyricist.takeIf { it.isUsableTagText() } ?: wavMetadata?.lyricist.takeIf { it.isUsableTagText() } ?: lyricist,
+            trackNumber = tagInfo?.trackNumber ?: wavMetadata?.trackNumber ?: trackNumber,
+            discNumber = tagInfo?.discNumber ?: wavMetadata?.discNumber ?: discNumber
         ).withFinalLibraryFallbacks()
     }
 
@@ -1390,16 +1486,24 @@ class MusicRepository(private val context: Context) {
             val tagInfo = runCatching {
                 audioTagRepository.readTagsBlocking(song.effectiveLocalPathForMetadata())?.toSongTagInfo()
             }.getOrNull() ?: SongTagInfo()
+            val wavInfo = runCatching { WavMetadataReader.read(song.effectiveLocalPathForMetadata()) }
+                .getOrNull()
             Song(
                 id = cursor.getLong(0),
                 title = tagInfo.title.usableTagText().ifBlank {
-                    cursor.getString(1)?.usableTagText().orEmpty().ifBlank { song.title }
+                    wavInfo?.title.usableTagText().ifBlank {
+                        cursor.getString(1)?.usableTagText().orEmpty().ifBlank { song.title }
+                    }
                 },
                 artist = tagInfo.artist.usableTagText().ifBlank {
-                    cursor.getString(2)?.usableTagText().orEmpty().ifBlank { song.artist }
+                    wavInfo?.artist.usableTagText().ifBlank {
+                        cursor.getString(2)?.usableTagText().orEmpty().ifBlank { song.artist }
+                    }
                 },
                 album = tagInfo.album.usableTagText().ifBlank {
-                    cursor.getString(3)?.usableTagText().orEmpty().ifBlank { song.album }
+                    wavInfo?.album.usableTagText().ifBlank {
+                        cursor.getString(3)?.usableTagText().orEmpty().ifBlank { song.album }
+                    }
                 },
                 albumId = cursor.getLong(4),
                 duration = cursor.getLong(5).takeIf { it > 0L } ?: song.duration,
@@ -1409,13 +1513,16 @@ class MusicRepository(private val context: Context) {
                 mimeType = cursor.getString(9).orEmpty().ifBlank { song.mimeType },
                 dateAdded = cursor.getLong(10) * 1000L,
                 dateModified = cursor.getLong(11) * 1000L,
-                trackNumber = cursor.getInt(12).let { if (it > 1000) it % 1000 else it },
-                discNumber = cursor.getInt(12).let { if (it >= 1000) it / 1000 else song.discNumber },
-                albumArtist = tagInfo.albumArtist.ifBlank { song.albumArtist },
-                genre = tagInfo.genre.ifBlank { song.genre },
-                year = tagInfo.year.ifBlank { song.year },
-                composer = tagInfo.composer.ifBlank { song.composer },
-                lyricist = tagInfo.lyricist.ifBlank { song.lyricist },
+                trackNumber = tagInfo.track.takeIf { it.isNotBlank() }?.toIntOrNull()
+                    ?: wavInfo?.trackNumber
+                    ?: cursor.getInt(12).let { if (it > 1000) it % 1000 else it },
+                discNumber = wavInfo?.discNumber
+                    ?: cursor.getInt(12).let { if (it >= 1000) it / 1000 else song.discNumber },
+                albumArtist = tagInfo.albumArtist.ifBlank { wavInfo?.albumArtist.orEmpty().ifBlank { song.albumArtist } },
+                genre = tagInfo.genre.ifBlank { wavInfo?.genre.orEmpty().ifBlank { song.genre } },
+                year = tagInfo.year.ifBlank { wavInfo?.year.orEmpty().ifBlank { song.year } },
+                composer = tagInfo.composer.ifBlank { wavInfo?.composer.orEmpty().ifBlank { song.composer } },
+                lyricist = tagInfo.lyricist.ifBlank { wavInfo?.lyricist.orEmpty().ifBlank { song.lyricist } },
                 coverUrl = song.coverUrl,
                 onlineSource = song.onlineSource,
                 onlineId = song.onlineId,
@@ -1566,13 +1673,15 @@ class MusicRepository(private val context: Context) {
         val text = usableTagText()
         return text.isNotBlank() &&
             !text.equals("Unknown", ignoreCase = true) &&
-            !text.equals("Unknown Album", ignoreCase = true)
+            !text.equals("Unknown Album", ignoreCase = true) &&
+            text != "未知" && text != "未知专辑"
     }
 
     private fun String.isUnknownArtistValue(): Boolean =
         trim().equals("Unknown", ignoreCase = true) ||
             trim().equals("Unknown Artist", ignoreCase = true) ||
-            trim() == "<unknown>"
+            trim() == "<unknown>" ||
+            trim() == "未知" || trim() == "未知歌手" || trim() == "未知艺术家"
 
     private fun String.looksLikeLastFolderName(path: String): Boolean {
         val folderName = path.parentFolderName()
@@ -1580,7 +1689,14 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun String.parentFolderName(): String =
-        runCatching { File(this).parentFile?.name.orEmpty() }
+        runCatching {
+            if (startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)) {
+                java.net.URI(this).path.orEmpty().trim('/').substringBeforeLast('/', "")
+                    .substringAfterLast('/')
+            } else {
+                File(this).parentFile?.name.orEmpty()
+            }
+        }
             .getOrDefault("")
             .trim()
 

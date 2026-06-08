@@ -52,10 +52,10 @@ sealed class Screen(val route: String) {
         fun createRoute(type: String? = null, keyword: String? = null): String {
             val params = buildList {
                 type?.trim()?.takeIf { it.isNotEmpty() }?.let {
-                    add("type=${java.net.URLEncoder.encode(it, "UTF-8")}")
+                    add("type=${java.net.URLEncoder.encode(it, "UTF-8").replace("+", "%20")}")
                 }
                 keyword?.trim()?.takeIf { it.isNotEmpty() }?.let {
-                    add("keyword=${java.net.URLEncoder.encode(it, "UTF-8")}")
+                    add("keyword=${java.net.URLEncoder.encode(it, "UTF-8").replace("+", "%20")}")
                 }
             }
             return if (params.isEmpty()) baseRoute else "$baseRoute?${params.joinToString("&")}"

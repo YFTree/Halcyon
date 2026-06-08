@@ -265,17 +265,17 @@ private fun AboutContent(
                 FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors, scrollProgress = scrollProgress) {
                     BasicComponent(
                         title = "BetterLyrics",
-                        summary = "播放页封面模糊背景和歌词视觉效果参考",
+                        summary = stringResource(R.string.about_summary_betterlyrics),
                         onClick = { uriHandler.openUri("https://github.com/jayfunc/BetterLyrics") },
                     )
                     BasicComponent(
                         title = "SPlayer",
-                        summary = "播放页动效和歌词体验参考",
+                        summary = stringResource(R.string.about_summary_splayer),
                         onClick = { uriHandler.openUri("https://github.com/imsyy/SPlayer") },
                     )
                     BasicComponent(
-                        title = "光锥音乐",
-                        summary = "部分界面视觉与 UI 效果参考",
+                        title = stringResource(R.string.about_title_lightcone),
+                        summary = stringResource(R.string.about_summary_lightcone),
                         onClick = { uriHandler.openUri("https://coneplayer.trantor.ink/") },
                     )
                 }
@@ -286,73 +286,78 @@ private fun AboutContent(
                 FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors, scrollProgress = scrollProgress) {
                     BasicComponent(
                         title = "Miuix",
-                        summary = "MIUI/HyperOS 风格 Compose UI 组件库（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_miuix),
                         onClick = { uriHandler.openUri("https://github.com/compose-miuix-ui/miuix") },
                     )
                     BasicComponent(
                         title = "AndroidX Media3",
-                        summary = "播放、媒体会话与 ExoPlayer 扩展（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_media3),
                         onClick = { uriHandler.openUri("https://github.com/androidx/media") },
                     )
                     BasicComponent(
                         title = "FFmpeg",
-                        summary = "ALAC 等音频格式软件解码（LGPL-2.1）",
+                        summary = stringResource(R.string.about_summary_ffmpeg),
                         onClick = { uriHandler.openUri("https://ffmpeg.org") },
                     )
                     BasicComponent(
                         title = "Lyricon",
-                        summary = "词幕 Provider API 与状态栏歌词（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_lyricon),
                         onClick = { uriHandler.openUri("https://github.com/proify/lyricon") },
                     )
                     BasicComponent(
                         title = "SuperLyricApi",
-                        summary = "SuperLyric 歌词发布 API（LGPL-2.1）",
+                        summary = stringResource(R.string.about_summary_superlyricapi),
                         onClick = { uriHandler.openUri("https://github.com/HChenX/SuperLyricApi") },
                     )
                     BasicComponent(
                         title = "LyricGetter-API",
-                        summary = "Lyric Getter 原文歌词传递 API（LGPL-2.1）",
+                        summary = stringResource(R.string.about_summary_lyricgetter),
                         onClick = { uriHandler.openUri("https://github.com/xiaowine/Lyric-Getter-Api") },
                     )
                     BasicComponent(
                         title = "Lyrico",
-                        summary = "歌曲标签读取与应用日志页面参考（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_lyrico),
                         onClick = { uriHandler.openUri("https://github.com/Replica0110/Lyrico") },
                     )
                     BasicComponent(
                         title = "Accompanist Lyrics UI",
-                        summary = "逐字卡拉OK歌词渲染与动画效果（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_accompanist_lyrics_ui),
                         onClick = { uriHandler.openUri("https://github.com/6xingyv/accompanist-lyrics-ui") },
                     )
                     BasicComponent(
                         title = "163KeyDecrypter",
-                        summary = "网易云音乐 163 key 解密流程参考（MIT）",
+                        summary = stringResource(R.string.about_summary_163keydecrypter),
                         onClick = { uriHandler.openUri("https://github.com/lycode404/163KeyDecrypter") },
                     )
                     BasicComponent(
                         title = "Kyant Backdrop",
-                        summary = "液态玻璃与背景模糊效果（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_kyant_backdrop),
                         onClick = { uriHandler.openUri("https://github.com/Kyant0/AndroidLiquidGlass") },
                     )
                     BasicComponent(
                         title = "Coil",
-                        summary = "Kotlin 图片加载库（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_coil),
                         onClick = { uriHandler.openUri("https://github.com/coil-kt/coil") },
                     )
                     BasicComponent(
                         title = "quickjs-wrapper Android",
-                        summary = "LX Music API JavaScript 运行时（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_quickjs),
                         onClick = { uriHandler.openUri("https://github.com/HarlonWang/quickjs-wrapper") },
                     )
                     BasicComponent(
                         title = "LX Music Mobile",
-                        summary = "在线音乐源与 API 适配参考（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_lxmusic),
                         onClick = { uriHandler.openUri("https://github.com/lyswhut/lx-music-mobile") },
                     )
                     BasicComponent(
                         title = "accompanist-lyrics-core",
-                        summary = "歌词解析与 TTML/LRC 结构参考（Apache-2.0）",
+                        summary = stringResource(R.string.about_summary_accompanist_lyrics_core),
                         onClick = { uriHandler.openUri("https://github.com/6xingyv/accompanist-lyrics-core") },
+                    )
+                    BasicComponent(
+                        title = "Reorderable",
+                        summary = stringResource(R.string.about_summary_reorderable),
+                        onClick = { uriHandler.openUri("https://github.com/Calvin-LL/Reorderable") },
                     )
                 }
             }

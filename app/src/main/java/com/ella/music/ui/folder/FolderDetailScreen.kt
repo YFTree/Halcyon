@@ -142,7 +142,7 @@ fun FolderDetailScreen(
     var scrollToTopRequest by remember { mutableStateOf(0) }
 
     val childFolders = remember(songs, normalizedFolderPath) {
-        songs.childFoldersOf(normalizedFolderPath).sortedBy { it.name.lowercase(Locale.ROOT) }
+        songs.childFoldersOf(context, normalizedFolderPath).sortedBy { it.name.lowercase(Locale.ROOT) }
     }
     val directSongs = remember(songs, normalizedFolderPath) {
         songs.directSongsInFolder(normalizedFolderPath)

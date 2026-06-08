@@ -192,7 +192,7 @@ fun MetadataCategoryScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -202,7 +202,7 @@ fun MetadataCategoryScreen(
                     IconButton(onClick = { sortExpanded = !sortExpanded }) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Sort,
-                            contentDescription = "排序",
+                            contentDescription = stringResource(R.string.common_sort),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -213,7 +213,7 @@ fun MetadataCategoryScreen(
                     }) {
                         Icon(
                             imageVector = MiuixIcons.Basic.Search,
-                            contentDescription = "搜索",
+                            contentDescription = stringResource(R.string.common_search),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -238,7 +238,7 @@ fun MetadataCategoryScreen(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
                 onSearch = { searchExpanded = false },
-                placeholder = "搜索${type.categoryTitle()}",
+                placeholder = stringResource(R.string.category_search_placeholder, type.categoryTitle()),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 4.dp)
@@ -277,7 +277,7 @@ fun MetadataCategoryScreen(
         if (displayedItems.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = if (searchQuery.isBlank()) "暂无${type.categoryTitle()}信息，刷新音乐库后再看看" else "没有匹配的${type.categoryTitle()}",
+                    text = if (searchQuery.isBlank()) stringResource(R.string.category_empty_hint, type.categoryTitle()) else stringResource(R.string.category_no_match, type.categoryTitle()),
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     fontSize = 14.sp
                 )
@@ -314,7 +314,7 @@ fun MetadataCategoryScreen(
                             )
                             Toast.makeText(
                                 context,
-                                if (ok) "已请求添加桌面快捷方式" else "当前桌面不支持固定快捷方式",
+                                if (ok) context.getString(R.string.playlist_shortcut_requested, item.name) else context.getString(R.string.playlist_shortcut_unsupported),
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -365,7 +365,7 @@ fun MetadataCategoryDetailScreen(
     val sortedSongs = remember(songs, sortMode) { songs.sortedForMetadataDetail(sortMode) }
     val showAlbumTab = type == "genre" || type == "year" || type == "composer" || type == "lyricist"
     val detailAlbums = remember(songs, libraryAlbums) {
-        songs.toMetadataAlbums(libraryAlbums)
+        songs.toMetadataAlbums(libraryAlbums, context)
     }
     val albumDurations = remember(songs) {
         songs.groupBy { it.albumIdentityId() }.mapValues { (_, albumSongs) -> albumSongs.sumOf { it.duration } }
@@ -461,7 +461,7 @@ fun MetadataCategoryDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = MiuixIcons.Regular.Back,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                             tint = MiuixTheme.colorScheme.onSurface,
                             modifier = Modifier.size(24.dp)
                         )
@@ -472,14 +472,14 @@ fun MetadataCategoryDetailScreen(
                         IconButton(onClick = {
                             val selectedSongs = sortedSongs.filter { it.id in selectedIds }
                             if (selectedSongs.isEmpty()) {
-                                Toast.makeText(context, "请先选择歌曲", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.library_select_songs_first), Toast.LENGTH_SHORT).show()
                             } else {
                                 playlistPickerSongs = selectedSongs
                             }
                         }) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Add,
-                                contentDescription = "添加到歌单",
+                                contentDescription = stringResource(R.string.song_more_add_to_playlist),
                                 tint = MiuixTheme.colorScheme.primary,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -487,14 +487,14 @@ fun MetadataCategoryDetailScreen(
                         IconButton(onClick = {
                             val selectedSongs = sortedSongs.filter { it.id in selectedIds }
                             if (selectedSongs.isEmpty()) {
-                                Toast.makeText(context, "请先选择歌曲", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.library_select_songs_first), Toast.LENGTH_SHORT).show()
                             } else {
                                 pendingDeleteSongs = selectedSongs
                             }
                         }) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Delete,
-                                contentDescription = "删除",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = Color(0xFFE5484D),
                                 modifier = Modifier.size(24.dp)
                             )
@@ -507,7 +507,7 @@ fun MetadataCategoryDetailScreen(
                             }) {
                                 Icon(
                                     imageVector = MiuixIcons.Regular.SelectAll,
-                                    contentDescription = "多选",
+                                    contentDescription = stringResource(R.string.common_multi_select),
                                     tint = MiuixTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -516,7 +516,7 @@ fun MetadataCategoryDetailScreen(
                         IconButton(onClick = { sortExpanded = !sortExpanded }) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Sort,
-                                contentDescription = "排序",
+                                contentDescription = stringResource(R.string.common_sort),
                                 tint = MiuixTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -546,7 +546,7 @@ fun MetadataCategoryDetailScreen(
                 if (selectedTab == MetadataDetailTab.Albums) {
                     MetadataDetailAlbumSortMode.entries.forEach { mode ->
                         Text(
-                            text = mode.label,
+                            text = mode.label(),
                             fontSize = 14.sp,
                             fontWeight = if (albumSortMode == mode) FontWeight.Bold else FontWeight.Normal,
                             color = if (albumSortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
@@ -563,7 +563,7 @@ fun MetadataCategoryDetailScreen(
                 } else {
                     MetadataDetailSongSortMode.entries.forEach { mode ->
                     Text(
-                        text = mode.label,
+                        text = mode.label(),
                         fontSize = 14.sp,
                         fontWeight = if (sortMode == mode) FontWeight.Bold else FontWeight.Normal,
                         color = if (sortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
@@ -589,11 +589,11 @@ fun MetadataCategoryDetailScreen(
                 item {
                     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                         val summaryText = if (selectionMode) {
-                            "已选择 ${selectedIds.size} 首"
+                            stringResource(R.string.category_selected_count, selectedIds.size)
                         } else if (selectedTab == MetadataDetailTab.Albums) {
-                            "${sortedAlbums.size} 张专辑 · ${type.categoryTitle()} · ${albumSortMode.label}"
+                            stringResource(R.string.category_album_summary, sortedAlbums.size, type.categoryTitle(), albumSortMode.label())
                         } else {
-                            "${sortedSongs.size} 首歌曲 · ${type.categoryTitle()} · ${sortMode.label}"
+                            stringResource(R.string.category_song_summary, sortedSongs.size, type.categoryTitle(), sortMode.label())
                         }
                         if (type == "composer" || type == "lyricist") {
                             Row(
@@ -602,19 +602,19 @@ fun MetadataCategoryDetailScreen(
                             ) {
                                 if (hasSameNameArtist) {
                                     MetadataDetailLinkChip(
-                                        text = "艺术家页",
+                                        text = stringResource(R.string.category_artist_page),
                                         onClick = { onArtistClick(name) }
                                     )
                                 }
                                 if (hasSameNameComposer) {
                                     MetadataDetailLinkChip(
-                                        text = "作曲家页",
+                                        text = stringResource(R.string.category_composer_page),
                                         onClick = { onMetadataCategoryClick("composer", name) }
                                     )
                                 }
                                 if (hasSameNameLyricist) {
                                     MetadataDetailLinkChip(
-                                        text = "作词家页",
+                                        text = stringResource(R.string.category_lyricist_page),
                                         onClick = { onMetadataCategoryClick("lyricist", name) }
                                     )
                                 }
@@ -627,7 +627,7 @@ fun MetadataCategoryDetailScreen(
                             ) {
                                 MetadataDetailTab.entries.forEach { tab ->
                                     Text(
-                                        text = tab.label,
+                                        text = tab.label(),
                                         fontSize = 13.sp,
                                         fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal,
                                         color = if (selectedTab == tab) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -715,7 +715,7 @@ fun MetadataCategoryDetailScreen(
                 WindowBottomSheet(
                     show = true,
                     enableNestedScroll = false,
-                    title = "添加到歌单",
+                    title = stringResource(R.string.song_more_add_to_playlist),
                     onDismissRequest = { playlistPickerSongs = null }
                 ) {
                     AddToPlaylistSheet(
@@ -731,7 +731,7 @@ fun MetadataCategoryDetailScreen(
                             selectedPlaylists.forEach { playlist ->
                                 mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd, appendToEnd)
                             }
-                            Toast.makeText(context, "已添加到 ${selectedPlaylists.size} 个歌单", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, context.getString(R.string.player_added_to_playlists, selectedPlaylists.size), Toast.LENGTH_SHORT).show()
                             playlistPickerSongs = null
                             selectedIds = emptySet()
                             selectionMode = false
@@ -748,7 +748,7 @@ fun MetadataCategoryDetailScreen(
                         mainViewModel.createPlaylist(playlistName) { playlist ->
                             if (playlist != null) {
                                 mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
-                                Toast.makeText(context, "已添加到 ${playlist.name}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, context.getString(R.string.player_added_to_playlist_named, playlist.name), Toast.LENGTH_SHORT).show()
                                 selectedIds = emptySet()
                                 selectionMode = false
                             }
@@ -760,9 +760,9 @@ fun MetadataCategoryDetailScreen(
 
             ConfirmDangerDialog(
                 show = pendingDeleteSongs.isNotEmpty(),
-                title = "永久删除歌曲",
-                message = "确定要永久删除选中的 ${pendingDeleteSongs.size} 首歌曲吗？此操作可能会删除本地音频文件。",
-                confirmText = "永久删除",
+                title = stringResource(R.string.song_more_delete_song_title),
+                message = stringResource(R.string.library_delete_selected_message, pendingDeleteSongs.size),
+                confirmText = stringResource(R.string.song_more_delete_permanently),
                 onDismiss = { pendingDeleteSongs = emptyList() },
                 onConfirm = {
                     val songsToDelete = pendingDeleteSongs
@@ -793,15 +793,15 @@ private fun CategoryAddSelectedSongsToPlaylistSheet(
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Text(
-            text = "已选择 $songCount 首歌曲",
+            text = stringResource(R.string.category_selected_songs, songCount),
             fontSize = 13.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
         )
-        CategorySheetItem("新建歌单", onCreatePlaylist)
+        CategorySheetItem(stringResource(R.string.song_more_create_playlist), onCreatePlaylist)
         if (playlists.isEmpty()) {
             Text(
-                text = "暂无自定义歌单",
+                text = stringResource(R.string.song_more_no_custom_playlists),
                 fontSize = 14.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 18.dp)
@@ -809,7 +809,7 @@ private fun CategoryAddSelectedSongsToPlaylistSheet(
         } else {
             playlists.forEach { playlist ->
                 val selected = playlist.id in selectedPlaylistIds
-                CategorySheetItem("${if (selected) "✓ " else ""}${playlist.name} · ${playlist.songs.size} 首") {
+                CategorySheetItem("${if (selected) "✓ " else ""}${playlist.name} · ${playlist.songs.size} ${stringResource(R.string.library_search_song_unit)}") {
                     selectedPlaylistIds = if (selected) {
                         selectedPlaylistIds - playlist.id
                     } else {
@@ -819,13 +819,13 @@ private fun CategoryAddSelectedSongsToPlaylistSheet(
             }
         }
         if (playlists.isNotEmpty()) {
-            CategorySheetItem("完成（${selectedPlaylistIds.size}）") {
+            CategorySheetItem(stringResource(R.string.song_more_done_selected, selectedPlaylistIds.size)) {
                 if (selectedPlaylists.isNotEmpty()) {
                     onPlaylistsConfirm(selectedPlaylists)
                 }
             }
         }
-        CategorySheetItem("取消", onDismiss)
+        CategorySheetItem(stringResource(R.string.common_cancel), onDismiss)
     }
 }
 
@@ -1048,7 +1048,7 @@ private fun MetadataCategoryCard(
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                text = "${item.songCount} 首歌曲",
+                text = stringResource(R.string.category_song_count_card, item.songCount),
                 fontSize = if (isGenreCard) 10.sp else 12.sp,
                 lineHeight = if (isGenreCard) 13.sp else 15.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -1104,7 +1104,7 @@ private fun FolderCategoryRow(
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.name.substringAfterLast('/').ifBlank { item.name.ifBlank { "根目录" } },
+                text = item.name.substringAfterLast('/').ifBlank { item.name.ifBlank { stringResource(R.string.folder_root) } },
                 fontSize = 17.sp,
                 lineHeight = 22.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -1176,7 +1176,7 @@ private fun PersonCategoryRow(
         Spacer(modifier = Modifier.size(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.name.ifBlank { "未知" },
+                text = item.name.ifBlank { stringResource(R.string.common_unknown) },
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MiuixTheme.colorScheme.onSurface,
@@ -1231,14 +1231,14 @@ private fun Color.darkenCategoryColor(factor: Float): Color {
     )
 }
 
-private enum class MetadataCategorySortMode(val label: String) {
-    Name("名称"),
-    NameDesc("年份倒序"),
-    SongCount("歌曲数"),
-    AlbumCount("专辑数"),
-    Duration("歌曲时长"),
-    DateModified("修改时间"),
-    DateModifiedAsc("修改时间升序")
+private enum class MetadataCategorySortMode {
+    Name,
+    NameDesc,
+    SongCount,
+    AlbumCount,
+    Duration,
+    DateModified,
+    DateModifiedAsc
 }
 
 private fun MetadataCategorySortMode.availableFor(type: String): Boolean {
@@ -1250,11 +1250,21 @@ private fun MetadataCategorySortMode.availableFor(type: String): Boolean {
     }
 }
 
+@Composable
 private fun MetadataCategorySortMode.displayLabel(type: String): String {
+    val context = LocalContext.current
     return when {
-        type == "year" && this == MetadataCategorySortMode.Name -> "年份正序"
-        (type == "composer" || type == "lyricist") && this == MetadataCategorySortMode.AlbumCount -> "参与专辑数"
-        else -> label
+        type == "year" && this == MetadataCategorySortMode.Name -> context.getString(R.string.category_sort_year_asc)
+        (type == "composer" || type == "lyricist") && this == MetadataCategorySortMode.AlbumCount -> context.getString(R.string.category_sort_participating_albums)
+        else -> context.getString(when (this) {
+            MetadataCategorySortMode.Name -> R.string.category_sort_name
+            MetadataCategorySortMode.NameDesc -> R.string.category_sort_year_desc
+            MetadataCategorySortMode.SongCount -> R.string.playlist_sort_song_count
+            MetadataCategorySortMode.AlbumCount -> R.string.category_sort_album_count
+            MetadataCategorySortMode.Duration -> R.string.playlist_sort_duration
+            MetadataCategorySortMode.DateModified -> R.string.playlist_song_sort_date_modified
+            MetadataCategorySortMode.DateModifiedAsc -> R.string.category_sort_date_modified_asc
+        })
     }
 }
 
@@ -1275,34 +1285,55 @@ private fun MetadataCategoryItem.matchesCategorySearch(query: String, type: Stri
         (type == "folder" && name.substringAfterLast('/').contains(query, ignoreCase = true))
 }
 
+@Composable
 private fun MetadataCategoryItem.folderSortSummary(sortMode: MetadataCategorySortMode): String {
+    val context = LocalContext.current
     return when (sortMode) {
-        MetadataCategorySortMode.AlbumCount -> "${albumCount} 张专辑"
+        MetadataCategorySortMode.AlbumCount -> context.getString(R.string.category_album_count_detail, albumCount)
         MetadataCategorySortMode.Duration -> duration.formatDuration()
         MetadataCategorySortMode.DateModified,
-        MetadataCategorySortMode.DateModifiedAsc -> dateModified.formatDateTimeText()
-        else -> "${songCount} 首歌曲"
+        MetadataCategorySortMode.DateModifiedAsc -> dateModified.formatDateTimeText(context)
+        else -> context.getString(R.string.analytics_song_count_value, songCount)
     }
 }
 
+@Composable
 private fun MetadataCategoryItem.personSortSummary(sortMode: MetadataCategorySortMode): String {
+    val context = LocalContext.current
     return when (sortMode) {
-        MetadataCategorySortMode.Duration -> "${duration.formatDuration()} · ${albumCount} 张参与专辑"
-        else -> "${songCount} 首歌曲 · ${albumCount} 张参与专辑"
+        MetadataCategorySortMode.Duration -> context.getString(R.string.category_person_sort_duration, duration.formatDuration(), albumCount)
+        else -> context.getString(R.string.category_person_sort, songCount, albumCount)
     }
 }
 
-private enum class MetadataDetailSongSortMode(val label: String) {
-    AlbumTrack("专辑曲序"),
-    Title("歌曲名称"),
-    FileName("文件名"),
-    Duration("歌曲时长"),
-    YearAsc("发行时间正序"),
-    YearDesc("发行时间倒序"),
-    DateAdded("添加时间"),
-    DateAddedAsc("添加时间升序"),
-    DateModified("修改时间"),
-    DateModifiedAsc("修改时间升序")
+private enum class MetadataDetailSongSortMode {
+    AlbumTrack,
+    Title,
+    FileName,
+    Duration,
+    YearAsc,
+    YearDesc,
+    DateAdded,
+    DateAddedAsc,
+    DateModified,
+    DateModifiedAsc
+}
+
+@Composable
+private fun MetadataDetailSongSortMode.label(): String {
+    val context = LocalContext.current
+    return context.getString(when (this) {
+        MetadataDetailSongSortMode.AlbumTrack -> R.string.category_sort_album_track
+        MetadataDetailSongSortMode.Title -> R.string.playlist_song_sort_title
+        MetadataDetailSongSortMode.FileName -> R.string.playlist_song_sort_file_name
+        MetadataDetailSongSortMode.Duration -> R.string.playlist_sort_duration
+        MetadataDetailSongSortMode.YearAsc -> R.string.playlist_song_sort_year_asc
+        MetadataDetailSongSortMode.YearDesc -> R.string.playlist_song_sort_year_desc
+        MetadataDetailSongSortMode.DateAdded -> R.string.playlist_song_sort_date_added
+        MetadataDetailSongSortMode.DateAddedAsc -> R.string.category_sort_date_added_asc
+        MetadataDetailSongSortMode.DateModified -> R.string.playlist_song_sort_date_modified
+        MetadataDetailSongSortMode.DateModifiedAsc -> R.string.category_sort_date_modified_asc
+    })
 }
 
 private fun List<com.ella.music.data.model.Song>.sortedForMetadataDetail(
@@ -1329,17 +1360,38 @@ private fun List<com.ella.music.data.model.Song>.sortedForMetadataDetail(
     }
 }
 
-private enum class MetadataDetailTab(val label: String) {
-    Songs("歌曲"),
-    Albums("专辑")
+private enum class MetadataDetailTab {
+    Songs,
+    Albums
 }
 
-private enum class MetadataDetailAlbumSortMode(val label: String) {
-    YearAsc("发行时间正序"),
-    YearDesc("发行时间倒序"),
-    SongCount("歌曲数"),
-    Duration("歌曲时长"),
-    Name("专辑名称")
+@Composable
+private fun MetadataDetailTab.label(): String {
+    val context = LocalContext.current
+    return context.getString(when (this) {
+        MetadataDetailTab.Songs -> R.string.album_stat_songs
+        MetadataDetailTab.Albums -> R.string.category_album
+    })
+}
+
+private enum class MetadataDetailAlbumSortMode {
+    YearAsc,
+    YearDesc,
+    SongCount,
+    Duration,
+    Name
+}
+
+@Composable
+private fun MetadataDetailAlbumSortMode.label(): String {
+    val context = LocalContext.current
+    return context.getString(when (this) {
+        MetadataDetailAlbumSortMode.YearAsc -> R.string.playlist_song_sort_year_asc
+        MetadataDetailAlbumSortMode.YearDesc -> R.string.playlist_song_sort_year_desc
+        MetadataDetailAlbumSortMode.SongCount -> R.string.playlist_sort_song_count
+        MetadataDetailAlbumSortMode.Duration -> R.string.playlist_sort_duration
+        MetadataDetailAlbumSortMode.Name -> R.string.category_sort_album_name
+    })
 }
 
 private fun List<Album>.sortedForMetadataAlbumDetail(
@@ -1355,13 +1407,13 @@ private fun List<Album>.sortedForMetadataAlbumDetail(
     }
 }
 
-private fun List<Song>.toMetadataAlbums(libraryAlbums: List<Album>): List<Album> {
+private fun List<Song>.toMetadataAlbums(libraryAlbums: List<Album>, context: android.content.Context): List<Album> {
     val albumById = libraryAlbums.associateBy { it.id }
     return groupBy { it.albumIdentityId() }
         .map { (albumId, albumSongs) ->
             albumById[albumId] ?: Album(
                 id = albumId,
-                name = albumSongs.firstOrNull()?.album.orEmpty().ifBlank { "未知专辑" },
+                name = albumSongs.firstOrNull()?.album.orEmpty().ifBlank { context.getString(R.string.player_unknown_album) },
                 artist = albumSongs.firstOrNull()?.artist.orEmpty(),
                 songCount = albumSongs.size,
                 year = albumSongs.mapNotNull { s -> s.year.takeIf { it.isNotBlank() } }.minByOrNull { it } ?: "",
@@ -1378,8 +1430,9 @@ private fun MetadataAlbumRow(
     albumArtUri: android.net.Uri?,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val summary = buildList {
-        add("${album.songCount} 首歌曲")
+        add(context.getString(R.string.analytics_song_count_value, album.songCount))
         if (album.year.isNotBlank()) add(album.year)
         add(duration.formatDuration())
     }.joinToString(" · ")
@@ -1452,25 +1505,29 @@ private fun List<Song>.sortedByReleaseDate(ascending: Boolean): List<Song> {
 private fun Song.releaseYearOrNull(): Int? =
     Regex("""\d{4}""").find(year)?.value?.toIntOrNull()
 
+@Composable
 private fun String.categoryTitle(): String {
+    val context = LocalContext.current
     return when (this) {
-        "genre" -> "流派"
-        "year" -> "年份"
-        "composer" -> "作曲家"
-        "lyricist" -> "作词家"
-        "folder" -> "文件夹"
-        else -> "分类"
+        "genre" -> context.getString(R.string.category_genre)
+        "year" -> context.getString(R.string.category_year)
+        "composer" -> context.getString(R.string.category_composer)
+        "lyricist" -> context.getString(R.string.category_lyricist)
+        "folder" -> context.getString(R.string.category_folder)
+        else -> context.getString(R.string.category_general)
     }
 }
 
+@Composable
 private fun String.categoryCountSummary(count: Int): String {
+    val context = LocalContext.current
     return when (this) {
-        "genre" -> "$count 种流派"
-        "composer" -> "$count 位作曲家"
-        "lyricist" -> "$count 位作词家"
-        "folder" -> "$count 个文件夹"
-        "year" -> "$count 个年份"
-        else -> "$count 个分类"
+        "genre" -> context.getString(R.string.category_count_genres, count)
+        "composer" -> context.getString(R.string.category_count_composers, count)
+        "lyricist" -> context.getString(R.string.category_count_lyricists, count)
+        "folder" -> context.getString(R.string.category_count_folders, count)
+        "year" -> context.getString(R.string.category_count_years, count)
+        else -> context.getString(R.string.category_count_general, count)
     }
 }
 
@@ -1482,14 +1539,14 @@ private fun Long.formatDuration(): String {
     return formatPlaybackDuration()
 }
 
-private fun Long.formatDateText(): String {
-    if (this <= 0L) return "未知修改时间"
+private fun Long.formatDateText(context: android.content.Context): String {
+    if (this <= 0L) return context.getString(R.string.folder_unknown_modified_time)
     val millis = if (this < 10_000_000_000L) this * 1000L else this
     return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(millis))
 }
 
-private fun Long.formatDateTimeText(): String {
-    if (this <= 0L) return "未知修改时间"
+private fun Long.formatDateTimeText(context: android.content.Context): String {
+    if (this <= 0L) return context.getString(R.string.folder_unknown_modified_time)
     val millis = if (this < 10_000_000_000L) this * 1000L else this
     return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(millis))
 }

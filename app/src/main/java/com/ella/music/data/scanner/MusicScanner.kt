@@ -8,6 +8,7 @@ import android.provider.MediaStore
 import android.util.Log
 import com.ella.music.data.metadata.AudioTagInfo
 import com.ella.music.data.metadata.LyricoAudioTagReaderWriter
+import com.ella.music.data.metadata.WavMetadataReader
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
@@ -17,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.RandomAccessFile
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 
@@ -130,6 +130,7 @@ class MusicScanner(private val context: Context) {
         var composer = ""
         var lyricist = ""
         var duration = item.duration
+        var trackNumber = item.trackNumber
         var discNumber = item.discNumber
         val file = File(item.path)
         if (!file.exists()) return@withContext null
@@ -155,6 +156,11 @@ class MusicScanner(private val context: Context) {
                 tagInfo.customTagValue("TEXT"),
                 tagInfo.customTagValue("WRITER")
             ).orEmpty()
+            trackNumber = trackNumber.takeIf { it > 0 } ?: tagInfo.trackNumber ?: firstNonBlank(
+                tagInfo.customTagValue("TRACKNUMBER"),
+                tagInfo.customTagValue("TRACK"),
+                tagInfo.customTagValue("TRCK")
+            ).orEmpty().normalizedTrackNumberFromTag()
             discNumber = discNumber.takeIf { it > 0 } ?: firstNonBlank(
                 tagInfo.discNumber?.toString(),
                 tagInfo.customTagValue("DISC"),
@@ -162,15 +168,33 @@ class MusicScanner(private val context: Context) {
             ).orEmpty().normalizedDiscNumberFromTag()
         }
 
-        if (shouldDeepRead || deepMetadata) file.readWavInfoTags()?.let { wavInfo ->
-            if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
-            if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
-            if (isMissingTag(album)) album = wavInfo.album.orEmpty()
-            if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
-            if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
-            if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
-            if (composer.isBlank()) composer = wavInfo.composer.orEmpty()
-            if (lyricist.isBlank()) lyricist = wavInfo.lyricist.orEmpty()
+        // WAV files always try WavMetadataReader — MediaStore/Lyrico may not read LIST/INFO chunks
+        if (file.extension.lowercase() in setOf("wav", "wave")) {
+            WavMetadataReader.read(file)?.let { wavInfo ->
+                if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
+                if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
+                if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
+                if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
+                if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
+                if (composer.isBlank()) composer = wavInfo.composer.orEmpty()
+                if (lyricist.isBlank()) lyricist = wavInfo.lyricist.orEmpty()
+                trackNumber = trackNumber.takeIf { it > 0 } ?: wavInfo.trackNumber ?: 0
+                discNumber = discNumber.takeIf { it > 0 } ?: wavInfo.discNumber ?: 0
+            }
+        } else if (shouldDeepRead || deepMetadata) {
+            WavMetadataReader.read(file)?.let { wavInfo ->
+                if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
+                if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
+                if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
+                if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
+                if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
+                if (composer.isBlank()) composer = wavInfo.composer.orEmpty()
+                if (lyricist.isBlank()) lyricist = wavInfo.lyricist.orEmpty()
+                trackNumber = trackNumber.takeIf { it > 0 } ?: wavInfo.trackNumber ?: 0
+                discNumber = discNumber.takeIf { it > 0 } ?: wavInfo.discNumber ?: 0
+            }
         }
 
         if (shouldDeepRead && (isMissingTag(title, file.name) || isMissingTag(artist) || isMissingTag(album) || duration <= 0)) {
@@ -206,7 +230,7 @@ class MusicScanner(private val context: Context) {
             mimeType = item.mimeType,
             dateAdded = item.dateAdded,
             dateModified = item.dateModified,
-            trackNumber = item.trackNumber,
+            trackNumber = trackNumber,
             discNumber = discNumber,
             albumArtist = albumArtist,
             genre = genre,
@@ -281,7 +305,7 @@ class MusicScanner(private val context: Context) {
                 val dateAdded = cursor.getLong(dateAddedCol) * 1000L
                 val dateModified = cursor.getLong(dateModifiedCol) * 1000L
                 val rawTrackNumber = cursor.getInt(trackCol)
-                val trackNumber = rawTrackNumber.normalizedTrackNumber()
+                var trackNumber = rawTrackNumber.normalizedTrackNumber()
                 var discNumber = rawTrackNumber.normalizedDiscNumber()
 
                 if (path.isEmpty()) continue
@@ -310,6 +334,11 @@ class MusicScanner(private val context: Context) {
                         tagInfo.customTagValue("TEXT"),
                         tagInfo.customTagValue("WRITER")
                     ).orEmpty()
+                    trackNumber = trackNumber.takeIf { it > 0 } ?: tagInfo.trackNumber ?: firstNonBlank(
+                        tagInfo.customTagValue("TRACKNUMBER"),
+                        tagInfo.customTagValue("TRACK"),
+                        tagInfo.customTagValue("TRCK")
+                    ).orEmpty().normalizedTrackNumberFromTag()
                     discNumber = discNumber.takeIf { it > 0 } ?: firstNonBlank(
                         tagInfo.discNumber?.toString(),
                         tagInfo.customTagValue("DISC"),
@@ -317,15 +346,33 @@ class MusicScanner(private val context: Context) {
                     ).orEmpty().normalizedDiscNumberFromTag()
                 }
 
-                if (shouldDeepRead || deepMetadata) file.readWavInfoTags()?.let { wavInfo ->
-                    if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
-                    if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
-                    if (isMissingTag(album)) album = wavInfo.album.orEmpty()
-                    if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
-                    if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
-                    if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
-                    if (composer.isBlank()) composer = wavInfo.composer.orEmpty()
-                    if (lyricist.isBlank()) lyricist = wavInfo.lyricist.orEmpty()
+                // WAV files always try WavMetadataReader — MediaStore/Lyrico may not read LIST/INFO chunks
+                if (file.extension.lowercase() in setOf("wav", "wave")) {
+                    WavMetadataReader.read(file)?.let { wavInfo ->
+                        if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
+                        if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
+                        if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                        if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
+                        if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
+                        if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
+                        if (composer.isBlank()) composer = wavInfo.composer.orEmpty()
+                        if (lyricist.isBlank()) lyricist = wavInfo.lyricist.orEmpty()
+                        trackNumber = trackNumber.takeIf { it > 0 } ?: wavInfo.trackNumber ?: 0
+                        discNumber = discNumber.takeIf { it > 0 } ?: wavInfo.discNumber ?: 0
+                    }
+                } else if (shouldDeepRead || deepMetadata) {
+                    WavMetadataReader.read(file)?.let { wavInfo ->
+                        if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
+                        if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
+                        if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                        if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
+                        if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
+                        if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
+                        if (composer.isBlank()) composer = wavInfo.composer.orEmpty()
+                        if (lyricist.isBlank()) lyricist = wavInfo.lyricist.orEmpty()
+                        trackNumber = trackNumber.takeIf { it > 0 } ?: wavInfo.trackNumber ?: 0
+                        discNumber = discNumber.takeIf { it > 0 } ?: wavInfo.discNumber ?: 0
+                    }
                 }
 
                 if (shouldDeepRead && (isMissingTag(title, file.name) || isMissingTag(artist) || isMissingTag(album) || duration <= 0)) {
@@ -375,6 +422,162 @@ class MusicScanner(private val context: Context) {
             }
         }
         songs
+    }
+
+    /**
+     * Scan audio files from a SAF document tree URI (e.g. USB drive).
+     * Returns a list of songs found recursively under the given URI.
+     */
+    suspend fun scanUsbFolder(
+        treeUri: Uri,
+        minDurationMs: Long = 0,
+        deepMetadata: Boolean = false,
+        onProgress: ((Int) -> Unit)? = null
+    ): List<Song> = withContext(Dispatchers.IO) {
+        val songs = mutableListOf<Song>()
+        try {
+            val documentId = android.provider.DocumentsContract.getTreeDocumentId(treeUri)
+            val childrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(
+                treeUri, documentId
+            )
+            scanDocumentTreeRecursive(
+                context, treeUri, childrenUri, songs, minDurationMs, deepMetadata, onProgress
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "USB folder scan failed for $treeUri", e)
+        }
+        songs
+    }
+
+    private fun scanDocumentTreeRecursive(
+        context: Context,
+        rootTreeUri: Uri,
+        childrenUri: Uri,
+        songs: MutableList<Song>,
+        minDurationMs: Long,
+        deepMetadata: Boolean,
+        onProgress: ((Int) -> Unit)?
+    ) {
+        val projection = arrayOf(
+            android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE,
+            android.provider.DocumentsContract.Document.COLUMN_SIZE,
+            android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED
+        )
+        val audioExtensions = setOf("mp3", "flac", "ogg", "opus", "aac", "m4a", "wav", "wave", "wma", "aiff", "ape", "alac")
+        try {
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val docIdCol = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeCol = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_SIZE)
+                val modifiedCol = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+
+                while (cursor.moveToNext()) {
+                    val docId = cursor.getString(docIdCol) ?: continue
+                    val name = cursor.getString(nameCol) ?: continue
+                    val mimeType = cursor.getString(mimeCol) ?: ""
+                    val size = cursor.getLong(sizeCol)
+                    val lastModified = cursor.getLong(modifiedCol) * 1000L
+
+                    if (mimeType == android.provider.DocumentsContract.Document.MIME_TYPE_DIR) {
+                        val subChildrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(
+                            rootTreeUri, docId
+                        )
+                        scanDocumentTreeRecursive(
+                            context, rootTreeUri, subChildrenUri, songs, minDurationMs, deepMetadata, onProgress
+                        )
+                        continue
+                    }
+
+                    val ext = name.substringAfterLast('.', "").lowercase()
+                    if (ext !in audioExtensions) continue
+
+                    val songUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(rootTreeUri, docId)
+                    var title = name.substringBeforeLast('.')
+                    var artist = ""
+                    var album = ""
+                    var albumArtist = ""
+                    var genre = ""
+                    var year = ""
+                    var composer = ""
+                    var lyricist = ""
+                    var duration = 0L
+                    var trackNumber = 0
+                    var discNumber = 0
+                    var albumId = 0L
+
+                    if (deepMetadata || title.isBlank()) {
+                        try {
+                            context.contentResolver.openFileDescriptor(songUri, "r")?.use { pfd ->
+                                val retriever = MediaMetadataRetriever()
+                                try {
+                                    retriever.setDataSource(pfd.fileDescriptor)
+                                    val metaTitle = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                                    val metaArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                                    val metaAlbum = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                                    val metaDuration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                    if (!metaTitle.isNullOrBlank()) title = metaTitle
+                                    if (!metaArtist.isNullOrBlank()) artist = metaArtist
+                                    if (!metaAlbum.isNullOrBlank()) album = metaAlbum
+                                    if (metaDuration != null) duration = metaDuration.toLongOrNull() ?: 0L
+                                } finally {
+                                    retriever.release()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Metadata extraction failed for USB file $name", e)
+                        }
+                    }
+
+                    if (title.isBlank()) title = name.substringBeforeLast('.')
+                    if (artist.isBlank()) artist = "Unknown"
+                    if (album.isBlank()) album = "Unknown"
+
+                    if (duration > 0 && duration >= minDurationMs) {
+                        val stableId = kotlin.math.abs(songUri.hashCode().toLong()).takeIf { it != 0L } ?: 1L
+                        songs.add(
+                            Song(
+                                id = stableId,
+                                title = title,
+                                artist = artist,
+                                album = album,
+                                albumId = albumId,
+                                duration = duration,
+                                path = songUri.toString(),
+                                fileName = name,
+                                fileSize = size,
+                                mimeType = mimeType.substringBefore(';').trim().lowercase(),
+                                dateAdded = System.currentTimeMillis(),
+                                dateModified = lastModified,
+                                trackNumber = trackNumber,
+                                discNumber = discNumber,
+                                albumArtist = albumArtist,
+                                genre = genre,
+                                year = year,
+                                composer = composer,
+                                lyricist = lyricist
+                            )
+                        )
+                        onProgress?.invoke(songs.size)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error scanning SAF document tree", e)
+        }
+    }
+
+    /**
+     * Check if a SAF URI is still accessible (USB drive connected).
+     */
+    fun isUsbUriAccessible(uri: Uri): Boolean {
+        return try {
+            context.contentResolver.query(uri, arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)?.use { true } ?: false
+        } catch (e: Exception) {
+            false
+        }
     }
 
     suspend fun scanAlbums(): List<Album> = withContext(Dispatchers.IO) {
@@ -506,6 +709,8 @@ class MusicScanner(private val context: Context) {
         if (normalized.equals("unknown", ignoreCase = true)) return true
         if (normalized.equals("unknown artist", ignoreCase = true)) return true
         if (normalized.equals("unknown album", ignoreCase = true)) return true
+        if (normalized == "未知" || normalized == "未知歌手" || normalized == "未知专辑" ||
+            normalized == "未知艺术家" || normalized == "未知歌曲") return true
         if (normalized.looksLikeMojibake()) return true
         return fileName != null && normalized == fileName.substringBeforeLast('.')
     }
@@ -619,90 +824,6 @@ class MusicScanner(private val context: Context) {
         return LrcParser.parse(this).lyrics.any { it.text.trim().isNotBlank() }
     }
 
-    private data class WavInfoTags(
-        val title: String? = null,
-        val artist: String? = null,
-        val album: String? = null,
-        val albumArtist: String? = null,
-        val genre: String? = null,
-        val year: String? = null,
-        val composer: String? = null,
-        val lyricist: String? = null
-    )
-
-    private fun File.readWavInfoTags(): WavInfoTags? {
-        val extension = extension.lowercase()
-        if (extension !in setOf("wav", "wave")) return null
-
-        return runCatching {
-            RandomAccessFile(this, "r").use { input ->
-                if (input.length() < 12L) return@use null
-                val riff = input.readFourCc()
-                input.readUnsignedIntLe()
-                val wave = input.readFourCc()
-                if (riff !in setOf("RIFF", "RF64") || wave != "WAVE") return@use null
-
-                val values = linkedMapOf<String, String>()
-                while (input.filePointer + 8L <= input.length()) {
-                    val chunkId = input.readFourCc()
-                    val chunkSize = input.readUnsignedIntLe()
-                    val chunkStart = input.filePointer
-                    val chunkEnd = (chunkStart + chunkSize).coerceAtMost(input.length())
-
-                    if (chunkId == "LIST" && chunkSize >= 4L) {
-                        val listType = input.readFourCc()
-                        if (listType == "INFO") {
-                            while (input.filePointer + 8L <= chunkEnd) {
-                                val key = input.readFourCc()
-                                val valueSize = input.readUnsignedIntLe()
-                                val valueEnd = (input.filePointer + valueSize).coerceAtMost(chunkEnd)
-                                val valueLength = (valueEnd - input.filePointer).toInt().coerceAtLeast(0)
-                                val bytes = ByteArray(valueLength)
-                                input.readFully(bytes)
-                                bytes.decodeInfoText().takeIf { it.isNotBlank() }?.let { values[key] = it }
-                                val paddedEnd = valueEnd + (valueSize and 1L)
-                                input.seek(paddedEnd.coerceAtMost(chunkEnd))
-                            }
-                            return@use WavInfoTags(
-                                title = values.firstInfoValue("INAM", "TITL", "TITLE", "NAME"),
-                                artist = values.firstInfoValue("IART", "ARTIST", "ALBUMARTIST", "ALBUM ARTIST", "PERFORMER"),
-                                album = values.firstInfoValue("IPRD", "IALB", "ALBUM", "PRODUCT"),
-                                albumArtist = values.firstInfoValue("ALBUMARTIST", "ALBUM ARTIST", "IARTIST"),
-                                genre = values.firstInfoValue("IGNR", "GENRE"),
-                                year = values.firstInfoValue("ICRD", "YEAR", "DATE"),
-                                composer = values.firstInfoValue("IMUS", "COMPOSER", "TCOM"),
-                                lyricist = values.firstInfoValue("IWRI", "LYRICIST", "WRITER", "TEXT")
-                            )
-                        }
-                    }
-
-                    input.seek((chunkEnd + (chunkSize and 1L)).coerceAtMost(input.length()))
-                }
-                null
-            }
-        }.onFailure {
-            Log.d(TAG, "WAV INFO metadata extraction failed for ${path}", it)
-        }.getOrNull()
-    }
-
-    private fun RandomAccessFile.readFourCc(): String {
-        val bytes = ByteArray(4)
-        readFully(bytes)
-        return String(bytes, StandardCharsets.US_ASCII)
-    }
-
-    private fun RandomAccessFile.readUnsignedIntLe(): Long {
-        val b0 = read()
-        val b1 = read()
-        val b2 = read()
-        val b3 = read()
-        if (b0 < 0 || b1 < 0 || b2 < 0 || b3 < 0) return 0L
-        return (b0.toLong() and 0xFF) or
-            ((b1.toLong() and 0xFF) shl 8) or
-            ((b2.toLong() and 0xFF) shl 16) or
-            ((b3.toLong() and 0xFF) shl 24)
-    }
-
     private fun ByteArray.decodeInfoText(): String {
         val trimmed = dropLastWhile { it == 0.toByte() || it == 0x20.toByte() }.toByteArray()
         if (trimmed.isEmpty()) return ""
@@ -763,6 +884,9 @@ class MusicScanner(private val context: Context) {
 
     private fun Int.normalizedDiscNumber(): Int =
         if (this >= 1000) this / 1000 else 0
+
+    private fun String.normalizedTrackNumberFromTag(): Int =
+        substringBefore('/').trim().toIntOrNull()?.normalizedTrackNumber() ?: 0
 
     private fun String.normalizedDiscNumberFromTag(): Int =
         substringBefore('/').trim().toIntOrNull() ?: 0

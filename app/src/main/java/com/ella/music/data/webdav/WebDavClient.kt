@@ -1,7 +1,9 @@
 package com.ella.music.data.webdav
 
+import android.content.Context
 import android.text.Html
 import android.util.Log
+import com.ella.music.R
 import com.ella.music.data.AppNetworkLoggingInterceptor
 import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaType
@@ -58,6 +60,17 @@ class WebDavException(message: String) : IOException(message)
 object WebDavClient {
     private const val TAG = "WebDavClient"
     private val audioExtensions = setOf("mp3", "m4a", "flac", "wav", "ogg", "opus", "aac", "alac")
+
+    @Volatile
+    private var appContext: Context? = null
+
+    fun initContext(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    private fun requireContext(): Context =
+        appContext ?: throw IllegalStateException("WebDavClient.initContext() must be called before using WebDavClient")
+
     private val listCache = mutableMapOf<String, List<WebDavItem>>()
     private val xmlMediaType = "application/xml; charset=utf-8".toMediaType()
     private val secureRandom = SecureRandom()
@@ -104,34 +117,36 @@ object WebDavClient {
     }
 
     fun testDetailed(config: WebDavConfig): WebDavTestResult {
+        val ctx = requireContext()
         if (!config.isConfigured) {
-            return WebDavTestResult(ok = false, message = "请先输入 WebDAV 地址")
+            return WebDavTestResult(ok = false, message = ctx.getString(R.string.webdav_please_enter_address))
         }
         return runCatching {
             val response = executePropfind(normalizeCollectionUrl(config.url), config, depth = "0")
             if (response.code in 200..399) {
                 Log.i(TAG, "WebDAV test succeeded: ${config.url.safeLogUrl()} code=${response.code}")
-                WebDavTestResult(ok = true, message = "WebDAV 连接成功")
+                WebDavTestResult(ok = true, message = ctx.getString(R.string.webdav_connection_succeeded))
             } else {
-                val message = response.toFriendlyMessage()
+                val message = response.toFriendlyMessage(ctx)
                 Log.w(TAG, "WebDAV test failed: ${config.url.safeLogUrl()} code=${response.code} message=$message")
                 WebDavTestResult(ok = false, message = message)
             }
         }.getOrElse { error ->
             Log.e(TAG, "WebDAV test failed", error)
-            WebDavTestResult(ok = false, message = error.toFriendlyMessage())
+            WebDavTestResult(ok = false, message = error.toFriendlyMessage(ctx))
         }
     }
 
     fun list(config: WebDavConfig, url: String = config.url, forceRefresh: Boolean = false): List<WebDavItem> {
         if (!config.isConfigured) return emptyList()
+        val ctx = requireContext()
         val requestUrl = normalizeCollectionUrl(url)
         val cacheKey = "${requestUrl}|${config.username}|${config.authMode}"
         if (!forceRefresh) listCache[cacheKey]?.let { return it }
         val propfind = executePropfind(requestUrl, config, depth = "1")
         val response = propfind.body
         if (propfind.code !in 200..399) {
-            val message = propfind.toFriendlyMessage()
+            val message = propfind.toFriendlyMessage(ctx)
             Log.w(TAG, "WebDAV list failed: ${requestUrl.safeLogUrl()} code=${propfind.code} message=$message")
             throw WebDavException(message)
         }
@@ -148,7 +163,58 @@ object WebDavClient {
         listCache.clear()
     }
 
+    fun uploadFile(url: String, config: WebDavConfig, data: ByteArray, contentType: String = "application/json") {
+        val ctx = requireContext()
+        val requestUrl = normalizeRequestUrl(url)
+        ensureParentDirectory(requestUrl, config)
+        val body = data.toRequestBody(contentType.toMediaType())
+        val request = Request.Builder()
+            .url(requestUrl)
+            .put(body)
+            .tag(WebDavConfig::class.java, config)
+            .apply { applyPreemptiveBasicAuth(config) }
+            .build()
+
+        httpClient.newCall(request).execute().use { response ->
+            if (response.code !in 200..399) {
+                throw WebDavException(WebDavResponse(response.code, response.body?.string().orEmpty()).toFriendlyMessage(ctx))
+            }
+        }
+    }
+
+    fun uploadFileFromString(url: String, config: WebDavConfig, content: String, contentType: String = "application/json") {
+        uploadFile(url, config, content.toByteArray(Charsets.UTF_8), contentType)
+    }
+
+    fun mkdir(url: String, config: WebDavConfig) {
+        val ctx = requireContext()
+        val requestUrl = normalizeRequestUrl(url)
+        val body = "".toRequestBody(null)
+        val request = Request.Builder()
+            .url(requestUrl)
+            .method("MKCOL", body)
+            .tag(WebDavConfig::class.java, config)
+            .apply { applyPreemptiveBasicAuth(config) }
+            .build()
+
+        httpClient.newCall(request).execute().use { response ->
+            if (response.code !in 200..399 && response.code != 405) {
+                Log.w(TAG, "WebDAV MKCOL failed: ${requestUrl.safeLogUrl()} code=${response.code}")
+            }
+        }
+    }
+
+    private fun ensureParentDirectory(url: String, config: WebDavConfig) {
+        val parentUrl = runCatching {
+            val uri = URI(url)
+            val parentPath = uri.path?.substringBeforeLast('/')?.let { "$it/" } ?: return
+            URI(uri.scheme, uri.authority, parentPath, null, null).toString()
+        }.getOrDefault(return)
+        mkdir(parentUrl, config)
+    }
+
     fun downloadToFile(url: String, config: WebDavConfig, target: File): File {
+        val ctx = requireContext()
         val request = Request.Builder()
             .url(normalizeRequestUrl(url))
             .get()
@@ -158,9 +224,9 @@ object WebDavClient {
 
         httpClient.newCall(request).execute().use { response ->
             if (response.code !in 200..399) {
-                throw WebDavException(WebDavResponse(response.code, response.body?.string().orEmpty()).toFriendlyMessage())
+                throw WebDavException(WebDavResponse(response.code, response.body?.string().orEmpty()).toFriendlyMessage(ctx))
             }
-            val body = response.body ?: throw WebDavException("WebDAV 文件下载失败")
+            val body = response.body ?: throw WebDavException(ctx.getString(R.string.webdav_file_download_failed))
             target.parentFile?.mkdirs()
             target.outputStream().use { output ->
                 body.byteStream().use { input -> input.copyTo(output) }
@@ -430,41 +496,42 @@ object WebDavClient {
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun WebDavResponse.toFriendlyMessage(): String {
+    private fun WebDavResponse.toFriendlyMessage(ctx: Context): String {
         return when (code) {
-            400 -> "HTTP 400：WebDAV 请求格式被服务器拒绝，请确认地址指向 WebDAV 根目录或子目录"
-            401 -> "HTTP 401：用户名或密码错误"
-            403 -> "HTTP 403：没有访问权限"
-            404 -> "HTTP 404：路径不存在，请确认 WebDAV 地址"
-            405 -> "HTTP 405：服务器不允许 PROPFIND，请确认填的是 WebDAV 地址"
-            in 300..399 -> "HTTP $code：服务器重定向异常，请检查 WebDAV 地址是否需要末尾斜杠"
+            400 -> ctx.getString(R.string.webdav_http_400)
+            401 -> ctx.getString(R.string.webdav_http_401)
+            403 -> ctx.getString(R.string.webdav_http_403)
+            404 -> ctx.getString(R.string.webdav_http_404)
+            405 -> ctx.getString(R.string.webdav_http_405)
+            in 300..399 -> ctx.getString(R.string.webdav_http_redirect, code)
             else -> {
                 val detail = body.lineSequence()
                     .map { it.trim() }
                     .firstOrNull { it.isNotBlank() }
                     ?.take(120)
                     .orEmpty()
-                if (detail.isBlank()) "HTTP $code：WebDAV 服务器返回错误" else "HTTP $code：$detail"
+                if (detail.isBlank()) ctx.getString(R.string.webdav_http_server_error, code)
+                else ctx.getString(R.string.webdav_http_server_error_detail, code, detail)
             }
         }
     }
 
-    private fun Throwable.toFriendlyMessage(): String {
+    private fun Throwable.toFriendlyMessage(ctx: Context): String {
         val rawMessage = localizedMessage.orEmpty()
         return when (this) {
-            is IllegalArgumentException -> rawMessage.ifBlank { "WebDAV 地址格式不正确" }
-            is UnknownHostException -> "无法解析主机，请检查地址或网络"
-            is SocketTimeoutException -> "连接超时，请检查服务器地址和网络"
-            is SSLHandshakeException -> "TLS/证书验证失败，请检查 HTTPS 证书"
-            is WebDavException -> rawMessage.ifBlank { "WebDAV 加载失败" }
+            is IllegalArgumentException -> rawMessage.ifBlank { ctx.getString(R.string.webdav_address_format_invalid) }
+            is UnknownHostException -> ctx.getString(R.string.webdav_host_unresolvable)
+            is SocketTimeoutException -> ctx.getString(R.string.webdav_connection_timeout)
+            is SSLHandshakeException -> ctx.getString(R.string.webdav_tls_handshake_failed)
+            is WebDavException -> rawMessage.ifBlank { ctx.getString(R.string.webdav_load_failed) }
             is IOException -> {
                 if (rawMessage.contains("CLEARTEXT", ignoreCase = true)) {
-                    "HTTP 明文连接被系统拦截，请重新安装后再试"
+                    ctx.getString(R.string.webdav_cleartext_blocked)
                 } else {
-                    rawMessage.ifBlank { "网络连接失败" }
+                    rawMessage.ifBlank { ctx.getString(R.string.webdav_network_failed) }
                 }
             }
-            else -> rawMessage.ifBlank { "WebDAV 连接失败" }
+            else -> rawMessage.ifBlank { ctx.getString(R.string.webdav_connection_failed) }
         }
     }
 
@@ -482,7 +549,7 @@ object WebDavClient {
     private fun normalizeRequestUrl(url: String): String {
         val trimmed = url.trim()
         require(trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-            "WebDAV 地址需要以 http:// 或 https:// 开头"
+            "WebDAV URL must start with http:// or https://"
         }
         return trimmed
     }

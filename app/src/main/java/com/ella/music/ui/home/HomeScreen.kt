@@ -616,6 +616,10 @@ fun LibraryScreen(
                                         if (openPlayerOnPlay) onNavigateToPlayer()
                                     }
                                 },
+                                onAddToQueue = {
+                                    playerViewModel.addToPlaylist(song)
+                                    Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                                },
                                 onMore = { actionSong = song }
                             )
                         }

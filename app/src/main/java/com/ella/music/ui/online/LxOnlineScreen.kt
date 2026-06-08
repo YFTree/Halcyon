@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.res.stringResource
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.lx.LxOnlineService
@@ -92,7 +93,8 @@ fun LxOnlineScreen(
         val previousSourceId = observedSourceId
         if (previousSourceId != null && previousSourceId != currentSourceId) {
             state.clearResults(
-                selectedSource?.let { "已切换到 ${it.name}" } ?: "请先导入或选择一个源"
+                selectedSource?.let { context.getString(R.string.lx_online_source_switched, it.name) }
+                    ?: context.getString(R.string.lx_online_please_import_source)
             )
         }
         observedSourceId = currentSourceId
@@ -114,16 +116,16 @@ fun LxOnlineScreen(
             startIndex = startIndex,
             resolvedStartSong = resolved
         ) { song ->
-            val target = itemById[song.id] ?: error("队列歌曲已失效")
+            val target = itemById[song.id] ?: error(context.getString(R.string.lx_online_queue_song_expired))
             service.resolvePlayableSong(target, sourceScript)
         }
-        state.message = "已获取 ${songs.size} 首队列歌曲，将在播放到对应歌曲时解析"
+        state.message = context.getString(R.string.lx_online_queue_obtained, songs.size)
     }
 
     suspend fun resolveActionSong(song: Song): Song {
         val item = actionItem?.takeIf { it.song.id == song.id }
             ?: state.results.firstOrNull { it.song.id == song.id }
-            ?: error("在线歌曲已失效")
+            ?: error(context.getString(R.string.lx_online_song_expired))
         return service.resolvePlayableSong(item, selectedSource?.script.orEmpty())
     }
 
@@ -140,7 +142,7 @@ fun LxOnlineScreen(
                 IconButton(onClick = onBack) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = "返回",
+                        contentDescription = stringResource(R.string.common_back),
                         tint = MiuixTheme.colorScheme.onSurface,
                         modifier = Modifier.size(24.dp)
                     )
@@ -150,7 +152,7 @@ fun LxOnlineScreen(
                 IconButton(onClick = onNavigateToSourceSettings) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Settings,
-                        contentDescription = "源管理",
+                        contentDescription = stringResource(R.string.lx_online_source_management),
                         tint = MiuixTheme.colorScheme.onSurface,
                         modifier = Modifier.size(24.dp)
                     )
@@ -166,8 +168,8 @@ fun LxOnlineScreen(
                 onClick = onNavigateToSourceSettings
             ) {
                 BasicComponent(
-                    title = selectedSource?.name ?: "未选择 LX 源",
-                    summary = selectedSource?.url ?: "点右上角齿轮导入或选择 LX 源",
+                    title = selectedSource?.name ?: stringResource(R.string.lx_online_no_source_selected),
+                    summary = selectedSource?.url ?: stringResource(R.string.lx_online_no_source_hint),
                 )
             }
 
@@ -177,22 +179,23 @@ fun LxOnlineScreen(
                 onSearch = {
                     if (state.searchQuery.isBlank()) return@OnlineTextField
                     if (selectedSource == null) {
-                        showToast("请先导入或选择一个源")
+                        showToast(context.getString(R.string.lx_online_please_import_source))
                         return@OnlineTextField
                     }
                     scope.launch {
                         state.isBusy = true
                         runCatching {
                             state.results = service.search(state.searchQuery, selectedSource)
-                            state.message = if (state.results.isEmpty()) "没有找到相关歌曲" else "找到 ${state.results.size} 首歌曲"
+                            state.message = if (state.results.isEmpty()) context.getString(R.string.lx_online_no_songs_found)
+                            else context.getString(R.string.lx_online_songs_found, state.results.size)
                         }.onFailure {
-                            state.message = it.localizedMessage ?: "搜索失败"
+                            state.message = it.localizedMessage ?: context.getString(R.string.lx_online_search_failed)
                             showToast(state.message)
                         }
                         state.isBusy = false
                     }
                 },
-                placeholder = "搜索在线歌曲、歌手",
+                placeholder = stringResource(R.string.lx_online_search_placeholder),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
             )
 
@@ -203,9 +206,10 @@ fun LxOnlineScreen(
                         state.isBusy = true
                         runCatching {
                             state.results = service.search(state.searchQuery, selectedSource)
-                            state.message = if (state.results.isEmpty()) "没有找到相关歌曲" else "找到 ${state.results.size} 首歌曲"
+                            state.message = if (state.results.isEmpty()) context.getString(R.string.lx_online_no_songs_found)
+                            else context.getString(R.string.lx_online_songs_found, state.results.size)
                         }.onFailure {
-                            state.message = it.localizedMessage ?: "搜索失败"
+                            state.message = it.localizedMessage ?: context.getString(R.string.lx_online_search_failed)
                             showToast(state.message)
                         }
                         state.isBusy = false
@@ -213,11 +217,13 @@ fun LxOnlineScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(text = "搜索")
+                Text(text = stringResource(R.string.common_search))
             }
 
             Text(
-                text = if (state.isBusy) "处理中..." else state.message,
+                text = if (state.isBusy) stringResource(R.string.lx_online_processing)
+                else if (state.hasCustomMessage) state.message
+                else stringResource(state.messageId),
                 fontSize = 13.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 maxLines = 1,
@@ -228,7 +234,7 @@ fun LxOnlineScreen(
             if (state.results.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        text = if (selectedSource == null) "请先导入或选择一个源" else "搜索后点选歌曲即可在线播放",
+                        text = if (selectedSource == null) stringResource(R.string.lx_online_please_import_source) else stringResource(R.string.lx_online_search_hint),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 }
@@ -246,7 +252,7 @@ fun LxOnlineScreen(
                                         playLazyOnlineQueue(item)
                                         if (openPlayerOnPlay) onNavigateToPlayer()
                                     }.onFailure {
-                                        state.message = it.localizedMessage ?: "播放失败"
+                                        state.message = it.localizedMessage ?: context.getString(R.string.lx_online_playback_failed)
                                         showToast(state.message)
                                     }
                                     state.isBusy = false
@@ -258,9 +264,9 @@ fun LxOnlineScreen(
                                     runCatching {
                                         val playable = service.resolvePlayableSong(item, selectedSource?.script.orEmpty())
                                         playerViewModel.addToPlaylist(playable)
-                                        showToast("已加入到播放队列")
+                                        showToast(context.getString(R.string.lx_online_added_to_queue))
                                     }.onFailure {
-                                        state.message = it.localizedMessage ?: "加入队列失败"
+                                        state.message = it.localizedMessage ?: context.getString(R.string.lx_online_add_to_queue_failed)
                                         showToast(state.message)
                                     }
                                     state.isBusy = false
@@ -274,7 +280,7 @@ fun LxOnlineScreen(
                                         enqueueDownload(context, playable)
                                         showToast(context.getString(R.string.player_download_started))
                                     }.onFailure {
-                                        state.message = it.localizedMessage ?: "下载失败"
+                                        state.message = it.localizedMessage ?: context.getString(R.string.lx_online_download_failed)
                                         showToast(state.message)
                                     }
                                     state.isBusy = false

@@ -520,7 +520,8 @@ private fun FavoriteInsightCard(
             AnalyticsSongCover(
                 song = insight.song,
                 mainViewModel = mainViewModel,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                coverSize = 512
             )
             Box(
                 modifier = Modifier
@@ -1163,11 +1164,15 @@ private fun RankingRow(
 private fun AnalyticsSongCover(
     song: Song?,
     mainViewModel: MainViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    coverSize: Int = 128
 ) {
     val coverBitmap by produceState<Bitmap?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
         value = withContext(Dispatchers.IO) {
-            song?.let(mainViewModel::getCoverArtBitmap)
+            song?.let { s ->
+                if (coverSize > 128) mainViewModel.getAlbumCoverArtBitmap(s)
+                else mainViewModel.getCoverArtBitmap(s)
+            }
         }
     }
     Box(

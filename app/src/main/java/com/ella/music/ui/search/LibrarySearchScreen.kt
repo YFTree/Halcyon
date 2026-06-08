@@ -1,6 +1,7 @@
 package com.ella.music.ui.search
 
 import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -282,6 +283,10 @@ fun LibrarySearchScreen(
                                 loadCoverArt = mainViewModel::getCoverArtBitmap,
                                 loadAudioInfo = mainViewModel::getAudioInfo,
                                 showPlayNextInLists = showPlayNextInLists,
+                                onAddToQueue = {
+                                    playerViewModel.addToPlaylist(result.song)
+                                    Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                                },
                                 onClick = {
                                     val playbackSongs = songResults.map { it.song }
                                     val index = playbackSongs.indexOfFirst { it.id == result.song.id && it.path == result.song.path }.coerceAtLeast(0)

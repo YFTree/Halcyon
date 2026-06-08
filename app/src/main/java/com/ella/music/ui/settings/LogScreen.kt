@@ -100,7 +100,7 @@ fun LogScreen(
         entries.filter { entry ->
             (selectedLevel == null || selectedLevel?.matches(entry) == true) &&
                 (selectedType == null || selectedType?.matches(entry) == true) &&
-                (keyword.isBlank() || entry.matchesKeyword(keyword))
+                (keyword.isBlank() || entry.matchesKeyword(context, keyword))
         }
     }
     val allLabel = stringResource(R.string.common_all)
@@ -137,7 +137,7 @@ fun LogScreen(
 
     fun copyEntry(entry: AppLogEntry) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(logClipLabel, entry.formatForCopy()))
+        clipboard.setPrimaryClip(ClipData.newPlainText(logClipLabel, entry.formatForCopy(context)))
         showToast(copiedToast)
         showDetailSheet = false
     }
@@ -518,16 +518,16 @@ private enum class EllaLogLevelFilter(val labelRes: Int, private val aliases: Se
     fun matches(entry: AppLogEntry): Boolean = entry.level.uppercase(Locale.ROOT) in aliases
 }
 
-private enum class EllaLogTypeFilter(val label: String, val storageNames: Set<String>, val keywords: Set<String>) {
-    APP("应用", setOf("APP"), emptySet()),
-    PLAYBACK("播放", setOf("PLAYBACK"), setOf("player", "playback", "play", "exo", "media", "audio", "decoder", "queue", "播放", "播放器", "解码", "队列")),
-    LYRICS("歌词", setOf("LYRICS"), setOf("lyric", "lyrics", "ticker", "superlyric", "lyricon", "flyme", "samsung", "bluetooth", "词幕", "歌词")),
-    LIBRARY("音乐库", setOf("LIBRARY"), setOf("scan", "scanner", "library", "folder", "album", "artist", "cover", "音乐库", "扫描", "文件夹", "专辑", "艺术家", "封面")),
-    METADATA("元数据", setOf("METADATA"), setOf("tag", "metadata", "taglib", "wav", "alac", "元数据", "标签")),
-    ONLINE("在线", setOf("ONLINE"), setOf("lx", "download", "api", "在线", "下载")),
-    NETWORK("网络", setOf("NETWORK"), setOf("network", "http", "okhttp", "webdav", "request", "response", "网络")),
-    DATABASE("数据", setOf("DATABASE"), setOf("database", "db", "room", "dao", "backup", "restore", "playlist", "stats", "数据库", "备份", "恢复")),
-    CRASH("崩溃", setOf("CRASH"), setOf("crash", "exception", "fatal", "崩溃", "闪退"));
+private enum class EllaLogTypeFilter(val storageNames: Set<String>, val keywords: Set<String>) {
+    APP(setOf("APP"), emptySet()),
+    PLAYBACK(setOf("PLAYBACK"), setOf("player", "playback", "play", "exo", "media", "audio", "decoder", "queue", "播放", "播放器", "解码", "队列")),
+    LYRICS(setOf("LYRICS"), setOf("lyric", "lyrics", "ticker", "superlyric", "lyricon", "flyme", "samsung", "bluetooth", "词幕", "歌词")),
+    LIBRARY(setOf("LIBRARY"), setOf("scan", "scanner", "library", "folder", "album", "artist", "cover", "音乐库", "扫描", "文件夹", "专辑", "艺术家", "封面")),
+    METADATA(setOf("METADATA"), setOf("tag", "metadata", "taglib", "wav", "alac", "元数据", "标签")),
+    ONLINE(setOf("ONLINE"), setOf("lx", "download", "api", "在线", "下载")),
+    NETWORK(setOf("NETWORK"), setOf("network", "http", "okhttp", "webdav", "request", "response", "网络")),
+    DATABASE(setOf("DATABASE"), setOf("database", "db", "room", "dao", "backup", "restore", "playlist", "stats", "数据库", "备份", "恢复")),
+    CRASH(setOf("CRASH"), setOf("crash", "exception", "fatal", "崩溃", "闪退"));
 
     val labelRes: Int
         get() = when (this) {
@@ -541,6 +541,8 @@ private enum class EllaLogTypeFilter(val label: String, val storageNames: Set<St
             DATABASE -> R.string.logs_type_database
             CRASH -> R.string.logs_type_crash
         }
+
+    fun label(context: Context): String = context.getString(labelRes)
 
     fun matches(entry: AppLogEntry): Boolean = entry.detectType() == this
 }
@@ -558,17 +560,17 @@ private fun AppLogEntry.detectType(): EllaLogTypeFilter {
         ?: EllaLogTypeFilter.APP
 }
 
-private fun AppLogEntry.matchesKeyword(keyword: String): Boolean {
+private fun AppLogEntry.matchesKeyword(context: Context, keyword: String): Boolean {
     return level.contains(keyword, ignoreCase = true) ||
         tag.contains(keyword, ignoreCase = true) ||
         message.contains(keyword, ignoreCase = true) ||
         throwable.orEmpty().contains(keyword, ignoreCase = true) ||
         AppLogStore.formatTime(time).contains(keyword, ignoreCase = true) ||
-        detectType().label.contains(keyword, ignoreCase = true)
+        detectType().label(context).contains(keyword, ignoreCase = true)
 }
 
-private fun AppLogEntry.formatForCopy(): String = buildString {
-    appendLine("${AppLogStore.formatTime(time)} [$level/${detectType().label}] $tag")
+private fun AppLogEntry.formatForCopy(context: Context): String = buildString {
+    appendLine("${AppLogStore.formatTime(time)} [$level/${detectType().label(context)}] $tag")
     appendLine(message)
     throwable?.takeIf { it.isNotBlank() }?.let {
         appendLine()

@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -62,6 +63,10 @@
                 <data android:scheme="ella" android:host="search" />
                 <data android:scheme="halcyon" android:host="search" />
                 <data android:scheme="halcyon" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.ella.music.action.SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
@@ -120,6 +125,11 @@
 
         <service
             android:name=".player.DesktopLyricService"
+            android:exported="false" />
+
+        <service
+            android:name=".mcp.McpServerService"
+            android:foregroundServiceType="specialUse"
             android:exported="false" />
 
         <provider

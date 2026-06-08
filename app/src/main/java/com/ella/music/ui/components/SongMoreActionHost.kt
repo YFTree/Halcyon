@@ -862,7 +862,7 @@ private fun AddToPlaylistRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${playlist.songs.size} 首歌曲",
+                text = stringResource(R.string.song_count, playlist.songs.size),
                 fontSize = 12.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 maxLines = 1,
@@ -1546,7 +1546,7 @@ private fun SongInfoActionRow(label: String, value: String, onClick: () -> Unit)
 private fun copySongInfoValue(context: Context, label: String, value: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
-    Toast.makeText(context, "已复制 $label", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, context.getString(R.string.song_more_copied, label), Toast.LENGTH_SHORT).show()
 }
 
 private fun openUrl(context: Context, url: String) {

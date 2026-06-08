@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import com.ella.music.R
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
@@ -362,7 +363,7 @@ class PlaylistStore private constructor(context: Context) {
         format: PlaylistExportFormat = PlaylistExportFormat.PlainText
     ): PlaylistBatchExportResult = withContext(Dispatchers.IO) {
         val root = DocumentFile.fromTreeUri(appContext, treeUri)
-            ?: error("无法打开导出目录")
+            ?: error(appContext.getString(R.string.playlist_export_open_directory_failed))
         val mimeType = when (format) {
             PlaylistExportFormat.PlainText -> "text/plain"
             PlaylistExportFormat.M3u -> "audio/x-mpegurl"
@@ -379,7 +380,7 @@ class PlaylistStore private constructor(context: Context) {
                 mimeType = mimeType,
                 baseName = playlist.name.safePlaylistFileName(),
                 extension = extension
-            ) ?: error("无法创建导出文件")
+            ) ?: error(appContext.getString(R.string.playlist_export_create_file_failed))
             val result = exportLocalPlaylist(playlist, target.uri, format)
             exportedPlaylists += 1
             exportedSongs += result.exportedCount
@@ -401,7 +402,7 @@ class PlaylistStore private constructor(context: Context) {
             val content = paths.joinToString(separator = "\n", postfix = if (paths.isNotEmpty()) "\n" else "")
             appContext.contentResolver.openOutputStream(uri, "wt")?.use { output ->
                 output.write(content.toByteArray(Charsets.UTF_8))
-            } ?: error("无法打开导出文件")
+            } ?: error(appContext.getString(R.string.playlist_export_open_file_failed))
             PlaylistExportResult(
                 exportedCount = paths.size,
                 skippedCount = playlist.songs.size - paths.size
@@ -427,7 +428,7 @@ class PlaylistStore private constructor(context: Context) {
             }
             appContext.contentResolver.openOutputStream(uri, "wt")?.use { output ->
                 output.write(content.toByteArray(Charsets.UTF_8))
-            } ?: error("无法打开导出文件")
+            } ?: error(appContext.getString(R.string.playlist_export_open_file_failed))
             PlaylistExportResult(
                 exportedCount = exportableSongs.size,
                 skippedCount = playlist.songs.size - exportableSongs.size
@@ -517,7 +518,7 @@ class PlaylistStore private constructor(context: Context) {
         return listOf(
             UserPlaylist(
                 id = FAVORITES_PLAYLIST_ID,
-                name = "我喜欢的音乐",
+                name = appContext.getString(R.string.playlist_favorites_default_name),
                 createdAt = now,
                 updatedAt = now
             )
@@ -557,7 +558,7 @@ class PlaylistStore private constructor(context: Context) {
             ?.substringBeforeLast('.')
             ?.trim()
             .orEmpty()
-        return displayName.ifBlank { "导入歌单" }
+        return displayName.ifBlank { appContext.getString(R.string.playlist_import_default_name) }
     }
 
     private fun String.safePlaylistFileName(): String =

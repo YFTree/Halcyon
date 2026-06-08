@@ -222,7 +222,7 @@ The Halcyon main project is licensed under **Apache-2.0**. Third-party component
 - **Lyrico** — Reference for external tag editor adaptation and log page interaction.
 - **LX Music Mobile** — Provides LX Music API compatibility implementation and testing reference.
 - **Light Cone Music** — Interface design and feature implementation reference.
-- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, LyricGetter-API, lyrico-audiotag / Lyrico, TagLib, 163KeyDecrypter, Kyant Backdrop, Coil, OkHttp, accompanist-lyrics-core, accompanist-lyrics-ui, and other open source projects used by Halcyon.
+- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, LyricGetter-API, lyrico-audiotag / Lyrico, TagLib, 163KeyDecrypter, Kyant Backdrop, Coil, OkHttp, Reorderable, accompanist-lyrics-core, accompanist-lyrics-ui, and other open source projects used by Halcyon.
 
 ---
 

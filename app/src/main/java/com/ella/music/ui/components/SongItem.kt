@@ -223,7 +223,13 @@ fun SongItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
+        Text(
+            text = song.durationText,
+            fontSize = 12.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+        )
         if (!selectionMode && showPlayNextInLists && onAddToQueue != null) {
+            Spacer(modifier = Modifier.width(8.dp))
             Box(
                 modifier = Modifier
                     .size(28.dp)
@@ -239,13 +245,7 @@ fun SongItem(
                     modifier = Modifier.size(18.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
         }
-        Text(
-            text = song.durationText,
-            fontSize = 12.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-        )
         if (!selectionMode && onDownload != null) {
             Spacer(modifier = Modifier.width(8.dp))
             Box(
@@ -325,7 +325,7 @@ private fun audioQualityColor(tag: String): Color {
         "Dolby" -> Color(0xFF6EE7FF)
         "MQ" -> Color(0xFFFF8F3D)
         "HR" -> Color(0xFFFFC23A)
-        "SQ" -> Color(0xFF69B7FF)
+        "SQ" -> Color(0xFF9B59FF)
         "HQ" -> Color(0xFF3D83FF)
         "LQ" -> Color(0xFF34C56E)
         else -> Color(0xFF9E9E9E)

@@ -1,5 +1,7 @@
 package com.ella.music.ui.folder
 
+import android.content.Context
+import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.albumIdentityId
 
@@ -33,8 +35,9 @@ internal fun List<Song>.commonFolderRoot(): String {
     return commonSegments.toFolderPath().ifBlank { "/" }
 }
 
-internal fun List<Song>.childFoldersOf(parentPath: String): List<FolderTreeEntry> {
+internal fun List<Song>.childFoldersOf(context: Context, parentPath: String): List<FolderTreeEntry> {
     val normalizedParent = parentPath.normalizeFolderPath()
+    val rootName = context.getString(R.string.folder_root)
     return asSequence()
         .mapNotNull { song ->
             val childPath = song.folderPath().immediateChildOf(normalizedParent) ?: return@mapNotNull null
@@ -44,7 +47,7 @@ internal fun List<Song>.childFoldersOf(parentPath: String): List<FolderTreeEntry
         .map { (path, songs) ->
             FolderTreeEntry(
                 path = path,
-                name = path.substringAfterLast('/').ifBlank { "根目录" },
+                name = path.substringAfterLast('/').ifBlank { rootName },
                 songCount = songs.size,
                 albumCount = songs.map { it.albumIdentityId() }.distinct().size,
                 duration = songs.sumOf { it.duration },

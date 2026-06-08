@@ -120,7 +120,7 @@ fun FolderScreen(
 
     val rootFolderPath = remember(songs) { songs.commonFolderRoot() }
     val rootSongs = remember(songs, rootFolderPath) { songs.recursiveSongsInFolder(rootFolderPath) }
-    val rootChildFolders = remember(songs, rootFolderPath) { songs.childFoldersOf(rootFolderPath) }
+    val rootChildFolders = remember(songs, rootFolderPath) { songs.childFoldersOf(context, rootFolderPath) }
 
     BackHandler(enabled = sortExpanded || searchExpanded || folderToBlock != null) {
         when {
@@ -421,6 +421,12 @@ fun ScanSettingsScreen(
     }
     var showBlockedDialog by remember { mutableStateOf(false) }
     var pendingRemoveScanFolder by remember { mutableStateOf<String?>(null) }
+    var pendingRemoveUsbUri by remember { mutableStateOf<String?>(null) }
+
+    val usbFolderUrisRaw by mainViewModel.settingsManager.usbFolderUris.collectAsState(initial = "")
+    val usbFolderUris = remember(usbFolderUrisRaw) {
+        usbFolderUrisRaw.split('\n').map { it.trim() }.filter { it.isNotBlank() }
+    }
 
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -435,7 +441,12 @@ fun ScanSettingsScreen(
             }
             val folderPath = uri.toPrimaryStoragePath()
             if (folderPath == null) {
-                Toast.makeText(context, R.string.unsupported_system_folder_path, Toast.LENGTH_SHORT).show()
+                // Non-primary storage (e.g. USB drive) -- store the SAF URI instead
+                scope.launch {
+                    mainViewModel.settingsManager.setUseAndroidMediaLibrary(false)
+                    mainViewModel.settingsManager.addUsbFolderUri(uri.toString())
+                }
+                Toast.makeText(context, R.string.folder_usb_added, Toast.LENGTH_SHORT).show()
             } else {
                 scope.launch {
                     mainViewModel.settingsManager.setUseAndroidMediaLibrary(false)
@@ -543,6 +554,16 @@ fun ScanSettingsScreen(
                     onClick = { showBlockedDialog = true }
                 )
             }
+
+            if (usbFolderUris.isNotEmpty()) {
+                item {
+                    UsbFoldersCard(
+                        usbFolderUris = usbFolderUris,
+                        onRemove = { uri -> pendingRemoveUsbUri = uri },
+                        onScan = { if (!isScanning) mainViewModel.scanMusic() }
+                    )
+                }
+            }
         }
 
         if (showBlockedDialog) {
@@ -593,6 +614,23 @@ fun ScanSettingsScreen(
                 }
             )
         }
+
+        pendingRemoveUsbUri?.let { uri ->
+            ConfirmDangerDialog(
+                show = true,
+                title = stringResource(R.string.folder_remove_usb_folder_title),
+                message = stringResource(R.string.folder_remove_usb_folder_message),
+                confirmText = stringResource(R.string.common_remove),
+                onDismiss = { pendingRemoveUsbUri = null },
+                onConfirm = {
+                    scope.launch {
+                        mainViewModel.settingsManager.removeUsbFolderUri(uri)
+                    }
+                    Toast.makeText(context, R.string.folder_usb_removed, Toast.LENGTH_SHORT).show()
+                    pendingRemoveUsbUri = null
+                }
+            )
+        }
     }
 }
 
@@ -638,6 +676,86 @@ private fun MediaSourceModeCard(
                 checked = useAndroidMediaLibrary,
                 onCheckedChange = onUseAndroidMediaLibraryChange
             )
+        }
+    }
+}
+
+@Composable
+private fun UsbFoldersCard(
+    usbFolderUris: List<String>,
+    onRemove: (String) -> Unit,
+    onScan: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.folder_usb_directories),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MiuixTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.folder_usb_directories_summary, usbFolderUris.size),
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
+                IconButton(onClick = onScan) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Refresh,
+                        contentDescription = stringResource(R.string.folder_full_scan),
+                        tint = MiuixTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+            usbFolderUris.forEach { uri ->
+                val displayName = runCatching {
+                    val docUri = android.net.Uri.parse(uri)
+                    val docId = android.provider.DocumentsContract.getTreeDocumentId(docUri)
+                    docId.substringAfterLast('/').ifBlank { docId.substringBeforeLast('/') }
+                }.getOrDefault(uri.substringAfterLast('/').ifBlank { uri })
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    FolderOutlineIcon(
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = displayName,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = uri,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = { onRemove(uri) }) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Close,
+                            contentDescription = stringResource(R.string.common_remove),
+                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }

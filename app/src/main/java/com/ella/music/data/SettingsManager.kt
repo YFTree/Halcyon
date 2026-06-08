@@ -11,6 +11,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import androidx.annotation.StringRes
+import com.ella.music.R
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
@@ -94,6 +96,7 @@ class SettingsManager(private val context: Context) {
         val KEY_PLAYER_BACKGROUND_URI = stringPreferencesKey("player_background_uri")
         val KEY_HI_RES_LOGO_ENABLED = booleanPreferencesKey("hi_res_logo_enabled")
         val KEY_HI_RES_LOGO_URI = stringPreferencesKey("hi_res_logo_uri")
+        val KEY_MCP_SERVER_ENABLED = booleanPreferencesKey("mcp_server_enabled")
         val KEY_PLAYLIST_SPECIAL_ENTRIES_VISIBLE = booleanPreferencesKey("playlist_special_entries_visible")
         val KEY_PLAYLIST_CUSTOM_ORDER = stringPreferencesKey("playlist_custom_order")
         val KEY_SHOW_PLAY_NEXT_IN_LISTS = booleanPreferencesKey("show_play_next_in_lists")
@@ -110,6 +113,8 @@ class SettingsManager(private val context: Context) {
         val KEY_WEBDAV_USERNAME = stringPreferencesKey("webdav_username")
         val KEY_WEBDAV_PASSWORD = stringPreferencesKey("webdav_password")
         val KEY_WEBDAV_LAST_URL = stringPreferencesKey("webdav_last_url")
+        val KEY_WEBDAV_BACKUP_URL = stringPreferencesKey("webdav_backup_url")
+        val KEY_WEBDAV_BACKUP_PATH = stringPreferencesKey("webdav_backup_path")
         val KEY_LX_SOURCE_URL = stringPreferencesKey("lx_source_url")
         val KEY_LX_SOURCE_NAME = stringPreferencesKey("lx_source_name")
         val KEY_LX_SOURCE_SCRIPT = stringPreferencesKey("lx_source_script")
@@ -131,6 +136,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_PERSPECTIVE_EFFECT = booleanPreferencesKey("lyric_perspective_effect")
         val KEY_SCAN_INCLUDE_FOLDERS = stringPreferencesKey("scan_include_folders")
         val KEY_SCAN_EXCLUDE_FOLDERS = stringPreferencesKey("scan_exclude_folders")
+        val KEY_USB_FOLDER_URIS = stringPreferencesKey("usb_folder_uris")
         val KEY_USE_ANDROID_MEDIA_LIBRARY = booleanPreferencesKey("use_android_media_library")
         val KEY_INITIAL_SCAN_PROMPT_HANDLED = booleanPreferencesKey("initial_scan_prompt_handled")
         val KEY_ARTIST_SEPARATORS = stringPreferencesKey("artist_separators")
@@ -150,6 +156,7 @@ class SettingsManager(private val context: Context) {
         val KEY_SORT_PLAYLIST_DETAIL_SONG = intPreferencesKey("sort_playlist_detail_song")
         val KEY_CATEGORY_GRID_COLUMNS = intPreferencesKey("category_grid_columns")
         val KEY_HOME_DAILY_MIX_VISIBLE = booleanPreferencesKey("home_daily_mix_visible")
+        val KEY_HOME_AI_MIX_VISIBLE = booleanPreferencesKey("home_ai_mix_visible")
         val KEY_HOME_SECTION_ORDER = stringPreferencesKey("home_section_order")
         val KEY_HOME_HIDDEN_SECTIONS = stringPreferencesKey("home_hidden_sections")
         val KEY_HOME_LIBRARY_TILE_ORDER = stringPreferencesKey("home_library_tile_order")
@@ -203,6 +210,22 @@ class SettingsManager(private val context: Context) {
         const val DEFAULT_SHORTCUT_LIBRARY_LABEL = "音乐库"
         const val DEFAULT_SHORTCUT_PLAYLISTS_LABEL = "歌单"
         const val DEFAULT_SHORTCUT_FOLDER_LABEL = "文件夹"
+
+        @StringRes
+        val DEFAULT_SHORTCUT_LIBRARY_LABEL_RES = R.string.settings_shortcut_library
+        @StringRes
+        val DEFAULT_SHORTCUT_PLAYLISTS_LABEL_RES = R.string.settings_shortcut_playlists
+        @StringRes
+        val DEFAULT_SHORTCUT_FOLDER_LABEL_RES = R.string.settings_shortcut_folder
+
+        fun defaultShortcutLibraryLabel(context: Context): String =
+            context.getString(DEFAULT_SHORTCUT_LIBRARY_LABEL_RES)
+
+        fun defaultShortcutPlaylistsLabel(context: Context): String =
+            context.getString(DEFAULT_SHORTCUT_PLAYLISTS_LABEL_RES)
+
+        fun defaultShortcutFolderLabel(context: Context): String =
+            context.getString(DEFAULT_SHORTCUT_FOLDER_LABEL_RES)
         const val DEFAULT_HOME_SECTION_ORDER = "library,online,recent"
         const val DEFAULT_HOME_LIBRARY_TILE_ORDER = "artist,album,folder,folder_tree,playlist,analytics,genre,year,composer,lyricist"
 
@@ -260,7 +283,7 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_STATUS_BAR_ALLOW_PHONETIC] ?: false }
     val desktopLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_ENABLED] ?: false }
     val desktopLyricHideWhenPaused: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED] ?: false }
+        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED] ?: true }
     val desktopLyricStatusBarMode: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MODE] ?: false }
     val desktopLyricStatusBarTopOffset: Flow<Int> =
@@ -272,7 +295,7 @@ class SettingsManager(private val context: Context) {
     val desktopLyricLocked: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_LOCKED] ?: false }
     val desktopLyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_FONT_SCALE] ?: 100 }
     val desktopLyricTranslationScale: Flow<Int> =
-        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_TRANSLATION_SCALE] ?: 110 }
+        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_TRANSLATION_SCALE] ?: 90 }
     val desktopLyricOpacity: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_OPACITY] ?: 100 }
     val desktopLyricTextColor: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_TEXT_COLOR] ?: -1 }
     val desktopLyricShadowStrength: Flow<Int> =
@@ -332,6 +355,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_AUDIO_VISUALIZER_ENABLED] ?: false }
     val dynamicCoverEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_DYNAMIC_COVER_ENABLED] ?: false }
+    val mcpServerEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_MCP_SERVER_ENABLED] ?: false }
     val startupPosterEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_STARTUP_POSTER_ENABLED] ?: false }
     val startupPosterUri: Flow<String> =
@@ -374,6 +399,8 @@ class SettingsManager(private val context: Context) {
     val webDavUsername: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_USERNAME] ?: "" }
     val webDavPassword: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_PASSWORD] ?: "" }
     val webDavLastUrl: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_LAST_URL] ?: "" }
+    val webDavBackupUrl: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_BACKUP_URL] ?: "" }
+    val webDavBackupPath: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_BACKUP_PATH] ?: "" }
     val lxSources: Flow<List<LxSourceConfig>> = context.dataStore.data.map { prefs -> prefs.lxSources() }
     val selectedLxSourceId: Flow<String> = context.dataStore.data.map { it[KEY_LX_SELECTED_SOURCE_ID] ?: "" }
     val selectedLxSource: Flow<LxSourceConfig?> = context.dataStore.data.map { prefs ->
@@ -405,6 +432,7 @@ class SettingsManager(private val context: Context) {
     val lyricPerspectiveEffect: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PERSPECTIVE_EFFECT] ?: false }
     val scanIncludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_INCLUDE_FOLDERS] ?: "" }
     val scanExcludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_EXCLUDE_FOLDERS] ?: "" }
+    val usbFolderUris: Flow<String> = context.dataStore.data.map { it[KEY_USB_FOLDER_URIS] ?: "" }
     val useAndroidMediaLibrary: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_USE_ANDROID_MEDIA_LIBRARY] ?: true }
     val initialScanPromptHandled: Flow<Boolean> =
@@ -443,6 +471,8 @@ class SettingsManager(private val context: Context) {
     }
     val homeDailyMixVisible: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_HOME_DAILY_MIX_VISIBLE] ?: true }
+    val homeAiMixVisible: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_HOME_AI_MIX_VISIBLE] ?: true }
     val homeSectionOrder: Flow<String> =
         context.dataStore.data.map { it[KEY_HOME_SECTION_ORDER] ?: DEFAULT_HOME_SECTION_ORDER }
     val homeHiddenSections: Flow<String> =
@@ -709,6 +739,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_DYNAMIC_COVER_ENABLED] = enabled }
     }
 
+    suspend fun setMcpServerEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_MCP_SERVER_ENABLED] = enabled }
+    }
+
     suspend fun setStartupPosterEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_STARTUP_POSTER_ENABLED] = enabled }
     }
@@ -845,12 +879,24 @@ class SettingsManager(private val context: Context) {
         }
     }
 
+    suspend fun setWebDavBackupUrl(url: String) {
+        context.dataStore.edit {
+            if (url.isBlank()) it.remove(KEY_WEBDAV_BACKUP_URL) else it[KEY_WEBDAV_BACKUP_URL] = url.trim()
+        }
+    }
+
+    suspend fun setWebDavBackupPath(path: String) {
+        context.dataStore.edit {
+            if (path.isBlank()) it.remove(KEY_WEBDAV_BACKUP_PATH) else it[KEY_WEBDAV_BACKUP_PATH] = path.trim()
+        }
+    }
+
     suspend fun setLxSource(url: String, name: String, script: String) {
         context.dataStore.edit {
             val source = LxSourceConfig(
                 id = url.toLxSourceId(script),
                 url = url.trim(),
-                name = name.ifBlank { "LX源" },
+                name = name.ifBlank { context.getString(R.string.settings_default_lx_source_name) },
                 script = script
             )
             val sources = it.lxSources().filterNot { existing -> existing.id == source.id } + source
@@ -943,7 +989,7 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setLyricFont(name: String, path: String) {
         context.dataStore.edit {
-            it[KEY_LYRIC_FONT_NAME] = name.ifBlank { "自定义字体" }
+            it[KEY_LYRIC_FONT_NAME] = name.ifBlank { context.getString(R.string.settings_default_custom_font_name) }
             it[KEY_LYRIC_FONT_PATH] = path
         }
     }
@@ -1031,6 +1077,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setHomeDailyMixVisible(visible: Boolean) {
         context.dataStore.edit { it[KEY_HOME_DAILY_MIX_VISIBLE] = visible }
+    }
+
+    suspend fun setHomeAiMixVisible(visible: Boolean) {
+        context.dataStore.edit { it[KEY_HOME_AI_MIX_VISIBLE] = visible }
     }
 
     suspend fun setHomeSectionOrder(order: String) {
@@ -1183,6 +1233,9 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_OPEN_PLAYER_ON_PLAY)
             setBoolean(KEY_STARTUP_AUTO_PLAY)
             setBoolean(KEY_HOME_DAILY_MIX_VISIBLE)
+            setBoolean(KEY_HOME_AI_MIX_VISIBLE)
+            setBoolean(KEY_MCP_SERVER_ENABLED)
+            setBoolean(KEY_SLEEP_TIMER_STOP_AFTER_CURRENT)
 
             setInt(KEY_THEME_MODE)
             setInt(KEY_MIN_DURATION)
@@ -1210,6 +1263,11 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_SORT_PLAYLIST_LIST)
             setInt(KEY_SORT_PLAYLIST_DETAIL_SONG)
             setInt(KEY_CATEGORY_GRID_COLUMNS)
+            setInt(KEY_MINI_PLAYER_LYRIC_SECONDARY)
+            setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_TOP_OFFSET)
+            setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_POSITION)
+            setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY)
+            setInt(KEY_SLEEP_TIMER_CUSTOM_MINUTES)
 
             val dynamicSortKeyPrefixes = listOf(
                 "sort_metadata_category_",
@@ -1228,6 +1286,8 @@ class SettingsManager(private val context: Context) {
             setString(KEY_WEBDAV_USERNAME)
             setString(KEY_WEBDAV_PASSWORD)
             setString(KEY_WEBDAV_LAST_URL)
+            setString(KEY_WEBDAV_BACKUP_URL)
+            setString(KEY_WEBDAV_BACKUP_PATH)
             setString(KEY_LX_SOURCE_URL)
             setString(KEY_LX_SOURCE_NAME)
             setString(KEY_LX_SOURCE_SCRIPT)
@@ -1251,6 +1311,7 @@ class SettingsManager(private val context: Context) {
             setString(KEY_SHORTCUT_FOLDER_LABEL)
             setString(KEY_SCAN_INCLUDE_FOLDERS)
             setString(KEY_SCAN_EXCLUDE_FOLDERS)
+            setString(KEY_USB_FOLDER_URIS)
             setString(KEY_ARTIST_SEPARATORS)
             setString(KEY_ARTIST_PROTECTED_NAMES)
             setString(KEY_GENRE_SEPARATORS)
@@ -1259,11 +1320,43 @@ class SettingsManager(private val context: Context) {
             setString(KEY_HOME_HIDDEN_SECTIONS)
             setString(KEY_HOME_LIBRARY_TILE_ORDER)
             setString(KEY_HOME_HIDDEN_LIBRARY_TILES)
+            setString(KEY_APP_LANGUAGE)
+            setString(KEY_BOTTOM_BAR_GLASS_EFFECT)
+            setString(KEY_PLAYLIST_CUSTOM_ORDER)
         }
     }
 
     suspend fun setScanExcludeFolders(folders: String) {
         context.dataStore.edit { it[KEY_SCAN_EXCLUDE_FOLDERS] = folders.trim() }
+    }
+
+    suspend fun setUsbFolderUris(uris: String) {
+        context.dataStore.edit { it[KEY_USB_FOLDER_URIS] = uris.trim() }
+    }
+
+    suspend fun addUsbFolderUri(uri: String) {
+        context.dataStore.edit { prefs ->
+            val existing = prefs[KEY_USB_FOLDER_URIS].orEmpty()
+                .split('\n')
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+            val updated = (existing + uri.trim()).distinct().joinToString("\n")
+            prefs[KEY_USB_FOLDER_URIS] = updated
+        }
+    }
+
+    suspend fun removeUsbFolderUri(uri: String) {
+        context.dataStore.edit { prefs ->
+            val existing = prefs[KEY_USB_FOLDER_URIS].orEmpty()
+                .split('\n')
+                .map { it.trim() }
+                .filter { it.isNotBlank() && it != uri.trim() }
+            if (existing.isEmpty()) {
+                prefs.remove(KEY_USB_FOLDER_URIS)
+            } else {
+                prefs[KEY_USB_FOLDER_URIS] = existing.joinToString("\n")
+            }
+        }
     }
 
     suspend fun setDecoderMode(mode: Int) {
@@ -1282,7 +1375,7 @@ class SettingsManager(private val context: Context) {
             LxSourceConfig(
                 id = legacyUrl.toLxSourceId(legacyScript),
                 url = legacyUrl,
-                name = this[KEY_LX_SOURCE_NAME].orEmpty().ifBlank { "LX源" },
+                name = this[KEY_LX_SOURCE_NAME].orEmpty().ifBlank { context.getString(R.string.settings_default_lx_source_name) },
                 script = legacyScript
             )
         )
@@ -1297,7 +1390,7 @@ class SettingsManager(private val context: Context) {
                 LxSourceConfig(
                     id = item.optString("id"),
                     url = item.optString("url"),
-                    name = item.optString("name").ifBlank { "LX源" },
+                    name = item.optString("name").ifBlank { context.getString(R.string.settings_default_lx_source_name) },
                     script = item.optString("script")
                 )
             }.filter { it.id.isNotBlank() && it.script.isNotBlank() }

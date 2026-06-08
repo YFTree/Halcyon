@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -285,7 +286,7 @@ fun ArtistScreen(
                 ArtistTab.Songs -> {
                     item {
                         Text(
-                            text = "${sortedArtistSongs.size} 首歌曲 · ${sortMode.label}",
+                            text = stringResource(R.string.artist_song_count_sorted, sortedArtistSongs.size, stringResource(sortMode.labelRes)),
                             fontSize = 13.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -326,7 +327,7 @@ fun ArtistScreen(
                 ArtistTab.ParticipatedAlbums -> {
                     item {
                         Text(
-                            text = "${sortedParticipatedAlbums.size} 个参与专辑 · ${albumSortMode.label}",
+                            text = stringResource(R.string.artist_participated_album_count_sorted, sortedParticipatedAlbums.size, stringResource(albumSortMode.labelRes)),
                             fontSize = 13.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -348,7 +349,7 @@ fun ArtistScreen(
                 ArtistTab.ReleaseAlbums -> {
                     item {
                         Text(
-                            text = "${sortedReleaseAlbums.size} 个发行专辑 · ${albumSortMode.label}",
+                            text = stringResource(R.string.artist_release_album_count_sorted, sortedReleaseAlbums.size, stringResource(albumSortMode.labelRes)),
                             fontSize = 13.sp,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -371,7 +372,7 @@ fun ArtistScreen(
             if (selectedArtistTab != ArtistTab.Songs && (selectedArtistTab == ArtistTab.ParticipatedAlbums && participatedAlbums.isEmpty() || selectedArtistTab == ArtistTab.ReleaseAlbums && releaseAlbums.isEmpty())) {
                 item {
                     Text(
-                        text = "暂无专辑",
+                        text = stringResource(R.string.artist_no_albums),
                         fontSize = 14.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp)
@@ -394,7 +395,7 @@ fun ArtistScreen(
         ) {
             Icon(
                 imageVector = MiuixIcons.Regular.Back,
-                contentDescription = "返回",
+                contentDescription = stringResource(R.string.common_back),
                 tint = Color.White,
                 modifier = Modifier.size(26.dp)
             )
@@ -418,7 +419,7 @@ fun ArtistScreen(
         ) {
             Icon(
                 imageVector = if (selectionMode) MiuixIcons.Regular.Add else MiuixIcons.Regular.SelectAll,
-                contentDescription = if (selectionMode) "添加到歌单" else "多选",
+                contentDescription = stringResource(if (selectionMode) R.string.player_add_to_playlist else R.string.common_multi_select),
                 tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
@@ -435,7 +436,7 @@ fun ArtistScreen(
         ) {
             Icon(
                 imageVector = MiuixIcons.Regular.Sort,
-                contentDescription = "排序",
+                contentDescription = stringResource(R.string.common_sort),
                 tint = if (selectionMode) Color.White.copy(alpha = 0.36f) else Color.White,
                 modifier = Modifier.size(24.dp)
             )
@@ -483,7 +484,7 @@ fun ArtistScreen(
                 if (selectedArtistTab == ArtistTab.Songs) {
                     ArtistDetailSongSortMode.entries.forEach { mode ->
                         Text(
-                            text = mode.label,
+                            text = stringResource(mode.labelRes),
                             fontSize = 14.sp,
                             fontWeight = if (sortMode == mode) FontWeight.Bold else FontWeight.Normal,
                             color = if (sortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
@@ -501,7 +502,7 @@ fun ArtistScreen(
                 } else {
                     ArtistDetailAlbumSortMode.entries.forEach { mode ->
                         Text(
-                            text = mode.label,
+                            text = stringResource(mode.labelRes),
                             fontSize = 14.sp,
                             fontWeight = if (albumSortMode == mode) FontWeight.Bold else FontWeight.Normal,
                             color = if (albumSortMode == mode) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
@@ -541,7 +542,7 @@ fun ArtistScreen(
             WindowBottomSheet(
                 show = true,
                 enableNestedScroll = false,
-                title = "添加到歌单",
+                title = stringResource(R.string.player_add_to_playlist),
                 onDismissRequest = { playlistPickerSong = null }
             ) {
                 AddToPlaylistSheet(
@@ -556,7 +557,7 @@ fun ArtistScreen(
                         selectedPlaylists.forEach { playlist ->
                             mainViewModel.addSongsToPlaylist(playlist.id, listOf(song), appendToEnd)
                         }
-                        Toast.makeText(context, "已添加到 ${selectedPlaylists.size} 个歌单", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.player_added_to_playlists, selectedPlaylists.size), Toast.LENGTH_SHORT).show()
                         playlistPickerSong = null
                     }
                 )
@@ -581,7 +582,7 @@ fun ArtistScreen(
             WindowBottomSheet(
                 show = true,
                 enableNestedScroll = false,
-                title = "添加到歌单",
+                title = stringResource(R.string.player_add_to_playlist),
                 onDismissRequest = { playlistPickerSongs = null }
             ) {
                 AddToPlaylistSheet(
@@ -597,7 +598,7 @@ fun ArtistScreen(
                         selectedPlaylists.forEach { playlist ->
                             mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd, appendToEnd)
                         }
-                        Toast.makeText(context, "已添加到 ${selectedPlaylists.size} 个歌单", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.player_added_to_playlists, selectedPlaylists.size), Toast.LENGTH_SHORT).show()
                         playlistPickerSongs = null
                         finishSelectionMode()
                     }
@@ -622,7 +623,7 @@ fun ArtistScreen(
             WindowBottomSheet(
                 show = true,
                 enableNestedScroll = false,
-                title = "编辑歌曲标签信息",
+                title = stringResource(R.string.song_more_edit_tags_title),
                 onDismissRequest = { tagEditorSong = null }
             ) {
                 ArtistTagEditorMenu(
@@ -640,7 +641,7 @@ fun ArtistScreen(
             WindowBottomSheet(
                 show = true,
                 enableNestedScroll = false,
-                title = "歌曲信息",
+                title = stringResource(R.string.player_song_info),
                 onDismissRequest = { songInfoSheetSong = null }
             ) {
                 ArtistSongInfoMenu(
@@ -659,7 +660,7 @@ fun ArtistScreen(
             WindowBottomSheet(
                 show = true,
                 enableNestedScroll = false,
-                title = "AI 解读歌曲",
+                title = stringResource(R.string.song_more_ai_title),
                 onDismissRequest = { aiInterpretationSong = null }
             ) {
                 ArtistAiInterpretationMenu(
@@ -688,13 +689,13 @@ private fun ArtistJumpActions(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (hasComposerCategory) {
-            ArtistJumpChip("作曲家页", onComposerClick)
+            ArtistJumpChip(stringResource(R.string.artist_composer_page), onComposerClick)
         }
         if (hasLyricistCategory) {
-            ArtistJumpChip("作词家页", onLyricistClick)
+            ArtistJumpChip(stringResource(R.string.artist_lyricist_page), onLyricistClick)
         }
         if (hasNeteaseArtist) {
-            ArtistJumpChip("网易云歌手页", onNeteaseClick)
+            ArtistJumpChip(stringResource(R.string.artist_netease_artist_page), onNeteaseClick)
         }
     }
 }
@@ -719,10 +720,10 @@ private fun openUrl(context: Context, url: String) {
     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
 }
 
-private enum class ArtistTab(val label: String) {
-    Songs("歌曲"),
-    ParticipatedAlbums("参与专辑"),
-    ReleaseAlbums("发行专辑")
+private enum class ArtistTab(@StringRes val labelRes: Int) {
+    Songs(R.string.artist_tab_songs),
+    ParticipatedAlbums(R.string.artist_tab_participated_albums),
+    ReleaseAlbums(R.string.artist_tab_release_albums)
 }
 
 @Composable
@@ -751,17 +752,17 @@ private fun ArtistSongActionMenu(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
         )
-        ArtistMenuItem("添加到歌单", onAddToPlaylist)
-        ArtistMenuItem("下一首播放", onPlayNext)
-        ArtistMenuItem("分享", onShare)
-        ArtistMenuItem("查看频谱", onSpectrum)
-        ArtistMenuItem("AI 解读歌曲", onAiInterpret)
-        ArtistMenuItem("查看歌曲信息", onInfo)
-        ArtistMenuItem("艺术家：${song.artist.ifBlank { "未知艺术家" }}", onArtist)
-        ArtistMenuItem("专辑：${song.album.ifBlank { "未知专辑" }}", onAlbum)
-        ArtistMenuItem("编辑歌曲标签信息", onEditTag)
-        ArtistMenuItem("永久删除", onDelete, danger = true)
-        ArtistMenuItem("取消", onDismiss)
+        ArtistMenuItem(stringResource(R.string.player_add_to_playlist), onAddToPlaylist)
+        ArtistMenuItem(stringResource(R.string.song_more_play_next), onPlayNext)
+        ArtistMenuItem(stringResource(R.string.common_share), onShare)
+        ArtistMenuItem(stringResource(R.string.song_more_view_spectrum), onSpectrum)
+        ArtistMenuItem(stringResource(R.string.song_more_ai_title), onAiInterpret)
+        ArtistMenuItem(stringResource(R.string.song_more_view_song_info), onInfo)
+        ArtistMenuItem(stringResource(R.string.song_more_artist_entry, song.artist.ifBlank { stringResource(R.string.player_unknown_artist) }), onArtist)
+        ArtistMenuItem(stringResource(R.string.song_more_album_entry, song.album.ifBlank { stringResource(R.string.player_unknown_album) }), onAlbum)
+        ArtistMenuItem(stringResource(R.string.song_more_edit_tags_title), onEditTag)
+        ArtistMenuItem(stringResource(R.string.song_more_delete_permanently), onDelete, danger = true)
+        ArtistMenuItem(stringResource(R.string.common_cancel), onDismiss)
     }
 }
 
@@ -777,16 +778,16 @@ private fun ArtistAddToPlaylistMenu(
     ArtistSheetColumn {
         ArtistSheetHandle()
         Text(
-            text = "添加到歌单",
+            text = stringResource(R.string.player_add_to_playlist),
             fontSize = 18.sp,
             fontWeight = FontWeight.ExtraBold,
             color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
         )
-        ArtistMenuItem("新建歌单", onCreatePlaylist)
+        ArtistMenuItem(stringResource(R.string.song_more_create_playlist), onCreatePlaylist)
         if (playlists.isEmpty()) {
             Text(
-                text = "暂无自定义歌单",
+                text = stringResource(R.string.song_more_no_custom_playlists),
                 fontSize = 14.sp,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 18.dp)
@@ -794,7 +795,7 @@ private fun ArtistAddToPlaylistMenu(
         } else {
             playlists.forEach { playlist ->
                 val selected = playlist.id in selectedPlaylistIds
-                ArtistMenuItem("${if (selected) "✓ " else ""}${playlist.name} · ${playlist.songs.size} 首", onClick = {
+                ArtistMenuItem(stringResource(R.string.song_more_playlist_item_summary, if (selected) "✓ " else "", playlist.name, playlist.songs.size), onClick = {
                     selectedPlaylistIds = if (selected) {
                         selectedPlaylistIds - playlist.id
                     } else {
@@ -804,13 +805,13 @@ private fun ArtistAddToPlaylistMenu(
             }
         }
         if (playlists.isNotEmpty()) {
-            ArtistMenuItem("完成（${selectedPlaylistIds.size}）", onClick = {
+            ArtistMenuItem(stringResource(R.string.song_more_done_selected, selectedPlaylistIds.size), onClick = {
                 if (selectedPlaylists.isNotEmpty()) {
                     onPlaylistsConfirm(selectedPlaylists, false)
                 }
             })
         }
-        ArtistMenuItem("取消", onDismiss)
+        ArtistMenuItem(stringResource(R.string.common_cancel), onDismiss)
     }
 }
 
@@ -865,7 +866,7 @@ private fun ArtistTagEditorMenu(
     ArtistSheetColumn {
         ArtistSheetHandle()
         Text(
-            text = "编辑歌曲标签信息",
+            text = stringResource(R.string.song_more_edit_tags_title),
             fontSize = 18.sp,
             fontWeight = FontWeight.ExtraBold,
             color = MiuixTheme.colorScheme.onSurface,
@@ -882,7 +883,7 @@ private fun ArtistTagEditorMenu(
         options.forEach { option ->
             ArtistMenuItem(option.label, onClick = { onOptionClick(option) })
         }
-        ArtistMenuItem("取消", onDismiss)
+        ArtistMenuItem(stringResource(R.string.common_cancel), onDismiss)
     }
 }
 
@@ -902,20 +903,20 @@ private fun ArtistSongInfoMenu(
     ArtistSheetColumn {
         ArtistSheetHandle()
         Text(
-            text = "歌曲信息",
+            text = stringResource(R.string.player_song_info),
             fontSize = 18.sp,
             fontWeight = FontWeight.ExtraBold,
             color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
         )
-        ArtistMenuItem("AI 解读歌曲", onAiInterpret)
-        ArtistInfoRow("标题", tagInfo?.title?.ifBlank { song.title } ?: song.title)
-        ArtistInfoRow("艺术家", tagInfo?.artist?.ifBlank { song.artist } ?: song.artist)
-        ArtistInfoRow("专辑", tagInfo?.album?.ifBlank { song.album } ?: song.album)
-        ArtistInfoRow("专辑艺术家", tagInfo?.albumArtist?.ifBlank { song.albumArtist }.orEmpty())
-        ArtistInfoRow("注释", tagInfo?.displayComment.orEmpty())
-        ArtistInfoRow("音频", audioInfo?.let { detailedAudioInfo(it) }.orEmpty())
-        ArtistInfoRow("路径", song.path)
+        ArtistMenuItem(stringResource(R.string.song_more_ai_title), onAiInterpret)
+        ArtistInfoRow(stringResource(R.string.song_more_metadata_title), tagInfo?.title?.ifBlank { song.title } ?: song.title)
+        ArtistInfoRow(stringResource(R.string.song_more_metadata_artist), tagInfo?.artist?.ifBlank { song.artist } ?: song.artist)
+        ArtistInfoRow(stringResource(R.string.song_more_metadata_album), tagInfo?.album?.ifBlank { song.album } ?: song.album)
+        ArtistInfoRow(stringResource(R.string.song_more_metadata_album_artist), tagInfo?.albumArtist?.ifBlank { song.albumArtist }.orEmpty())
+        ArtistInfoRow(stringResource(R.string.song_more_metadata_comment), tagInfo?.displayComment.orEmpty())
+        ArtistInfoRow(stringResource(R.string.artist_info_audio), audioInfo?.let { detailedAudioInfo(it) }.orEmpty())
+        ArtistInfoRow(stringResource(R.string.song_more_detail_path), song.path)
     }
 }
 
@@ -931,7 +932,7 @@ private fun ArtistAiInterpretationMenu(
     ArtistSheetColumn {
         ArtistSheetHandle()
         Text(
-            text = "AI 解读歌曲",
+            text = stringResource(R.string.song_more_ai_title),
             fontSize = 18.sp,
             fontWeight = FontWeight.ExtraBold,
             color = MiuixTheme.colorScheme.onSurface,
@@ -939,9 +940,9 @@ private fun ArtistAiInterpretationMenu(
         )
         Text(
             text = when {
-                result == null -> "正在读取歌曲信息和歌词..."
+                result == null -> stringResource(R.string.song_more_loading_ai)
                 result?.isSuccess == true -> result?.getOrNull().orEmpty()
-                else -> result?.exceptionOrNull()?.message ?: "AI 解读失败"
+                else -> result?.exceptionOrNull()?.message ?: stringResource(R.string.song_more_ai_failed)
             },
             fontSize = 14.sp,
             lineHeight = 22.sp,
@@ -952,7 +953,7 @@ private fun ArtistAiInterpretationMenu(
                 .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f))
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         )
-        ArtistMenuItem("关闭", onDismiss)
+        ArtistMenuItem(stringResource(R.string.common_close), onDismiss)
     }
 }
 
@@ -1026,7 +1027,7 @@ private fun ArtistInfoRow(label: String, value: String) {
             text = value,
             fontSize = 14.sp,
             color = MiuixTheme.colorScheme.onSurface,
-            maxLines = if (label == "路径" || label == "音频") 4 else 2,
+            maxLines = if (label == stringResource(R.string.song_more_detail_path) || label == stringResource(R.string.artist_info_audio)) 4 else 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 2.dp)
         )
@@ -1048,7 +1049,7 @@ private fun ArtistTabRow(
         tabs.forEach { tab ->
             val selected = tab == selectedTab
             Text(
-                text = tab.label,
+                text = stringResource(tab.labelRes),
                 fontSize = 14.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                 color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurface,
@@ -1122,7 +1123,7 @@ private fun ArtistHeader(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = artistName.ifBlank { "未知歌手" },
+                text = artistName.ifBlank { stringResource(R.string.player_unknown_artist) },
                 fontSize = 36.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = headerTextColor,
@@ -1131,7 +1132,7 @@ private fun ArtistHeader(
             )
 
             Text(
-                text = "$albumCount 张专辑 · $songCount 首歌曲",
+                text = stringResource(R.string.artist_album_song_summary, albumCount, songCount),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = headerSubTextColor,
@@ -1140,7 +1141,7 @@ private fun ArtistHeader(
             )
 
             AppleStylePlayButton(
-                text = "播放全部",
+                text = stringResource(R.string.play_all),
                 onClick = onPlayAll,
                 modifier = Modifier
                     .padding(top = 12.dp)
@@ -1160,17 +1161,17 @@ private fun SectionTitle(text: String) {
     )
 }
 
-private enum class ArtistDetailSongSortMode(val label: String) {
-    Title("歌曲名称"),
-    AlbumTrack("专辑曲序"),
-    FileName("文件名"),
-    Duration("歌曲时长"),
-    DateAdded("添加时间"),
-    DateAddedAsc("添加时间升序"),
-    DateModified("修改时间"),
-    DateModifiedAsc("修改时间升序"),
-    YearAsc("发行时间正序"),
-    YearDesc("发行时间倒序")
+private enum class ArtistDetailSongSortMode(@StringRes val labelRes: Int) {
+    Title(R.string.artist_sort_title),
+    AlbumTrack(R.string.artist_sort_album_track),
+    FileName(R.string.artist_sort_file_name),
+    Duration(R.string.artist_sort_duration),
+    DateAdded(R.string.artist_sort_date_added),
+    DateAddedAsc(R.string.artist_sort_date_added_asc),
+    DateModified(R.string.artist_sort_date_modified),
+    DateModifiedAsc(R.string.artist_sort_date_modified_asc),
+    YearAsc(R.string.artist_sort_year_asc),
+    YearDesc(R.string.artist_sort_year_desc)
 }
 
 private fun List<Song>.sortedForArtistDetail(mode: ArtistDetailSongSortMode): List<Song> {
@@ -1193,12 +1194,12 @@ private fun List<Song>.sortedForArtistDetail(mode: ArtistDetailSongSortMode): Li
     }
 }
 
-private enum class ArtistDetailAlbumSortMode(val label: String) {
-    YearAsc("发行时间正序"),
-    YearDesc("发行时间倒序"),
-    SongCount("歌曲数"),
-    Duration("歌曲时长"),
-    Name("专辑名称")
+private enum class ArtistDetailAlbumSortMode(@StringRes val labelRes: Int) {
+    YearAsc(R.string.artist_sort_year_asc),
+    YearDesc(R.string.artist_sort_year_desc),
+    SongCount(R.string.artist_sort_song_count),
+    Duration(R.string.artist_sort_duration),
+    Name(R.string.artist_sort_album_name)
 }
 
 private fun List<Album>.sortedForArtistAlbumDetail(
@@ -1241,8 +1242,9 @@ private fun ArtistAlbumRow(
     albumArtUri: Uri?,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
     val summary = buildList {
-        add("${album.songCount} 首歌曲")
+        add(context.getString(R.string.artist_album_song_summary_detail, album.songCount))
         if (album.year.isNotBlank()) add(album.year)
         add(duration.formatArtistDetailDuration())
     }.joinToString(" · ")

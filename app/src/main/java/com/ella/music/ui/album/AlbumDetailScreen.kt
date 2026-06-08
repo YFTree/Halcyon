@@ -110,6 +110,7 @@ fun AlbumDetailScreen(
     val ratingRevision by mainViewModel.ratingRevision.collectAsState()
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = false)
     val sortIndex by mainViewModel.settingsManager.albumDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.albumDetailSongSortIndex)
+    val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val sortMode = AlbumDetailSongSortMode.entries.getOrElse(sortIndex) { AlbumDetailSongSortMode.Track }
     val scope = rememberCoroutineScope()
     var sortExpanded by remember { mutableStateOf(false) }
@@ -263,8 +264,9 @@ fun AlbumDetailScreen(
             item {
                 Text(
                     text = stringResource(
-                        R.string.library_song_count_sorted,
+                        R.string.album_sort_summary,
                         sortedAlbumSongs.size,
+                        albumDuration.formatPlaybackDuration(),
                         stringResource(sortMode.labelRes)
                     ),
                     fontSize = 13.sp,
@@ -302,7 +304,8 @@ fun AlbumDetailScreen(
                                 selectedIds = selectedIds + song.id
                             },
                             onSelectionClick = { toggleSelection(song) },
-                            onMore = { actionSong = song }
+                            onMore = { actionSong = song },
+                            showPlayNextInLists = showPlayNextInLists
                         )
                     }
                 }
@@ -327,7 +330,8 @@ fun AlbumDetailScreen(
                             selectedIds = selectedIds + song.id
                         },
                         onSelectionClick = { toggleSelection(song) },
-                        onMore = { actionSong = song }
+                        onMore = { actionSong = song },
+                        showPlayNextInLists = showPlayNextInLists
                     )
                 }
             }
@@ -336,7 +340,8 @@ fun AlbumDetailScreen(
                 albumGenres.isNotEmpty() ||
                 participatingArtists.isNotEmpty() ||
                 participatingComposers.isNotEmpty() ||
-                participatingLyricists.isNotEmpty()
+                participatingLyricists.isNotEmpty() ||
+                album?.year?.takeIf { it.isNotBlank() } != null
             ) {
                 item(key = "album-extra-info") {
                     AlbumCopyrightFooter(
@@ -345,10 +350,12 @@ fun AlbumDetailScreen(
                         artists = participatingArtists,
                         composers = participatingComposers,
                         lyricists = participatingLyricists,
+                        year = album?.year?.takeIf { it.isNotBlank() },
                         onGenreClick = { genre -> onNavigateToMetadataCategory("genre", genre) },
                         onArtistClick = onNavigateToArtist,
                         onComposerClick = { composer -> onNavigateToMetadataCategory("composer", composer) },
-                        onLyricistClick = { lyricist -> onNavigateToMetadataCategory("lyricist", lyricist) }
+                        onLyricistClick = { lyricist -> onNavigateToMetadataCategory("lyricist", lyricist) },
+                        onYearClick = { year -> onNavigateToMetadataCategory("year", year) }
                     )
                 }
             }
@@ -556,10 +563,12 @@ private fun AlbumCopyrightFooter(
     artists: List<String>,
     composers: List<String>,
     lyricists: List<String>,
+    year: String?,
     onGenreClick: (String) -> Unit,
     onArtistClick: (String) -> Unit,
     onComposerClick: (String) -> Unit,
-    onLyricistClick: (String) -> Unit
+    onLyricistClick: (String) -> Unit,
+    onYearClick: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -571,6 +580,13 @@ private fun AlbumCopyrightFooter(
             title = stringResource(R.string.album_copyright),
             values = copyright.lines().filter { it.isNotBlank() }
         )
+        if (!year.isNullOrBlank()) {
+            AlbumInfoSection(
+                title = stringResource(R.string.category_year),
+                values = listOf(year),
+                onValueClick = onYearClick
+            )
+        }
         AlbumInfoSection(
             title = stringResource(R.string.category_genre),
             values = genres,
@@ -578,7 +594,7 @@ private fun AlbumCopyrightFooter(
         )
         if (artists.isNotEmpty() || composers.isNotEmpty() || lyricists.isNotEmpty()) {
             Text(
-                text = stringResource(R.string.album_participating_artists),
+                text = stringResource(R.string.album_participating_artists_label),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
@@ -661,7 +677,8 @@ private fun AlbumSongRow(
     selected: Boolean,
     onLongClick: () -> Unit,
     onSelectionClick: () -> Unit,
-    onMore: () -> Unit
+    onMore: () -> Unit,
+    showPlayNextInLists: Boolean
 ) {
     AlbumTrackRow(
         song = song,
@@ -683,6 +700,7 @@ private fun AlbumSongRow(
             playerViewModel.setPlaylist(sortedAlbumSongs, safeIndex)
             if (openPlayerOnPlay) onNavigateToPlayer()
         },
+        showPlayNextInLists = showPlayNextInLists,
         onAddToQueue = { playerViewModel.addToPlaylist(song) },
         onMore = onMore
     )
@@ -702,6 +720,7 @@ private fun AlbumTrackRow(
     selected: Boolean,
     onLongClick: () -> Unit,
     onClick: () -> Unit,
+    showPlayNextInLists: Boolean,
     onAddToQueue: () -> Unit,
     onMore: () -> Unit
 ) {
@@ -743,7 +762,7 @@ private fun AlbumTrackRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = song.title,
-                    fontSize = 18.sp,
+                    fontSize = 15.sp,
                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                     color = if (isCurrent) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -762,15 +781,19 @@ private fun AlbumTrackRow(
             Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!qualityTag.isNullOrBlank()) {
-                    Text(
-                        text = qualityTag,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MiuixTheme.colorScheme.primary,
+                    Box(
                         modifier = Modifier
-                            .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(3.dp))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                    )
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(albumDetailQualityColor(qualityTag).copy(alpha = 0.18f))
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (qualityTag == "Dolby") "ᴶᴶ" else qualityTag,
+                            fontSize = 9.sp,
+                            color = albumDetailQualityColor(qualityTag)
+                        )
+                    }
                     Spacer(modifier = Modifier.width(6.dp))
                 }
                 Text(
@@ -784,14 +807,22 @@ private fun AlbumTrackRow(
         }
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = "+",
-            fontSize = 18.sp,
-            color = MiuixTheme.colorScheme.primary,
-            modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .clickable(onClick = onAddToQueue)
-                .padding(horizontal = 10.dp, vertical = 4.dp)
+            text = song.duration.formatPlaybackDuration(),
+            fontSize = 13.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.padding(end = 4.dp)
         )
+        if (!selectionMode && showPlayNextInLists) {
+            Text(
+                text = "+",
+                fontSize = 18.sp,
+                color = MiuixTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable(onClick = onAddToQueue)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            )
+        }
         Text(
             text = "⋮",
             fontSize = 24.sp,
@@ -856,8 +887,8 @@ private fun AlbumHeader(
             ) {
                 Text(
                     text = album?.name ?: stringResource(R.string.player_unknown_album),
-                    fontSize = 24.sp,
-                    lineHeight = 32.sp,
+                    fontSize = 20.sp,
+                    lineHeight = 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = MiuixTheme.colorScheme.onSurface,
                     maxLines = 3,
@@ -874,27 +905,16 @@ private fun AlbumHeader(
                         modifier = Modifier.clickable(onClick = onAlbumArtistClick)
                     )
                 }
-                Text(
-                    text = album?.year?.takeIf { it.isNotBlank() }
-                        ?: stringResource(R.string.album_unknown_year),
-                    fontSize = 14.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.clickable(enabled = !album?.year.isNullOrBlank(), onClick = onReleaseYearClick)
-                )
+                val albumYearText = album?.year?.takeIf { it.isNotBlank() }
+                if (albumYearText != null) {
+                    Text(
+                        text = albumYearText,
+                        fontSize = 14.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.clickable(onClick = onReleaseYearClick)
+                    )
+                }
             }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AlbumStatItem(value = songCount.toString(), label = stringResource(R.string.album_stat_songs))
-            AlbumStatItem(value = duration.formatPlaybackDuration(), label = stringResource(R.string.album_stat_duration))
-            AlbumStatItem(
-                value = album?.year?.takeIf { it.isNotBlank() } ?: stringResource(R.string.album_unknown_year),
-                label = stringResource(R.string.album_stat_year)
-            )
         }
 
         Row(
@@ -902,7 +922,7 @@ private fun AlbumHeader(
             verticalAlignment = Alignment.CenterVertically
         ) {
             AppleStylePlayButton(
-                text = stringResource(R.string.play_all),
+                text = stringResource(R.string.album_play_all),
                 onClick = onPlayAll,
                 modifier = Modifier.weight(1f)
             )
@@ -920,27 +940,6 @@ private fun AlbumHeader(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun AlbumStatItem(value: String, label: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(
-            text = value,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-        )
     }
 }
 
@@ -997,5 +996,17 @@ private fun List<Song>.sortedForAlbumDetail(mode: AlbumDetailSongSortMode): List
         AlbumDetailSongSortMode.DateAddedAsc -> sortedBy { it.dateAdded }
         AlbumDetailSongSortMode.DateModified -> sortedByDescending { it.dateModified }
         AlbumDetailSongSortMode.DateModifiedAsc -> sortedBy { it.dateModified }
+    }
+}
+
+private fun albumDetailQualityColor(tag: String): Color {
+    return when (tag) {
+        "Dolby" -> Color(0xFF6EE7FF)
+        "MQ" -> Color(0xFFFF8F3D)
+        "HR" -> Color(0xFFFFC23A)
+        "SQ" -> Color(0xFF9B59FF)
+        "HQ" -> Color(0xFF3D83FF)
+        "LQ" -> Color(0xFF34C56E)
+        else -> Color(0xFF9E9E9E)
     }
 }

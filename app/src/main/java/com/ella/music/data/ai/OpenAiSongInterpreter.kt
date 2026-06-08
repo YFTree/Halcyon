@@ -1,5 +1,7 @@
 package com.ella.music.data.ai
 
+import android.content.Context
+import com.ella.music.R
 import com.ella.music.data.AppNetworkLoggingInterceptor
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
@@ -28,6 +30,7 @@ data class OpenAiSongInterpretationInput(
 )
 
 class OpenAiSongInterpreter(
+    private val context: Context,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -42,7 +45,7 @@ class OpenAiSongInterpreter(
         input: OpenAiSongInterpretationInput
     ): String {
         val apiKey = config.apiKey.trim()
-        if (apiKey.isBlank()) error("请先在设置中填写 OpenAI API Key")
+        if (apiKey.isBlank()) error(context.getString(R.string.error_openai_missing_api_key))
 
         val endpoint = config.baseUrl.toChatCompletionsEndpoint()
         val requestBody = JSONObject()
@@ -79,11 +82,11 @@ class OpenAiSongInterpreter(
                 val message = runCatching {
                     JSONObject(body).optJSONObject("error")?.optString("message")
                 }.getOrNull().orEmpty()
-                error("OpenAI 请求失败（HTTP ${response.code}）${message.takeIf { it.isNotBlank() }?.let { "：$it" }.orEmpty()}")
+                error(context.getString(R.string.error_openai_request_failed, response.code, message.takeIf { it.isNotBlank() }?.let { "${context.getString(R.string.error_openai_api_error_separator)}$it" }.orEmpty()))
             }
 
             val text = parseResponseText(body)
-            if (text.isBlank()) error("OpenAI 返回为空")
+            if (text.isBlank()) error(context.getString(R.string.error_openai_empty_response))
             text.trim()
         }
     }

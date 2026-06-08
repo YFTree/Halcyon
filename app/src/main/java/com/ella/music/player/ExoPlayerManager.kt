@@ -937,25 +937,8 @@ class ExoPlayerManager(private val context: Context) {
     ) {
         if (targetOrder.isEmpty()) return
         val safeIndex = targetIndex.coerceIn(targetOrder.indices)
-        val currentItems = List(controller.mediaItemCount) { index -> controller.getMediaItemAt(index) }
-        val canReorderInPlace = currentItems.size == targetOrder.size &&
-                targetOrder.all { song -> currentItems.any { it.matchesSong(song) } }
-        if (canReorderInPlace) {
-            val mutableItems = currentItems.toMutableList()
-            targetOrder.forEachIndexed { desiredIndex, desiredSong ->
-                val currentIndex = mutableItems.indexOfFirst { it.matchesSong(desiredSong) }
-                if (currentIndex < 0 || currentIndex == desiredIndex) return@forEachIndexed
-                controller.moveMediaItem(currentIndex, desiredIndex)
-                val moved = mutableItems.removeAt(currentIndex)
-                mutableItems.add(desiredIndex, moved)
-            }
-            if (controller.currentMediaItem?.matchesSong(targetOrder[safeIndex]) != true) {
-                controller.seekTo(safeIndex, positionMs)
-            }
-            if (controller.playbackState == Player.STATE_IDLE) controller.prepare()
-            if (wasPlaying && !controller.isPlaying) controller.play()
-            return
-        }
+        // Always use setMediaItems (single IPC call) instead of N moveMediaItem calls
+        // to avoid main-thread freezes with large playlists
         controller.setMediaItems(targetOrder.map(::songToMediaItem), safeIndex, positionMs)
         if (controller.playbackState == Player.STATE_IDLE) controller.prepare()
         if (wasPlaying) controller.play()

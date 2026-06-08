@@ -1,5 +1,7 @@
 package com.ella.music.data.ai
 
+import android.content.Context
+import com.ella.music.R
 import com.ella.music.data.AppNetworkLoggingInterceptor
 import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.SongPlaybackStats
@@ -18,15 +20,18 @@ data class OpenAiLibraryChatInput(
     val playbackStats: List<SongPlaybackStats>,
     val playbackHistory: List<PlaybackHistoryEntry>,
     val userMessage: String,
-    val maxPlayableItems: Int = 30
+    val maxPlayableItems: Int = 30,
+    val conversationHistory: List<Pair<String, String>> = emptyList()
 )
 
 data class OpenAiLibraryChatResponse(
     val answer: String,
-    val songKeys: List<String>
+    val songKeys: List<String>,
+    val playlistName: String
 )
 
 class OpenAiLibraryChatAssistant(
+    private val context: Context,
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -41,18 +46,20 @@ class OpenAiLibraryChatAssistant(
         input: OpenAiLibraryChatInput
     ): OpenAiLibraryChatResponse {
         val apiKey = config.apiKey.trim()
-        if (apiKey.isBlank()) error("请先在设置中填写 OpenAI API Key")
-        if (input.userMessage.isBlank()) error("请输入问题")
-        if (input.songs.isEmpty()) error("曲库为空，请先扫描本地歌曲")
+        if (apiKey.isBlank()) error(context.getString(R.string.error_openai_missing_api_key))
+        if (input.userMessage.isBlank()) error(context.getString(R.string.error_ai_chat_empty_message))
+        if (input.songs.isEmpty()) error(context.getString(R.string.error_library_empty))
+
+        val messagesArray = JSONArray()
+            .put(JSONObject().put("role", "system").put("content", buildSystemPrompt()))
+        input.conversationHistory.takeLast(20).forEach { (role, content) ->
+            messagesArray.put(JSONObject().put("role", role).put("content", content))
+        }
+        messagesArray.put(JSONObject().put("role", "user").put("content", buildPrompt(input)))
 
         val requestBody = JSONObject()
             .put("model", config.model.trim().ifBlank { "gpt-4.1-mini" })
-            .put(
-                "messages",
-                JSONArray()
-                    .put(JSONObject().put("role", "system").put("content", buildSystemPrompt()))
-                    .put(JSONObject().put("role", "user").put("content", buildPrompt(input)))
-            )
+            .put("messages", messagesArray)
             .put("temperature", 0.68)
             .put("top_p", 0.9)
             .put("max_tokens", 1600)
@@ -71,7 +78,7 @@ class OpenAiLibraryChatAssistant(
                 val message = runCatching {
                     JSONObject(body).optJSONObject("error")?.optString("message")
                 }.getOrNull().orEmpty()
-                error("OpenAI 请求失败（HTTP ${response.code}）${message.takeIf { it.isNotBlank() }?.let { "：$it" }.orEmpty()}")
+                error(context.getString(R.string.error_openai_request_failed, response.code, message.takeIf { it.isNotBlank() }?.let { "${context.getString(R.string.error_openai_api_error_separator)}$it" }.orEmpty()))
             }
             parseChatResponse(parseResponseText(body), input.songs)
         }
@@ -125,8 +132,9 @@ class OpenAiLibraryChatAssistant(
             appendLine("用户问题：${input.userMessage.trim()}")
             appendLine()
             appendLine("请只返回一个 JSON 对象，不要输出 Markdown。")
-            appendLine("JSON 格式：{\"answer\":\"中文回答\",\"songIds\":[\"song_1\",\"song_2\"]}")
+            appendLine("JSON 格式：{\"answer\":\"中文回答\",\"playlistName\":\"歌单名称\",\"songIds\":[\"song_1\",\"song_2\"]}")
             appendLine("answer 字段可以使用轻量 Markdown，例如 ## 标题、- 列表、**重点**、`标签`；不要在 JSON 外层使用 Markdown 代码块。")
+            appendLine("playlistName 是根据用户问题和推荐内容生成的简短歌单名称（2-8个字），例如'日语流行'、'深夜放松'、'跑步动感'等。如果不需要推荐歌曲则返回空字符串。")
             appendLine("如果推荐了歌曲，请在 answer 里简短说明推荐理由，真正可播放的歌曲必须放进 songIds。")
             appendLine("如果不需要播放或推荐歌曲，songIds 返回空数组。")
             appendLine("songIds 最多 ${input.maxPlayableItems.coerceIn(1, 50)} 首，且必须来自候选歌曲 id。")
@@ -143,7 +151,7 @@ class OpenAiLibraryChatAssistant(
     }
 
     private fun parseChatResponse(text: String, songs: List<Song>): OpenAiLibraryChatResponse {
-        if (text.isBlank()) error("OpenAI 返回为空")
+        if (text.isBlank()) error(context.getString(R.string.error_openai_empty_response))
         val root = JSONObject(text.toJsonObjectText())
         val ids = root.optJSONArray("songIds") ?: root.optJSONArray("songs") ?: JSONArray()
         val songsByCandidateId = songs.mapIndexed { index, song -> song.toCandidateId(index) to song }.toMap()
@@ -158,7 +166,8 @@ class OpenAiLibraryChatAssistant(
         }
         return OpenAiLibraryChatResponse(
             answer = root.optString("answer").ifBlank { text.trim() },
-            songKeys = songKeys.distinct()
+            songKeys = songKeys.distinct(),
+            playlistName = root.optString("playlistName").trim()
         )
     }
 

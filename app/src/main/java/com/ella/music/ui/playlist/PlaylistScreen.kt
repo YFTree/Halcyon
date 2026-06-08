@@ -831,7 +831,7 @@ fun PlaylistDetailScreen(
         Box {
             EllaSmallTopAppBar(
                 title = when {
-                    selectionMode -> "已选择 ${selectedSongKeys.size} 首"
+                    selectionMode -> stringResource(R.string.library_selected_count, selectedSongKeys.size)
                     playlist == null -> stringResource(R.string.playlist_title)
                     listState.firstVisibleItemIndex > 0 -> playlist.name
                     else -> stringResource(R.string.playlist_title)
@@ -1714,14 +1714,14 @@ private fun PlaylistRow(
                 )
             }
             if (onDelete != null) {
-                Text(
-                    text = stringResource(R.string.common_delete),
-                    fontSize = 13.sp,
-                    color = Color(0xFFE5484D),
-                    modifier = Modifier
-                        .clickable(onClick = onDelete)
-                        .padding(8.dp)
-                )
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Delete,
+                        contentDescription = stringResource(R.string.common_delete),
+                        tint = Color(0xFFE5484D),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             } else if (trailingContent != null) {
                 trailingContent()
             }

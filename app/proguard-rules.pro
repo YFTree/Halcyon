@@ -20,3 +20,9 @@
 -keep class androidx.media3.decoder.ffmpeg.FfmpegAudioDecoder { *; }
 -keep class androidx.media3.decoder.ffmpeg.FfmpegLibrary { *; }
 -dontwarn androidx.media3.decoder.ffmpeg.**
+
+# Ktor / MCP SDK — suppress warnings for JVM-only classes not available on Android
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean
+-dontwarn io.ktor.**
+-dontwarn io.modelcontextprotocol.**

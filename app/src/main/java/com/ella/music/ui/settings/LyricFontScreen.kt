@@ -377,23 +377,22 @@ private data class FontChoice(
 
 private fun collectFontChoices(context: Context): List<FontChoice> {
     val bundledFonts = ensureBundledFontChoices(context)
-    val importedDir = File(context.filesDir, IMPORTED_FONT_DIR)
-    val fontDirs = listOf(
-        Triple(importedDir, context.getString(R.string.settings_lyric_font_source_imported), 1),
-        Triple(File("/system/fonts"), context.getString(R.string.settings_lyric_font_source_system), 2),
-        Triple(File("/product/fonts"), context.getString(R.string.settings_lyric_font_source_system), 2),
-        Triple(File("/system_ext/fonts"), context.getString(R.string.settings_lyric_font_source_system), 2),
-        Triple(File("/vendor/fonts"), context.getString(R.string.settings_lyric_font_source_system), 2)
+    val systemFont = listOf(
+        FontChoice(
+            name = context.getString(R.string.settings_lyric_font_system_default),
+            path = SYSTEM_FONT_PATH,
+            source = context.getString(R.string.settings_lyric_font_source_system),
+            sourceRank = 1
+        )
     )
-    return (bundledFonts + fontDirs
-        .flatMap { (dir, source, rank) ->
-            dir.listFiles()
-                ?.asSequence()
-                ?.filter { it.isFile && it.extension.lowercase() in SUPPORTED_FONT_EXTENSIONS && it.canRead() }
-                ?.map { file -> FontChoice(file.nameWithoutExtension.cleanFontName(), file.absolutePath, source, rank) }
-                ?.toList()
-                .orEmpty()
-        })
+    val importedDir = File(context.filesDir, IMPORTED_FONT_DIR)
+    val importedFonts = importedDir.listFiles()
+        ?.asSequence()
+        ?.filter { it.isFile && it.extension.lowercase() in SUPPORTED_FONT_EXTENSIONS && it.canRead() }
+        ?.map { file -> FontChoice(file.nameWithoutExtension.cleanFontName(context), file.absolutePath, context.getString(R.string.settings_lyric_font_source_imported), 2) }
+        ?.toList()
+        .orEmpty()
+    return (bundledFonts + systemFont + importedFonts)
         .distinctBy { it.path }
         .sortedWith(compareBy<FontChoice> { it.sourceRank }.thenBy { it.name.lowercase() })
 }
@@ -429,6 +428,11 @@ private fun ensureBundledFontChoices(context: Context): List<FontChoice> {
 }
 
 private fun String.toFontFamilyOrNull(weight: Int, italic: Boolean): FontFamily? {
+    if (this == SYSTEM_FONT_PATH) {
+        return runCatching {
+            FontFamily(Typeface.create(Typeface.DEFAULT, weight.coerceIn(100, 900), italic))
+        }.getOrNull()
+    }
     val file = File(this)
     if (!file.exists() || !file.canRead()) return null
     return runCatching {
@@ -446,7 +450,7 @@ private fun copyImportedFont(context: Context, uri: Uri): FontChoice {
         target.outputStream().use { output -> input.copyTo(output) }
     } ?: error("Unable to open font")
     return FontChoice(
-        name = target.nameWithoutExtension.cleanFontName(),
+        name = target.nameWithoutExtension.cleanFontName(context),
         path = target.absolutePath,
         source = context.getString(R.string.settings_lyric_font_source_imported),
         sourceRank = 1
@@ -480,8 +484,8 @@ private fun String.ensureFontExtension(): String {
     return if (substringAfterLast('.', "").lowercase() in SUPPORTED_FONT_EXTENSIONS) this else "$this.ttf"
 }
 
-private fun String.cleanFontName(): String {
-    return replace('_', ' ').replace('-', ' ').trim().ifBlank { "字体" }
+private fun String.cleanFontName(context: Context): String {
+    return replace('_', ' ').replace('-', ' ').trim().ifBlank { context.getString(R.string.settings_lyric_font) }
 }
 
 @Composable
@@ -492,4 +496,5 @@ private fun previewFontFamily(path: String, weight: Int, italic: Boolean): FontF
 private const val IMPORTED_FONT_DIR = "lyric_fonts"
 private const val BUNDLED_FONT_DIR = "lyric_builtin_fonts"
 private const val MISANS_VF_ASSET_PATH = "fonts/MiSans-Semibold.ttf"
+const val SYSTEM_FONT_PATH = "__system_default__"
 private val SUPPORTED_FONT_EXTENSIONS = setOf("ttf", "otf", "ttc")

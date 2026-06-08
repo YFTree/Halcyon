@@ -508,11 +508,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         updateCurrentLyricIndex()
                         return@collectLatest
                     }
+                    // Clear external bridge state before async fetch to prevent stale lyrics
                     lastTickerPayload = null
                     lastBluetoothLyricPayload = null
                     lyricGetterBridge.clearLyric()
+                    tickerBridge.clearLyric()
+                    if (desktopLyricHideWhenPausedEnabled) {
+                        desktopLyricBridge.clearLyric()
+                    }
+                    superLyricBridge.sendStop()
+                    // Send song metadata to bridges BEFORE setting lyrics,
+                    // so the 50ms update loop can't send new lyrics with old metadata
+                    if (lyriconBridge.isEnabled()) {
+                        lyriconBridge.sendSong(song, emptyList())
+                    }
+                    superLyricBridge.sendSong(song)
                     val songLyrics = repository.getLyrics(song, lyricSourceMode)
                     repository.getCoverArt(song)
+                    // Verify song hasn't changed during async fetch
+                    if (playerManager.currentSong.value?.lyricIdentityKey() != songKey) {
+                        return@collectLatest
+                    }
                     loadedLyricSongKey = songKey
                     _lyrics.value = songLyrics
                     _currentLyricIndex.value = -1
@@ -520,7 +536,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (lyriconBridge.isEnabled()) {
                         lyriconBridge.sendSong(song, songLyrics)
                     }
-                    superLyricBridge.sendSong(song)
                     if (songLyrics.isEmpty()) {
                         clearExternalLyrics(clearLyricon = false, clearSuperLyricSong = false)
                     } else {
@@ -639,8 +654,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun resendExternalLyrics(force: Boolean = false) {
         val song = currentSong.value ?: return
+        val songKey = song.lyricIdentityKey()
+        // Guard: if lyrics are loaded for a different song, skip this resend
+        if (loadedLyricSongKey != null && loadedLyricSongKey != songKey) return
         val songLyrics = _lyrics.value.ifEmpty { repository.getLyrics(song, lyricSourceMode) }
         if (_lyrics.value.isEmpty()) _lyrics.value = songLyrics
+        // Re-verify after potential async fetch
+        if (playerManager.currentSong.value?.lyricIdentityKey() != songKey) return
         lyriconBridge.sendSong(song, songLyrics)
         lyriconBridge.sendPlaybackState(isPlaying.value)
         lyriconBridge.sendPosition(currentPosition.value)
@@ -702,9 +722,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun scheduleExternalLyricResend() {
         externalLyricResendJob?.cancel()
+        val scheduledSongKey = currentSong.value?.lyricIdentityKey()
         externalLyricResendJob = viewModelScope.launch {
             repeat(3) { attempt ->
                 delay(350L + attempt * 550L)
+                // Skip if song changed since scheduling
+                if (currentSong.value?.lyricIdentityKey() != scheduledSongKey) return@launch
                 resendExternalLyrics(force = true)
                 resendBluetoothLyric(force = true)
                 resendLyricGetter(force = true)

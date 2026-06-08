@@ -2,6 +2,7 @@ package com.ella.music.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import com.ella.music.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ella.music.data.PlaylistBatchImportResult
@@ -61,9 +62,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val settingsManager = SettingsManager(application)
     private val playlistStore = PlaylistStore.getInstance(application)
     private val playbackStatsStore = PlaybackStatsStore.getInstance(application)
-    private val openAiSongInterpreter = OpenAiSongInterpreter()
-    private val openAiPlaylistRecommender = OpenAiPlaylistRecommender()
-    private val openAiLibraryChatAssistant = OpenAiLibraryChatAssistant()
+    private val openAiSongInterpreter = OpenAiSongInterpreter(getApplication())
+    private val openAiPlaylistRecommender = OpenAiPlaylistRecommender(getApplication())
+    private val openAiLibraryChatAssistant = OpenAiLibraryChatAssistant(getApplication())
 
     val songs: StateFlow<List<Song>> = repository.songs
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -159,6 +160,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 excludeFolders,
                 fullRescan = fullRescan,
                 deepRescan = deepRescan
+            )
+        }
+        // Scan USB folders via SAF
+        val usbFolderUris = settingsManager.usbFolderUris.first()
+            .split('\n')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        if (usbFolderUris.isNotEmpty()) {
+            val uris = usbFolderUris.mapNotNull { runCatching { Uri.parse(it) }.getOrNull() }
+            repository.scanUsbFolders(
+                usbUris = uris,
+                minDurationMs = minDuration,
+                deepMetadata = deepRescan
             )
         }
         preloadLibrarySearchSnapshot()
@@ -411,7 +425,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val librarySongs = songs.value
         val currentStats = playbackStats.value
         val currentHistory = playbackHistory.value
-        if (librarySongs.isEmpty()) error("曲库为空，请先扫描本地歌曲")
+        if (librarySongs.isEmpty()) error(getApplication<android.app.Application>().getString(R.string.error_library_empty))
 
         val candidates = buildOpenAiRecommendationCandidates(
             library = librarySongs,
@@ -436,10 +450,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             .mapNotNull { key -> libraryByKey[key] }
             .distinctBy { it.playlistIdentityKey() }
             .take(maxItems.coerceAtLeast(1))
-        if (recommendedSongs.isEmpty()) error("AI 没有返回可播放歌曲")
+        if (recommendedSongs.isEmpty()) error(getApplication<android.app.Application>().getString(R.string.error_ai_no_playable_songs))
 
         AiPlaylistRecommendationResult(
-            title = recommendation.title.ifBlank { "AI 推荐歌单" },
+            title = recommendation.title.ifBlank { getApplication<android.app.Application>().getString(R.string.ai_default_playlist_title) },
             reason = recommendation.reason,
             songs = recommendedSongs
         )
@@ -447,10 +461,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun chatWithOpenAiLibraryAssistant(
         message: String,
+        conversationHistory: List<Pair<String, String>> = emptyList(),
         maxPlayableItems: Int = 30
     ): AiLibraryChatResult = withContext(Dispatchers.IO) {
         val librarySongs = songs.value
-        if (librarySongs.isEmpty()) error("曲库为空，请先扫描本地歌曲")
+        if (librarySongs.isEmpty()) error(getApplication<android.app.Application>().getString(R.string.error_library_empty))
         val candidates = buildOpenAiRecommendationCandidates(
             library = librarySongs,
             stats = playbackStats.value,
@@ -467,7 +482,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 playbackStats = playbackStats.value,
                 playbackHistory = playbackHistory.value,
                 userMessage = message,
-                maxPlayableItems = maxPlayableItems.coerceIn(1, 50)
+                maxPlayableItems = maxPlayableItems.coerceIn(1, 50),
+                conversationHistory = conversationHistory
             )
         )
         val libraryByKey = librarySongs.associateBy { it.playlistIdentityKey() }
@@ -476,7 +492,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             songs = response.songKeys
                 .mapNotNull { key -> libraryByKey[key] }
                 .distinctBy { it.playlistIdentityKey() }
-                .take(maxPlayableItems.coerceAtLeast(1))
+                .take(maxPlayableItems.coerceAtLeast(1)),
+            playlistName = response.playlistName.ifBlank { getApplication<android.app.Application>().getString(R.string.ai_chat_playlist_name) }
         )
     }
 
@@ -684,7 +701,8 @@ data class AiPlaylistRecommendationResult(
 
 data class AiLibraryChatResult(
     val answer: String,
-    val songs: List<Song>
+    val songs: List<Song>,
+    val playlistName: String
 )
 
 data class MetadataCategoryItem(
