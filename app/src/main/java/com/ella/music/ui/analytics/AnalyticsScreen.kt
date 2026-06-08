@@ -1222,7 +1222,7 @@ private fun analyticsWallpaperCardColors(alpha: Float = 0.42f) =
 @Composable
 private fun analyticsWallpaperCardColor(alpha: Float): Color {
     val context = LocalContext.current
-    val settingsManager = remember(context) { SettingsManager(context) }
+    val settingsManager = remember(context) { SettingsManager.getInstance(context) }
     val wallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
     val wallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     return if (wallpaperEnabled && wallpaperUri.isNotBlank()) {

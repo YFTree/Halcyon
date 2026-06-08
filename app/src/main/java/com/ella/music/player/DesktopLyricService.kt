@@ -71,7 +71,7 @@ class DesktopLyricService : Service() {
     private var controllerIsPlaying = false
     private var savedX = Int.MIN_VALUE
     private var savedY = Int.MIN_VALUE
-    private val settingsManager by lazy { SettingsManager(this) }
+    private val settingsManager by lazy { SettingsManager.getInstance(this) }
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private val hideControlsRunnable = Runnable { hideControls() }
     private val panelBackground by lazy {
@@ -379,7 +379,7 @@ class DesktopLyricService : Service() {
 
     private fun closeByUser() {
         userHidden = true
-        serviceScope.launch { SettingsManager(this@DesktopLyricService).setDesktopLyricEnabled(false) }
+        serviceScope.launch { SettingsManager.getInstance(this@DesktopLyricService).setDesktopLyricEnabled(false) }
         rootView?.let { runCatching { windowManager.removeView(it) } }
         rootView = null
         lyricView = null

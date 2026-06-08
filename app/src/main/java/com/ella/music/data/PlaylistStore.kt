@@ -1,7 +1,9 @@
 package com.ella.music.data
 
 import android.content.Context
+import android.content.ContentUris
 import android.net.Uri
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
@@ -58,6 +60,7 @@ data class PlaylistBatchExportResult(
 
 enum class PlaylistExportFormat {
     PlainText,
+    M3u8,
     M3u
 }
 
@@ -298,6 +301,51 @@ class PlaylistStore private constructor(context: Context) {
             }
         }
 
+    suspend fun importLocalPlaylistFiles(
+        librarySongs: List<Song>,
+        mode: PlaylistImportMode = PlaylistImportMode.MergeReplaceExisting
+    ): PlaylistBatchImportResult =
+        withContext(Dispatchers.IO) {
+            val playlistUris = findLocalPlaylistFileUris()
+            if (playlistUris.isEmpty()) {
+                return@withContext PlaylistBatchImportResult(0, 0, 0, 0, 0)
+            }
+            importLocalPlaylists(playlistUris, librarySongs, mode)
+        }
+
+    private fun findLocalPlaylistFileUris(): List<Uri> {
+        val collection = MediaStore.Files.getContentUri("external")
+        val projection = arrayOf(
+            MediaStore.Files.FileColumns._ID,
+            MediaStore.Files.FileColumns.DISPLAY_NAME
+        )
+        val selection = "${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ? OR ${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?"
+        val args = arrayOf("%.m3u", "%.m3u8")
+        return runCatching {
+            appContext.contentResolver.query(
+                collection,
+                projection,
+                selection,
+                args,
+                "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
+                buildList {
+                    while (cursor.moveToNext()) {
+                        val name = cursor.getString(nameColumn).orEmpty()
+                        if (!name.endsWith(".m3u", ignoreCase = true) && !name.endsWith(".m3u8", ignoreCase = true)) {
+                            continue
+                        }
+                        add(ContentUris.withAppendedId(collection, cursor.getLong(idColumn)))
+                    }
+                }
+            }.orEmpty()
+        }.onFailure {
+            Log.w(TAG, "Failed to scan local playlist files", it)
+        }.getOrDefault(emptyList())
+    }
+
     private fun List<String>.toPlaylistEntries(): List<String> {
         return map { it.trim().trimStart('\uFEFF') }
             .filter { it.isNotBlank() }
@@ -313,7 +361,7 @@ class PlaylistStore private constructor(context: Context) {
     private fun String.toPlaylistPath(): String {
         val text = trim().trim('"', '\'')
         val decoded = Uri.decode(text)
-        if (decoded.startsWith("file://", ignoreCase = true)) {
+        if (decoded.isFileUriAudioSource()) {
             return Uri.parse(decoded).path.orEmpty().replace('\\', '/')
         }
         return decoded.replace('\\', '/')
@@ -354,6 +402,7 @@ class PlaylistStore private constructor(context: Context) {
         format: PlaylistExportFormat = PlaylistExportFormat.PlainText
     ): PlaylistExportResult = when (format) {
         PlaylistExportFormat.PlainText -> exportSaltPlayerPlaylist(playlist, uri)
+        PlaylistExportFormat.M3u8,
         PlaylistExportFormat.M3u -> exportM3uPlaylist(playlist, uri)
     }
 
@@ -366,11 +415,13 @@ class PlaylistStore private constructor(context: Context) {
             ?: error(appContext.getString(R.string.playlist_export_open_directory_failed))
         val mimeType = when (format) {
             PlaylistExportFormat.PlainText -> "text/plain"
+            PlaylistExportFormat.M3u8 -> "application/vnd.apple.mpegurl"
             PlaylistExportFormat.M3u -> "audio/x-mpegurl"
         }
         val extension = when (format) {
             PlaylistExportFormat.PlainText -> "txt"
-            PlaylistExportFormat.M3u -> "m3u8"
+            PlaylistExportFormat.M3u8 -> "m3u8"
+            PlaylistExportFormat.M3u -> "m3u"
         }
         var exportedPlaylists = 0
         var exportedSongs = 0
@@ -603,8 +654,7 @@ class PlaylistStore private constructor(context: Context) {
     private fun String.isExportableLocalPlaylistPath(): Boolean {
         val value = trim()
         return value.isNotBlank() &&
-            !value.startsWith("http://", ignoreCase = true) &&
-            !value.startsWith("https://", ignoreCase = true)
+            !value.isHttpAudioSource()
     }
 
     private fun Song.playlistPathKeys(): List<String> =

@@ -20,6 +20,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.ella.music.data.AppLogStore
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.isUriAudioSource
 import com.ella.music.data.model.Song
 import com.ella.music.data.repository.MusicRepository
 import com.google.common.util.concurrent.FutureCallback
@@ -85,7 +86,7 @@ class ExoPlayerManager(private val context: Context) {
     private var playlistBeforeShuffle: List<Song>? = null
 
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val artworkRepository = MusicRepository(context)
+    private val artworkRepository = MusicRepository.getInstance(context)
     private val notificationArtworkCache = object : LruCache<String, ByteArray>(4 * 1024) {
         override fun sizeOf(key: String, value: ByteArray): Int = value.size / 1024
     }
@@ -191,15 +192,6 @@ class ExoPlayerManager(private val context: Context) {
 
             override fun onRepeatModeChanged(repeatMode: Int) {
                 _repeatMode.value = repeatMode
-                val appShuffleEnabled = loadAppShuffleEnabled()
-                if (_shuffleEnabled.value != appShuffleEnabled) {
-                    _shuffleEnabled.value = appShuffleEnabled
-                    if (appShuffleEnabled) {
-                        shufflePlaylistKeepingCurrent()
-                    } else {
-                        restorePlaylistOrderAfterShuffle()
-                    }
-                }
             }
 
             override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
@@ -520,22 +512,12 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     fun toggleShuffle() {
-        val enableShuffle = !_shuffleEnabled.value
-        if (enableShuffle) {
-            shufflePlaylistKeepingCurrent()
-            mediaController?.let { controller ->
-                controller.shuffleModeEnabled = false
-                if (controller.repeatMode != Player.REPEAT_MODE_ALL) {
-                    controller.repeatMode = Player.REPEAT_MODE_ALL
-                }
-            }
-        } else {
-            mediaController?.shuffleModeEnabled = false
-            restorePlaylistOrderAfterShuffle()
-        }
-        _shuffleEnabled.value = enableShuffle
-        persistAppShuffleEnabled(enableShuffle)
-        savePlaybackQueue(force = true)
+        val nextShuffle = !_shuffleEnabled.value
+        applyPlaybackMode(
+            shuffle = nextShuffle,
+            repeatMode = if (nextShuffle) Player.REPEAT_MODE_ALL else mediaController?.repeatMode ?: _repeatMode.value,
+            reorderForShuffleChange = true
+        )
     }
 
     fun setShuffleMode(mode: Int) {
@@ -552,50 +534,51 @@ class ExoPlayerManager(private val context: Context) {
             Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
             else -> Player.REPEAT_MODE_OFF
         }
-        if (next != Player.REPEAT_MODE_ALL && mediaController?.shuffleModeEnabled == true) {
-            mediaController?.shuffleModeEnabled = false
-        }
-        if (next != Player.REPEAT_MODE_ALL) {
-            _shuffleEnabled.value = false
-            persistAppShuffleEnabled(false)
-            restorePlaylistOrderAfterShuffle()
-        }
-        mediaController?.repeatMode = next
-        savePlaybackQueue(force = true)
+        applyPlaybackMode(
+            shuffle = _shuffleEnabled.value,
+            repeatMode = next,
+            reorderForShuffleChange = false
+        )
     }
 
     fun cyclePlaybackMode() {
         val controller = mediaController ?: return
-        when {
-            _shuffleEnabled.value -> {
-                _shuffleEnabled.value = false
-                persistAppShuffleEnabled(false)
-                controller.shuffleModeEnabled = false
-                restorePlaylistOrderAfterShuffle()
-                controller.repeatMode = Player.REPEAT_MODE_OFF
-            }
+        val currentShuffle = _shuffleEnabled.value
+        val currentRepeat = controller.repeatMode
+        val (nextShuffle, nextRepeat) = when {
+            currentShuffle -> false to Player.REPEAT_MODE_OFF
+            currentRepeat == Player.REPEAT_MODE_OFF -> false to Player.REPEAT_MODE_ALL
+            currentRepeat == Player.REPEAT_MODE_ALL -> false to Player.REPEAT_MODE_ONE
+            else -> true to Player.REPEAT_MODE_ALL
+        }
+        applyPlaybackMode(
+            shuffle = nextShuffle,
+            repeatMode = nextRepeat,
+            reorderForShuffleChange = nextShuffle != currentShuffle
+        )
+    }
 
-            controller.repeatMode == Player.REPEAT_MODE_OFF -> {
-                _shuffleEnabled.value = false
-                persistAppShuffleEnabled(false)
-                controller.shuffleModeEnabled = false
-                controller.repeatMode = Player.REPEAT_MODE_ALL
-            }
-
-            controller.repeatMode == Player.REPEAT_MODE_ALL -> {
-                _shuffleEnabled.value = false
-                persistAppShuffleEnabled(false)
-                controller.shuffleModeEnabled = false
-                controller.repeatMode = Player.REPEAT_MODE_ONE
-            }
-
-            else -> {
-                _shuffleEnabled.value = true
-                persistAppShuffleEnabled(true)
-                controller.repeatMode = Player.REPEAT_MODE_ALL
+    private fun applyPlaybackMode(
+        shuffle: Boolean,
+        repeatMode: Int,
+        reorderForShuffleChange: Boolean
+    ) {
+        val controller = mediaController ?: return
+        val previousShuffle = _shuffleEnabled.value
+        controller.shuffleModeEnabled = false
+        if (reorderForShuffleChange && shuffle != previousShuffle) {
+            if (shuffle) {
                 shufflePlaylistKeepingCurrent()
-                controller.shuffleModeEnabled = false
+            } else {
+                restorePlaylistOrderAfterShuffle()
             }
+        }
+        _shuffleEnabled.value = shuffle
+        persistAppShuffleEnabled(shuffle)
+        if (controller.repeatMode != repeatMode) {
+            controller.repeatMode = repeatMode
+        } else {
+            _repeatMode.value = repeatMode
         }
         savePlaybackQueue(force = true)
     }
@@ -746,11 +729,7 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     private fun Song.playbackUri(): Uri {
-        if (path.startsWith("content://", ignoreCase = true) ||
-            path.startsWith("http://", ignoreCase = true) ||
-            path.startsWith("https://", ignoreCase = true) ||
-            path.startsWith("file://", ignoreCase = true)
-        ) {
+        if (path.isUriAudioSource()) {
             return path.toUri()
         }
         if (onlineSource.isBlank() && path.startsWith("/") && id > 0L) {

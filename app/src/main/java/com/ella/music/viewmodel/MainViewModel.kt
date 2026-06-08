@@ -58,8 +58,8 @@ import kotlinx.coroutines.withContext
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    val repository = MusicRepository(application)
-    val settingsManager = SettingsManager(application)
+    val repository = MusicRepository.getInstance(application)
+    val settingsManager = SettingsManager.getInstance(application)
     private val playlistStore = PlaylistStore.getInstance(application)
     private val playbackStatsStore = PlaybackStatsStore.getInstance(application)
     private val openAiSongInterpreter = OpenAiSongInterpreter(getApplication())
@@ -581,6 +581,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             val result = runCatching { playlistStore.importLocalPlaylists(uris, songs.value, mode) }
+            onResult(result)
+        }
+    }
+
+    fun scanLocalPlaylistFiles(
+        onResult: (Result<PlaylistBatchImportResult>) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = runCatching { playlistStore.importLocalPlaylistFiles(songs.value) }
             onResult(result)
         }
     }

@@ -100,6 +100,11 @@
     <string name="folder_scan_manual_needed">フォルダを追加しました。手動でスキャンして内容を確認できます</string>
     <string name="initial_scan_title">曲なし</string>
     <string name="initial_scan_message">まだ曲がありません。今からスキャンしますか？</string>
+    <string name="local_playlist_scan_title">ローカルプレイリストファイルをスキャン</string>
+    <string name="local_playlist_scan_message">このデバイス上の M3U / M3U8 プレイリストファイルをスキャンして Halcyon にインポートしますか？スキップしても、後で設定から自動スキャンを有効にできます。</string>
+    <string name="local_playlist_scan_confirm">プレイリストをスキャン</string>
+    <string name="local_playlist_scan_skip">今はしない</string>
+    <string name="local_playlist_scan_none">インポートできるローカル M3U / M3U8 プレイリストが見つかりません</string>
 
     <string name="notification_action_shuffle">シャッフル再生</string>
     <string name="notification_action_repeat_one">1曲リピート</string>
@@ -138,10 +143,14 @@
     <string name="settings_language">アプリ言語</string>
     <string name="settings_language_system">システムに合わせる</string>
     <string name="settings_language_simplified_chinese">簡体字中国語</string>
+    <string name="settings_language_traditional_chinese">繁体字中国語</string>
     <string name="settings_language_english">English</string>
+    <string name="settings_language_japanese">日本語</string>
     <string name="settings_language_summary_system">システム言語を使用</string>
     <string name="settings_language_summary_simplified_chinese">簡体字中国語を強制使用</string>
+    <string name="settings_language_summary_traditional_chinese">繁体字中国語インターフェースを強制使用</string>
     <string name="settings_language_summary_english">英語インターフェースを強制使用</string>
+    <string name="settings_language_summary_japanese">日本語インターフェースを強制使用</string>
     <string name="settings_preferences">アプリ設定</string>
     <string name="settings_preferences_summary">外観とスキャンの設定</string>
     <string name="settings_lyrics">歌詞</string>
@@ -754,6 +763,8 @@
     <string name="settings_scan">スキャン</string>
     <string name="settings_auto_scan">自動スキャン</string>
     <string name="settings_auto_scan_summary">起動時に自動的に音楽ファイルをスキャン</string>
+    <string name="settings_auto_scan_local_playlists">ローカルプレイリストファイルを自動スキャン</string>
+    <string name="settings_auto_scan_local_playlists_summary">起動時に M3U / M3U8 ファイルをスキャンし、ローカルプレイリストに統合します</string>
     <string name="settings_min_duration_filter">最短再生時間フィルター</string>
     <string name="settings_min_duration_filter_summary">%1$d 秒未満のオーディオファイルをフィルター</string>
     <string name="settings_seconds_value">%1$d秒</string>
@@ -1009,8 +1020,10 @@
     <string name="playlist_import_merge_keep_summary">同名プレイリストには存在しない曲のみ追加</string>
     <string name="playlist_export_txt">TXT としてエクスポート</string>
     <string name="playlist_export_txt_summary">ローカル曲のパスを1行ずつエクスポート</string>
-    <string name="playlist_export_m3u">M3U8 としてエクスポート</string>
-    <string name="playlist_export_m3u_summary">UTF-8 エンコードの #EXTM3U プレイリストをエクスポート。曲情報とローカルパスを含む</string>
+    <string name="playlist_export_m3u8">M3U8 としてエクスポート</string>
+    <string name="playlist_export_m3u8_summary">UTF-8 エンコードの #EXTM3U プレイリストをエクスポート。曲情報とローカルパスを含む</string>
+    <string name="playlist_export_m3u">M3U としてエクスポート</string>
+    <string name="playlist_export_m3u_summary">M3U 拡張子のみを認識するアプリ向けに .m3u プレイリストをエクスポート</string>
     <string name="notification_permission_denied_hint">通知権限の拒否は使用に影響しません。vivo / iQOO で通知が表示されない場合は、システム設定から許可してください。</string>
     <string name="playlist_import_none">インポートできる曲がありません</string>
     <string name="playlist_import_missing_paths">、%1$d 曲のパスが一致しません</string>

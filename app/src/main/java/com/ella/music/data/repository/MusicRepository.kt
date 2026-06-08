@@ -18,7 +18,12 @@ import com.ella.music.data.exception.WritePermissionRequiredException
 import com.ella.music.data.AppLogStore
 import com.ella.music.data.AppLogType
 import com.ella.music.data.AppNetworkLoggingInterceptor
+import com.ella.music.data.LibraryAlbumAggregator
+import com.ella.music.data.LibraryNormalizer
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.isContentAudioSource
+import com.ella.music.data.isHttpAudioSource
+import com.ella.music.data.isMediaStoreContentAudioSource
 import com.ella.music.data.looksLikeNeteaseKeyValue
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.AudioInfo
@@ -74,6 +79,16 @@ private sealed class CoverDataState {
 }
 
 class MusicRepository(private val context: Context) {
+    companion object {
+        @Volatile
+        private var instance: MusicRepository? = null
+
+        fun getInstance(context: Context): MusicRepository =
+            instance ?: synchronized(this) {
+                instance ?: MusicRepository(context.applicationContext).also { instance = it }
+            }
+    }
+
     data class LyricFormatAvailability(
         val hasTtml: Boolean = false,
         val hasPlain: Boolean = false
@@ -86,7 +101,7 @@ class MusicRepository(private val context: Context) {
     private val audioTagRepository = AudioTagRepository(
         primary = LyricoAudioTagReaderWriter()
     )
-    private val settingsManager = SettingsManager(context)
+    private val settingsManager = SettingsManager.getInstance(context)
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -339,7 +354,7 @@ class MusicRepository(private val context: Context) {
     }
 
     suspend fun refreshSongAfterExternalEdit(song: Song): Song? = withContext(Dispatchers.IO) {
-        if (song.path.startsWith("http://") || song.path.startsWith("https://")) return@withContext null
+        if (song.path.isHttpAudioSource()) return@withContext null
 
         clearMetadataCache(song)
         scanEditedFile(song)
@@ -768,7 +783,7 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun Song.withCurrentFileSnapshot(): Song {
-        if (path.startsWith("http://") || path.startsWith("https://")) return this
+        if (path.isHttpAudioSource()) return this
         val file = File(path)
         if (!file.exists()) return copy(dateModified = System.currentTimeMillis())
         return copy(
@@ -820,7 +835,7 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun Song.writableAudioUri(): Uri? {
-        if (path.startsWith("content://", ignoreCase = true)) return Uri.parse(path)
+        if (path.isContentAudioSource()) return Uri.parse(path)
         if (id > 0L) return ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
         return null
     }
@@ -874,7 +889,7 @@ class MusicRepository(private val context: Context) {
                     null
                 } else {
                     audioTagRepository.readEmbeddedCoverDataBlocking(metadataPath)
-                        ?: if (metadataPath.startsWith("http://", ignoreCase = true) || metadataPath.startsWith("https://", ignoreCase = true)) {
+                        ?: if (metadataPath.isHttpAudioSource()) {
                             null
                         } else {
                             readEmbeddedPictureWithRetriever(metadataPath)
@@ -906,7 +921,7 @@ class MusicRepository(private val context: Context) {
         return runCatching {
             val retriever = MediaMetadataRetriever()
             try {
-                if (path.startsWith("content://", ignoreCase = true)) {
+                if (path.isContentAudioSource()) {
                     retriever.setDataSource(context, Uri.parse(path))
                 } else {
                     retriever.setDataSource(path)
@@ -1010,7 +1025,7 @@ class MusicRepository(private val context: Context) {
     private fun tryDeleteSongDirect(song: Song): Boolean {
         if (song.onlineSource.isNotBlank()) return false
         val path = song.path.trim()
-        if (path.startsWith("content://", ignoreCase = true)) {
+        if (path.isContentAudioSource()) {
             val uri = Uri.parse(path)
             val documentDeleted = runCatching {
                 DocumentFile.fromSingleUri(context, uri)?.delete() == true
@@ -1037,7 +1052,7 @@ class MusicRepository(private val context: Context) {
 
     private fun Song.mediaStoreDeleteUriOrNull(): Uri? {
         if (onlineSource.isNotBlank() || id <= 0L) return null
-        if (path.startsWith("content://", ignoreCase = true) && !path.startsWith("content://media/", ignoreCase = true)) {
+        if (path.isContentAudioSource() && !path.isMediaStoreContentAudioSource()) {
             return null
         }
         return ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
@@ -1151,7 +1166,7 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun Song.effectiveLocalPathForMetadata(allowFullDownload: Boolean = false): String {
-        if (path.startsWith("content://", ignoreCase = true)) return path
+        if (path.isContentAudioSource()) return path
         if (!isWebDavRemoteSong()) return path
         val fullCache = webDavFullCacheFile()
         if (fullCache.exists() && fullCache.length() > 0L) return fullCache.absolutePath
@@ -1184,8 +1199,7 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun Song.isWebDavRemoteSong(): Boolean =
-        (path.startsWith("http://", ignoreCase = true) ||
-            path.startsWith("https://", ignoreCase = true)) &&
+        path.isHttpAudioSource() &&
             onlineSource.isBlank()
 
     private fun Song.webDavCacheExtension(): String =
@@ -1255,27 +1269,7 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun List<Song>.toAlbums(): List<Album> {
-        return groupBy { it.albumIdentityId() }
-            .map { (albumIdentityId, albumSongs) ->
-                val first = albumSongs.first()
-                val albumOwner = first.albumArtist
-                    .takeIf { it.isUsableTagText() && !it.isUnknownArtistValue() }
-                    ?: ""
-                Album(
-                    id = albumIdentityId,
-                    name = first.album.takeIf { it.isUsableAlbumText() } ?: "Unknown Album",
-                    artist = albumOwner,
-                    songCount = albumSongs.size,
-                    year = albumSongs.mapNotNull { s -> s.year.takeIf { it.isNotBlank() } }.minByOrNull { it } ?: "",
-                    artAlbumId = first.albumId,
-                    albumArtist = first.albumArtist.takeIf { it.isUsableTagText() }.orEmpty()
-                )
-            }
-            .sortedWith(
-                compareBy<Album> { it.name.lowercase() }
-                    .thenBy { it.artist.lowercase() }
-                    .thenBy { it.id }
-            )
+        return LibraryAlbumAggregator.toAlbums(this)
     }
 
     private fun Song.withRepositoryTags(allowFullDownload: Boolean = false): Song {
@@ -1299,7 +1293,7 @@ class MusicRepository(private val context: Context) {
             ?: "Unknown Album"
         val mergedAlbumArtist = tagInfo?.albumArtist.takeIf { it.isUsableTagText() }
             ?: wavMetadata?.albumArtist.takeIf { it.isUsableTagText() }
-            ?: albumArtist.takeIf { it.isUsableTagText() && !it.isUnknownArtistValue() }
+            ?: albumArtist.takeIf { it.isUsableTagText() }
             ?: ""
 
         return copy(
@@ -1327,7 +1321,7 @@ class MusicRepository(private val context: Context) {
             title = title.takeIf { it.isUsableTagText() } ?: fileName.substringBeforeLast('.').ifBlank { path.substringAfterLast('/') },
             artist = fallbackArtist,
             album = fallbackAlbum,
-            albumArtist = albumArtist.takeIf { it.isUsableTagText() && !it.isUnknownArtistValue() }.orEmpty()
+            albumArtist = albumArtist.takeIf { it.isUsableTagText() }.orEmpty()
         )
     }
 
@@ -1443,7 +1437,7 @@ class MusicRepository(private val context: Context) {
 
     private suspend fun scanEditedFile(song: Song) = suspendCoroutine<Unit> { continuation ->
         val path = song.path.takeIf { it.isNotBlank() }
-        if (path == null || path.startsWith("content://", ignoreCase = true)) {
+        if (path == null || path.isContentAudioSource()) {
             continuation.resume(Unit)
             return@suspendCoroutine
         }
@@ -1660,45 +1654,19 @@ class MusicRepository(private val context: Context) {
         Regex("""\d{4}""").find(this)?.value?.toIntOrNull()
 
     private fun String?.usableTagText(): String {
-        val text = this?.trim().orEmpty()
-        if (text.isBlank() || text == "<unknown>") return ""
-        if ('\uFFFD' in text || "锟斤拷" in text || Regex("""(?:锟|斤|拷){3,}""").containsMatchIn(text)) return ""
-        return text
+        return LibraryNormalizer.cleanedTagText(this)
     }
 
     private fun String?.isUsableTagText(): Boolean =
         usableTagText().isNotBlank()
 
     private fun String?.isUsableAlbumText(): Boolean {
-        val text = usableTagText()
-        return text.isNotBlank() &&
-            !text.equals("Unknown", ignoreCase = true) &&
-            !text.equals("Unknown Album", ignoreCase = true) &&
-            text != "未知" && text != "未知专辑"
+        return usableTagText().isNotBlank()
     }
-
-    private fun String.isUnknownArtistValue(): Boolean =
-        trim().equals("Unknown", ignoreCase = true) ||
-            trim().equals("Unknown Artist", ignoreCase = true) ||
-            trim() == "<unknown>" ||
-            trim() == "未知" || trim() == "未知歌手" || trim() == "未知艺术家"
 
     private fun String.looksLikeLastFolderName(path: String): Boolean {
-        val folderName = path.parentFolderName()
-        return folderName.isNotBlank() && trim().equals(folderName, ignoreCase = true)
+        return LibraryNormalizer.looksLikeLastFolderName(this, path)
     }
-
-    private fun String.parentFolderName(): String =
-        runCatching {
-            if (startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)) {
-                java.net.URI(this).path.orEmpty().trim('/').substringBeforeLast('/', "")
-                    .substringAfterLast('/')
-            } else {
-                File(this).parentFile?.name.orEmpty()
-            }
-        }
-            .getOrDefault("")
-            .trim()
 
     private fun AudioTagInfo.toSongTagInfo(): SongTagInfo =
         SongTagInfo(

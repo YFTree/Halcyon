@@ -100,6 +100,11 @@
     <string name="folder_scan_manual_needed">已新增資料夾，可手動掃描新增內容</string>
     <string name="initial_scan_title">無歌曲</string>
     <string name="initial_scan_message">目前沒有歌曲，是否現在掃描歌曲？</string>
+    <string name="local_playlist_scan_title">掃描本機歌單檔案</string>
+    <string name="local_playlist_scan_message">是否掃描裝置中的 M3U / M3U8 歌單檔案並匯入 Halcyon？拒絕後仍可在設定中開啟自動掃描。</string>
+    <string name="local_playlist_scan_confirm">掃描歌單</string>
+    <string name="local_playlist_scan_skip">暫不掃描</string>
+    <string name="local_playlist_scan_none">未找到可匯入的本機 M3U / M3U8 歌單</string>
 
     <string name="notification_action_shuffle">隨機播放</string>
     <string name="notification_action_repeat_one">單曲循環</string>
@@ -138,10 +143,14 @@
     <string name="settings_language">應用語言</string>
     <string name="settings_language_system">跟隨系統</string>
     <string name="settings_language_simplified_chinese">簡體中文</string>
+    <string name="settings_language_traditional_chinese">繁體中文</string>
     <string name="settings_language_english">English</string>
+    <string name="settings_language_japanese">日本語</string>
     <string name="settings_language_summary_system">使用系統語言</string>
     <string name="settings_language_summary_simplified_chinese">強制使用簡體中文</string>
+    <string name="settings_language_summary_traditional_chinese">強制使用繁體中文介面</string>
     <string name="settings_language_summary_english">強制使用英文介面</string>
+    <string name="settings_language_summary_japanese">強制使用日文介面</string>
     <string name="settings_preferences">應用偏好</string>
     <string name="settings_preferences_summary">外觀和掃描相關設定</string>
     <string name="settings_lyrics">歌詞</string>
@@ -754,6 +763,8 @@
     <string name="settings_scan">掃描</string>
     <string name="settings_auto_scan">自動掃描</string>
     <string name="settings_auto_scan_summary">啟動時自動掃描音樂檔案</string>
+    <string name="settings_auto_scan_local_playlists">自動掃描本機歌單檔案</string>
+    <string name="settings_auto_scan_local_playlists_summary">啟動後掃描裝置中的 M3U / M3U8 檔案，並合併到本機歌單</string>
     <string name="settings_min_duration_filter">最短時長過濾</string>
     <string name="settings_min_duration_filter_summary">過濾短於 %1$d 秒的音訊檔案</string>
     <string name="settings_seconds_value">%1$d秒</string>
@@ -1009,8 +1020,10 @@
     <string name="playlist_import_merge_keep_summary">同名歌單只追加不存在的歌曲</string>
     <string name="playlist_export_txt">匯出為 TXT</string>
     <string name="playlist_export_txt_summary">逐行匯出本地歌曲路徑</string>
-    <string name="playlist_export_m3u">匯出為 M3U8</string>
-    <string name="playlist_export_m3u_summary">匯出 UTF-8 編碼的 #EXTM3U 播放列表，包含歌曲資訊和本地路徑</string>
+    <string name="playlist_export_m3u8">匯出為 M3U8</string>
+    <string name="playlist_export_m3u8_summary">匯出 UTF-8 編碼的 #EXTM3U 播放列表，包含歌曲資訊和本地路徑</string>
+    <string name="playlist_export_m3u">匯出為 M3U</string>
+    <string name="playlist_export_m3u_summary">匯出 .m3u 播放列表，便於相容只識別 M3U 後綴的軟體</string>
     <string name="notification_permission_denied_hint">拒絕通知權限不影響使用；如果 vivo / iQOO 系統不顯示通知，請自行到系統設定裡授權。</string>
     <string name="playlist_import_none">沒有可匯入的歌曲</string>
     <string name="playlist_import_missing_paths">，保留 %1$d 首未符合路徑</string>

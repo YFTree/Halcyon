@@ -14,6 +14,7 @@ import androidx.core.content.FileProvider
 import com.ella.music.R
 import com.ella.music.data.AppLogStore
 import com.ella.music.data.AppLogType
+import com.ella.music.data.isHttpAudioSource
 import com.ella.music.data.model.Song
 import java.io.File
 
@@ -61,7 +62,7 @@ object TagEditorEditTracker {
 }
 
 fun buildTagEditorOptions(context: Context, song: Song): List<TagEditorOption> {
-    if (song.path.startsWith("http://") || song.path.startsWith("https://")) {
+    if (song.path.isHttpAudioSource()) {
         return emptyList()
     }
 

@@ -74,6 +74,7 @@ import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import android.icu.text.Transliterator
+import com.ella.music.data.LibraryAlbumAggregator
 import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.model.formatPlaybackDuration
 import java.util.Locale
@@ -109,10 +110,10 @@ fun AlbumScreen(
     var scrollToTopRequest by remember { mutableStateOf(0) }
     var gridCoversEnabled by remember { mutableStateOf(false) }
     val albumDurations = remember(songs) {
-        songs.groupBy { it.albumIdentityId() }.mapValues { (_, albumSongs) -> albumSongs.sumOf { it.duration } }
+        LibraryAlbumAggregator.durationsByAlbumIdentity(songs)
     }
     val representativeSongsByAlbumId = remember(songs) {
-        songs.groupBy { it.albumIdentityId() }.mapValues { (_, albumSongs) -> albumSongs.firstOrNull() }
+        LibraryAlbumAggregator.representativeSongsByAlbumIdentity(songs)
     }
 
     val filteredAlbums = remember(albums, searchQuery) {

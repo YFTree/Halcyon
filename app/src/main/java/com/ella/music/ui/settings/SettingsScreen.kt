@@ -117,7 +117,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -221,7 +221,7 @@ fun AudioSettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
 
@@ -430,7 +430,7 @@ fun BackupSettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val backupScope = remember(context, scope) { context.findComponentActivity()?.lifecycleScope ?: scope }
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val playbackStatsStore = remember { PlaybackStatsStore.getInstance(context) }
     val playlistStore = remember { PlaylistStore.getInstance(context) }
     val librarySongs by mainViewModel?.songs?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
@@ -903,16 +903,18 @@ fun SettingsDetailScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
 
     val mcpServerEnabled by settingsManager.mcpServerEnabled.collectAsState(initial = false)
     val autoScan by settingsManager.autoScan.collectAsState(initial = false)
+    val autoScanLocalPlaylists by settingsManager.autoScanLocalPlaylists.collectAsState(initial = false)
     val lyriconEnabled by settingsManager.lyriconEnabled.collectAsState(initial = false)
     val lyriconTranslation by settingsManager.lyriconTranslation.collectAsState(initial = true)
     val lyriconPronunciation by settingsManager.lyriconPronunciation.collectAsState(initial = false)
     val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
+    val appLanguage by settingsManager.appLanguage.collectAsState(initial = SettingsManager.APP_LANGUAGE_SYSTEM)
     val bottomBarGlassEffect by settingsManager.bottomBarGlassEffect.collectAsState(initial = BottomBarGlassEffect.LiquidGlass)
     val tickerEnabled by settingsManager.tickerEnabled.collectAsState(initial = false)
     val tickerHeadsUpLyrics by settingsManager.tickerHeadsUpLyrics.collectAsState(initial = false)
@@ -995,6 +997,24 @@ fun SettingsDetailScreen(
     )
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
     val themeEntries = remember(themeLabels) { themeLabels.map { DropdownItem(title = it) } }
+    val languageOptions = listOf(
+        SettingsManager.APP_LANGUAGE_SYSTEM to stringResource(R.string.settings_language_system),
+        SettingsManager.APP_LANGUAGE_ZH_CN to stringResource(R.string.settings_language_simplified_chinese),
+        SettingsManager.APP_LANGUAGE_ZH_TW to stringResource(R.string.settings_language_traditional_chinese),
+        SettingsManager.APP_LANGUAGE_EN to stringResource(R.string.settings_language_english),
+        SettingsManager.APP_LANGUAGE_JA to stringResource(R.string.settings_language_japanese)
+    )
+    val selectedLanguageIndex = languageOptions.indexOfFirst { it.first == appLanguage }.takeIf { it >= 0 } ?: 0
+    val languageEntries = remember(languageOptions) {
+        languageOptions.map { (_, label) -> DropdownItem(title = label) }
+    }
+    val languageSummary = when (languageOptions.getOrNull(selectedLanguageIndex)?.first) {
+        SettingsManager.APP_LANGUAGE_ZH_CN -> stringResource(R.string.settings_language_summary_simplified_chinese)
+        SettingsManager.APP_LANGUAGE_ZH_TW -> stringResource(R.string.settings_language_summary_traditional_chinese)
+        SettingsManager.APP_LANGUAGE_EN -> stringResource(R.string.settings_language_summary_english)
+        SettingsManager.APP_LANGUAGE_JA -> stringResource(R.string.settings_language_summary_japanese)
+        else -> stringResource(R.string.settings_language_summary_system)
+    }
     val bottomBarGlassEffects = remember {
         listOf(BottomBarGlassEffect.Blur, BottomBarGlassEffect.LiquidGlass)
     }
@@ -1315,6 +1335,17 @@ fun SettingsDetailScreen(
                             selectedIndex = selectedThemeMode,
                             onSelectedIndexChange = { index ->
                                 scope.launch { settingsManager.setThemeMode(index) }
+                            }
+                        )
+                        WindowSpinnerPreference(
+                            title = stringResource(R.string.settings_language),
+                            summary = languageSummary,
+                            items = languageEntries,
+                            selectedIndex = selectedLanguageIndex,
+                            onSelectedIndexChange = { index ->
+                                languageOptions.getOrNull(index)?.first?.let { language ->
+                                    scope.launch { settingsManager.setAppLanguage(language) }
+                                }
                             }
                         )
                         WindowSpinnerPreference(
@@ -1688,6 +1719,17 @@ fun SettingsDetailScreen(
                             checked = autoScan,
                             onCheckedChange = {
                                 scope.launch { settingsManager.setAutoScan(it) }
+                            }
+                        )
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_auto_scan_local_playlists),
+                            summary = stringResource(R.string.settings_auto_scan_local_playlists_summary),
+                            checked = autoScanLocalPlaylists,
+                            onCheckedChange = {
+                                scope.launch {
+                                    settingsManager.setAutoScanLocalPlaylists(it)
+                                    settingsManager.setLocalPlaylistScanPromptHandled(true)
+                                }
                             }
                         )
 

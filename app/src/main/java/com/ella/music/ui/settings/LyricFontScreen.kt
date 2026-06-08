@@ -59,6 +59,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Download
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -68,7 +69,7 @@ fun LyricFontScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val selectedFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
     val lyricFontWeight by settingsManager.lyricFontWeight.collectAsState(initial = 800)
     val lyricFontItalic by settingsManager.lyricFontItalic.collectAsState(initial = false)
@@ -257,7 +258,7 @@ fun LyricFontScreen(
                             ).show()
                         }
                     },
-                    onDelete = if (font.sourceRank == 1) {
+                    onDelete = if (font.sourceRank == 2) {
                         {
                             scope.launch {
                                 val deleted = withContext(Dispatchers.IO) {
@@ -357,12 +358,14 @@ private fun FontChoiceItem(
 
             if (onDelete != null) {
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = stringResource(R.string.common_delete),
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.clickable(onClick = onDelete)
-                )
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Delete,
+                        contentDescription = stringResource(R.string.common_delete),
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
     }

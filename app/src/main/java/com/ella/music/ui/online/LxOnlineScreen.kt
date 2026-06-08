@@ -74,7 +74,7 @@ fun LxOnlineScreen(
     BackHandler(onBack = onBack)
 
     val context = LocalContext.current
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val service = remember(context) { LxOnlineService(context) }
     val scope = rememberCoroutineScope()
 

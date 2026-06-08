@@ -73,6 +73,14 @@ It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, 
 - Supports song information, tag editing, lyric timing tools, external tag-editor adaptation, and AI song interpretation.
 - Supports MediaSession custom commands for favorite and playback-mode controls in notifications / control centers.
 
+### 🤖 AI & MCP
+
+- Includes an MCP server built with the official Kotlin SDK, Ktor CIO, and Streamable HTTP, allowing MCP hosts such as Claude Desktop to control Halcyon playback.
+- Enable it from Settings → MCP server, then connect to `http://<device-ip>:8384/mcp`.
+- Available tools: `play_song`, `search_music`, `get_now_playing`, `skip_next`, `skip_previous`, `toggle_play_pause`, `toggle_shuffle`, `seek_to`, `get_queue`, and `get_library_stats`.
+- Available read-only resources: `ella://playback/current` and `ella://library/stats`.
+- The MCP server runs as an Android Foreground Service and stops when the setting is turned off.
+
 ---
 
 ## 📱 Requirements

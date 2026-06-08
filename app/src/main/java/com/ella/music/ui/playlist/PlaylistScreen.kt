@@ -793,6 +793,7 @@ fun PlaylistDetailScreen(
         }
     }
     var showExportFormatSheet by remember { mutableStateOf(false) }
+    var pendingM3uExportFormat by remember { mutableStateOf<PlaylistExportFormat?>(null) }
     val txtExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         val targetPlaylist = playlist
         if (uri == null || targetPlaylist == null) return@rememberLauncherForActivityResult
@@ -809,8 +810,10 @@ fun PlaylistDetailScreen(
     }
     val m3uExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/x-mpegurl")) { uri ->
         val targetPlaylist = playlist
+        val targetFormat = pendingM3uExportFormat ?: PlaylistExportFormat.M3u8
+        pendingM3uExportFormat = null
         if (uri == null || targetPlaylist == null) return@rememberLauncherForActivityResult
-        mainViewModel.exportLocalPlaylist(targetPlaylist, uri, PlaylistExportFormat.M3u) { result ->
+        mainViewModel.exportLocalPlaylist(targetPlaylist, uri, targetFormat) { result ->
             result
                 .onSuccess { exportResult ->
                     val skippedText = if (exportResult.skippedCount > 0) context.getString(R.string.playlist_export_skipped, exportResult.skippedCount) else ""
@@ -1243,13 +1246,18 @@ fun PlaylistDetailScreen(
             onFormatSelected = { format ->
                 val extension = when (format) {
                     PlaylistExportFormat.PlainText -> "txt"
-                    PlaylistExportFormat.M3u -> "m3u8"
+                    PlaylistExportFormat.M3u8 -> "m3u8"
+                    PlaylistExportFormat.M3u -> "m3u"
                 }
                 showExportFormatSheet = false
                 val fileName = "${playlist.name.safePlaylistFileName()}.$extension"
                 when (format) {
                     PlaylistExportFormat.PlainText -> txtExportLauncher.launch(fileName)
-                    PlaylistExportFormat.M3u -> m3uExportLauncher.launch(fileName)
+                    PlaylistExportFormat.M3u8,
+                    PlaylistExportFormat.M3u -> {
+                        pendingM3uExportFormat = format
+                        m3uExportLauncher.launch(fileName)
+                    }
                 }
             }
         )
@@ -1854,6 +1862,11 @@ private fun ExportPlaylistFormatSheet(
                 onClick = { onFormatSelected(PlaylistExportFormat.PlainText) }
             )
             ImportModeItem(
+                title = stringResource(R.string.playlist_export_m3u8),
+                summary = stringResource(R.string.playlist_export_m3u8_summary),
+                onClick = { onFormatSelected(PlaylistExportFormat.M3u8) }
+            )
+            ImportModeItem(
                 title = stringResource(R.string.playlist_export_m3u),
                 summary = stringResource(R.string.playlist_export_m3u_summary),
                 onClick = { onFormatSelected(PlaylistExportFormat.M3u) }
@@ -1897,7 +1910,7 @@ private fun ImportModeItem(
 @Composable
 private fun wallpaperAwarePlaylistCardColor(alpha: Float = 0.42f): Color {
     val context = LocalContext.current
-    val settingsManager = remember(context) { SettingsManager(context) }
+    val settingsManager = remember(context) { SettingsManager.getInstance(context) }
     val wallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
     val wallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     return if (wallpaperEnabled && wallpaperUri.isNotBlank()) {

@@ -82,14 +82,17 @@ class PlaybackService : MediaLibraryService() {
     private var previousButtonAction = SettingsManager.PREVIOUS_BUTTON_PREVIOUS
     @Volatile
     private var appShuffleEnabled = false
+    @Volatile
+    private var bluetoothAutoPlayEnabled = false
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         notificationProvider = NoArtworkMediaNotificationProvider(this)
         setMediaNotificationProvider(notificationProvider)
-        val settingsManager = SettingsManager(this)
+        val settingsManager = SettingsManager.getInstance(this)
         var webDavConfig = currentWebDavConfig(settingsManager)
+        appShuffleEnabled = loadAppShuffleEnabled()
         previousButtonAction = runBlocking(Dispatchers.IO) {
             settingsManager.previousButtonAction.first()
         }
@@ -102,6 +105,11 @@ class PlaybackService : MediaLibraryService() {
                     SettingsManager.PREVIOUS_BUTTON_PREVIOUS,
                     SettingsManager.PREVIOUS_BUTTON_REPLAY_CURRENT
                 )
+            }
+        }
+        serviceScope.launch {
+            settingsManager.bluetoothAutoPlay.collect { enabled ->
+                bluetoothAutoPlayEnabled = enabled
             }
         }
         serviceScope.launch {
@@ -195,7 +203,9 @@ class PlaybackService : MediaLibraryService() {
         updateMediaButtonPreferences()
 
         // Register Bluetooth auto-play receiver
-        bluetoothReceiver = BluetoothAutoPlayReceiver {
+        bluetoothReceiver = BluetoothAutoPlayReceiver(
+            isAutoPlayEnabled = { bluetoothAutoPlayEnabled }
+        ) {
             val player = mediaSession?.player ?: return@BluetoothAutoPlayReceiver
             if (player.mediaItemCount > 0 && !player.isPlaying && player.playWhenReady) {
                 player.play()
@@ -812,7 +822,6 @@ class PlaybackService : MediaLibraryService() {
         }
 
         private fun Player.playbackModeAction(): PlaybackModeAction {
-            service.appShuffleEnabled = service.loadAppShuffleEnabled()
             return when {
                 service.appShuffleEnabled -> PlaybackModeAction(
                     icon = R.drawable.ic_notification_shuffle,

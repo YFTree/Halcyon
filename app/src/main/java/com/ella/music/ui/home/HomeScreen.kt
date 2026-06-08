@@ -145,7 +145,7 @@ fun LibraryScreen(
     val scanProgress by mainViewModel.scanProgress.collectAsState()
     val ratingRevision by mainViewModel.ratingRevision.collectAsState()
     val context = LocalContext.current
-    val settingsManager = remember(context) { SettingsManager(context) }
+    val settingsManager = remember(context) { SettingsManager.getInstance(context) }
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = false)
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
 
@@ -173,7 +173,6 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
     fun navigateToArtistOrChoose(artistText: String) {
         val artists = splitArtistNames(artistText)
-            .filterNot { it.equals("Unknown", ignoreCase = true) }
             .distinctBy { it.tagIdentityKey() }
         when (artists.size) {
             0 -> Toast.makeText(context, context.getString(R.string.player_no_artist_jump), Toast.LENGTH_SHORT).show()
@@ -965,7 +964,7 @@ private fun SongAiInterpretationMenu(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val settingsManager = remember(context) { SettingsManager(context) }
+    val settingsManager = remember(context) { SettingsManager.getInstance(context) }
     val openAiApiKey by settingsManager.openAiApiKey.collectAsState(initial = "")
     val missingApiKeyText = stringResource(R.string.library_ai_missing_api_key)
     val aiFailedText = stringResource(R.string.song_more_ai_failed)

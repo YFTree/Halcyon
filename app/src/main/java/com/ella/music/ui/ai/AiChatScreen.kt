@@ -90,6 +90,12 @@ private data class AiChatSession(
 private fun sessionsDir(context: Context): File =
     File(context.filesDir, "ai_chat_sessions").also { it.mkdirs() }
 
+private fun defaultSessionTitle(context: Context): String =
+    context.getString(R.string.ai_chat_new_session)
+
+private fun String.isDefaultAiChatSessionTitle(): Boolean =
+    trim() in setOf("New chat", "New Chat", "新对话", "新對話", "新しい会話")
+
 private fun loadSessionIndex(context: Context): List<AiChatSessionMeta> {
     return runCatching {
         val file = File(sessionsDir(context), "index.json")
@@ -97,7 +103,12 @@ private fun loadSessionIndex(context: Context): List<AiChatSessionMeta> {
         val array = JSONArray(file.readText())
         (0 until array.length()).map { i ->
             val obj = array.getJSONObject(i)
-            AiChatSessionMeta(obj.getString("id"), obj.getString("title"), obj.getLong("createdAt"))
+            val rawTitle = obj.getString("title")
+            AiChatSessionMeta(
+                id = obj.getString("id"),
+                title = if (rawTitle.isDefaultAiChatSessionTitle()) defaultSessionTitle(context) else rawTitle,
+                createdAt = obj.getLong("createdAt")
+            )
         }
     }.getOrDefault(emptyList())
 }
@@ -180,7 +191,7 @@ fun AiChatScreen(
     LaunchedEffect(Unit) {
         if (sessionIndex.isEmpty()) {
             val id = UUID.randomUUID().toString()
-            val meta = AiChatSessionMeta(id, context.getString(R.string.ai_chat_new_session), System.currentTimeMillis())
+            val meta = AiChatSessionMeta(id, defaultSessionTitle(context), System.currentTimeMillis())
             sessionIndex = listOf(meta)
             currentSessionId = id
             messages = emptyList()
@@ -201,7 +212,7 @@ fun AiChatScreen(
             if (firstUserMsg != null) {
                 val newTitle = firstUserMsg.text.take(20).replace("\n", " ")
                 val updatedIndex = sessionIndex.map {
-                    if (it.id == id && it.title == context.getString(R.string.ai_chat_new_session)) it.copy(title = newTitle) else it
+                    if (it.id == id && it.title.isDefaultAiChatSessionTitle()) it.copy(title = newTitle) else it
                 }
                 if (updatedIndex != sessionIndex) {
                     sessionIndex = updatedIndex
@@ -219,7 +230,7 @@ fun AiChatScreen(
 
     fun createNewSession() {
         val id = UUID.randomUUID().toString()
-        val meta = AiChatSessionMeta(id, context.getString(R.string.ai_chat_new_session), System.currentTimeMillis())
+        val meta = AiChatSessionMeta(id, defaultSessionTitle(context), System.currentTimeMillis())
         sessionIndex = listOf(meta) + sessionIndex
         currentSessionId = id
         messages = emptyList()

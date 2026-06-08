@@ -236,7 +236,6 @@ fun SongMoreActionHost(
                 },
                 onArtist = {
                     val artists = splitArtistNames(song.artist)
-                        .filterNot { it.equals("Unknown", ignoreCase = true) }
                         .distinctBy { it.tagIdentityKey() }
                     when (artists.size) {
                         0 -> Toast.makeText(context, noArtistJump, Toast.LENGTH_SHORT).show()

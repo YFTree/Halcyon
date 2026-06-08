@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -153,7 +154,7 @@ class MainActivity : ComponentActivity() {
     ) { isGranted ->
         if (isGranted) {
             lifecycleScope.launch {
-                if (SettingsManager(this@MainActivity).initialScanPromptHandled.first()) {
+                if (SettingsManager.getInstance(this@MainActivity).initialScanPromptHandled.first()) {
                     mainViewModel?.scanMusicIfAutoEnabled()
                 }
             }
@@ -180,7 +181,7 @@ class MainActivity : ComponentActivity() {
             val playerVm: PlayerViewModel = viewModel()
             mainViewModel = mainVm
 
-            val settingsManager = remember { SettingsManager(this@MainActivity) }
+            val settingsManager = remember { SettingsManager.getInstance(this@MainActivity) }
             val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
             val appLanguage by settingsManager.appLanguage.collectAsState(initial = SettingsManager.APP_LANGUAGE_SYSTEM)
 
@@ -268,7 +269,7 @@ class MainActivity : ComponentActivity() {
 
     private fun applySavedAppLanguage() {
         val language = runBlocking(Dispatchers.IO) {
-            SettingsManager(this@MainActivity).appLanguage.first()
+            SettingsManager.getInstance(this@MainActivity).appLanguage.first()
         }
         applyAppLanguage(language)
     }
@@ -277,7 +278,9 @@ class MainActivity : ComponentActivity() {
         if (appliedLanguageTag == languageTag) return false
         val locales = when (languageTag) {
             SettingsManager.APP_LANGUAGE_ZH_CN -> LocaleListCompat.forLanguageTags("zh-CN")
+            SettingsManager.APP_LANGUAGE_ZH_TW -> LocaleListCompat.forLanguageTags("zh-TW")
             SettingsManager.APP_LANGUAGE_EN -> LocaleListCompat.forLanguageTags("en")
+            SettingsManager.APP_LANGUAGE_JA -> LocaleListCompat.forLanguageTags("ja")
             else -> LocaleListCompat.getEmptyLocaleList()
         }
         appliedLanguageTag = languageTag
@@ -321,7 +324,7 @@ fun EllaApp(
     val view = LocalView.current
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val scope = rememberCoroutineScope()
     val activity = context as? Activity
     val mainActivity = context as? MainActivity
@@ -336,11 +339,15 @@ fun EllaApp(
     val isPlayerVisible = showPlayerOverlay || currentRoute == Screen.Player.route
     val libraryCacheLoaded by mainViewModel.libraryCacheLoaded.collectAsState()
     val initialScanPromptHandled by settingsManager.initialScanPromptHandled.collectAsState(initial = true)
+    val localPlaylistScanPromptHandled by settingsManager.localPlaylistScanPromptHandled.collectAsState(initial = true)
+    val autoScanLocalPlaylists by settingsManager.autoScanLocalPlaylists.collectAsState(initial = false)
     val shortcutLibraryLabel by settingsManager.shortcutLibraryLabel.collectAsState(initial = SettingsManager.DEFAULT_SHORTCUT_LIBRARY_LABEL)
     val shortcutPlaylistsLabel by settingsManager.shortcutPlaylistsLabel.collectAsState(initial = SettingsManager.DEFAULT_SHORTCUT_PLAYLISTS_LABEL)
     val shortcutFolderLabel by settingsManager.shortcutFolderLabel.collectAsState(initial = SettingsManager.DEFAULT_SHORTCUT_FOLDER_LABEL)
     val isScanning by mainViewModel.isScanning.collectAsState()
     var showInitialScanPrompt by remember { mutableStateOf(false) }
+    var showLocalPlaylistScanPrompt by remember { mutableStateOf(false) }
+    var localPlaylistAutoScanHandled by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(currentProcessingIntent.value) {
         val activity = context as? Activity
         val shortcutAction = currentProcessingIntent.value?.getStringExtra(EXTRA_SHORTCUT_ACTION)
@@ -456,6 +463,24 @@ fun EllaApp(
             mainViewModel.scanMusicIfAutoEnabled()
         } else if (!isScanning) {
             showInitialScanPrompt = true
+        }
+    }
+
+    LaunchedEffect(
+        libraryCacheLoaded,
+        localPlaylistScanPromptHandled,
+        autoScanLocalPlaylists,
+        librarySongs,
+        showInitialScanPrompt
+    ) {
+        if (!libraryCacheLoaded || librarySongs.isEmpty() || showInitialScanPrompt) return@LaunchedEffect
+        if (!localPlaylistScanPromptHandled) {
+            showLocalPlaylistScanPrompt = true
+            return@LaunchedEffect
+        }
+        if (autoScanLocalPlaylists && !localPlaylistAutoScanHandled) {
+            localPlaylistAutoScanHandled = true
+            mainViewModel.scanLocalPlaylistFiles()
         }
     }
 
@@ -779,6 +804,60 @@ fun EllaApp(
                     }
                 }
             )
+
+            LocalPlaylistScanPromptDialog(
+                show = showLocalPlaylistScanPrompt,
+                onDismiss = {
+                    showLocalPlaylistScanPrompt = false
+                    scope.launch {
+                        settingsManager.setLocalPlaylistScanPromptHandled(true)
+                        settingsManager.setAutoScanLocalPlaylists(false)
+                    }
+                },
+                onScan = {
+                    showLocalPlaylistScanPrompt = false
+                    scope.launch {
+                        settingsManager.setLocalPlaylistScanPromptHandled(true)
+                        settingsManager.setAutoScanLocalPlaylists(true)
+                    }
+                    mainViewModel.scanLocalPlaylistFiles { result ->
+                        result
+                            .onSuccess { importResult ->
+                                val message = if (importResult.importedPlaylists == 0) {
+                                    context.getString(R.string.local_playlist_scan_none)
+                                } else {
+                                    context.getString(
+                                        R.string.playlist_import_result,
+                                        context.getString(
+                                            R.string.playlist_import_playlist_prefix,
+                                            importResult.importedPlaylists
+                                        ),
+                                        importResult.importedCount,
+                                        importResult.matchedCount,
+                                        if (importResult.missingCount > 0) {
+                                            context.getString(R.string.playlist_import_missing_paths, importResult.missingCount)
+                                        } else {
+                                            ""
+                                        },
+                                        if (importResult.duplicateCount > 0) {
+                                            context.getString(R.string.playlist_import_duplicates, importResult.duplicateCount)
+                                        } else {
+                                            ""
+                                        }
+                                    )
+                                }
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            }
+                            .onFailure {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.playlist_import_failed, it.message.orEmpty()),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                    }
+                }
+            )
         }
     }
 }
@@ -806,6 +885,53 @@ private fun Intent.resolveShortcutRoute(): String {
     return getStringExtra(EXTRA_SHORTCUT_ROUTE)
         ?: getStringExtra(EXTRA_SHORTCUT_ROUTE_NEW)
         ?: ""
+}
+
+@Composable
+private fun LocalPlaylistScanPromptDialog(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    onScan: () -> Unit
+) {
+    WindowDialog(
+        show = show,
+        title = stringResource(R.string.local_playlist_scan_title),
+        onDismissRequest = onDismiss
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            top.yukonga.miuix.kmp.basic.Text(
+                text = stringResource(R.string.local_playlist_scan_message),
+                color = MiuixTheme.colorScheme.onSurface,
+                fontSize = 15.sp,
+                lineHeight = 22.sp
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    TextButton(
+                        text = stringResource(R.string.local_playlist_scan_skip),
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(modifier = Modifier.weight(1f)) {
+                    TextButton(
+                        text = stringResource(R.string.local_playlist_scan_confirm),
+                        onClick = onScan,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -933,96 +1059,110 @@ private fun FloatingBottomControls(
                 onExpand = onExpand
             )
         } else {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                AnimatedVisibility(
-                    visible = showMiniPlayer,
-                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-                ) {
-                    currentSong?.let { song ->
-                        MiniPlayer(
-                            song = song,
-                            isPlaying = isPlaying,
-                            progress = if (duration > 0L) currentPosition.toFloat() / duration.toFloat() else 0f,
-                            coverRotationEnabled = coverRotationEnabled,
-                            lyricText = lyricText,
-                            lyricTranslation = lyricTranslation,
-                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
-                            loadCoverArt = mainViewModel::getCoverArtBitmap,
-                            backdrop = if (useGlass) backdrop else null,
-                            liquidGlass = useGlass,
-                            glassEffect = glassEffect,
-                            showQueueButton = miniPlayerRightButton == SettingsManager.MINI_PLAYER_RIGHT_QUEUE,
-                            onClick = onNavigatePlayer,
-                            onPlayPause = { playerViewModel.togglePlayPause() },
-                            onSkipNext = { playerViewModel.skipToNext() },
-                            onSkipPrevious = { playerViewModel.skipToPrevious() },
-                            onShowQueue = { queueSheetExpanded = true },
-                            lyricProgress = lyricProgress,
-                        )
-                    }
-                }
-
-                AnimatedVisibility(visible = showBottomBar) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (useGlass) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                val selectedBottomTabIndex = tabs
-                                    .indexOfFirst { currentTabRoute == it.route }
-                                    .takeIf { it >= 0 }
-                                LiquidGlassBottomBar(
-                                    backdrop = backdrop,
-                                    isBlurEnabled = true,
-                                    glassEffect = glassEffect,
-                                    selectedIndex = selectedBottomTabIndex,
-                                    itemCount = tabs.size,
-                                    onSelected = { index ->
-                                        tabs.getOrNull(index)?.let { onNavigate(it.route) }
-                                    }
-                                ) {
-                                    tabs.forEach { tab ->
-                                        LiquidGlassBottomBarItem(
-                                            selected = currentTabRoute == tab.route,
-                                            onClick = {},
-                                            backdrop = backdrop,
-                                            isBlurEnabled = true,
-                                            showSelectedIndicator = glassEffect == BottomBarGlassEffect.LiquidGlass,
-                                            icon = {
-                                                Icon(
-                                                    imageVector = tab.icon,
-                                                    contentDescription = tab.label,
-                                                    tint = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
-                                                    else MiuixTheme.colorScheme.onSurface,
-                                                    modifier = Modifier
-                                                )
-                                            },
-                                            label = {
-                                                top.yukonga.miuix.kmp.basic.Text(
-                                                    text = tab.label,
-                                                    fontSize = 11.sp,
-                                                    color = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
-                                                    else MiuixTheme.colorScheme.onSurface
-                                                )
-                                            }
-                                        )
-                                    }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .pointerInput(showMiniPlayer, showBottomBar) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    event.changes.forEach { it.consume() }
                                 }
                             }
-                            BottomDockActionPill(
-                                icon = MiuixIcons.Basic.Search,
-                                label = stringResource(R.string.common_search),
-                                selected = currentRoute.isSearchRoute(),
-                                onClick = onNavigateSearch,
-                                backdrop = backdrop,
+                        }
+                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    AnimatedVisibility(
+                        visible = showMiniPlayer,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                    ) {
+                        currentSong?.let { song ->
+                            MiniPlayer(
+                                song = song,
+                                isPlaying = isPlaying,
+                                progress = if (duration > 0L) currentPosition.toFloat() / duration.toFloat() else 0f,
+                                coverRotationEnabled = coverRotationEnabled,
+                                lyricText = lyricText,
+                                lyricTranslation = lyricTranslation,
+                                albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                                loadCoverArt = mainViewModel::getCoverArtBitmap,
+                                backdrop = if (useGlass) backdrop else null,
+                                liquidGlass = useGlass,
                                 glassEffect = glassEffect,
-                                modifier = Modifier.size(64.dp)
+                                showQueueButton = miniPlayerRightButton == SettingsManager.MINI_PLAYER_RIGHT_QUEUE,
+                                onClick = onNavigatePlayer,
+                                onPlayPause = { playerViewModel.togglePlayPause() },
+                                onSkipNext = { playerViewModel.skipToNext() },
+                                onSkipPrevious = { playerViewModel.skipToPrevious() },
+                                onShowQueue = { queueSheetExpanded = true },
+                                lyricProgress = lyricProgress,
                             )
+                        }
+                    }
+
+                    AnimatedVisibility(visible = showBottomBar) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (useGlass) {
+                                Box(modifier = Modifier.weight(1f)) {
+                                    val selectedBottomTabIndex = tabs
+                                        .indexOfFirst { currentTabRoute == it.route }
+                                        .takeIf { it >= 0 }
+                                    LiquidGlassBottomBar(
+                                        backdrop = backdrop,
+                                        isBlurEnabled = true,
+                                        glassEffect = glassEffect,
+                                        selectedIndex = selectedBottomTabIndex,
+                                        itemCount = tabs.size,
+                                        onSelected = { index ->
+                                            tabs.getOrNull(index)?.let { onNavigate(it.route) }
+                                        }
+                                    ) {
+                                        tabs.forEach { tab ->
+                                            LiquidGlassBottomBarItem(
+                                                selected = currentTabRoute == tab.route,
+                                                onClick = {},
+                                                backdrop = backdrop,
+                                                isBlurEnabled = true,
+                                                showSelectedIndicator = glassEffect == BottomBarGlassEffect.LiquidGlass,
+                                                icon = {
+                                                    Icon(
+                                                        imageVector = tab.icon,
+                                                        contentDescription = tab.label,
+                                                        tint = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
+                                                        else MiuixTheme.colorScheme.onSurface,
+                                                        modifier = Modifier
+                                                    )
+                                                },
+                                                label = {
+                                                    top.yukonga.miuix.kmp.basic.Text(
+                                                        text = tab.label,
+                                                        fontSize = 11.sp,
+                                                        color = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
+                                                        else MiuixTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                                BottomDockActionPill(
+                                    icon = MiuixIcons.Basic.Search,
+                                    label = stringResource(R.string.common_search),
+                                    selected = currentRoute.isSearchRoute(),
+                                    onClick = onNavigateSearch,
+                                    backdrop = backdrop,
+                                    glassEffect = glassEffect,
+                                    modifier = Modifier.size(64.dp)
+                                )
+                            }
                         }
                     }
                 }

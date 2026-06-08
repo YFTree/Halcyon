@@ -12,7 +12,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun ellaPageBackground(): Color {
     val context = LocalContext.current
-    val settingsManager = androidx.compose.runtime.remember(context) { SettingsManager(context) }
+    val settingsManager = androidx.compose.runtime.remember(context) { SettingsManager.getInstance(context) }
     val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
     val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     if (appWallpaperEnabled && appWallpaperUri.isNotBlank()) return Color.Transparent

@@ -100,6 +100,11 @@
     <string name="folder_scan_manual_needed">Folder added. You can scan manually for new content.</string>
     <string name="initial_scan_title">No songs</string>
     <string name="initial_scan_message">There are no songs yet. Scan music now?</string>
+    <string name="local_playlist_scan_title">Scan local playlist files</string>
+    <string name="local_playlist_scan_message">Scan M3U / M3U8 playlist files on this device and import them into Halcyon? If you skip this, you can still enable automatic scanning in Settings.</string>
+    <string name="local_playlist_scan_confirm">Scan playlists</string>
+    <string name="local_playlist_scan_skip">Not now</string>
+    <string name="local_playlist_scan_none">No local M3U / M3U8 playlists found</string>
 
     <string name="notification_action_shuffle">Shuffle</string>
     <string name="notification_action_repeat_one">Repeat one</string>
@@ -138,10 +143,14 @@
     <string name="settings_language">App language</string>
     <string name="settings_language_system">Follow system</string>
     <string name="settings_language_simplified_chinese">Simplified Chinese</string>
+    <string name="settings_language_traditional_chinese">Traditional Chinese</string>
     <string name="settings_language_english">English</string>
+    <string name="settings_language_japanese">Japanese</string>
     <string name="settings_language_summary_system">Use the system language</string>
     <string name="settings_language_summary_simplified_chinese">Force Simplified Chinese for the app UI</string>
+    <string name="settings_language_summary_traditional_chinese">Force Traditional Chinese for the app UI</string>
     <string name="settings_language_summary_english">Force English for the app UI</string>
+    <string name="settings_language_summary_japanese">Force Japanese for the app UI</string>
     <string name="settings_preferences">App preferences</string>
     <string name="settings_preferences_summary">Appearance and scanning settings</string>
     <string name="settings_lyrics">Lyrics</string>
@@ -754,6 +763,8 @@
     <string name="settings_scan">Scanning</string>
     <string name="settings_auto_scan">Auto scan</string>
     <string name="settings_auto_scan_summary">Scan music files automatically on startup</string>
+    <string name="settings_auto_scan_local_playlists">Auto scan local playlist files</string>
+    <string name="settings_auto_scan_local_playlists_summary">Scan M3U / M3U8 files on startup and merge them into local playlists</string>
     <string name="settings_min_duration_filter">Minimum duration filter</string>
     <string name="settings_min_duration_filter_summary">Filter audio files shorter than %1$d seconds</string>
     <string name="settings_seconds_value">%1$d sec</string>
@@ -909,6 +920,9 @@
     <string name="player_enable_keep_screen_on">Enable lyrics screen always-on</string>
     <string name="player_lyric_font_size">Lyric font size</string>
     <string name="player_lyric_source">Lyric source</string>
+    <string name="player_lyric_format">Lyric format</string>
+    <string name="player_lyric_format_ttml">TTML</string>
+    <string name="player_lyric_format_lrc">(E)LRC</string>
     <string name="player_lyric_source_auto">Auto</string>
     <string name="player_lyric_source_external">External</string>
     <string name="player_lyric_source_embedded">Embedded</string>
@@ -1006,8 +1020,10 @@
     <string name="playlist_import_merge_keep_summary">For same-name playlists, append only songs that are not already present</string>
     <string name="playlist_export_txt">Export as TXT</string>
     <string name="playlist_export_txt_summary">Export local song paths line by line</string>
-    <string name="playlist_export_m3u">Export as M3U8</string>
-    <string name="playlist_export_m3u_summary">Export a UTF-8 #EXTM3U playlist including song info and local paths</string>
+    <string name="playlist_export_m3u8">Export as M3U8</string>
+    <string name="playlist_export_m3u8_summary">Export a UTF-8 #EXTM3U playlist including song info and local paths</string>
+    <string name="playlist_export_m3u">Export as M3U</string>
+    <string name="playlist_export_m3u_summary">Export a .m3u playlist for apps that only recognize the M3U extension</string>
     <string name="notification_permission_denied_hint">Denying notification permission will not affect playback. If notifications do not appear on vivo / iQOO, please enable it manually in system settings.</string>
     <string name="playlist_import_none">No songs available to import</string>
     <string name="playlist_import_missing_paths">, kept %1$d unmatched paths</string>

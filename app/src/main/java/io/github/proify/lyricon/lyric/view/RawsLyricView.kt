@@ -67,7 +67,7 @@ class RawsLyricView @JvmOverloads constructor(
         private const val TRANS_GAP_DP = 6f
         private const val FEATHER_WIDTH_DP = 30f
         private const val SCROLL_ANIM_MS = 400L
-        private const val AUTO_SCROLL_RESUME_MS = 3000L
+        private const val AUTO_SCROLL_RESUME_MS = 5000L
         private const val INTERLUDE_FADE_MS = 600L
         private const val INTERLUDE_MIN_GAP_MS = 7000L
         private const val INTERLUDE_DOT_SIZE_DP = 10f
@@ -173,6 +173,7 @@ class RawsLyricView @JvmOverloads constructor(
     private var maxScrollY = 0f
     private var isUserScrolling = false
     private var autoScrollResumeTime = 0L
+    private var autoScrollResumeLineIndex = -1
     private var isDragging = false
     private var downTouchX = 0f
     private var downTouchY = 0f
@@ -330,8 +331,17 @@ class RawsLyricView @JvmOverloads constructor(
         updateSecondaryVisibilityIfNeeded()
         val newIndex = findCurrentLine(positionMs + lineOffsetMs)
         if (newIndex != currentIndex) {
+            val shouldResumeForNextLine = autoScrollResumeEnabled &&
+                isUserScrolling &&
+                !isDragging &&
+                autoScrollResumeLineIndex >= 0 &&
+                newIndex != autoScrollResumeLineIndex
             onLineChanged(currentIndex, newIndex)
             currentIndex = newIndex
+            if (shouldResumeForNextLine) {
+                isUserScrolling = false
+                autoScrollResumeLineIndex = -1
+            }
             if (!isUserScrolling) {
                 scrollToCurrentLine(positionInitialized && playbackActive)
             }
@@ -420,8 +430,10 @@ class RawsLyricView @JvmOverloads constructor(
         autoScrollResumeEnabled = enabled
         if (!enabled) {
             autoScrollResumeTime = Long.MAX_VALUE
+            autoScrollResumeLineIndex = -1
         } else if (isUserScrolling) {
             autoScrollResumeTime = SystemClock.uptimeMillis() + AUTO_SCROLL_RESUME_MS
+            autoScrollResumeLineIndex = currentIndex
         }
     }
 
@@ -817,6 +829,7 @@ class RawsLyricView @JvmOverloads constructor(
         }
         if (autoScrollResumeEnabled && isUserScrolling && SystemClock.uptimeMillis() > autoScrollResumeTime) {
             isUserScrolling = false
+            autoScrollResumeLineIndex = -1
             scrollToCurrentLine(true)
         }
         var anyAlphaAnimating = false
@@ -1790,6 +1803,7 @@ class RawsLyricView @JvmOverloads constructor(
                         scroller.abortAnimation()
                         isDragging = true
                         isUserScrolling = true
+                        autoScrollResumeLineIndex = currentIndex
                         parent.requestDisallowInterceptTouchEvent(true)
                         postFrame()
                     }
@@ -1814,6 +1828,10 @@ class RawsLyricView @JvmOverloads constructor(
                         0, 0, 0, maxScrollY.toInt()
                     )
                     autoScrollResumeTime = SystemClock.uptimeMillis() + AUTO_SCROLL_RESUME_MS
+                    autoScrollResumeLineIndex = currentIndex
+                } else if (isDragging) {
+                    autoScrollResumeTime = SystemClock.uptimeMillis() + AUTO_SCROLL_RESUME_MS
+                    autoScrollResumeLineIndex = currentIndex
                 }
                 velocityTracker?.recycle()
                 velocityTracker = null

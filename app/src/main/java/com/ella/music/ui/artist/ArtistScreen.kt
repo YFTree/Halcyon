@@ -63,12 +63,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.ella.music.R
+import com.ella.music.data.LibraryAlbumAggregator
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.UserPlaylist
-import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.ui.LibrarySortUiState
@@ -88,7 +88,9 @@ import com.ella.music.ui.components.openSongSpectrumWithAspectPro
 import com.ella.music.ui.components.shareLocalSong
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.AddToPlaylistSheet
+import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -163,7 +165,7 @@ fun ArtistScreen(
         showAlbumArtists && mainViewModel.hasAlbumArtistTags() && releaseAlbums.isNotEmpty()
     }
     val albumDurations = remember(songs) {
-        songs.groupBy { it.albumIdentityId() }.mapValues { (_, albumSongs) -> albumSongs.sumOf { it.duration } }
+        LibraryAlbumAggregator.durationsByAlbumIdentity(songs)
     }
     val sortedParticipatedAlbums = remember(participatedAlbums, albumSortMode, albumDurations) {
         participatedAlbums.sortedForArtistAlbumDetail(albumSortMode, albumDurations)
@@ -208,10 +210,17 @@ fun ArtistScreen(
         }
     }
 
-    // 暂时用该歌手第一首歌的专辑封面作为歌手页顶部大图
-    val artistCoverUri = artistSongs.firstOrNull()?.albumId
+    val representativeCoverSong = remember(artistSongs) { artistSongs.firstOrNull() }
+    val artistCoverUri = representativeCoverSong?.albumId
         ?.takeIf { it > 0L }
         ?.let { mainViewModel.getAlbumArtUri(it) }
+    val artistCoverState = rememberSongArtworkState(
+        song = representativeCoverSong,
+        albumArtUri = artistCoverUri,
+        loadCoverArt = mainViewModel::getAlbumCoverArtBitmap,
+        usage = ArtworkUsage.ArtistImage,
+        showDefaultWhenMissing = false
+    )
 
     fun finishSelectionMode() {
         selectionMode = false
@@ -249,7 +258,7 @@ fun ArtistScreen(
             item {
                 ArtistHeader(
                     artistName = artistName,
-                    coverUri = artistCoverUri,
+                    coverModel = artistCoverState.model,
                     songCount = sortedArtistSongs.size,
                     albumCount = (participatedAlbums + releaseAlbums).distinctBy { it.id }.size,
                     onPlayAll = {
@@ -1069,7 +1078,7 @@ private fun ArtistTabRow(
 @Composable
 private fun ArtistHeader(
     artistName: String,
-    coverUri: Uri?,
+    coverModel: Any?,
     songCount: Int,
     albumCount: Int,
     onPlayAll: () -> Unit
@@ -1082,9 +1091,9 @@ private fun ArtistHeader(
             .fillMaxWidth()
             .height(468.dp)
     ) {
-        if (coverUri != null) {
+        if (coverModel != null) {
             SafeCoverImage(
-                model = coverUri,
+                model = coverModel,
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,

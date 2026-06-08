@@ -22,7 +22,10 @@ import com.ella.music.player.LyriconBridge
 import com.ella.music.player.PlaybackService
 import com.ella.music.player.SuperLyricBridge
 import com.ella.music.player.TickerBridge
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,13 +38,15 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
+    companion object {
+        private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
 
-    private val repository = MusicRepository(application)
+    private val repository = MusicRepository.getInstance(application)
     val playerManager = ExoPlayerManager(application)
-    val settingsManager = SettingsManager(application)
+    val settingsManager = SettingsManager.getInstance(application)
     val lyriconBridge = LyriconBridge(application)
     val tickerBridge = TickerBridge(application)
     val desktopLyricBridge = DesktopLyricBridge(application)
@@ -1402,8 +1407,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
-        runBlocking {
-            flushPlaybackStats()
+        val songToFlush = statsSong
+        val listenedMsToFlush = pendingListenMs
+        pendingListenMs = 0L
+        if (songToFlush != null && playCountedSongId == songToFlush.id && listenedMsToFlush > 0L) {
+            cleanupScope.launch {
+                playbackStatsStore.addListenTime(songToFlush, listenedMsToFlush)
+            }
         }
         super.onCleared()
         externalLyricResendJob?.cancel()

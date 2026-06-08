@@ -18,18 +18,23 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.ella.music.data.AppLogStore
+import com.ella.music.data.ExternalUriResolver
+import com.ella.music.data.LibraryNormalizer
 import com.ella.music.data.model.Song
 import com.ella.music.player.PlaybackService
 import com.ella.music.player.toMediaItemExtras
 import com.google.common.util.concurrent.FutureCallback
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 class ExternalPlaybackActivity : ComponentActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
+    private val externalUriResolver by lazy { ExternalUriResolver(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,9 +59,34 @@ class ExternalPlaybackActivity : ComponentActivity() {
             return
         }
 
-        persistReadGrantIfPossible(uri, intent.flags)
-        val song = uri.toExternalSong(intent.type.orEmpty())
-        val mediaItem = song.toExternalMediaItem(uri)
+        lifecycleScope.launch {
+            val mediaItem = runCatching {
+                val song = withContext(Dispatchers.IO) { uri.toExternalSong(intent.type.orEmpty()) }
+                val resolved = externalUriResolver.resolveForPlayback(
+                    uri = uri,
+                    grantFlags = intent.flags,
+                    preferredName = song.fileName
+                )
+                val playbackSong = song.copy(
+                    id = stableExternalId(resolved.playbackUri),
+                    path = resolved.playbackUri.toString(),
+                    fileSize = if (resolved.copiedToCache) {
+                        File(resolved.playbackUri.path.orEmpty()).length()
+                    } else {
+                        song.fileSize
+                    }
+                )
+                playbackSong.toExternalMediaItem(resolved.playbackUri)
+            }.getOrElse { error ->
+                AppLogStore.error(this@ExternalPlaybackActivity, "ExternalPlayback", "Failed to resolve external uri=$uri", error)
+                finish()
+                return@launch
+            }
+            playExternalMediaItem(uri, mediaItem)
+        }
+    }
+
+    private fun playExternalMediaItem(originalUri: Uri, mediaItem: MediaItem) {
         val token = SessionToken(this, ComponentName(this, PlaybackService::class.java))
         val future = MediaController.Builder(this, token).buildAsync()
         controllerFuture = future
@@ -71,7 +101,7 @@ class ExternalPlaybackActivity : ComponentActivity() {
                         controller.prepare()
                         controller.play()
                     }.onFailure { error ->
-                        AppLogStore.error(this@ExternalPlaybackActivity, "ExternalPlayback", "Failed to play external uri=$uri", error)
+                        AppLogStore.error(this@ExternalPlaybackActivity, "ExternalPlayback", "Failed to play external uri=$originalUri", error)
                     }
                     finish()
                 }
@@ -88,7 +118,7 @@ class ExternalPlaybackActivity : ComponentActivity() {
         lifecycleScope.launch {
             delay(5_000L)
             if (!isFinishing) {
-                AppLogStore.warn(this@ExternalPlaybackActivity, "ExternalPlayback", "Timed out while opening external uri=$uri")
+                AppLogStore.warn(this@ExternalPlaybackActivity, "ExternalPlayback", "Timed out while opening external uri=$originalUri")
                 finish()
             }
         }
@@ -138,14 +168,6 @@ class ExternalPlaybackActivity : ComponentActivity() {
         (0 until itemCount).asSequence()
             .mapNotNull { index -> getItemAt(index)?.uri }
             .firstOrNull()
-
-    private fun persistReadGrantIfPossible(uri: Uri, flags: Int) {
-        if (uri.scheme != "content") return
-        if (flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION == 0) return
-        runCatching {
-            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-    }
 
     private fun Uri.toExternalSong(intentMimeType: String): Song {
         val queried = queryAudioMetadata(this)
@@ -226,9 +248,9 @@ class ExternalPlaybackActivity : ComponentActivity() {
                 if (!cursor.moveToFirst()) return@use null
                 ExternalAudioMetadata(
                     id = cursor.longOrNull(MediaStore.Audio.Media._ID),
-                    title = cursor.stringOrNull(MediaStore.Audio.Media.TITLE),
-                    artist = cursor.stringOrNull(MediaStore.Audio.Media.ARTIST),
-                    album = cursor.stringOrNull(MediaStore.Audio.Media.ALBUM),
+                    title = cursor.tagStringOrNull(MediaStore.Audio.Media.TITLE),
+                    artist = cursor.tagStringOrNull(MediaStore.Audio.Media.ARTIST),
+                    album = cursor.tagStringOrNull(MediaStore.Audio.Media.ALBUM),
                     albumId = cursor.longOrNull(MediaStore.Audio.Media.ALBUM_ID),
                     duration = cursor.longOrNull(MediaStore.Audio.Media.DURATION),
                     displayName = cursor.stringOrNull(MediaStore.Audio.Media.DISPLAY_NAME),
@@ -237,8 +259,8 @@ class ExternalPlaybackActivity : ComponentActivity() {
                     dateAdded = cursor.longOrNull(MediaStore.Audio.Media.DATE_ADDED),
                     dateModified = cursor.longOrNull(MediaStore.Audio.Media.DATE_MODIFIED),
                     trackNumber = cursor.intOrNull(MediaStore.Audio.Media.TRACK),
-                    year = cursor.stringOrNull(MediaStore.Audio.Media.YEAR),
-                    composer = cursor.stringOrNull(MediaStore.Audio.Media.COMPOSER)
+                    year = cursor.tagStringOrNull(MediaStore.Audio.Media.YEAR),
+                    composer = cursor.tagStringOrNull(MediaStore.Audio.Media.COMPOSER)
                 )
             }
         }.getOrNull()
@@ -279,7 +301,7 @@ class ExternalPlaybackActivity : ComponentActivity() {
     }
 
     private fun MediaMetadataRetriever.extract(keyCode: Int): String? =
-        extractMetadata(keyCode)?.trim()?.takeIf { it.isNotBlank() && it != "<unknown>" }
+        LibraryNormalizer.cleanedTagText(extractMetadata(keyCode)).takeIf { it.isNotBlank() }
 
     private fun stableExternalId(uri: Uri): Long =
         (uri.toString().hashCode().toLong() and Long.MAX_VALUE).takeIf { it != 0L } ?: 1L
@@ -289,6 +311,9 @@ class ExternalPlaybackActivity : ComponentActivity() {
         if (index < 0 || isNull(index)) return null
         return getString(index)?.trim()?.takeIf { it.isNotBlank() }
     }
+
+    private fun Cursor.tagStringOrNull(columnName: String): String? =
+        LibraryNormalizer.cleanedTagText(stringOrNull(columnName)).takeIf { it.isNotBlank() }
 
     private fun Cursor.longOrNull(columnName: String): Long? {
         val index = getColumnIndex(columnName)

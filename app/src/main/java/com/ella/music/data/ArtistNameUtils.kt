@@ -50,7 +50,7 @@ fun splitArtistNames(value: String): List<String> {
         defaultSeparatorPatterns = defaultArtistSeparatorPatterns,
         customSeparators = NameSplitConfigStore.artistCustomSeparators,
         protectedNames = NameSplitConfigStore.artistProtectedNames,
-        unknownValues = setOf("unknown", "unknown artist")
+        unknownValues = setOf("<unknown>")
     )
 }
 
@@ -60,7 +60,7 @@ fun splitGenreNames(value: String): List<String> {
         defaultSeparatorPatterns = defaultGenreSeparatorPatterns,
         customSeparators = NameSplitConfigStore.genreCustomSeparators,
         protectedNames = NameSplitConfigStore.genreProtectedNames,
-        unknownValues = setOf("unknown", "unknown genre")
+        unknownValues = setOf("<unknown>")
     )
 }
 

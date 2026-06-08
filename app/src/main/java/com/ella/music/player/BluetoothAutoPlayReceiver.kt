@@ -9,11 +9,9 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Build
 import android.util.Log
-import com.ella.music.data.SettingsManager
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 
 class BluetoothAutoPlayReceiver(
+    private val isAutoPlayEnabled: () -> Boolean,
     private val onDeviceConnected: () -> Unit
 ) : BroadcastReceiver() {
 
@@ -49,10 +47,7 @@ class BluetoothAutoPlayReceiver(
 
                 if (state == BluetoothA2dp.STATE_CONNECTED) {
                     Log.i(TAG, "Bluetooth A2DP connected: $deviceName")
-                    val enabled = runBlocking {
-                        SettingsManager(context).bluetoothAutoPlay.first()
-                    }
-                    if (enabled) {
+                    if (isAutoPlayEnabled()) {
                         Log.i(TAG, "Bluetooth auto-play enabled, starting playback")
                         onDeviceConnected()
                     }

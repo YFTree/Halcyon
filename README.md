@@ -73,6 +73,14 @@
 - 支持歌曲信息查看、标签编辑、歌词打轴软件跳转、外部标签编辑器适配和 AI 歌曲解读。
 - 支持 MediaSession 自定义命令，通知 / 控制中心可显示收藏和播放模式按钮。
 
+### 🤖 AI 与 MCP
+
+- 内置 MCP 服务器，基于官方 Kotlin SDK、Ktor CIO 和 Streamable HTTP，可让 Claude Desktop 等 MCP Host 控制 Halcyon 播放。
+- 开启路径：设置 → MCP 服务器 → 开启；连接地址：`http://<设备IP>:8384/mcp`。
+- 当前提供 10 个 tools：`play_song`、`search_music`、`get_now_playing`、`skip_next`、`skip_previous`、`toggle_play_pause`、`toggle_shuffle`、`seek_to`、`get_queue`、`get_library_stats`。
+- 当前提供 2 个只读 resources：`ella://playback/current`、`ella://library/stats`。
+- MCP 服务器以 Android Foreground Service 运行；关闭设置开关后会停止监听。
+
 ---
 
 ## 📱 运行要求

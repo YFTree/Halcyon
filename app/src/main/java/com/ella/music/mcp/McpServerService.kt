@@ -61,7 +61,7 @@ class McpServerService : Service() {
             try {
                 val playerManager = ExoPlayerManager(this@McpServerService)
                 playerManager.connect()
-                val repository = MusicRepository(this@McpServerService)
+                val repository = MusicRepository.getInstance(this@McpServerService)
                 val mcpServer = HalcyonMcpServer(playerManager, repository)
 
                 serverJob = embeddedServer(CIO, host = "0.0.0.0", port = PORT) {

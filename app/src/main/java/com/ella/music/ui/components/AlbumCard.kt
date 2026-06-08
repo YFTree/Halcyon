@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,8 +27,6 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -50,23 +46,14 @@ fun AlbumCard(
 ) {
     val context = LocalContext.current
     val resolvedSummary = summary ?: "${album.artist} · ${context.getString(R.string.song_count, album.songCount)}"
-    val embeddedCover by produceState<Bitmap?>(
-        initialValue = null,
-        representativeSong?.id,
-        representativeSong?.dateModified,
-        representativeSong?.fileSize,
-        loadCoverArt
-    ) {
-        val song = representativeSong
-        value = if (song == null || loadCoverArt == null || !song.prefersEmbeddedCover()) {
-            null
-        } else {
-            withContext(Dispatchers.IO) { runCatching { loadCoverArt(song) }.getOrNull() }
-        }
-    }
-    val coverModel: Any? = representativeSong?.coverUrl?.takeIf { it.isNotBlank() }
-        ?: embeddedCover
-        ?: albumArtUri
+    val coverState = rememberSongArtworkState(
+        song = representativeSong,
+        albumArtUri = albumArtUri,
+        loadCoverArt = loadCoverArt,
+        usage = ArtworkUsage.ArtistImage,
+        showDefaultWhenMissing = false
+    )
+    val coverModel: Any? = coverState.model
 
     Column(
         modifier = modifier
@@ -139,9 +126,4 @@ fun AlbumCard(
             overflow = TextOverflow.Ellipsis
         )
     }
-}
-
-private fun Song.prefersEmbeddedCover(): Boolean {
-    val extension = fileName.substringAfterLast('.', path.substringAfterLast('.')).lowercase()
-    return extension in setOf("m4a", "mp4", "alac", "flac", "wav", "wave", "aiff", "aif")
 }

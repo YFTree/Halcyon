@@ -27,7 +27,7 @@ class EllaApp : Application() {
 
         // Auto-start MCP server if previously enabled
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            val settingsManager = SettingsManager(this@EllaApp)
+            val settingsManager = SettingsManager.getInstance(this@EllaApp)
             if (settingsManager.mcpServerEnabled.first()) {
                 McpServerService.start(this@EllaApp)
             }

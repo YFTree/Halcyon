@@ -65,6 +65,7 @@ import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.AppleStylePlayButton
 import com.ella.music.ui.components.ArtistPickerSheet
+import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.DoubleTapScrollOverlay
@@ -72,6 +73,7 @@ import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import top.yukonga.miuix.kmp.basic.Icon
@@ -133,16 +135,14 @@ fun AlbumDetailScreen(
         }
     }
     val albumArtUri = mainViewModel.getAlbumArtUri(album?.artAlbumId ?: albumSongs.firstOrNull()?.albumId ?: 0L)
-    val albumCoverModel by produceState<Any?>(initialValue = albumArtUri, albumArtUri, albumSongs) {
-        val representative = albumSongs.firstOrNull()
-        value = if (representative != null && representative.prefersEmbeddedCoverForHeader()) {
-            withContext(Dispatchers.IO) {
-                runCatching { mainViewModel.getLargeCoverArtBitmap(representative) }.getOrNull()
-            } ?: albumArtUri
-        } else {
-            albumArtUri
-        }
-    }
+    val albumCoverState = rememberSongArtworkState(
+        song = albumSongs.firstOrNull(),
+        albumArtUri = albumArtUri,
+        loadCoverArt = mainViewModel::getLargeCoverArtBitmap,
+        usage = ArtworkUsage.ArtistImage,
+        showDefaultWhenMissing = false
+    )
+    val albumCoverModel = albumCoverState.model
     val neteaseAlbumUrl by produceState<String?>(initialValue = null, albumId, albumSongs) {
         value = mainViewModel.getNeteaseAlbumUrlForAlbum(albumId)
     }
@@ -166,7 +166,6 @@ fun AlbumDetailScreen(
     val participatingArtists = remember(albumSongs) {
         albumSongs
             .flatMap { splitArtistNames(it.artist) }
-            .filterNot { it.equals("Unknown", ignoreCase = true) }
             .distinctBy { it.lowercase(Locale.ROOT) }
     }
     val participatingComposers = remember(albumSongs) {
@@ -238,7 +237,6 @@ fun AlbumDetailScreen(
                     onNeteaseAlbumClick = { openUrl(context, neteaseAlbumUrl.orEmpty()) },
                     onAlbumArtistClick = {
                         val albumArtist = album?.albumArtist?.takeIf { it.isNotBlank() }
-                            ?.takeIf { it.isNotBlank() && !it.equals("Unknown", ignoreCase = true) }
                             ?: return@AlbumHeader
                         val artists = splitArtistNames(albumArtist).ifEmpty { listOf(albumArtist.trim()) }
                         if (artists.size == 1) {
@@ -848,8 +846,7 @@ private fun AlbumHeader(
     onPlayAll: () -> Unit
 ) {
     val albumArtist = album?.albumArtist?.takeIf { it.isNotBlank() }
-        ?.takeIf { !it.equals("Unknown", ignoreCase = true) }
-        ?: album?.artist?.takeIf { it.isNotBlank() && !it.equals("Unknown", ignoreCase = true) }
+        ?: album?.artist?.takeIf { it.isNotBlank() }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -974,11 +971,6 @@ private fun Song.safeDiscNumber(): Int =
 
 private fun Song.displayTrackNumber(): String =
     trackNumber.takeIf { it > 0 }?.toString().orEmpty()
-
-private fun Song.prefersEmbeddedCoverForHeader(): Boolean {
-    val extension = fileName.substringAfterLast('.', path.substringAfterLast('.')).lowercase()
-    return extension in setOf("m4a", "mp4", "alac", "flac", "wav", "wave", "aiff", "aif")
-}
 
 private fun List<Song>.sortedForAlbumDetail(mode: AlbumDetailSongSortMode): List<Song> {
     return when (mode) {

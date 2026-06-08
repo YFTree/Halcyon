@@ -34,10 +34,19 @@ enum class BottomBarGlassEffect {
 class SettingsManager(private val context: Context) {
 
     companion object {
+        @Volatile
+        private var instance: SettingsManager? = null
+
+        fun getInstance(context: Context): SettingsManager =
+            instance ?: synchronized(this) {
+                instance ?: SettingsManager(context.applicationContext).also { instance = it }
+            }
+
         val KEY_LYRICON_ENABLED = booleanPreferencesKey("lyricon_enabled")
         val KEY_LYRICON_TRANSLATION = booleanPreferencesKey("lyricon_translation")
         val KEY_LYRICON_PRONUNCIATION = booleanPreferencesKey("lyricon_pronunciation")
         val KEY_AUTO_SCAN = booleanPreferencesKey("auto_scan")
+        val KEY_AUTO_SCAN_LOCAL_PLAYLISTS = booleanPreferencesKey("auto_scan_local_playlists")
         val KEY_GAPLESS = booleanPreferencesKey("gapless_playback")
         val KEY_THEME_MODE = intPreferencesKey("theme_mode")
         val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
@@ -139,6 +148,7 @@ class SettingsManager(private val context: Context) {
         val KEY_USB_FOLDER_URIS = stringPreferencesKey("usb_folder_uris")
         val KEY_USE_ANDROID_MEDIA_LIBRARY = booleanPreferencesKey("use_android_media_library")
         val KEY_INITIAL_SCAN_PROMPT_HANDLED = booleanPreferencesKey("initial_scan_prompt_handled")
+        val KEY_LOCAL_PLAYLIST_SCAN_PROMPT_HANDLED = booleanPreferencesKey("local_playlist_scan_prompt_handled")
         val KEY_ARTIST_SEPARATORS = stringPreferencesKey("artist_separators")
         val KEY_ARTIST_PROTECTED_NAMES = stringPreferencesKey("artist_protected_names")
         val KEY_GENRE_SEPARATORS = stringPreferencesKey("genre_separators")
@@ -192,7 +202,9 @@ class SettingsManager(private val context: Context) {
         const val PLAYER_FLOW_EFFECT_DARK = 0
         const val APP_LANGUAGE_SYSTEM = "system"
         const val APP_LANGUAGE_ZH_CN = "zh-CN"
+        const val APP_LANGUAGE_ZH_TW = "zh-TW"
         const val APP_LANGUAGE_EN = "en"
+        const val APP_LANGUAGE_JA = "ja"
         const val DESKTOP_LYRIC_STATUS_POSITION_LEFT = 0
         const val DESKTOP_LYRIC_STATUS_POSITION_CENTER = 1
         const val DESKTOP_LYRIC_STATUS_POSITION_RIGHT = 2
@@ -263,6 +275,8 @@ class SettingsManager(private val context: Context) {
     val lyriconTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_TRANSLATION] ?: true }
     val lyriconPronunciation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_PRONUNCIATION] ?: false }
     val autoScan: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUTO_SCAN] ?: false }
+    val autoScanLocalPlaylists: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_AUTO_SCAN_LOCAL_PLAYLISTS] ?: false }
     val gaplessPlayback: Flow<Boolean> = context.dataStore.data.map { it[KEY_GAPLESS] ?: true }
     val themeMode: Flow<Int> = context.dataStore.data.map { it[KEY_THEME_MODE] ?: 0 }
     val appLanguage: Flow<String> =
@@ -437,6 +451,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_USE_ANDROID_MEDIA_LIBRARY] ?: true }
     val initialScanPromptHandled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_INITIAL_SCAN_PROMPT_HANDLED] ?: false }
+    val localPlaylistScanPromptHandled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_LOCAL_PLAYLIST_SCAN_PROMPT_HANDLED] ?: false }
     val notificationPermissionPromptHandled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_NOTIFICATION_PERMISSION_PROMPT_HANDLED] ?: false }
     val artistSeparators: Flow<String> = context.dataStore.data.map { it[KEY_ARTIST_SEPARATORS] ?: "" }
@@ -514,6 +530,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_AUTO_SCAN] = enabled }
     }
 
+    suspend fun setAutoScanLocalPlaylists(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_AUTO_SCAN_LOCAL_PLAYLISTS] = enabled }
+    }
+
     suspend fun setGaplessPlayback(enabled: Boolean) {
         context.dataStore.edit { it[KEY_GAPLESS] = enabled }
     }
@@ -525,7 +545,9 @@ class SettingsManager(private val context: Context) {
     suspend fun setAppLanguage(languageTag: String) {
         val normalized = when (languageTag) {
             APP_LANGUAGE_ZH_CN -> APP_LANGUAGE_ZH_CN
+            APP_LANGUAGE_ZH_TW -> APP_LANGUAGE_ZH_TW
             APP_LANGUAGE_EN -> APP_LANGUAGE_EN
+            APP_LANGUAGE_JA -> APP_LANGUAGE_JA
             else -> APP_LANGUAGE_SYSTEM
         }
         context.dataStore.edit { it[KEY_APP_LANGUAGE] = normalized }
@@ -1127,6 +1149,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_INITIAL_SCAN_PROMPT_HANDLED] = handled }
     }
 
+    suspend fun setLocalPlaylistScanPromptHandled(handled: Boolean) {
+        context.dataStore.edit { it[KEY_LOCAL_PLAYLIST_SCAN_PROMPT_HANDLED] = handled }
+    }
+
     suspend fun setNotificationPermissionPromptHandled(handled: Boolean) {
         context.dataStore.edit { it[KEY_NOTIFICATION_PERMISSION_PROMPT_HANDLED] = handled }
     }
@@ -1180,6 +1206,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_LYRICON_TRANSLATION)
             setBoolean(KEY_LYRICON_PRONUNCIATION)
             setBoolean(KEY_AUTO_SCAN)
+            setBoolean(KEY_AUTO_SCAN_LOCAL_PLAYLISTS)
             setBoolean(KEY_GAPLESS)
             setBoolean(KEY_TICKER_ENABLED)
             setBoolean(KEY_TICKER_HIDE_NOTIFICATION)
@@ -1224,6 +1251,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_HOME_TILE_PIN_BUTTONS_VISIBLE)
             setBoolean(KEY_USE_ANDROID_MEDIA_LIBRARY)
             setBoolean(KEY_INITIAL_SCAN_PROMPT_HANDLED)
+            setBoolean(KEY_LOCAL_PLAYLIST_SCAN_PROMPT_HANDLED)
             setBoolean(KEY_NOTIFICATION_PERMISSION_PROMPT_HANDLED)
             setBoolean(KEY_TAG_IGNORE_CASE)
             setBoolean(KEY_BLUETOOTH_LYRIC_ENABLED)

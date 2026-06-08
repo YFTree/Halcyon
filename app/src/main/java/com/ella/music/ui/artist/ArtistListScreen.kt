@@ -1,7 +1,6 @@
 package com.ella.music.ui.artist
 
 import androidx.activity.compose.BackHandler
-import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -32,7 +31,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,13 +60,13 @@ import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.SafeCoverImage
+import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.viewmodel.MainViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import com.ella.music.ui.components.EllaSmallTopAppBar
@@ -454,30 +452,20 @@ private fun ArtistRow(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val embeddedCover by produceState<Bitmap?>(
-        initialValue = null,
-        representativeSong?.id,
-        representativeSong?.dateModified,
-        representativeSong?.fileSize
-    ) {
-        val song = representativeSong
-        value = if (song != null && song.prefersEmbeddedArtistCover()) {
-            withContext(Dispatchers.IO) {
-                runCatching { mainViewModel.getAlbumCoverArtBitmap(song) }.getOrNull()
-            }
-        } else {
-            null
-        }
-    }
     val albumArtUri = remember(coversEnabled, representativeSong?.albumId) {
         representativeSong
             ?.albumId
             ?.takeIf { coversEnabled && it > 0L }
             ?.let(mainViewModel::getAlbumArtUri)
     }
-    val coverModel: Any? = representativeSong?.coverUrl?.takeIf { it.isNotBlank() }
-        ?: embeddedCover
-        ?: albumArtUri
+    val coverState = rememberSongArtworkState(
+        song = representativeSong,
+        albumArtUri = albumArtUri,
+        loadCoverArt = mainViewModel::getAlbumCoverArtBitmap,
+        usage = ArtworkUsage.ArtistImage,
+        showDefaultWhenMissing = false
+    )
+    val coverModel: Any? = coverState.model
 
     Row(
         modifier = Modifier
@@ -570,11 +558,6 @@ private fun Artist.summaryForSort(
         ArtistSortMode.ReleaseAlbumCount -> stringResolver(R.string.artist_list_summary_release_album, arrayOf(songCount, releaseAlbumCount))
         else -> stringResolver(R.string.artist_list_summary_default, arrayOf(songCount, albumCount))
     }
-}
-
-private fun Song.prefersEmbeddedArtistCover(): Boolean {
-    val extension = fileName.substringAfterLast('.', path.substringAfterLast('.')).lowercase()
-    return extension in setOf("m4a", "mp4", "alac", "flac", "wav", "wave", "aiff", "aif")
 }
 
 private fun Long.formatArtistDuration(): String {

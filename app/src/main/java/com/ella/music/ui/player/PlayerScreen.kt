@@ -272,7 +272,7 @@ fun PlayerScreen(
     val view = LocalView.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val lyricFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
     val lyricFontWeightValue by settingsManager.lyricFontWeight.collectAsState(initial = 800)
     val lyricFontScaleValue by settingsManager.lyricFontScale.collectAsState(initial = 100)
@@ -521,7 +521,6 @@ fun PlayerScreen(
     val neteaseInfo = remember(tagInfo?.neteaseKey) { decodeNeteaseKey(tagInfo?.neteaseKey.orEmpty()) }
     fun navigateToArtistOrChoose(artistText: String) {
         val artists = splitArtistNames(artistText)
-            .filterNot { it.equals("Unknown", ignoreCase = true) }
             .distinctBy { it.tagIdentityKey() }
         when (artists.size) {
             0 -> Toast.makeText(context, context.getString(R.string.player_no_artist_jump), Toast.LENGTH_SHORT).show()
@@ -2582,7 +2581,6 @@ private fun PlayerDetailPage(
     }
     val artistNames = remember(tagInfo?.artist, song?.artist) {
         splitArtistNames(tagInfo?.artist?.ifBlank { song?.artist.orEmpty() }.orEmpty())
-            .filterNot { it.equals("Unknown", ignoreCase = true) }
     }
     var showNeteaseArtistPicker by remember(neteaseInfo) { mutableStateOf(false) }
     val neteaseArtists = remember(neteaseInfo) {
@@ -3872,7 +3870,7 @@ private fun PlayerTransportControls(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val showOutlines by settingsManager.transportButtonOutlines.collectAsState(initial = false)
     val density = LocalDensity.current
     Row(
@@ -4875,10 +4873,10 @@ private fun miniLyricsPreviewHeight(
     showPronunciation: Boolean,
     compact: Boolean = false
 ) = when (line?.miniVisiblePartCount(showTranslation, showPronunciation) ?: 1) {
-    0, 1 -> if (compact) 116.dp else 150.dp
-    2 -> if (compact) 132.dp else 176.dp
-    3 -> if (compact) 146.dp else 194.dp
-    else -> if (compact) 154.dp else 206.dp
+    0, 1 -> if (compact) 132.dp else 168.dp
+    2 -> if (compact) 150.dp else 190.dp
+    3 -> if (compact) 162.dp else 206.dp
+    else -> if (compact) 170.dp else 214.dp
 }
 
 @Composable
@@ -4915,12 +4913,13 @@ private fun MiniLyricsPreview(
         fontPath = fontPath,
         fontWeight = fontWeight,
         primaryTextSizeSp = 19f,
-        secondaryTextSizeSp = 12f,
+        secondaryTextSizeSp = 13.5f,
         anchorOffsetRatio = -0.01f,
         topContentPadding = 0.dp,
         onLineClick = onLineClick,
         nonCurrentLineBlurEnabled = false,
         nonCurrentLineBlurDistance = Int.MAX_VALUE,
+        autoScrollResumeEnabled = true,
         modifier = modifier.fillMaxWidth()
     )
 }

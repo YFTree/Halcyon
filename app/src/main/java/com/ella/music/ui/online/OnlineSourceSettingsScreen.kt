@@ -63,7 +63,7 @@ fun LxSourceSettingsScreen(onBack: () -> Unit) {
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settingsManager = remember { SettingsManager(context) }
+    val settingsManager = remember { SettingsManager.getInstance(context) }
     val service = remember(context) { LxOnlineService(context) }
     val sources by settingsManager.lxSources.collectAsState(initial = emptyList())
     val selectedId by settingsManager.selectedLxSourceId.collectAsState(initial = "")

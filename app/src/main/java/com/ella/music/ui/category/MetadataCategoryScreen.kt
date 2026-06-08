@@ -69,12 +69,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.LibraryAlbumAggregator
 import com.ella.music.data.exception.WritePermissionRequiredException
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
-import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.viewmodel.MainViewModel
@@ -93,7 +93,9 @@ import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.ui.components.requestPinnedEllaShortcut
 import com.ella.music.ui.navigation.Screen
 import top.yukonga.miuix.kmp.basic.Button
@@ -365,10 +367,14 @@ fun MetadataCategoryDetailScreen(
     val sortedSongs = remember(songs, sortMode) { songs.sortedForMetadataDetail(sortMode) }
     val showAlbumTab = type == "genre" || type == "year" || type == "composer" || type == "lyricist"
     val detailAlbums = remember(songs, libraryAlbums) {
-        songs.toMetadataAlbums(libraryAlbums, context)
+        LibraryAlbumAggregator.toAlbumsForSongs(
+            songs = songs,
+            libraryAlbums = libraryAlbums,
+            unknownAlbumName = context.getString(R.string.player_unknown_album)
+        )
     }
     val albumDurations = remember(songs) {
-        songs.groupBy { it.albumIdentityId() }.mapValues { (_, albumSongs) -> albumSongs.sumOf { it.duration } }
+        LibraryAlbumAggregator.durationsByAlbumIdentity(songs)
     }
     val sortedAlbums = remember(detailAlbums, albumSortMode, albumDurations) {
         detailAlbums.sortedForMetadataAlbumDetail(albumSortMode, albumDurations)
@@ -921,23 +927,14 @@ private fun MetadataCategoryCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val embeddedCover by produceState<Bitmap?>(
-        initialValue = null,
-        representativeSong?.id,
-        representativeSong?.dateModified,
-        representativeSong?.fileSize,
-        loadCoverArt
-    ) {
-        val song = representativeSong
-        value = if (song == null || loadCoverArt == null || !song.prefersEmbeddedCategoryCover()) {
-            null
-        } else {
-            withContext(Dispatchers.IO) { runCatching { loadCoverArt(song) }.getOrNull() }
-        }
-    }
-    val coverModel: Any? = representativeSong?.coverUrl?.takeIf { it.isNotBlank() }
-        ?: embeddedCover
-        ?: albumArtUri
+    val coverState = rememberSongArtworkState(
+        song = representativeSong,
+        albumArtUri = albumArtUri,
+        loadCoverArt = loadCoverArt,
+        usage = ArtworkUsage.ArtistImage,
+        showDefaultWhenMissing = false
+    )
+    val coverModel: Any? = coverState.model
 
     when (type) {
         "folder" -> {
@@ -1214,11 +1211,6 @@ private fun String.categoryCardColor(): Color {
     return palette[index]
 }
 
-private fun Song.prefersEmbeddedCategoryCover(): Boolean {
-    val extension = fileName.substringAfterLast('.', path.substringAfterLast('.')).lowercase()
-    return extension in setOf("m4a", "mp4", "alac", "flac", "wav", "wave", "aiff", "aif")
-}
-
 private fun String.prefersEmbeddedCategoryCardCover(): Boolean =
     this == "folder" || this == "composer" || this == "lyricist"
 
@@ -1405,22 +1397,6 @@ private fun List<Album>.sortedForMetadataAlbumDetail(
         MetadataDetailAlbumSortMode.Duration -> sortedByDescending { durations[it.id] ?: 0L }
         MetadataDetailAlbumSortMode.Name -> sortedBy { it.name.lowercase(Locale.ROOT) }
     }
-}
-
-private fun List<Song>.toMetadataAlbums(libraryAlbums: List<Album>, context: android.content.Context): List<Album> {
-    val albumById = libraryAlbums.associateBy { it.id }
-    return groupBy { it.albumIdentityId() }
-        .map { (albumId, albumSongs) ->
-            albumById[albumId] ?: Album(
-                id = albumId,
-                name = albumSongs.firstOrNull()?.album.orEmpty().ifBlank { context.getString(R.string.player_unknown_album) },
-                artist = albumSongs.firstOrNull()?.artist.orEmpty(),
-                songCount = albumSongs.size,
-                year = albumSongs.mapNotNull { s -> s.year.takeIf { it.isNotBlank() } }.minByOrNull { it } ?: "",
-                artAlbumId = albumSongs.firstOrNull()?.albumId ?: albumId,
-                albumArtist = albumSongs.firstOrNull()?.albumArtist.orEmpty()
-            )
-        }
 }
 
 @Composable

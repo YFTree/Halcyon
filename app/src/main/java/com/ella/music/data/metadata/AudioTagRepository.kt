@@ -7,6 +7,7 @@ import android.media.MediaFormat
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.util.LruCache
+import com.ella.music.data.isHttpAudioSource
 import com.ella.music.data.looksLikeNeteaseKeyValue
 import com.lonx.audiotag.model.AudioPicture
 import com.lonx.audiotag.rw.AudioTagReader as LyricoReader
@@ -215,7 +216,7 @@ class AudioTagRepository(
     }
 
     private fun cacheKey(path: String): String? {
-        if (path.isBlank() || path.startsWith("http://") || path.startsWith("https://")) return null
+        if (path.isBlank() || path.isHttpAudioSource()) return null
         val file = File(path)
         if (!file.exists() || !file.isFile) return null
         return "${file.absolutePath}:${file.lastModified()}:${file.length()}"

@@ -537,41 +537,16 @@ private fun rememberMiniPlayerCoverModel(
     albumArtUri: Uri?,
     loadCoverArt: ((Song) -> Bitmap?)?
 ): MiniPlayerCoverState {
-    val preferEmbeddedCover = song.fileName.substringAfterLast('.', song.path.substringAfterLast('.'))
-        .lowercase() in setOf("m4a", "mp4", "alac", "flac", "wav", "aiff", "aif")
-    val shouldLoadEmbeddedCover = song.coverUrl.isBlank() &&
-        loadCoverArt != null &&
-        (albumArtUri == null || preferEmbeddedCover)
-    val initialModel = song.coverUrl.takeIf { it.isNotBlank() }
-        ?: albumArtUri
-    val coverState by produceState(
-        initialValue = MiniPlayerCoverState(
-            model = initialModel,
-            showDefaultCover = initialModel == null && !shouldLoadEmbeddedCover
-        ),
-        song.id,
-        song.dateModified,
-        song.fileSize,
-        shouldLoadEmbeddedCover
-    ) {
-        if (!shouldLoadEmbeddedCover) {
-            value = MiniPlayerCoverState(
-                model = initialModel,
-                showDefaultCover = initialModel == null
-            )
-        } else {
-            val embeddedCover = withContext(Dispatchers.IO) {
-                runCatching {
-                    CoverLoadLimiter.run { loadCoverArt.invoke(song) }
-                }.getOrNull()
-            }
-            value = MiniPlayerCoverState(
-                model = if (preferEmbeddedCover) embeddedCover ?: albumArtUri else albumArtUri ?: embeddedCover,
-                showDefaultCover = embeddedCover == null && albumArtUri == null
-            )
-        }
-    }
-    return coverState
+    val coverState = rememberSongArtworkState(
+        song = song,
+        albumArtUri = albumArtUri,
+        loadCoverArt = loadCoverArt,
+        usage = ArtworkUsage.MiniPlayer
+    )
+    return MiniPlayerCoverState(
+        model = coverState.model,
+        showDefaultCover = coverState.showDefaultCover
+    )
 }
 
 private data class MiniPlayerCoverState(

@@ -9,6 +9,7 @@ import android.util.Log
 import com.ella.music.data.metadata.AudioTagInfo
 import com.ella.music.data.metadata.LyricoAudioTagReaderWriter
 import com.ella.music.data.metadata.WavMetadataReader
+import com.ella.music.data.LibraryNormalizer
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
@@ -703,16 +704,7 @@ class MusicScanner(private val context: Context) {
         ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId)
 
     private fun isMissingTag(value: String?, fileName: String? = null): Boolean {
-        val normalized = value?.trim().orEmpty()
-        if (normalized.isBlank()) return true
-        if (normalized.equals("<unknown>", ignoreCase = true)) return true
-        if (normalized.equals("unknown", ignoreCase = true)) return true
-        if (normalized.equals("unknown artist", ignoreCase = true)) return true
-        if (normalized.equals("unknown album", ignoreCase = true)) return true
-        if (normalized == "未知" || normalized == "未知歌手" || normalized == "未知专辑" ||
-            normalized == "未知艺术家" || normalized == "未知歌曲") return true
-        if (normalized.looksLikeMojibake()) return true
-        return fileName != null && normalized == fileName.substringBeforeLast('.')
+        return LibraryNormalizer.isMissingTag(value, fileName)
     }
 
     private fun readTagsBlocking(path: String): AudioTagInfo? =

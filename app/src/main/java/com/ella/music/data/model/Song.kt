@@ -1,5 +1,7 @@
 package com.ella.music.data.model
 
+import com.ella.music.data.LibraryNormalizer
+
 data class Song(
     val id: Long,
     val title: String,
@@ -34,7 +36,7 @@ fun Song.albumIdentityId(): Long {
     val albumName = album.trim().ifBlank { "Unknown Album" }
     val albumOwner = albumArtist
         .trim()
-        .takeIf { it.isNotBlank() && !it.equals("Unknown Artist", ignoreCase = true) && !it.equals("Unknown", ignoreCase = true) }
+        .takeIf { LibraryNormalizer.isUsableTagText(it) }
         ?: ""
     val key = "${albumName.normalizedAlbumIdentityPart()}|${albumOwner.normalizedAlbumIdentityPart()}"
     var hash = -0x340d631b7bdddcdbL

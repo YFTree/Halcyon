@@ -102,6 +102,7 @@ fun SmoothLyricView(
     topContentPadding: Dp = 0.dp,
     nonCurrentLineBlurDistance: Int = 2,
     nonCurrentLineBlurEnabled: Boolean = true,
+    autoScrollResumeEnabled: Boolean = true,
     onLineClick: (LyricLine) -> Unit = {},
     onLineDoubleClick: () -> Unit = {},
     onLineLongClick: (LyricLine) -> Unit = {}
@@ -183,7 +184,7 @@ fun SmoothLyricView(
             view.setContinuousFrameUpdatesEnabled(true)
             view.setPlaybackActive(isPlaying)
             view.setPronunciationAboveMainEnabled(true)
-            view.setAutoScrollResumeEnabled(false)
+            view.setAutoScrollResumeEnabled(autoScrollResumeEnabled)
             view.updateAnchorOffset(view.height * anchorOffsetRatio)
             view.setTopContentPadding(with(density) { topContentPadding.toPx() })
             view.updateDisplayTranslation(showTranslation, showPronunciation)

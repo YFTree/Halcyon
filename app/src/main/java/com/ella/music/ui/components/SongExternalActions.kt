@@ -11,6 +11,8 @@ import android.provider.MediaStore
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.ella.music.R
+import com.ella.music.data.isContentAudioSource
+import com.ella.music.data.isHttpAudioSource
 import com.ella.music.data.model.Song
 import java.io.File
 
@@ -18,7 +20,7 @@ private const val ASPECT_PRO_PACKAGE = "com.andrewkhandr.aspectpro"
 private const val ASPECT_PRO_ACTIVITY = "com.andrewkhandr.aspectpro.MainActivity"
 
 fun openSongSpectrumWithAspectPro(context: Context, song: Song) {
-    if (song.path.startsWith("http://") || song.path.startsWith("https://")) {
+    if (song.path.isHttpAudioSource()) {
         Toast.makeText(context, context.getString(R.string.aspect_pro_requires_local_audio), Toast.LENGTH_SHORT).show()
         return
     }
@@ -41,7 +43,7 @@ fun openSongSpectrumWithAspectPro(context: Context, song: Song) {
 }
 
 fun shareLocalSong(context: Context, song: Song) {
-    if (song.path.startsWith("http://") || song.path.startsWith("https://")) {
+    if (song.path.isHttpAudioSource()) {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, "${song.title} - ${song.artist}\n${song.path}")
@@ -92,7 +94,7 @@ private fun Song.aspectProUri(context: Context): Uri {
 
 @Suppress("DEPRECATION")
 private fun Song.mediaStoreUriByPath(context: Context): Uri? {
-    val filePath = path.takeIf { it.isNotBlank() && !it.startsWith("content://") } ?: return null
+    val filePath = path.takeIf { it.isNotBlank() && !it.isContentAudioSource() } ?: return null
     return runCatching {
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
