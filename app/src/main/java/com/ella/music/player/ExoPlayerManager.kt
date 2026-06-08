@@ -784,10 +784,13 @@ class ExoPlayerManager(private val context: Context) {
     private fun updateCurrentSong() {
         val controller = mediaController ?: return
         val currentIndex = controller.currentMediaItemIndex
+        val currentItem = controller.currentMediaItem
+        val itemSong = currentItem?.toSongFromMediaItemExtras() ?: currentItem?.toSong()
         val restoredSong = if (currentIndex in playlist.indices) {
-            playlist[virtualPlaylistCurrentIndex?.takeIf { it in playlist.indices } ?: currentIndex]
+            val playlistSong = playlist[virtualPlaylistCurrentIndex?.takeIf { it in playlist.indices } ?: currentIndex]
+            itemSong?.takeUnless { it.isSamePlaybackIdentity(playlistSong) } ?: playlistSong
         } else {
-            controller.currentMediaItem?.toSong()
+            itemSong
         }
         val previousSong = _currentSong.value
         _currentSong.value = restoredSong
@@ -891,9 +894,13 @@ class ExoPlayerManager(private val context: Context) {
 
     private fun resolveCurrentPlaybackSong(controller: MediaController): Song? {
         val controllerIndex = controller.currentMediaItemIndex
-        if (controllerIndex in playlist.indices) return playlist[controllerIndex]
-        return controller.currentMediaItem?.toSongFromMediaItemExtras()
+        val itemSong = controller.currentMediaItem?.toSongFromMediaItemExtras()
             ?: controller.currentMediaItem?.toSong()
+        if (controllerIndex in playlist.indices) {
+            val playlistSong = playlist[controllerIndex]
+            return itemSong?.takeUnless { it.isSamePlaybackIdentity(playlistSong) } ?: playlistSong
+        }
+        return itemSong
             ?: _currentSong.value
     }
 

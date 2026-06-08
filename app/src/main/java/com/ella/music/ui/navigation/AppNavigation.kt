@@ -273,6 +273,7 @@ fun AppNavigation(
             MetadataCategoryScreen(
                 type = type,
                 mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
                 onCategoryClick = { name ->
                     navController.navigate(Screen.MetadataCategoryDetail.createRoute(type, name))

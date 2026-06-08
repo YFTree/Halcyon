@@ -69,6 +69,7 @@ import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.PlaylistExportFormat
 import com.ella.music.data.PlaylistImportMode
+import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.AppleStylePlayButton
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.ConfirmDangerDialog
@@ -133,10 +134,13 @@ fun PlaylistScreen(
     var sortExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
-    val playlistSortIndex by mainViewModel.settingsManager.playlistListSortIndex.collectAsState(initial = 2)
+    val playlistSortIndex by mainViewModel.settingsManager.playlistListSortIndex.collectAsState(initial = LibrarySortUiState.playlistListSortIndex)
     val playlistCustomOrderIds by mainViewModel.settingsManager.playlistCustomOrder.collectAsState(initial = emptyList())
     val specialPlaylistEntriesVisible by mainViewModel.settingsManager.playlistSpecialEntriesVisible.collectAsState(initial = false)
     val playlistSortMode = PlaylistSortMode.entries.getOrElse(playlistSortIndex) { PlaylistSortMode.UpdatedAt }
+    LaunchedEffect(playlistSortIndex) {
+        LibrarySortUiState.playlistListSortIndex = playlistSortIndex
+    }
     var pendingImportUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var showImportModeSheet by remember { mutableStateOf(false) }
     var playlistPendingDelete by remember { mutableStateOf<UserPlaylist?>(null) }
@@ -1482,15 +1486,14 @@ private fun List<UserPlaylist>.applyPlaylistCustomOrder(orderedIds: List<String>
     if (orderedIds.isEmpty()) return sortedWith(fallbackComparator)
 
     val playlistsById = associateBy(UserPlaylist::id)
-    val consumedIds = linkedSetOf<String>()
     return buildList {
+        val orderedIdSet = orderedIds.toSet()
+        addAll(filterNot { it.id in orderedIdSet }.sortedWith(fallbackComparator))
         orderedIds.forEach { id ->
             playlistsById[id]?.let { playlist ->
-                consumedIds += id
                 add(playlist)
             }
         }
-        addAll(filterNot { it.id in consumedIds }.sortedWith(fallbackComparator))
     }
 }
 

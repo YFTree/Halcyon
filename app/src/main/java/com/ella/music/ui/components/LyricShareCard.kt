@@ -113,6 +113,7 @@ fun shareLyricCard(
     backgroundColors: List<Int>,
     annotation: String = "",
     customInfo: String = "",
+    shareTypeface: android.graphics.Typeface? = null,
     includeTranslation: Boolean = true
 ) {
     shareLyricCard(
@@ -123,6 +124,7 @@ fun shareLyricCard(
         backgroundColors = backgroundColors,
         annotation = annotation,
         customInfo = customInfo,
+        shareTypeface = shareTypeface,
         includeTranslation = includeTranslation
     )
 }
@@ -135,6 +137,7 @@ fun shareLyricCard(
     backgroundColors: List<Int>,
     annotation: String = "",
     customInfo: String = "",
+    shareTypeface: android.graphics.Typeface? = null,
     includeTranslation: Boolean = true
 ) {
     runCatching {
@@ -146,6 +149,7 @@ fun shareLyricCard(
             backgroundColors = backgroundColors,
             annotation = annotation,
             customInfo = customInfo,
+            shareTypeface = shareTypeface,
             includeTranslation = includeTranslation
         )
         val uri = writeLyricShareCard(context, bitmap)
@@ -192,7 +196,8 @@ internal fun calculateLyricShareLayout(
     content: LyricShareCardContent,
     canvasWidth: Int = SHARE_CARD_WIDTH,
     minHeight: Int = SHARE_CARD_MIN_HEIGHT,
-    maxHeight: Int = SHARE_CARD_MAX_HEIGHT
+    maxHeight: Int = SHARE_CARD_MAX_HEIGHT,
+    shareTypeface: android.graphics.Typeface? = null
 ): LyricShareCardLayout {
     val safePadding = SHARE_CARD_HORIZONTAL_PADDING
     val coverRect = RectF(
@@ -207,18 +212,18 @@ internal fun calculateLyricShareLayout(
     val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textSize = 38f
-        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        typeface = shareTypeface.shareCardTypeface(android.graphics.Typeface.BOLD)
         setShadowLayer(18f, 0f, 8f, Color.argb(76, 0, 0, 0))
     }
     val annotationPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(214, 255, 255, 255)
         textSize = 27f
-        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        typeface = shareTypeface.shareCardTypeface(android.graphics.Typeface.BOLD)
     }
     val artistPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(168, 255, 255, 255)
         textSize = 26f
-        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+        typeface = shareTypeface.shareCardTypeface(android.graphics.Typeface.NORMAL)
     }
     val titleLayout = buildLayout(
         text = content.title,
@@ -262,7 +267,7 @@ internal fun calculateLyricShareLayout(
     val footerPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(112, 255, 255, 255)
         textSize = 24f
-        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        typeface = shareTypeface.shareCardTypeface(android.graphics.Typeface.BOLD)
     }
     val footerHeight = footerPaint.fontMetrics.run { bottom - top } + 8f
     val lyricsTop = headerTop + headerHeight + SHARE_CARD_HEADER_GAP
@@ -281,7 +286,8 @@ internal fun calculateLyricShareLayout(
                 blocks = content.blocks,
                 width = (canvasWidth - safePadding * 2).roundToInt(),
                 candidate = candidate,
-                availableHeight = maxLyricsHeight.toFloat()
+                availableHeight = maxLyricsHeight.toFloat(),
+                shareTypeface = shareTypeface
             )?.takeIf { it.first.isNotEmpty() }
         }
         ?: measureLyricBlocks(
@@ -289,6 +295,7 @@ internal fun calculateLyricShareLayout(
             width = (canvasWidth - safePadding * 2).roundToInt(),
             candidate = candidates.last(),
             availableHeight = maxLyricsHeight.toFloat(),
+            shareTypeface = shareTypeface,
             forceTruncate = true
         )
         ?: (emptyList<MeasuredShareLyricBlock>() to 0f)
@@ -353,6 +360,7 @@ private fun createLyricShareCard(
     backgroundColors: List<Int>,
     annotation: String,
     customInfo: String,
+    shareTypeface: android.graphics.Typeface?,
     includeTranslation: Boolean
 ): Bitmap {
     val resolvedBackgroundColors = resolveLyricShareBackgroundColors(cover, backgroundColors)
@@ -365,9 +373,13 @@ private fun createLyricShareCard(
         customInfo = customInfo,
         includeTranslation = includeTranslation
     )
-    val layout = calculateLyricShareLayout(content)
+    val layout = calculateLyricShareLayout(content, shareTypeface = shareTypeface)
     return renderLyricShareCardBitmap(content, layout, cover)
 }
+
+private fun android.graphics.Typeface?.shareCardTypeface(style: Int): android.graphics.Typeface =
+    if (this != null) android.graphics.Typeface.create(this, style)
+    else android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, style)
 
 private fun buildLyricSizingCandidates(blocks: List<ShareLyricBlock>): List<LyricSizingCandidate> {
     val longestLine = blocks.maxOfOrNull { it.primary.length } ?: 0
@@ -400,18 +412,19 @@ private fun measureLyricBlocks(
     width: Int,
     candidate: LyricSizingCandidate,
     availableHeight: Float,
+    shareTypeface: android.graphics.Typeface? = null,
     forceTruncate: Boolean = false
 ): Pair<List<MeasuredShareLyricBlock>, Float>? {
     val primaryPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         textSize = candidate.primarySize
-        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        typeface = shareTypeface.shareCardTypeface(android.graphics.Typeface.BOLD)
         setShadowLayer(20f, 0f, 8f, Color.argb(92, 0, 0, 0))
     }
     val secondaryPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(186, 255, 255, 255)
         textSize = candidate.secondarySize
-        typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+        typeface = shareTypeface.shareCardTypeface(android.graphics.Typeface.NORMAL)
         setShadowLayer(10f, 0f, 4f, Color.argb(70, 0, 0, 0))
     }
 

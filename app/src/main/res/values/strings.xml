@@ -92,8 +92,10 @@
     <string name="common_all">全部</string>
     <string name="common_select_artist">选择歌手</string>
     <string name="common_add_to_queue">添加到队列</string>
+    <string name="common_add_desktop_shortcut">添加桌面快捷方式</string>
     <string name="common_exit_selection">退出多选</string>
     <string name="common_multi_select">多选</string>
+    <string name="common_deselect_all">取消全选</string>
 
     <string name="unsupported_system_folder_path">暂不支持该系统目录路径</string>
     <string name="scan_folder_added">已添加扫描文件夹</string>
@@ -537,9 +539,9 @@
     <string name="settings_backup_settings_section">设置</string>
     <string name="settings_backup_playback_section">听歌历史</string>
     <string name="settings_backup_export_settings_title">导出设置</string>
-    <string name="settings_backup_export_settings_summary">仅导出应用设置和偏好</string>
+    <string name="settings_backup_export_settings_summary">导出应用设置、歌单和 AI 对话</string>
     <string name="settings_backup_restore_settings_title">恢复设置</string>
-    <string name="settings_backup_restore_settings_summary">从备份 JSON 恢复应用设置</string>
+    <string name="settings_backup_restore_settings_summary">从备份 JSON 恢复应用设置、歌单和 AI 对话</string>
     <string name="settings_backup_export_playback_title">导出听歌历史</string>
     <string name="settings_backup_export_playback_summary">导出播放历史、排行和日历统计，兼容 Prism Music sessions</string>
     <string name="settings_backup_restore_playback_title">导入听歌历史</string>
@@ -750,6 +752,8 @@
     <string name="settings_openai_model">OpenAI 模型</string>
     <string name="settings_openai_model_summary">例如 %1$s；可按账号可用模型自行修改</string>
     <string name="settings_lyric_share_card">歌词卡片分享</string>
+    <string name="settings_lyric_share_use_lyric_font">使用歌词字体</string>
+    <string name="settings_lyric_share_use_lyric_font_summary">开启后分享卡片和预览会跟随歌词页的自定义字体与粗细</string>
     <string name="settings_lyric_share_custom_info">自定义信息</string>
     <string name="settings_lyric_share_custom_info_summary">留空显示 Halcyon；填写名称后显示为 by @名称</string>
     <string name="settings_tag_scraping">音乐标签刮削</string>
@@ -1091,6 +1095,8 @@
     <string name="library_empty_hint">未找到歌曲，点击右上角刷新扫描</string>
     <string name="library_organizing">正在整理歌曲...</string>
     <string name="library_selected_count">已选择 %1$d 首</string>
+    <string name="library_selected_fraction">%1$d / %2$d</string>
+    <string name="library_range_select">区间选择</string>
     <string name="library_song_count_sorted">%1$d 首歌曲 · %2$s</string>
     <string name="library_delete_selected_message">确定要永久删除选中的 %1$d 首歌曲吗？此操作可能会删除本地音频文件。</string>
     <string name="library_ai_missing_api_key">请先到 设置 > 应用偏好 > AI 解读 填写 OpenAI API Key。</string>

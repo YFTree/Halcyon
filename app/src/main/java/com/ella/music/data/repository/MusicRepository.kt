@@ -78,6 +78,17 @@ private sealed class CoverDataState {
     data class Error(val message: String?) : CoverDataState()
 }
 
+private val embeddedArtworkThumbnailExtensions = setOf(
+    "m4a",
+    "mp4",
+    "alac",
+    "flac",
+    "wav",
+    "wave",
+    "aif",
+    "aiff"
+)
+
 class MusicRepository(private val context: Context) {
     companion object {
         @Volatile
@@ -946,12 +957,61 @@ class MusicRepository(private val context: Context) {
         coverBitmapCache.get(cacheKey)?.let { return it }
         return synchronized(coverArtLock) {
             coverBitmapCache.get(cacheKey)?.let { return it }
-            val data = getCoverArt(song) ?: return null
+            if (usage == CoverUsage.ListThumbnail && !song.prefersEmbeddedArtworkForThumbnail()) {
+                val albumBitmap = decodeAlbumArtBitmap(song.albumId, targetSize, usage)
+                if (albumBitmap != null) {
+                    return albumBitmap
+                }
+            }
+            val data = getCoverArt(song)
+            if (data == null) {
+                return decodeAlbumArtBitmap(song.albumId, targetSize, usage)
+            }
             runCatching {
+                val bounds = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+                var sampleSize = 1
+                while ((bounds.outWidth / sampleSize) > targetSize || (bounds.outHeight / sampleSize) > targetSize) {
+                    sampleSize *= 2
+                }
+
+                val options = BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize.coerceAtLeast(1)
+                    inPreferredConfig = if (usage == CoverUsage.ListThumbnail) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
+                }
+                BitmapFactory.decodeByteArray(data, 0, data.size, options)
+                    ?.also { coverBitmapCache.put(cacheKey, it) }
+            }.getOrElse { error ->
+                if (error is OutOfMemoryError) {
+                    coverArtCache.evictAll()
+                    coverBitmapCache.evictAll()
+                }
+                Log.w("MusicRepo", "Failed to decode cover bitmap for ${song.path}", error)
+                null
+            }
+        }
+    }
+
+    private fun decodeAlbumArtBitmap(
+        albumId: Long,
+        targetSize: Int,
+        usage: CoverUsage
+    ): Bitmap? {
+        if (albumId <= 0L) return null
+        val albumCacheKey = "album:$albumId:${usage.name}:$targetSize"
+        coverBitmapCache.get(albumCacheKey)?.let { return it }
+        val albumArtUri = getAlbumArtUri(albumId) ?: return null
+        return runCatching {
             val bounds = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
-            BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+            context.contentResolver.openInputStream(albumArtUri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, bounds)
+            }
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
             var sampleSize = 1
@@ -963,18 +1023,22 @@ class MusicRepository(private val context: Context) {
                 inSampleSize = sampleSize.coerceAtLeast(1)
                 inPreferredConfig = if (usage == CoverUsage.ListThumbnail) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
             }
-            BitmapFactory.decodeByteArray(data, 0, data.size, options)
-                ?.also { coverBitmapCache.put(cacheKey, it) }
-            }.getOrElse { error ->
+            context.contentResolver.openInputStream(albumArtUri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, options)
+            }?.also { coverBitmapCache.put(albumCacheKey, it) }
+        }.getOrElse { error ->
             if (error is OutOfMemoryError) {
                 coverArtCache.evictAll()
                 coverBitmapCache.evictAll()
             }
-            Log.w("MusicRepo", "Failed to decode cover bitmap for ${song.path}", error)
+            Log.d("MusicRepo", "Failed to decode album art bitmap for albumId=$albumId", error)
             null
-            }
         }
     }
+
+    private fun Song.prefersEmbeddedArtworkForThumbnail(): Boolean =
+        fileName.substringAfterLast('.', path.substringAfterLast('.'))
+            .lowercase() in embeddedArtworkThumbnailExtensions
 
     fun getAlbumArtUri(albumId: Long): Uri? {
         if (albumId <= 0L) return null

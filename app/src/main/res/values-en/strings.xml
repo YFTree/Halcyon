@@ -92,8 +92,10 @@
     <string name="common_all">All</string>
     <string name="common_select_artist">Select artist</string>
     <string name="common_add_to_queue">Add to queue</string>
+    <string name="common_add_desktop_shortcut">Add desktop shortcut</string>
     <string name="common_exit_selection">Exit selection</string>
     <string name="common_multi_select">Multi-select</string>
+    <string name="common_deselect_all">Deselect all</string>
 
     <string name="unsupported_system_folder_path">This system folder path is not supported</string>
     <string name="scan_folder_added">Scan folder added</string>
@@ -537,9 +539,9 @@
     <string name="settings_backup_settings_section">Settings</string>
     <string name="settings_backup_playback_section">Listening history</string>
     <string name="settings_backup_export_settings_title">Export settings</string>
-    <string name="settings_backup_export_settings_summary">Export app settings and preferences only</string>
+    <string name="settings_backup_export_settings_summary">Export app settings, playlists, and AI chats</string>
     <string name="settings_backup_restore_settings_title">Restore settings</string>
-    <string name="settings_backup_restore_settings_summary">Restore app settings from a backup JSON</string>
+    <string name="settings_backup_restore_settings_summary">Restore app settings, playlists, and AI chats from a backup JSON</string>
     <string name="settings_backup_export_playback_title">Export listening history</string>
     <string name="settings_backup_export_playback_summary">Export play history, rankings, and calendar stats; compatible with Prism Music sessions</string>
     <string name="settings_backup_restore_playback_title">Import listening history</string>
@@ -750,6 +752,8 @@
     <string name="settings_openai_model">OpenAI model</string>
     <string name="settings_openai_model_summary">For example %1$s; change it to any model available to your account</string>
     <string name="settings_lyric_share_card">Lyric share card</string>
+    <string name="settings_lyric_share_use_lyric_font">Use lyric font</string>
+    <string name="settings_lyric_share_use_lyric_font_summary">Preview and shared cards follow the lyric page custom font and weight</string>
     <string name="settings_lyric_share_custom_info">Custom info</string>
     <string name="settings_lyric_share_custom_info_summary">Leave blank to show Halcyon; fill a name to show by @name</string>
     <string name="settings_tag_scraping">Music tag scraping</string>
@@ -1091,6 +1095,8 @@
     <string name="library_empty_hint">No songs found. Tap the refresh button in the top-right corner to scan again.</string>
     <string name="library_organizing">Organizing songs...</string>
     <string name="library_selected_count">%1$d selected</string>
+    <string name="library_selected_fraction">%1$d / %2$d</string>
+    <string name="library_range_select">Range select</string>
     <string name="library_song_count_sorted">%1$d songs · %2$s</string>
     <string name="library_delete_selected_message">Delete the selected %1$d songs permanently? This may remove the local audio files.</string>
     <string name="library_ai_missing_api_key">Go to Settings > Preferences > AI interpretation and fill in the OpenAI API key first.</string>

@@ -97,6 +97,7 @@ import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.SongSelectionActionRow
 import com.ella.music.ui.components.TagEditorOption
 import com.ella.music.ui.components.TagEditorOptionKind
 import com.ella.music.ui.components.buildTagEditorOptions
@@ -117,6 +118,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.SelectAll
@@ -156,8 +158,13 @@ fun LibraryScreen(
     var sortExpanded by remember { mutableStateOf(false) }
     val sortIndex by settingsManager.librarySongSortIndex.collectAsState(initial = LibrarySortUiState.librarySongSortIndex)
     val sortMode = HomeSortMode.entries.getOrElse(sortIndex) { HomeSortMode.Title }
+    LaunchedEffect(sortIndex) {
+        LibrarySortUiState.librarySongSortIndex = sortIndex
+    }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    var rangeAnchorId by remember { mutableStateOf<Long?>(null) }
+    var rangeTargetId by remember { mutableStateOf<Long?>(null) }
     var actionSong by remember { mutableStateOf<Song?>(null) }
     var artistChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
@@ -258,31 +265,95 @@ fun LibraryScreen(
         }
     }
     val sortedResult by produceState<HomeSortedSongs?>(
-        initialValue = null,
+        initialValue = filteredSongs.sortedForHomeMode(sortMode),
         filteredSongs,
         sortMode
     ) {
-        value = withContext(Dispatchers.Default) {
-            when (sortMode) {
-                HomeSortMode.Title -> filteredSongs.sortedByMusicKey { it.title }
-                HomeSortMode.FileName -> filteredSongs.sortedByMusicKey { it.fileName.ifBlank { it.path.substringAfterLast('/') } }
-                HomeSortMode.YearAsc -> HomeSortedSongs(filteredSongs.sortedByReleaseDate(ascending = true), emptyMap())
-                HomeSortMode.YearDesc -> HomeSortedSongs(filteredSongs.sortedByReleaseDate(ascending = false), emptyMap())
-                HomeSortMode.DateAdded -> HomeSortedSongs(filteredSongs.sortedByDescending { it.dateAdded }, emptyMap())
-                HomeSortMode.DateAddedAsc -> HomeSortedSongs(filteredSongs.sortedBy { it.dateAdded }, emptyMap())
-                HomeSortMode.DateModified -> HomeSortedSongs(filteredSongs.sortedByDescending { it.dateModified }, emptyMap())
-                HomeSortMode.DateModifiedAsc -> HomeSortedSongs(filteredSongs.sortedBy { it.dateModified }, emptyMap())
-            }
-        }
+        value = withContext(Dispatchers.Default) { filteredSongs.sortedForHomeMode(sortMode) }
     }
     val sortedSongs = sortedResult?.songs.orEmpty()
     val sortKeysBySongId = sortedResult?.sortKeysBySongId.orEmpty()
+    val visibleSongIds = remember(sortedSongs) { sortedSongs.map { it.id }.toSet() }
+    val selectedVisibleCount = remember(selectedIds, visibleSongIds) { selectedIds.count { it in visibleSongIds } }
+    val rangeSelectionAvailable = remember(sortedSongs, selectedIds, rangeAnchorId, rangeTargetId) {
+        val anchor = rangeAnchorId
+        val target = rangeTargetId
+        if (anchor == null || target == null || anchor == target) {
+            false
+        } else {
+            anchor in selectedIds &&
+                target in selectedIds &&
+                sortedSongs.indexOfFirst { it.id == anchor } >= 0 &&
+                sortedSongs.indexOfFirst { it.id == target } >= 0
+        }
+    }
     val albumArtUrisBySongId = remember(sortedSongs, listCoversEnabled) {
         if (!listCoversEnabled) {
             emptyMap()
         } else {
             sortedSongs.associate { song -> song.id to mainViewModel.getAlbumArtUri(song.albumId) }
         }
+    }
+    fun finishSelectionMode() {
+        selectedIds = emptySet()
+        rangeAnchorId = null
+        rangeTargetId = null
+        selectionMode = false
+    }
+
+    fun updateRangeAnchorsForManualSelection(songId: Long, selectedNow: Boolean) {
+        if (selectedNow) {
+            when {
+                rangeAnchorId == null -> rangeAnchorId = songId
+                rangeAnchorId == songId -> Unit
+                else -> rangeTargetId = songId
+            }
+        } else {
+            if (rangeTargetId == songId) rangeTargetId = null
+            if (rangeAnchorId == songId) {
+                rangeAnchorId = rangeTargetId ?: selectedIds.firstOrNull { it != songId && it in visibleSongIds }
+                rangeTargetId = null
+            }
+        }
+    }
+
+    fun toggleSongSelection(songId: Long) {
+        val selecting = songId !in selectedIds
+        selectedIds = if (selecting) selectedIds + songId else selectedIds - songId
+        updateRangeAnchorsForManualSelection(songId, selecting)
+    }
+
+    fun applyRangeSelection() {
+        val anchor = rangeAnchorId ?: return
+        val target = rangeTargetId ?: return
+        val anchorIndex = sortedSongs.indexOfFirst { it.id == anchor }
+        val targetIndex = sortedSongs.indexOfFirst { it.id == target }
+        if (anchorIndex < 0 || targetIndex < 0 || anchorIndex == targetIndex) return
+        val bounds = if (anchorIndex < targetIndex) anchorIndex..targetIndex else targetIndex..anchorIndex
+        selectedIds = selectedIds + bounds.map { sortedSongs[it].id }
+        rangeAnchorId = target
+        rangeTargetId = null
+    }
+
+    fun toggleSelectAllVisibleSongs() {
+        if (sortedSongs.isEmpty()) return
+        val ids = sortedSongs.map { it.id }.toSet()
+        if (ids.all { it in selectedIds }) {
+            selectedIds = selectedIds - ids
+            rangeAnchorId = null
+            rangeTargetId = null
+        } else {
+            selectedIds = selectedIds + ids
+            rangeAnchorId = sortedSongs.firstOrNull()?.id
+            rangeTargetId = sortedSongs.lastOrNull()?.id
+        }
+    }
+
+    LaunchedEffect(selectionMode, visibleSongIds) {
+        if (!selectionMode) return@LaunchedEffect
+        selectedIds = selectedIds.filterTo(mutableSetOf()) { it in visibleSongIds }
+        if (rangeAnchorId !in visibleSongIds) rangeAnchorId = selectedIds.firstOrNull()
+        if (rangeTargetId !in visibleSongIds) rangeTargetId = null
     }
 
     Column(
@@ -380,10 +451,14 @@ fun LibraryScreen(
                             )
                         }
                         IconButton(onClick = {
-                            selectedIds = emptySet()
-                            selectionMode = false
+                            finishSelectionMode()
                         }) {
-                            Text(text = stringResource(R.string.common_cancel), fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurface)
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Close,
+                                contentDescription = stringResource(R.string.common_exit_selection),
+                                tint = MiuixTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     } else {
                         IconButton(onClick = { sortExpanded = !sortExpanded }) {
@@ -420,8 +495,7 @@ fun LibraryScreen(
         BackHandler(enabled = selectionMode || searchExpanded || sortExpanded || ratingFilterExpanded) {
             when {
                 selectionMode -> {
-                    selectedIds = emptySet()
-                    selectionMode = false
+                    finishSelectionMode()
                 }
                 searchExpanded -> {
                     searchExpanded = false
@@ -559,10 +633,19 @@ fun LibraryScreen(
 
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Text(
-                        text = if (selectionMode) {
-                            stringResource(R.string.library_selected_count, selectedIds.size)
-                        } else {
+                    if (selectionMode) {
+                        SongSelectionActionRow(
+                            selectedCount = selectedVisibleCount,
+                            totalCount = sortedSongs.size,
+                            rangeEnabled = rangeSelectionAvailable,
+                            allSelected = sortedSongs.isNotEmpty() && selectedVisibleCount == sortedSongs.size,
+                            onRangeSelect = ::applyRangeSelection,
+                            onSelectAll = ::toggleSelectAllVisibleSongs,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    } else {
+                        Text(
+                            text =
                                 stringResource(
                                     R.string.library_song_count_sorted,
                                     sortedSongs.size,
@@ -571,12 +654,12 @@ fun LibraryScreen(
                                         ratingFilter.summaryLabel(context),
                                     stringResource(R.string.favorite_filter).takeIf { favoriteFilter }
                                 ).joinToString(" · ")
-                            )
-                        },
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
+                                ),
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
 
                     LazyColumn(
                         state = listState,
@@ -601,15 +684,14 @@ fun LibraryScreen(
                                 selected = selected,
                                 onLongClick = {
                                     selectionMode = true
-                                    selectedIds = selectedIds + song.id
+                                    if (song.id !in selectedIds) {
+                                        selectedIds = selectedIds + song.id
+                                        updateRangeAnchorsForManualSelection(song.id, selectedNow = true)
+                                    }
                                 },
                                 onClick = {
                                     if (selectionMode) {
-                                        selectedIds = if (selected) {
-                                            selectedIds - song.id
-                                        } else {
-                                            selectedIds + song.id
-                                        }
+                                        toggleSongSelection(song.id)
                                     } else {
                                         playerViewModel.setPlaylist(sortedSongs, sortedSongs.indexOf(song))
                                         if (openPlayerOnPlay) onNavigateToPlayer()
@@ -728,8 +810,7 @@ fun LibraryScreen(
                             Toast.LENGTH_SHORT
                         ).show()
                         playlistPickerSongs = null
-                        selectedIds = emptySet()
-                        selectionMode = false
+                        finishSelectionMode()
                     }
                 )
             }
@@ -748,8 +829,7 @@ fun LibraryScreen(
                                 context.getString(R.string.player_added_to_playlist_named, playlist.name),
                                 Toast.LENGTH_SHORT
                             ).show()
-                            selectedIds = emptySet()
-                            selectionMode = false
+                            finishSelectionMode()
                         }
                     }
                     createPlaylistSongs = null
@@ -766,8 +846,7 @@ fun LibraryScreen(
             onConfirm = {
                 requestDeleteSongs(pendingConfirmDeleteSongs)
                 pendingConfirmDeleteSongs = emptyList()
-                selectedIds = emptySet()
-                selectionMode = false
+                finishSelectionMode()
             }
         )
 
@@ -1519,6 +1598,18 @@ private enum class HomeSortMode(val labelRes: Int) {
     YearAsc(R.string.playlist_song_sort_year_asc),
     YearDesc(R.string.playlist_song_sort_year_desc)
 }
+
+private fun List<Song>.sortedForHomeMode(sortMode: HomeSortMode): HomeSortedSongs =
+    when (sortMode) {
+        HomeSortMode.Title -> sortedByMusicKey { it.title }
+        HomeSortMode.FileName -> sortedByMusicKey { it.fileName.ifBlank { it.path.substringAfterLast('/') } }
+        HomeSortMode.YearAsc -> HomeSortedSongs(sortedByReleaseDate(ascending = true), emptyMap())
+        HomeSortMode.YearDesc -> HomeSortedSongs(sortedByReleaseDate(ascending = false), emptyMap())
+        HomeSortMode.DateAdded -> HomeSortedSongs(sortedByDescending { it.dateAdded }, emptyMap())
+        HomeSortMode.DateAddedAsc -> HomeSortedSongs(sortedBy { it.dateAdded }, emptyMap())
+        HomeSortMode.DateModified -> HomeSortedSongs(sortedByDescending { it.dateModified }, emptyMap())
+        HomeSortMode.DateModifiedAsc -> HomeSortedSongs(sortedBy { it.dateModified }, emptyMap())
+    }
 
 private fun List<Song>.sortedByReleaseDate(ascending: Boolean): List<Song> {
     val comparator = if (ascending) {

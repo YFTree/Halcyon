@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +52,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +79,7 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.model.playlistIdentityKey
+import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.MetadataCategoryItem
 import com.ella.music.viewmodel.PlayerViewModel
@@ -88,6 +91,7 @@ import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixSheetActions
 import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.FolderOutlineIcon
+import com.ella.music.ui.components.LazyGridScrollIndicator
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SafeCoverImage
@@ -126,6 +130,7 @@ import java.util.Locale
 fun MetadataCategoryScreen(
     type: String,
     mainViewModel: MainViewModel,
+    playerViewModel: PlayerViewModel,
     onBack: () -> Unit,
     onCategoryClick: (String) -> Unit
 ) {
@@ -140,6 +145,7 @@ fun MetadataCategoryScreen(
     val sortedItems = remember(items, sortMode) { items.sortedForCategory(sortMode) }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var categoryMenuItem by remember { mutableStateOf<MetadataCategoryItem?>(null) }
     val displayedItems = remember(sortedItems, searchQuery, type) {
         val query = searchQuery.trim()
         if (query.isBlank()) {
@@ -168,8 +174,28 @@ fun MetadataCategoryScreen(
         gridColumns.coerceIn(1, 4)
     }
     val pageBackground = ellaPageBackground()
-    val gridState = rememberLazyGridState()
+    val savedCategoryScroll = remember(type) {
+        LibrarySortUiState.metadataCategoryScrollPositions[type] ?: (0 to 0)
+    }
+    val gridState = rememberLazyGridState(
+        initialFirstVisibleItemIndex = savedCategoryScroll.first,
+        initialFirstVisibleItemScrollOffset = savedCategoryScroll.second
+    )
     val scope = rememberCoroutineScope()
+    var skipInitialCategoryReset by remember(type) { mutableStateOf(true) }
+    LaunchedEffect(type, sortMode, searchQuery, safeGridColumns) {
+        if (skipInitialCategoryReset) {
+            skipInitialCategoryReset = false
+        } else {
+            gridState.scrollToItem(0)
+        }
+    }
+    LaunchedEffect(type, gridState) {
+        snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
+            .collect { position ->
+                LibrarySortUiState.metadataCategoryScrollPositions[type] = position
+            }
+    }
     BackHandler(enabled = sortExpanded || searchExpanded) {
         when {
             searchExpanded -> {
@@ -268,7 +294,7 @@ fun MetadataCategoryScreen(
                             .clickable {
                                 sortExpanded = false
                                 scope.launch { mainViewModel.settingsManager.setMetadataCategorySortIndex(type, availableSortModes.indexOf(mode)) }
-                                scope.launch { gridState.animateScrollToItem(0) }
+                                scope.launch { gridState.scrollToItem(0) }
                             }
                             .padding(vertical = 10.dp)
                     )
@@ -285,42 +311,82 @@ fun MetadataCategoryScreen(
                 )
             }
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(safeGridColumns),
-                state = gridState,
-                contentPadding = PaddingValues(bottom = 120.dp)
-            ) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text = "${type.categoryCountSummary(displayedItems.size)} · ${sortMode.displayLabel(type)}",
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(safeGridColumns),
+                    state = gridState,
+                    contentPadding = PaddingValues(bottom = 120.dp)
+                ) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = "${type.categoryCountSummary(displayedItems.size)} · ${sortMode.displayLabel(type)}",
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                    items(displayedItems, key = { it.name }) { item ->
+                        MetadataCategoryCard(
+                            type = type,
+                            item = item,
+                            sortMode = sortMode,
+                            albumArtUri = albumArtUrisByName[item.name],
+                            representativeSong = representativeSongsByName[item.name],
+                            loadCoverArt = if (type.prefersEmbeddedCategoryCardCover()) mainViewModel::getAlbumCoverArtBitmap else null,
+                            onClick = { onCategoryClick(item.name) },
+                            onLongClick = { categoryMenuItem = item }
+                        )
+                    }
+                }
+                if (displayedItems.size > 30) {
+                    LazyGridScrollIndicator(
+                        state = gridState,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
                     )
                 }
-                items(displayedItems, key = { it.name }) { item ->
-                    MetadataCategoryCard(
-                        type = type,
-                        item = item,
-                        sortMode = sortMode,
-                        albumArtUri = albumArtUrisByName[item.name],
-                        representativeSong = representativeSongsByName[item.name],
-                        loadCoverArt = if (type.prefersEmbeddedCategoryCardCover()) mainViewModel::getAlbumCoverArtBitmap else null,
-                        onClick = { onCategoryClick(item.name) },
-                        onLongClick = {
-                            val ok = requestPinnedEllaShortcut(
-                                context = context,
-                                id = "category_${type}_${item.name}",
-                                label = item.name,
-                                route = Screen.MetadataCategoryDetail.createRoute(type, item.name)
-                            )
-                            Toast.makeText(
-                                context,
-                                if (ok) context.getString(R.string.playlist_shortcut_requested, item.name) else context.getString(R.string.playlist_shortcut_unsupported),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
+            }
+        }
+    }
+
+    categoryMenuItem?.let { item ->
+        WindowBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = item.name.substringAfterLast('/').ifBlank { item.name },
+            onDismissRequest = { categoryMenuItem = null }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
+                    .background(MiuixTheme.colorScheme.background.copy(alpha = 0.98f))
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                CategorySheetItem(stringResource(R.string.song_more_play_next)) {
+                    val selectedSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
+                    selectedSongs.asReversed().forEach(playerViewModel::playNext)
+                    Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                    categoryMenuItem = null
+                }
+                CategorySheetItem(stringResource(R.string.common_add_desktop_shortcut)) {
+                    val ok = requestPinnedEllaShortcut(
+                        context = context,
+                        id = "category_${type}_${item.name}",
+                        label = item.name,
+                        route = Screen.MetadataCategoryDetail.createRoute(type, item.name)
                     )
+                    Toast.makeText(
+                        context,
+                        if (ok) context.getString(R.string.playlist_shortcut_requested, item.name) else context.getString(R.string.playlist_shortcut_unsupported),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    categoryMenuItem = null
+                }
+                CategorySheetItem(stringResource(R.string.common_cancel)) {
+                    categoryMenuItem = null
                 }
             }
         }
@@ -1045,7 +1111,7 @@ private fun MetadataCategoryCard(
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                text = stringResource(R.string.category_song_count_card, item.songCount),
+                text = item.categorySortSummary(sortMode),
                 fontSize = if (isGenreCard) 10.sp else 12.sp,
                 lineHeight = if (isGenreCard) 13.sp else 15.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -1278,6 +1344,16 @@ private fun MetadataCategoryItem.matchesCategorySearch(query: String, type: Stri
 }
 
 @Composable
+private fun MetadataCategoryItem.categorySortSummary(sortMode: MetadataCategorySortMode): String {
+    val context = LocalContext.current
+    return when (sortMode) {
+        MetadataCategorySortMode.AlbumCount -> context.getString(R.string.category_album_count_detail, albumCount)
+        MetadataCategorySortMode.Duration -> duration.formatDuration()
+        else -> context.getString(R.string.category_song_count_card, songCount)
+    }
+}
+
+@Composable
 private fun MetadataCategoryItem.folderSortSummary(sortMode: MetadataCategorySortMode): String {
     val context = LocalContext.current
     return when (sortMode) {
@@ -1409,8 +1485,8 @@ private fun MetadataAlbumRow(
     val context = LocalContext.current
     val summary = buildList {
         add(context.getString(R.string.analytics_song_count_value, album.songCount))
-        if (album.year.isNotBlank()) add(album.year)
         add(duration.formatDuration())
+        if (album.year.isNotBlank()) add(album.year)
     }.joinToString(" · ")
 
     Row(

@@ -137,11 +137,16 @@ object WebDavClient {
         }
     }
 
-    fun list(config: WebDavConfig, url: String = config.url, forceRefresh: Boolean = false): List<WebDavItem> {
+    fun list(
+        config: WebDavConfig,
+        url: String = config.url,
+        forceRefresh: Boolean = false,
+        includeNonAudioFiles: Boolean = false
+    ): List<WebDavItem> {
         if (!config.isConfigured) return emptyList()
         val ctx = requireContext()
         val requestUrl = normalizeCollectionUrl(url)
-        val cacheKey = "${requestUrl}|${config.username}|${config.authMode}"
+        val cacheKey = "${requestUrl}|${config.username}|${config.authMode}|files=$includeNonAudioFiles"
         if (!forceRefresh) listCache[cacheKey]?.let { return it }
         val propfind = executePropfind(requestUrl, config, depth = "1")
         val response = propfind.body
@@ -154,7 +159,7 @@ object WebDavClient {
 
         return parseItems(response, requestUrl)
             .filterNot { normalizeCollectionUrl(it.url) == requestUrl }
-            .filter { it.isDirectory || isAudioFile(it.name) }
+            .filter { it.isDirectory || includeNonAudioFiles || isAudioFile(it.name) }
             .sortedWith(compareByDescending<WebDavItem> { it.isDirectory }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.name })
             .also { listCache[cacheKey] = it }
     }

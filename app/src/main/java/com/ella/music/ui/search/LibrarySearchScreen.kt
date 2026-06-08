@@ -59,6 +59,8 @@ import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
+import org.json.JSONArray
+import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -100,19 +102,23 @@ fun LibrarySearchScreen(
                 .map { SongSearchResult(it) }
         }
     }
+    val cachedSongResults = remember(context, songs, trimmedQuery, filter) {
+        loadCachedSongSearchResults(context, songs, trimmedQuery, filter)
+    }
     val songResults by produceState(
-        initialValue = immediateSongResults,
+        initialValue = cachedSongResults.ifEmpty { immediateSongResults },
         songs,
         trimmedQuery,
         filter,
         duplicateSongs,
+        cachedSongResults,
         lyricSourceMode
     ) {
-        value = immediateSongResults
+        value = cachedSongResults.ifEmpty { immediateSongResults }
         if (trimmedQuery.isBlank() || filter !in listOf(SearchFilter.All, SearchFilter.Songs) || filter == SearchFilter.Duplicates) {
             return@produceState
         }
-        val current = immediateSongResults.toMutableList()
+        val current = cachedSongResults.ifEmpty { immediateSongResults }.toMutableList()
         val seenKeys = current.map { it.song.searchIdentityKey() }.toMutableSet()
         for (song in songs) {
             if (current.size >= 80) break
@@ -131,6 +137,7 @@ fun LibrarySearchScreen(
             seenKeys += song.searchIdentityKey()
             value = current.toList()
         }
+        saveCachedSongSearchResults(context, trimmedQuery, filter, current)
     }
     val albumResults = remember(albums, trimmedQuery, filter) {
         if (filter !in listOf(SearchFilter.All, SearchFilter.Albums) || trimmedQuery.isBlank()) emptyList()
@@ -641,6 +648,54 @@ private fun saveSearchHistory(context: Context, history: List<String>) {
         .putString(SEARCH_HISTORY_KEY, history.joinToString("\n"))
         .apply()
 }
+
+private fun loadCachedSongSearchResults(
+    context: Context,
+    songs: List<Song>,
+    query: String,
+    filter: SearchFilter
+): List<SongSearchResult> {
+    if (query.isBlank() || filter !in listOf(SearchFilter.All, SearchFilter.Songs)) return emptyList()
+    val raw = context.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE)
+        .getString(searchResultCacheKey(query, filter), null)
+        ?: return emptyList()
+    val byKey = songs.associateBy { it.searchIdentityKey() }
+    return runCatching {
+        val array = JSONArray(raw)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val song = byKey[item.optString("key")] ?: continue
+                add(SongSearchResult(song, item.optString("lyricSnippet").takeIf { it.isNotBlank() }))
+                if (size >= 80) break
+            }
+        }
+    }.getOrDefault(emptyList())
+}
+
+private fun saveCachedSongSearchResults(
+    context: Context,
+    query: String,
+    filter: SearchFilter,
+    results: List<SongSearchResult>
+) {
+    if (query.isBlank() || filter !in listOf(SearchFilter.All, SearchFilter.Songs) || results.isEmpty()) return
+    val array = JSONArray()
+    results.take(80).forEach { result ->
+        array.put(
+            JSONObject()
+                .put("key", result.song.searchIdentityKey())
+                .put("lyricSnippet", result.lyricSnippet.orEmpty())
+        )
+    }
+    context.getSharedPreferences(SEARCH_PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putString(searchResultCacheKey(query, filter), array.toString())
+        .apply()
+}
+
+private fun searchResultCacheKey(query: String, filter: SearchFilter): String =
+    "results:${filter.name.lowercase()}:${query.trim().lowercase()}"
 
 private const val SEARCH_PREFS = "library_search"
 private const val SEARCH_HISTORY_KEY = "history"

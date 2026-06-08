@@ -530,17 +530,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun createPlaylist(name: String, onCreated: (UserPlaylist?) -> Unit = {}) {
         viewModelScope.launch {
-            onCreated(playlistStore.createPlaylist(name))
+            val playlist = playlistStore.createPlaylist(name)
+            if (playlist != null) {
+                syncPlaylistCustomOrder(newPlaylistIds = listOf(playlist.id))
+            }
+            onCreated(playlist)
         }
     }
 
     fun deletePlaylist(id: String) {
-        viewModelScope.launch { playlistStore.deletePlaylist(id) }
+        viewModelScope.launch {
+            playlistStore.deletePlaylist(id)
+            syncPlaylistCustomOrder()
+        }
     }
 
     fun deletePlaylists(ids: Set<String>) {
         if (ids.isEmpty()) return
-        viewModelScope.launch { playlistStore.deletePlaylists(ids) }
+        viewModelScope.launch {
+            playlistStore.deletePlaylists(ids)
+            syncPlaylistCustomOrder()
+        }
     }
 
     fun removeSongFromPlaylist(playlistId: String, songKey: String) {
@@ -569,7 +579,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun importLocalPlaylist(uri: Uri, onResult: (Result<PlaylistImportResult>) -> Unit) {
         viewModelScope.launch {
+            val beforeIds = playlistStore.playlists.value.mapTo(mutableSetOf()) { it.id }
             val result = runCatching { playlistStore.importLocalPlaylist(uri, songs.value) }
+            result.getOrNull()?.playlist?.id?.let { id ->
+                if (id !in beforeIds) syncPlaylistCustomOrder(newPlaylistIds = listOf(id)) else syncPlaylistCustomOrder()
+            }
             onResult(result)
         }
     }
@@ -580,7 +594,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         onResult: (Result<PlaylistBatchImportResult>) -> Unit
     ) {
         viewModelScope.launch {
+            val beforeIds = playlistStore.playlists.value.mapTo(mutableSetOf()) { it.id }
             val result = runCatching { playlistStore.importLocalPlaylists(uris, songs.value, mode) }
+            result.onSuccess {
+                val newIds = playlistStore.playlists.value
+                    .map { it.id }
+                    .filter { it !in beforeIds }
+                syncPlaylistCustomOrder(newPlaylistIds = newIds)
+            }
             onResult(result)
         }
     }
@@ -589,9 +610,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         onResult: (Result<PlaylistBatchImportResult>) -> Unit = {}
     ) {
         viewModelScope.launch {
+            val beforeIds = playlistStore.playlists.value.mapTo(mutableSetOf()) { it.id }
             val result = runCatching { playlistStore.importLocalPlaylistFiles(songs.value) }
+            result.onSuccess {
+                val newIds = playlistStore.playlists.value
+                    .map { it.id }
+                    .filter { it !in beforeIds }
+                syncPlaylistCustomOrder(newPlaylistIds = newIds)
+            }
             onResult(result)
         }
+    }
+
+    private suspend fun syncPlaylistCustomOrder(newPlaylistIds: List<String> = emptyList()) {
+        val customPlaylists = playlistStore.playlists.value
+            .filterNot { it.isFavorites || it.isFiveStarRating }
+        val customIds = customPlaylists.mapTo(linkedSetOf()) { it.id }
+        if (customIds.isEmpty()) {
+            settingsManager.setPlaylistCustomOrder(emptyList())
+            return
+        }
+
+        val newIds = newPlaylistIds
+            .filter { it in customIds }
+            .distinct()
+        val currentOrder = settingsManager.playlistCustomOrder.first()
+        val ordered = buildList {
+            addAll(newIds)
+            currentOrder.forEach { id ->
+                if (id in customIds && id !in this) add(id)
+            }
+            customPlaylists
+                .sortedWith(
+                    compareByDescending<UserPlaylist> { it.createdAt }
+                        .thenByDescending { it.updatedAt }
+                        .thenBy { it.name.lowercase() }
+                        .thenBy { it.id }
+                )
+                .forEach { playlist ->
+                    if (playlist.id !in this) add(playlist.id)
+                }
+        }
+        settingsManager.setPlaylistCustomOrder(ordered)
     }
 
     fun exportLocalPlaylist(

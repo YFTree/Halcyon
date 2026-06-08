@@ -66,6 +66,7 @@ fun LyricSharePicker(
     backgroundColors: List<Color>,
     annotation: String = "",
     customInfo: String = "",
+    shareTypeface: android.graphics.Typeface? = null,
     onDismiss: () -> Unit,
     onShare: (List<LyricLine>, Boolean) -> Unit
 ) {
@@ -172,6 +173,7 @@ fun LyricSharePicker(
                 cover = cover,
                 colors = colors,
                 lines = selectedLines,
+                shareTypeface = shareTypeface,
                 includeTranslation = includeTranslation,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -306,6 +308,7 @@ private fun LyricSharePreviewCard(
     cover: Bitmap?,
     colors: List<Color>,
     lines: List<LyricLine>,
+    shareTypeface: android.graphics.Typeface?,
     includeTranslation: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -324,8 +327,8 @@ private fun LyricSharePreviewCard(
             includeTranslation = includeTranslation
         )
     }
-    val layout = remember(content) {
-        calculateLyricShareLayout(content)
+    val layout = remember(content, shareTypeface) {
+        calculateLyricShareLayout(content, shareTypeface = shareTypeface)
     }
     val previewBitmap = remember(content, layout, cover) {
         renderLyricShareCardBitmap(content, layout, cover)

@@ -110,6 +110,7 @@ class SettingsManager(private val context: Context) {
         val KEY_PLAYLIST_CUSTOM_ORDER = stringPreferencesKey("playlist_custom_order")
         val KEY_SHOW_PLAY_NEXT_IN_LISTS = booleanPreferencesKey("show_play_next_in_lists")
         val KEY_LYRIC_SHARE_CUSTOM_INFO = stringPreferencesKey("lyric_share_custom_info")
+        val KEY_LYRIC_SHARE_USE_LYRIC_FONT = booleanPreferencesKey("lyric_share_use_lyric_font")
         val KEY_SHOW_ALBUM_ARTISTS = booleanPreferencesKey("show_album_artists")
         val KEY_METADATA_EDITOR_ID = stringPreferencesKey("metadata_editor_id")
         val KEY_LYRIC_TIMING_EDITOR_ID = stringPreferencesKey("lyric_timing_editor_id")
@@ -443,6 +444,7 @@ class SettingsManager(private val context: Context) {
     val lyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_SCALE] ?: 100 }
     val lyricFontItalic: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_ITALIC] ?: false }
     val lyricFontApplyToPage: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_APPLY_TO_PAGE] ?: true }
+    val lyricShareUseLyricFont: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_SHARE_USE_LYRIC_FONT] ?: false }
     val lyricPerspectiveEffect: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PERSPECTIVE_EFFECT] ?: false }
     val scanIncludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_INCLUDE_FOLDERS] ?: "" }
     val scanExcludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_EXCLUDE_FOLDERS] ?: "" }
@@ -826,6 +828,10 @@ class SettingsManager(private val context: Context) {
                 it[KEY_LYRIC_SHARE_CUSTOM_INFO] = trimmed
             }
         }
+    }
+
+    suspend fun setLyricShareUseLyricFont(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_LYRIC_SHARE_USE_LYRIC_FONT] = enabled }
     }
 
     suspend fun setShowAlbumArtists(enabled: Boolean) {

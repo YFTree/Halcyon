@@ -1,6 +1,7 @@
 package com.ella.music.ui.components
 
 import android.os.SystemClock
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +27,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -37,6 +40,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -132,6 +136,7 @@ fun LazyListScrollIndicator(
         }
     }
     ScrollIndicator(
+        scrollInProgress = state.isScrollInProgress,
         firstVisibleIndex = info.first,
         visibleCount = info.second,
         totalCount = info.third,
@@ -157,6 +162,7 @@ fun LazyGridScrollIndicator(
         }
     }
     ScrollIndicator(
+        scrollInProgress = state.isScrollInProgress,
         firstVisibleIndex = info.first,
         visibleCount = info.second,
         totalCount = info.third,
@@ -169,6 +175,7 @@ fun LazyGridScrollIndicator(
 
 @Composable
 private fun ScrollIndicator(
+    scrollInProgress: Boolean,
     firstVisibleIndex: Int,
     visibleCount: Int,
     totalCount: Int,
@@ -180,7 +187,21 @@ private fun ScrollIndicator(
     val maxFirst = max(1, totalCount - visibleCount)
     val offsetFraction = (firstVisibleIndex.toFloat() / maxFirst.toFloat()).coerceIn(0f, 1f)
     var trackHeightPx by remember(totalCount, visibleCount) { mutableStateOf(1) }
+    var visible by remember(totalCount, visibleCount) { mutableStateOf(false) }
+    var dragging by remember { mutableStateOf(false) }
+    val thumbAlpha by animateFloatAsState(targetValue = if (visible) 1f else 0f, label = "scrollThumbAlpha")
     val currentOnDragToIndex by rememberUpdatedState(onDragToIndex)
+
+    LaunchedEffect(firstVisibleIndex, scrollInProgress, dragging) {
+        if (scrollInProgress || dragging) {
+            visible = true
+            return@LaunchedEffect
+        }
+        if (visible) {
+            delay(SCROLL_THUMB_IDLE_HIDE_MS)
+            if (!dragging) visible = false
+        }
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -218,6 +239,8 @@ private fun ScrollIndicator(
                             }
 
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            dragging = true
+                            visible = true
                             down.consume()
                             dispatch(down.position.y, force = true)
                             while (true) {
@@ -229,8 +252,10 @@ private fun ScrollIndicator(
                                     dispatch(change.position.y)
                                 }
                             }
+                            dragging = false
                         }
                     } finally {
+                        dragging = false
                         targetIndices.close()
                         scrollWorker.cancel()
                     }
@@ -245,6 +270,7 @@ private fun ScrollIndicator(
                 .offset(y = thumbOffset)
                 .height(thumbHeight.coerceAtLeast(24.dp))
                 .width(4.dp)
+                .alpha(thumbAlpha)
                 .clip(RoundedCornerShape(999.dp))
                 .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.48f))
         )
@@ -252,3 +278,4 @@ private fun ScrollIndicator(
 }
 
 private const val SCROLL_THUMB_DRAG_THROTTLE_MS = 24L
+private const val SCROLL_THUMB_IDLE_HIDE_MS = 3_000L

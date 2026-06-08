@@ -92,8 +92,10 @@
     <string name="common_all">すべて</string>
     <string name="common_select_artist">アーティストを選択</string>
     <string name="common_add_to_queue">キューに追加</string>
+    <string name="common_add_desktop_shortcut">デスクトップショートカットを追加</string>
     <string name="common_exit_selection">複数選択を終了</string>
     <string name="common_multi_select">複数選択</string>
+    <string name="common_deselect_all">すべて解除</string>
 
     <string name="unsupported_system_folder_path">このシステムフォルダパスはサポートされていません</string>
     <string name="scan_folder_added">スキャンフォルダを追加しました</string>
@@ -537,9 +539,9 @@
     <string name="settings_backup_settings_section">設定</string>
     <string name="settings_backup_playback_section">再生履歴</string>
     <string name="settings_backup_export_settings_title">設定をエクスポート</string>
-    <string name="settings_backup_export_settings_summary">アプリ設定とプレファレンスのみエクスポート</string>
+    <string name="settings_backup_export_settings_summary">アプリ設定、プレイリスト、AI会話をエクスポート</string>
     <string name="settings_backup_restore_settings_title">設定をリストア</string>
-    <string name="settings_backup_restore_settings_summary">バックアップ JSON からアプリ設定をリストア</string>
+    <string name="settings_backup_restore_settings_summary">バックアップ JSON からアプリ設定、プレイリスト、AI会話をリストア</string>
     <string name="settings_backup_export_playback_title">再生履歴をエクスポート</string>
     <string name="settings_backup_export_playback_summary">再生履歴、ランキング、カレンダー統計をエクスポート。Sollin/Aurora sessions 互換</string>
     <string name="settings_backup_restore_playback_title">再生履歴をインポート</string>
@@ -750,6 +752,8 @@
     <string name="settings_openai_model">OpenAI モデル</string>
     <string name="settings_openai_model_summary">例：%1$s。アカウントで利用可能なモデルに合わせて変更可能</string>
     <string name="settings_lyric_share_card">歌詞カード共有</string>
+    <string name="settings_lyric_share_use_lyric_font">歌詞フォントを使用</string>
+    <string name="settings_lyric_share_use_lyric_font_summary">オンにすると、共有カードとプレビューが歌詞ページのカスタムフォントと太さに従います</string>
     <string name="settings_lyric_share_custom_info">カスタム情報</string>
     <string name="settings_lyric_share_custom_info_summary">空白にすると Halcyon と表示。名前を入力すると by @名前 と表示</string>
     <string name="settings_tag_scraping">音楽タグスクラピング</string>
@@ -1091,6 +1095,8 @@
     <string name="library_empty_hint">曲が見つかりません。右上の更新ボタンでスキャンしてください</string>
     <string name="library_organizing">曲を整理中...</string>
     <string name="library_selected_count">%1$d 曲を選択中</string>
+    <string name="library_selected_fraction">%1$d / %2$d</string>
+    <string name="library_range_select">範囲選択</string>
     <string name="library_song_count_sorted">%1$d 曲 · %2$s</string>
     <string name="library_delete_selected_message">選択した %1$d 曲を完全に削除しますか？この操作によりローカルオーディオファイルが削除される場合があります。</string>
     <string name="library_ai_missing_api_key">先に設定 > アプリ設定 > AI 解説 で OpenAI API Key を入力してください。</string>

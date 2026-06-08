@@ -420,6 +420,9 @@ fun FolderDetailScreen(
         } else {
             val listState = remember(normalizedFolderPath) { LazyListState() }
             var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+            LaunchedEffect(normalizedFolderPath, sortMode) {
+                listState.scrollToItem(0)
+            }
             LaunchedEffect(scrollToTopRequest) {
                 if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
             }

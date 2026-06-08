@@ -129,7 +129,11 @@ fun AlbumScreen(
     val sortedAlbums = remember(filteredAlbums, sortMode, albumDurations) {
         when (sortMode) {
             AlbumSortMode.Name -> filteredAlbums.sortedBy { it.name.musicSortKey() }
-            AlbumSortMode.Artist -> filteredAlbums.sortedBy { it.artist.musicSortKey() }
+            AlbumSortMode.Artist -> filteredAlbums.sortedWith(
+                compareBy<Album> { it.albumArtist.isBlank() && it.artist.isBlank() }
+                    .thenBy { it.albumArtist.ifBlank { it.artist }.musicSortKey() }
+                    .thenBy { it.name.musicSortKey() }
+            )
             AlbumSortMode.SongCount -> filteredAlbums.sortedByDescending { it.songCount }
             AlbumSortMode.Duration -> filteredAlbums.sortedByDescending { albumDurations[it.id] ?: 0L }
             AlbumSortMode.YearAsc -> filteredAlbums.sortedWith(compareBy<Album> { it.yearInt <= 0 }.thenBy { it.yearInt }.thenBy { it.name.musicSortKey() })
@@ -320,9 +324,9 @@ fun AlbumScreen(
                         LibrarySortUiState.albumListFirstVisibleItemScrollOffset = offset
                     }
             }
-            val fastIndexTargets = remember(sortedAlbums) {
+            val fastIndexTargets = remember(sortedAlbums, sortMode) {
                 sortedAlbums
-                    .mapIndexed { index, album -> album.indexLetter() to index }
+                    .mapIndexed { index, album -> album.indexLetter(sortMode) to index }
                     .distinctBy { it.first }
                     .toMap()
             }
@@ -381,9 +385,9 @@ fun AlbumScreen(
                     }
                 }
 
-                if (sortMode == AlbumSortMode.Name && sortedAlbums.size > 30) {
+                if ((sortMode == AlbumSortMode.Name || sortMode == AlbumSortMode.Artist) && sortedAlbums.size > 30) {
                     FastIndexBar(
-                        letters = sortedAlbums.map { it.indexLetter() },
+                        letters = sortedAlbums.map { it.indexLetter(sortMode) },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
@@ -461,6 +465,13 @@ private enum class AlbumSortMode(val labelRes: Int) {
 }
 
 private fun Album.summaryForSort(context: android.content.Context, sortMode: AlbumSortMode, duration: Long): String {
+    if (sortMode == AlbumSortMode.Artist) {
+        return buildList {
+            albumArtist.ifBlank { artist }.trim().takeIf { it.isNotBlank() }?.let(::add)
+            if (year.isNotBlank()) add(year)
+            add(context.getString(R.string.song_count, songCount))
+        }.joinToString(" · ")
+    }
     val first = if (sortMode == AlbumSortMode.Duration) {
         duration.formatAlbumDuration(context)
     } else {
@@ -478,8 +489,9 @@ private fun Long.formatAlbumDuration(context: android.content.Context): String {
     return formatPlaybackDuration()
 }
 
-private fun Album.indexLetter(): String {
-    val first = name.musicSortKey().firstOrNull()?.uppercaseChar()
+private fun Album.indexLetter(sortMode: AlbumSortMode): String {
+    val source = if (sortMode == AlbumSortMode.Artist) albumArtist.ifBlank { artist } else name
+    val first = source.musicSortKey().firstOrNull()?.uppercaseChar()
     return if (first != null && first in 'A'..'Z') first.toString() else "#"
 }
 

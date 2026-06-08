@@ -34,11 +34,14 @@ fun rememberSongArtworkState(
         coverUrl == null &&
         loadCoverArt != null &&
         when (usage) {
+            ArtworkUsage.ListThumbnail -> true
             ArtworkUsage.ArtistImage -> true
-            ArtworkUsage.ListThumbnail,
             ArtworkUsage.MiniPlayer -> albumArtUri == null || preferEmbedded
         }
-    val initialModel = coverUrl ?: albumArtUri
+    val initialModel = when {
+        usage == ArtworkUsage.ListThumbnail && shouldTryEmbedded -> coverUrl
+        else -> coverUrl ?: albumArtUri
+    }
 
     val state by produceState(
         initialValue = SongArtworkState(
@@ -67,6 +70,7 @@ fun rememberSongArtworkState(
                 }.getOrNull()
             }
             val resolved = coverUrl ?: when {
+                usage == ArtworkUsage.ListThumbnail -> embeddedCover
                 usage == ArtworkUsage.ArtistImage -> embeddedCover ?: albumArtUri
                 preferEmbedded -> embeddedCover ?: albumArtUri
                 else -> albumArtUri ?: embeddedCover

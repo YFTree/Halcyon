@@ -99,8 +99,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.CompactMiniPlayer
+import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.GlassPill
 import com.ella.music.ui.components.LiquidGlassBottomBar
 import com.ella.music.ui.components.LiquidGlassBottomBarItem
@@ -184,6 +187,8 @@ class MainActivity : ComponentActivity() {
             val settingsManager = remember { SettingsManager.getInstance(this@MainActivity) }
             val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
             val appLanguage by settingsManager.appLanguage.collectAsState(initial = SettingsManager.APP_LANGUAGE_SYSTEM)
+            val appFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
+            val appFontWeight by settingsManager.lyricFontWeight.collectAsState(initial = 800)
 
             val isDark = when (themeMode) {
                 THEME_DARK -> true
@@ -248,7 +253,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            EllaTheme(themeMode = themeMode) {
+            EllaTheme(
+                themeMode = themeMode,
+                appFontPath = appFontPath,
+                appFontWeight = appFontWeight
+            ) {
                 EllaApp(mainVm, playerVm, isDark)
             }
         }
@@ -566,6 +575,7 @@ fun EllaApp(
 
     val showMiniPlayer = currentSong != null &&
         currentRoute != Screen.Player.route &&
+        currentRoute != Screen.AiChat.route &&
         !showPlayerOverlay
     LaunchedEffect(showMiniPlayer, canCompactBottomDock) {
         if (!showMiniPlayer || !canCompactBottomDock) bottomDockMode = BottomDockMode.Expanded
@@ -1021,8 +1031,12 @@ private fun FloatingBottomControls(
     modifier: Modifier = Modifier,
     useGlass: Boolean = true
 ) {
+    val context = LocalContext.current
     var queueSheetExpanded by remember { mutableStateOf(false) }
+    var queueSongsToAdd by remember { mutableStateOf<List<Song>?>(null) }
+    var queueSongsForNewPlaylist by remember { mutableStateOf<List<Song>?>(null) }
     val playlist by playerViewModel.playlist.collectAsState()
+    val userPlaylists by mainViewModel.playlists.collectAsState()
     val currentSongId = currentSong?.id
     val effectiveMode = if (showMiniPlayer && canCompact) bottomDockMode else BottomDockMode.Expanded
     AnimatedContent(
@@ -1186,6 +1200,10 @@ private fun FloatingBottomControls(
                 },
                 onRemoveSong = { index -> playerViewModel.removeFromPlaylist(index) },
                 onMoveSong = { fromIndex, toIndex -> playerViewModel.movePlaylistItem(fromIndex, toIndex) },
+                onAddQueueToPlaylist = {
+                    queueSheetExpanded = false
+                    queueSongsToAdd = playlist
+                },
                 onClearQueue = {
                     queueSheetExpanded = false
                     playerViewModel.clearPlaylist()
@@ -1193,6 +1211,57 @@ private fun FloatingBottomControls(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+
+    queueSongsToAdd?.let { songsToAdd ->
+        WindowBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = stringResource(R.string.player_add_to_playlist),
+            onDismissRequest = { queueSongsToAdd = null }
+        ) {
+            AddToPlaylistSheet(
+                playlists = userPlaylists.sortedWith(
+                    compareByDescending<com.ella.music.data.model.UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }
+                        .thenByDescending { it.createdAt }
+                ),
+                onDismiss = { queueSongsToAdd = null },
+                onCreatePlaylist = {
+                    queueSongsForNewPlaylist = songsToAdd
+                    queueSongsToAdd = null
+                },
+                onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
+                    selectedPlaylists.forEach { target ->
+                        mainViewModel.addSongsToPlaylist(target.id, songsToAdd, appendToEnd)
+                    }
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.player_added_to_playlists, selectedPlaylists.size),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    queueSongsToAdd = null
+                }
+            )
+        }
+    }
+
+    queueSongsForNewPlaylist?.let { songsToAdd ->
+        CreatePlaylistAndAddSheet(
+            onDismiss = { queueSongsForNewPlaylist = null },
+            onCreate = { name ->
+                mainViewModel.createPlaylist(name) { target ->
+                    if (target != null) {
+                        mainViewModel.addSongsToPlaylist(target.id, songsToAdd)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.player_added_to_playlist_named, target.name),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                queueSongsForNewPlaylist = null
+            }
+        )
     }
 }
 
@@ -1238,7 +1307,7 @@ private fun CompactBottomDock(
         BottomDockActionPill(
             icon = leftIcon,
             label = leftLabel,
-            selected = true,
+            selected = !isSearchSelected,
             onClick = onExpand,
             backdrop = backdrop,
             glassEffect = glassEffect,

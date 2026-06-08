@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -133,8 +132,9 @@ private fun loadSessionMessages(context: Context, sessionId: String): List<AiCha
             AiChatMessage(
                 role = if (obj.getString("role") == "user") AiChatRole.User else AiChatRole.Assistant,
                 text = obj.getString("text"),
-                songs = emptyList(),
-                loading = false
+                songs = obj.optJSONArray("songs")?.toSongList().orEmpty(),
+                loading = false,
+                playlistName = obj.optString("playlistName")
             )
         }
     }.getOrDefault(emptyList())
@@ -148,11 +148,75 @@ private fun saveSessionMessages(context: Context, sessionId: String, messages: L
                 JSONObject()
                     .put("role", if (msg.role == AiChatRole.User) "user" else "assistant")
                     .put("text", msg.text)
+                    .put("playlistName", msg.playlistName)
+                    .put("songs", JSONArray().apply {
+                        msg.songs.forEach { put(it.toJson()) }
+                    })
             )
         }
         File(sessionsDir(context), "$sessionId.json").writeText(array.toString())
     }
 }
+
+private fun JSONArray.toSongList(): List<Song> =
+    (0 until length()).mapNotNull { index ->
+        optJSONObject(index)?.toSong()
+    }
+
+private fun Song.toJson(): JSONObject =
+    JSONObject()
+        .put("id", id)
+        .put("title", title)
+        .put("artist", artist)
+        .put("album", album)
+        .put("albumId", albumId)
+        .put("duration", duration)
+        .put("path", path)
+        .put("fileName", fileName)
+        .put("fileSize", fileSize)
+        .put("mimeType", mimeType)
+        .put("dateAdded", dateAdded)
+        .put("dateModified", dateModified)
+        .put("trackNumber", trackNumber)
+        .put("discNumber", discNumber)
+        .put("albumArtist", albumArtist)
+        .put("genre", genre)
+        .put("year", year)
+        .put("composer", composer)
+        .put("lyricist", lyricist)
+        .put("coverUrl", coverUrl)
+        .put("onlineSource", onlineSource)
+        .put("onlineId", onlineId)
+        .put("onlineLyrics", onlineLyrics)
+        .put("onlineLyricTranslation", onlineLyricTranslation)
+
+private fun JSONObject.toSong(): Song =
+    Song(
+        id = optLong("id"),
+        title = optString("title"),
+        artist = optString("artist"),
+        album = optString("album"),
+        albumId = optLong("albumId"),
+        duration = optLong("duration"),
+        path = optString("path"),
+        fileName = optString("fileName"),
+        fileSize = optLong("fileSize"),
+        mimeType = optString("mimeType"),
+        dateAdded = optLong("dateAdded"),
+        dateModified = optLong("dateModified"),
+        trackNumber = optInt("trackNumber"),
+        discNumber = optInt("discNumber"),
+        albumArtist = optString("albumArtist"),
+        genre = optString("genre"),
+        year = optString("year"),
+        composer = optString("composer"),
+        lyricist = optString("lyricist"),
+        coverUrl = optString("coverUrl"),
+        onlineSource = optString("onlineSource"),
+        onlineId = optString("onlineId"),
+        onlineLyrics = optString("onlineLyrics"),
+        onlineLyricTranslation = optString("onlineLyricTranslation")
+    )
 
 private fun deleteSession(context: Context, sessionId: String) {
     runCatching {
@@ -429,7 +493,7 @@ fun AiChatScreen(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 160.dp),
+                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(messages) { message ->
@@ -449,8 +513,7 @@ fun AiChatScreen(
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .imePadding()
-                .navigationBarsPadding()
-                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 72.dp),
+                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             EllaMiuixTextField(

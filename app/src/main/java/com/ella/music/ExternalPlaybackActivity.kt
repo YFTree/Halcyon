@@ -34,6 +34,7 @@ import java.io.File
 
 class ExternalPlaybackActivity : ComponentActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
+    private var handlingIntent = false
     private val externalUriResolver by lazy { ExternalUriResolver(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,11 +54,13 @@ class ExternalPlaybackActivity : ComponentActivity() {
     }
 
     private fun handleExternalPlaybackIntent(intent: Intent?) {
+        if (handlingIntent) return
         val uri = intent?.resolveAudioUri()
         if (uri == null) {
             finish()
             return
         }
+        handlingIntent = true
 
         lifecycleScope.launch {
             val mediaItem = runCatching {
@@ -79,6 +82,7 @@ class ExternalPlaybackActivity : ComponentActivity() {
                 playbackSong.toExternalMediaItem(resolved.playbackUri)
             }.getOrElse { error ->
                 AppLogStore.error(this@ExternalPlaybackActivity, "ExternalPlayback", "Failed to resolve external uri=$uri", error)
+                handlingIntent = false
                 finish()
                 return@launch
             }
@@ -103,12 +107,14 @@ class ExternalPlaybackActivity : ComponentActivity() {
                     }.onFailure { error ->
                         AppLogStore.error(this@ExternalPlaybackActivity, "ExternalPlayback", "Failed to play external uri=$originalUri", error)
                     }
+                    handlingIntent = false
                     finish()
                 }
 
                 override fun onFailure(t: Throwable) {
                     if (controllerFuture !== future) return
                     AppLogStore.error(this@ExternalPlaybackActivity, "ExternalPlayback", "Failed to connect media controller", t)
+                    handlingIntent = false
                     finish()
                 }
             },
@@ -119,6 +125,7 @@ class ExternalPlaybackActivity : ComponentActivity() {
             delay(5_000L)
             if (!isFinishing) {
                 AppLogStore.warn(this@ExternalPlaybackActivity, "ExternalPlayback", "Timed out while opening external uri=$originalUri")
+                handlingIntent = false
                 finish()
             }
         }

@@ -32,6 +32,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -308,10 +309,28 @@ fun ArtistListScreen(
                 Text(text = stringResource(R.string.artist_list_empty), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
             }
         } else {
-            val listState = rememberLazyListState()
+            val listState = rememberLazyListState(
+                initialFirstVisibleItemIndex = LibrarySortUiState.artistListFirstVisibleItemIndex,
+                initialFirstVisibleItemScrollOffset = LibrarySortUiState.artistListFirstVisibleItemScrollOffset
+            )
             var fastScrollJob by remember { mutableStateOf<Job?>(null) }
+            var skipInitialReset by remember { mutableStateOf(true) }
+            LaunchedEffect(sortMode, searchQuery) {
+                if (skipInitialReset) {
+                    skipInitialReset = false
+                } else {
+                    listState.scrollToItem(0)
+                }
+            }
             LaunchedEffect(scrollToTopRequest) {
                 if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
+            }
+            LaunchedEffect(listState) {
+                snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+                    .collect { (index, offset) ->
+                        LibrarySortUiState.artistListFirstVisibleItemIndex = index
+                        LibrarySortUiState.artistListFirstVisibleItemScrollOffset = offset
+                    }
             }
             val fastIndexTargets = remember(filteredArtists) {
                 filteredArtists

@@ -1,5 +1,6 @@
 package com.ella.music.ui.theme
 
+import android.graphics.Typeface
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -7,6 +8,8 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.ella.music.R
+import com.ella.music.ui.settings.SYSTEM_FONT_PATH
+import java.io.File
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -19,6 +22,8 @@ const val THEME_DARK = 2
 @Composable
 fun EllaTheme(
     themeMode: Int = THEME_FOLLOW_SYSTEM,
+    appFontPath: String = "",
+    appFontWeight: Int = 800,
     content: @Composable () -> Unit
 ) {
     val colorSchemeMode = when (themeMode) {
@@ -38,29 +43,33 @@ fun EllaTheme(
             )
         )
     }
+    val customAppFontFamily = remember(appFontPath, appFontWeight) {
+        appFontPath.toCustomAppFontFamily(appFontWeight)
+    }
     val preferMiSansByDefault = remember {
         !isXiaomiFamilyDevice()
     }
-    val textStyles = remember(appFontFamily, preferMiSansByDefault) {
+    val textStyles = remember(appFontFamily, customAppFontFamily, preferMiSansByDefault) {
         val defaults = defaultTextStyles()
-        if (!preferMiSansByDefault) {
-            defaults
+        val effectiveFontFamily = customAppFontFamily ?: appFontFamily.takeIf { preferMiSansByDefault }
+        if (effectiveFontFamily == null) {
+            return@remember defaults
         } else {
             defaults.copy(
-                main = defaults.main.copy(fontFamily = appFontFamily),
-                paragraph = defaults.paragraph.copy(fontFamily = appFontFamily),
-                body1 = defaults.body1.copy(fontFamily = appFontFamily),
-                body2 = defaults.body2.copy(fontFamily = appFontFamily),
-                button = defaults.button.copy(fontFamily = appFontFamily),
-                footnote1 = defaults.footnote1.copy(fontFamily = appFontFamily),
-                footnote2 = defaults.footnote2.copy(fontFamily = appFontFamily),
-                headline1 = defaults.headline1.copy(fontFamily = appFontFamily),
-                headline2 = defaults.headline2.copy(fontFamily = appFontFamily),
-                subtitle = defaults.subtitle.copy(fontFamily = appFontFamily),
-                title1 = defaults.title1.copy(fontFamily = appFontFamily),
-                title2 = defaults.title2.copy(fontFamily = appFontFamily),
-                title3 = defaults.title3.copy(fontFamily = appFontFamily),
-                title4 = defaults.title4.copy(fontFamily = appFontFamily)
+                main = defaults.main.copy(fontFamily = effectiveFontFamily),
+                paragraph = defaults.paragraph.copy(fontFamily = effectiveFontFamily),
+                body1 = defaults.body1.copy(fontFamily = effectiveFontFamily),
+                body2 = defaults.body2.copy(fontFamily = effectiveFontFamily),
+                button = defaults.button.copy(fontFamily = effectiveFontFamily),
+                footnote1 = defaults.footnote1.copy(fontFamily = effectiveFontFamily),
+                footnote2 = defaults.footnote2.copy(fontFamily = effectiveFontFamily),
+                headline1 = defaults.headline1.copy(fontFamily = effectiveFontFamily),
+                headline2 = defaults.headline2.copy(fontFamily = effectiveFontFamily),
+                subtitle = defaults.subtitle.copy(fontFamily = effectiveFontFamily),
+                title1 = defaults.title1.copy(fontFamily = effectiveFontFamily),
+                title2 = defaults.title2.copy(fontFamily = effectiveFontFamily),
+                title3 = defaults.title3.copy(fontFamily = effectiveFontFamily),
+                title4 = defaults.title4.copy(fontFamily = effectiveFontFamily)
             )
         }
     }
@@ -79,4 +88,14 @@ private fun isXiaomiFamilyDevice(): Boolean {
             value.contains("redmi", ignoreCase = true) ||
             value.contains("poco", ignoreCase = true)
     }
+}
+
+private fun String.toCustomAppFontFamily(weight: Int): FontFamily? {
+    if (isBlank() || this == SYSTEM_FONT_PATH) return null
+    val file = File(this)
+    if (!file.exists() || !file.canRead()) return null
+    return runCatching {
+        val typeface = Typeface.create(Typeface.createFromFile(file), weight.coerceIn(100, 900), false)
+        FontFamily(typeface)
+    }.getOrNull()
 }

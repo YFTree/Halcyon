@@ -75,6 +75,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.widget.Toast
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Locale
@@ -458,6 +459,7 @@ fun BackupSettingsScreen(
                     .put("exportedAt", System.currentTimeMillis())
                     .put("settings", settingsManager.exportSettingsJson())
                     .put("playlists", playlistStore.exportJson())
+                    .put("aiChat", exportAiChatBackupJson(context))
                 writeBackupText(uri, backup.toString(2))
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_export_success), Toast.LENGTH_SHORT).show()
@@ -509,6 +511,7 @@ fun BackupSettingsScreen(
                 if (playlistPayload != null) {
                     playlistStore.restoreJson(playlistPayload)
                 }
+                root.optJSONObject("aiChat")?.let { restoreAiChatBackupJson(context, it) }
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_restore_success), Toast.LENGTH_SHORT).show()
             }.onFailure {
@@ -578,6 +581,7 @@ fun BackupSettingsScreen(
             .put("exportedAt", System.currentTimeMillis())
             .put("settings", settingsManager.exportSettingsJson())
             .put("playlists", playlistStore.exportJson())
+            .put("aiChat", exportAiChatBackupJson(context))
         return backup.toString(2)
     }
 
@@ -706,7 +710,7 @@ fun BackupSettingsScreen(
                                             password = effectivePassword
                                         )
                                         val path = webDavBackupPath.trim().ifBlank { "halcyon_backup" }
-                                        val fileName = "ella_backup_${System.currentTimeMillis()}.json"
+                                        val fileName = "halcyon_backup_${System.currentTimeMillis()}.json"
                                         val fullUrl = "${effectiveUrl.trimEnd('/')}/$path/$fileName"
                                         val backupContent = withContext(Dispatchers.IO) { buildBackupJson() }
                                         withContext(Dispatchers.IO) {
@@ -748,11 +752,16 @@ fun BackupSettingsScreen(
                                         val path = webDavBackupPath.trim().ifBlank { "halcyon_backup" }
                                         val backupDirUrl = "${effectiveUrl.trimEnd('/')}/$path/"
                                         val items = withContext(Dispatchers.IO) {
-                                            WebDavClient.list(config, backupDirUrl, forceRefresh = true)
+                                            WebDavClient.list(
+                                                config,
+                                                backupDirUrl,
+                                                forceRefresh = true,
+                                                includeNonAudioFiles = true
+                                            )
                                         }
                                         val backupFiles = items
                                             .filterNot { it.isDirectory }
-                                            .filter { it.name.endsWith(".json") && it.name.startsWith("ella_backup_") }
+                                            .filter { it.name.endsWith(".json") && it.name.isHalcyonBackupFileName() }
                                             .sortedByDescending { it.name }
                                         if (backupFiles.isEmpty()) {
                                             throw IllegalStateException(context.getString(R.string.settings_backup_webdav_file_not_found))
@@ -820,7 +829,9 @@ fun BackupSettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 webDavBackupFiles.forEach { item ->
-                    val displayName = item.name.removePrefix("ella_backup_")
+                    val displayName = item.name
+                        .removePrefix("halcyon_backup_")
+                        .removePrefix("ella_backup_")
                         .removeSuffix(".json")
                         .ifBlank { item.name }
                     BasicComponent(
@@ -851,6 +862,7 @@ fun BackupSettingsScreen(
                                             if (playlistPayload != null) {
                                                 playlistStore.restoreJson(playlistPayload)
                                             }
+                                            root.optJSONObject("aiChat")?.let { restoreAiChatBackupJson(context, it) }
                                             withContext(Dispatchers.IO) { tempFile.delete() }
                                         }.onSuccess {
                                             Toast.makeText(context, context.getString(R.string.settings_backup_webdav_download_success), Toast.LENGTH_SHORT).show()
@@ -878,6 +890,57 @@ private tailrec fun Context.findComponentActivity(): ComponentActivity? = when (
     is ContextWrapper -> baseContext.findComponentActivity()
     else -> null
 }
+
+private fun aiChatSessionsDir(context: Context): File =
+    File(context.filesDir, "ai_chat_sessions")
+
+private fun exportAiChatBackupJson(context: Context): JSONObject {
+    val dir = aiChatSessionsDir(context)
+    val sessions = JSONArray()
+    if (dir.exists()) {
+        dir.listFiles()
+            ?.filter { it.isFile && it.extension.equals("json", ignoreCase = true) && it.name != "index.json" }
+            ?.sortedBy { it.name }
+            ?.forEach { file ->
+                runCatching {
+                    sessions.put(
+                        JSONObject()
+                            .put("fileName", file.name)
+                            .put("messages", JSONArray(file.readText(Charsets.UTF_8)))
+                    )
+                }
+            }
+    }
+    val index = runCatching {
+        val file = File(dir, "index.json")
+        if (file.exists()) JSONArray(file.readText(Charsets.UTF_8)) else JSONArray()
+    }.getOrDefault(JSONArray())
+    return JSONObject()
+        .put("version", 1)
+        .put("index", index)
+        .put("sessions", sessions)
+}
+
+private fun restoreAiChatBackupJson(context: Context, payload: JSONObject) {
+    val dir = aiChatSessionsDir(context).apply { mkdirs() }
+    dir.listFiles()
+        ?.filter { it.isFile && it.extension.equals("json", ignoreCase = true) }
+        ?.forEach { it.delete() }
+
+    val index = payload.optJSONArray("index") ?: JSONArray()
+    File(dir, "index.json").writeText(index.toString(), Charsets.UTF_8)
+
+    val sessions = payload.optJSONArray("sessions") ?: JSONArray()
+    for (i in 0 until sessions.length()) {
+        val item = sessions.optJSONObject(i) ?: continue
+        val fileName = item.optString("fileName").takeIf { it.isSafeAiChatBackupFileName() } ?: continue
+        val messages = item.optJSONArray("messages") ?: continue
+        File(dir, fileName).writeText(messages.toString(), Charsets.UTF_8)
+    }
+}
+
+private fun String.isSafeAiChatBackupFileName(): Boolean =
+    matches(Regex("""[A-Za-z0-9._-]+\.json""")) && this != "index.json"
 
 @Composable
 private fun BackupExportFormatRow(
@@ -968,6 +1031,7 @@ fun SettingsDetailScreen(
     val playlistSpecialEntriesVisible by settingsManager.playlistSpecialEntriesVisible.collectAsState(initial = false)
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val lyricShareCustomInfo by settingsManager.lyricShareCustomInfo.collectAsState(initial = "")
+    val lyricShareUseLyricFont by settingsManager.lyricShareUseLyricFont.collectAsState(initial = false)
     val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = false)
     val metadataEditorId by settingsManager.metadataEditorId.collectAsState(initial = TagEditorOptionIds.ASK_EACH_TIME)
     val lyricTimingEditorId by settingsManager.lyricTimingEditorId.collectAsState(initial = TagEditorOptionIds.ASK_EACH_TIME)
@@ -1639,6 +1703,14 @@ fun SettingsDetailScreen(
 
                 SettingsCardGroup {
                     Column {
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_lyric_share_use_lyric_font),
+                            summary = stringResource(R.string.settings_lyric_share_use_lyric_font_summary),
+                            checked = lyricShareUseLyricFont,
+                            onCheckedChange = { value ->
+                                scope.launch { settingsManager.setLyricShareUseLyricFont(value) }
+                            }
+                        )
                         SplitSettingTextField(
                             label = stringResource(R.string.settings_lyric_share_custom_info),
                             value = lyricShareCustomInfo,
@@ -2400,21 +2472,24 @@ private fun SplitSettingTextField(
     onValueChange: (String) -> Unit
 ) {
     var localValue by remember(label) { mutableStateOf(value) }
-    var hasPendingEdit by remember(label) { mutableStateOf(false) }
+    var pendingValue by remember(label) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(value) {
-        if (!hasPendingEdit && value != localValue) {
+        if (pendingValue == value) {
+            pendingValue = null
+            if (localValue != value) localValue = value
+        } else if (pendingValue == null && value != localValue) {
             localValue = value
         }
     }
 
     LaunchedEffect(localValue) {
-        if (!hasPendingEdit) return@LaunchedEffect
+        if (pendingValue == localValue || localValue == value) return@LaunchedEffect
         delay(360)
         if (localValue != value) {
+            pendingValue = localValue
             onValueChange(localValue)
         }
-        hasPendingEdit = false
     }
 
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -2434,7 +2509,6 @@ private fun SplitSettingTextField(
                 value = localValue,
                 onValueChange = {
                     localValue = it
-                    hasPendingEdit = true
                 },
                 singleLine = singleLine,
                 visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
@@ -2464,7 +2538,6 @@ private fun SplitSettingTextField(
                 value = localValue,
                 onValueChange = {
                     localValue = it
-                    hasPendingEdit = true
                 },
                 label = label,
                 singleLine = singleLine,
@@ -2772,6 +2845,9 @@ private fun String.csvIds(defaultValue: String): List<String> {
 }
 
 private fun Set<String>.toCsv(): String = sorted().joinToString(",")
+
+private fun String.isHalcyonBackupFileName(): Boolean =
+    startsWith("halcyon_backup_") || startsWith("ella_backup_")
 
 private fun android.content.Context.persistImageReadPermission(uri: Uri) {
     runCatching {

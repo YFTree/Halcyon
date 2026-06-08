@@ -75,7 +75,7 @@
             android:exported="true"
             android:excludeFromRecents="true"
             android:noHistory="true"
-            android:theme="@android:style/Theme.NoDisplay">
+            android:theme="@style/Theme.Ella.ExternalPlayback">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 

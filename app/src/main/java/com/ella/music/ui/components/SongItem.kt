@@ -39,6 +39,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Download
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -250,10 +251,11 @@ fun SongItem(
                     .clickable(onClick = onDownload),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "↓",
-                    fontSize = 16.sp,
-                    color = MiuixTheme.colorScheme.primary
+                Icon(
+                    imageVector = MiuixIcons.Regular.Download,
+                    contentDescription = stringResource(R.string.player_download_lx_song),
+                    tint = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
