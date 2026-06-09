@@ -4,9 +4,9 @@
 
 $ErrorActionPreference = "Stop"
 
-$FFMPEG_MODULE_PATH = "D:\Repos\Ella\ffmpeg-decoder\src\main"
+$REPO_ROOT = $PSScriptRoot
+$FFMPEG_MODULE_PATH = Join-Path $REPO_ROOT "ffmpeg-decoder\src\main"
 $SDK_PATH = $env:ANDROID_HOME
-$REPO_ROOT = "D:\Repos\Ella"
 $FFMPEG_PREBUILT_DIR = Join-Path $FFMPEG_MODULE_PATH "jni\ffmpeg"
 $LINUX_NDK_VERSION = "r29"
 $LINUX_NDK_URL = "https://dl.google.com/android/repository/android-ndk-$LINUX_NDK_VERSION-linux.zip"
@@ -71,7 +71,7 @@ function Cleanup-FfmpegSourceTree {
 }
 
 if ([string]::IsNullOrWhiteSpace($SDK_PATH)) {
-    $localProperties = "D:\Repos\Ella\local.properties"
+    $localProperties = Join-Path $REPO_ROOT "local.properties"
     if (Test-Path $localProperties) {
         $sdkLine = Get-Content $localProperties | Where-Object { $_ -match "^sdk\.dir=" } | Select-Object -First 1
         if ($sdkLine) {

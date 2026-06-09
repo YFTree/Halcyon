@@ -62,9 +62,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val settingsManager = SettingsManager.getInstance(application)
     private val playlistStore = PlaylistStore.getInstance(application)
     private val playbackStatsStore = PlaybackStatsStore.getInstance(application)
-    private val openAiSongInterpreter = OpenAiSongInterpreter(getApplication())
-    private val openAiPlaylistRecommender = OpenAiPlaylistRecommender(getApplication())
-    private val openAiLibraryChatAssistant = OpenAiLibraryChatAssistant(getApplication())
+    private val aiCoordinator = MainViewModelAiCoordinator(getApplication(), settingsManager, repository)
 
     val songs: StateFlow<List<Song>> = repository.songs
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -199,48 +197,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getArtists(includeAlbumArtists: Boolean = false): List<Artist> {
-        val currentSongs = songs.value
-        val currentAlbums = albums.value
-        val counts = linkedMapOf<String, ArtistAccumulator>()
-        val albumIdsByArtist = mutableMapOf<String, MutableSet<Long>>()
-
-        currentSongs.forEach { song ->
-            splitArtistNames(song.artist).forEach { rawName ->
-                val key = rawName.tagIdentityKey()
-                val accumulator = counts.getOrPut(key) { ArtistAccumulator(rawName) }
-                accumulator.songCount += 1
-                albumIdsByArtist.getOrPut(key) { mutableSetOf() } += song.albumIdentityId()
-            }
-            if (includeAlbumArtists) {
-                splitArtistNames(song.albumArtist).forEach { rawName ->
-                    val key = rawName.tagIdentityKey()
-                    counts.getOrPut(key) { ArtistAccumulator(rawName) }
-                    albumIdsByArtist.getOrPut(key) { mutableSetOf() } += song.albumIdentityId()
-                }
-            }
-        }
-
-        if (includeAlbumArtists) {
-            currentAlbums.forEach { album ->
-                splitArtistNames(album.albumArtist).forEach { rawName ->
-                    val key = rawName.tagIdentityKey()
-                    counts.getOrPut(key) { ArtistAccumulator(rawName) }
-                    if (album.id > 0L) {
-                        albumIdsByArtist.getOrPut(key) { mutableSetOf() } += album.id
-                    }
-                }
-            }
-        }
-
-        return counts
-            .map { (key, accumulator) ->
-                Artist(
-                    name = accumulator.name,
-                    songCount = accumulator.songCount,
-                    albumCount = albumIdsByArtist[key]?.size ?: 0
-                )
-            }
-            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        return buildArtists(
+            songs = songs.value,
+            albums = albums.value,
+            includeAlbumArtists = includeAlbumArtists
+        )
     }
 
     fun getSongsForArtist(artistName: String): List<Song> {
@@ -270,51 +231,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getMetadataCategoryItems(type: String): List<MetadataCategoryItem> {
-        val groups = linkedMapOf<String, MutableList<Song>>()
-        val displayNames = linkedMapOf<String, String>()
-        songs.value.forEach { song ->
-            song.metadataCategoryNames(type).forEach { name ->
-                val key = name.tagIdentityKey()
-                displayNames.putIfAbsent(key, name)
-                groups.getOrPut(key) { mutableListOf() } += song
-            }
-        }
-        return groups
-            .map { (key, items) ->
-                MetadataCategoryItem(
-                    name = displayNames[key] ?: key,
-                    songCount = items.size,
-                    albumCount = items.map { it.albumIdentityId() }.distinct().size,
-                    duration = items.sumOf { it.duration },
-                    dateModified = items.maxOfOrNull { it.dateModified } ?: 0L,
-                    coverAlbumIds = items
-                        .mapNotNull { it.albumId.takeIf { albumId -> albumId > 0L } }
-                        .distinct()
-                        .take(3)
-                )
-            }
-            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+        return buildMetadataCategoryItems(songs.value, type)
     }
 
     fun getSongsForMetadataCategory(type: String, name: String): List<Song> {
-        val target = name.trim()
-        if (target.isBlank()) return emptyList()
-        return songs.value
-            .filter { song -> song.metadataCategoryNames(type).any { it.equals(target, ignoreCase = NameSplitConfigStore.tagIgnoreCase) } }
-            .sortedWith(
-                compareBy<Song, String>(String.CASE_INSENSITIVE_ORDER) { it.album }
-                    .thenBy { if (it.discNumber > 0) it.discNumber else Int.MAX_VALUE }
-                    .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { song -> song.title }
-            )
+        return filterSongsForMetadataCategory(songs.value, type, name)
     }
 
     fun hasMetadataCategory(type: String, name: String): Boolean {
-        val target = name.trim()
-        if (target.isBlank()) return false
-        return songs.value.any { song ->
-            song.metadataCategoryNames(type).any { it.equals(target, ignoreCase = NameSplitConfigStore.tagIgnoreCase) }
-        }
+        return containsMetadataCategory(songs.value, type, name)
     }
 
     suspend fun getNeteaseArtistUrlForArtist(artistName: String): String? = withContext(Dispatchers.IO) {
@@ -400,102 +325,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun getFullAudioTagInfo(song: Song): AudioTagInfo? =
         repository.getFullAudioTagInfo(song)
 
-    suspend fun interpretSongWithOpenAi(song: Song): String = withContext(Dispatchers.IO) {
-        val lyricSourceMode = settingsManager.lyricSourceMode.first()
-        val tagInfo = repository.getSongTagInfo(song)
-        val audioInfo = runCatching { repository.getAudioInfo(song) }.getOrNull()
-        val lyrics = repository.getLyrics(song, lyricSourceMode)
-        openAiSongInterpreter.interpret(
-            config = OpenAiSongInterpretationConfig(
-                apiKey = settingsManager.openAiApiKey.first(),
-                baseUrl = settingsManager.openAiBaseUrl.first(),
-                model = settingsManager.openAiModel.first()
-            ),
-            input = OpenAiSongInterpretationInput(
-                song = song,
-                tagInfo = tagInfo,
-                audioInfo = audioInfo,
-                audioInfoText = audioInfo?.let { detailedAudioInfo(it) }.orEmpty(),
-                lyrics = lyrics
-            )
-        )
-    }
+    suspend fun interpretSongWithOpenAi(song: Song): String =
+        aiCoordinator.interpretSong(song)
 
-    suspend fun recommendPlaylistWithOpenAi(maxItems: Int = 30): AiPlaylistRecommendationResult = withContext(Dispatchers.IO) {
-        val librarySongs = songs.value
-        val currentStats = playbackStats.value
-        val currentHistory = playbackHistory.value
-        if (librarySongs.isEmpty()) error(getApplication<android.app.Application>().getString(R.string.error_library_empty))
-
-        val candidates = buildOpenAiRecommendationCandidates(
-            library = librarySongs,
-            stats = currentStats,
-            history = currentHistory
+    suspend fun recommendPlaylistWithOpenAi(maxItems: Int = 30): AiPlaylistRecommendationResult =
+        aiCoordinator.recommendPlaylist(
+            librarySongs = songs.value,
+            playbackStats = playbackStats.value,
+            playbackHistory = playbackHistory.value,
+            maxItems = maxItems
         )
-        val recommendation = openAiPlaylistRecommender.recommend(
-            config = OpenAiSongInterpretationConfig(
-                apiKey = settingsManager.openAiApiKey.first(),
-                baseUrl = settingsManager.openAiBaseUrl.first(),
-                model = settingsManager.openAiModel.first()
-            ),
-            input = OpenAiPlaylistRecommendationInput(
-                songs = candidates,
-                playbackStats = currentStats,
-                playbackHistory = currentHistory,
-                maxItems = maxItems.coerceIn(5, 50)
-            )
-        )
-        val libraryByKey = librarySongs.associateBy { it.playlistIdentityKey() }
-        val recommendedSongs = recommendation.songKeys
-            .mapNotNull { key -> libraryByKey[key] }
-            .distinctBy { it.playlistIdentityKey() }
-            .take(maxItems.coerceAtLeast(1))
-        if (recommendedSongs.isEmpty()) error(getApplication<android.app.Application>().getString(R.string.error_ai_no_playable_songs))
-
-        AiPlaylistRecommendationResult(
-            title = recommendation.title.ifBlank { getApplication<android.app.Application>().getString(R.string.ai_default_playlist_title) },
-            reason = recommendation.reason,
-            songs = recommendedSongs
-        )
-    }
 
     suspend fun chatWithOpenAiLibraryAssistant(
         message: String,
         conversationHistory: List<Pair<String, String>> = emptyList(),
         maxPlayableItems: Int = 30
-    ): AiLibraryChatResult = withContext(Dispatchers.IO) {
-        val librarySongs = songs.value
-        if (librarySongs.isEmpty()) error(getApplication<android.app.Application>().getString(R.string.error_library_empty))
-        val candidates = buildOpenAiRecommendationCandidates(
-            library = librarySongs,
-            stats = playbackStats.value,
-            history = playbackHistory.value
+    ): AiLibraryChatResult =
+        aiCoordinator.chatWithLibrary(
+            librarySongs = songs.value,
+            playbackStats = playbackStats.value,
+            playbackHistory = playbackHistory.value,
+            message = message,
+            conversationHistory = conversationHistory,
+            maxPlayableItems = maxPlayableItems
         )
-        val response = openAiLibraryChatAssistant.chat(
-            config = OpenAiSongInterpretationConfig(
-                apiKey = settingsManager.openAiApiKey.first(),
-                baseUrl = settingsManager.openAiBaseUrl.first(),
-                model = settingsManager.openAiModel.first()
-            ),
-            input = OpenAiLibraryChatInput(
-                songs = candidates,
-                playbackStats = playbackStats.value,
-                playbackHistory = playbackHistory.value,
-                userMessage = message,
-                maxPlayableItems = maxPlayableItems.coerceIn(1, 50),
-                conversationHistory = conversationHistory
-            )
-        )
-        val libraryByKey = librarySongs.associateBy { it.playlistIdentityKey() }
-        AiLibraryChatResult(
-            answer = response.answer,
-            songs = response.songKeys
-                .mapNotNull { key -> libraryByKey[key] }
-                .distinctBy { it.playlistIdentityKey() }
-                .take(maxPlayableItems.coerceAtLeast(1)),
-            playlistName = response.playlistName.ifBlank { getApplication<android.app.Application>().getString(R.string.ai_chat_playlist_name) }
-        )
-    }
 
     fun clearOnlineMetadataCache() {
         repository.clearRemoteMetadataCache()
@@ -625,33 +478,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun syncPlaylistCustomOrder(newPlaylistIds: List<String> = emptyList()) {
         val customPlaylists = playlistStore.playlists.value
             .filterNot { it.isFavorites || it.isFiveStarRating }
-        val customIds = customPlaylists.mapTo(linkedSetOf()) { it.id }
-        if (customIds.isEmpty()) {
-            settingsManager.setPlaylistCustomOrder(emptyList())
-            return
-        }
-
-        val newIds = newPlaylistIds
-            .filter { it in customIds }
-            .distinct()
-        val currentOrder = settingsManager.playlistCustomOrder.first()
-        val ordered = buildList {
-            addAll(newIds)
-            currentOrder.forEach { id ->
-                if (id in customIds && id !in this) add(id)
-            }
-            customPlaylists
-                .sortedWith(
-                    compareByDescending<UserPlaylist> { it.createdAt }
-                        .thenByDescending { it.updatedAt }
-                        .thenBy { it.name.lowercase() }
-                        .thenBy { it.id }
-                )
-                .forEach { playlist ->
-                    if (playlist.id !in this) add(playlist.id)
-                }
-        }
-        settingsManager.setPlaylistCustomOrder(ordered)
+        settingsManager.setPlaylistCustomOrder(
+            buildPlaylistCustomOrder(
+                customPlaylists = customPlaylists,
+                currentOrder = settingsManager.playlistCustomOrder.first(),
+                newPlaylistIds = newPlaylistIds
+            )
+        )
     }
 
     fun exportLocalPlaylist(
@@ -697,115 +530,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun String.toFolderFilterList(): List<String> {
-        return split('\n', ';', '；')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-    }
-
-    private fun buildOpenAiRecommendationCandidates(
-        library: List<Song>,
-        stats: List<SongPlaybackStats>,
-        history: List<PlaybackHistoryEntry>,
-        maxCandidates: Int = 160
-    ): List<Song> {
-        if (library.size <= maxCandidates) return library.distinctBy { it.playlistIdentityKey() }
-
-        val songsById = library.associateBy { it.id }
-        val selected = linkedMapOf<String, Song>()
-
-        fun add(song: Song) {
-            if (selected.size >= maxCandidates) return
-            selected.putIfAbsent(song.playlistIdentityKey(), song)
-        }
-
-        history
-            .mapNotNull { entry -> songsById[entry.songId] }
-            .take(60)
-            .forEach(::add)
-
-        stats
-            .sortedWith(
-                compareByDescending<SongPlaybackStats> { it.playCount }
-                    .thenByDescending { it.listenedMs }
-                    .thenByDescending { it.lastPlayedAt }
-            )
-            .mapNotNull { stat -> songsById[stat.songId] }
-            .take(60)
-            .forEach(::add)
-
-        stats
-            .sortedByDescending { it.lastPlayedAt }
-            .mapNotNull { stat -> songsById[stat.songId] }
-            .take(40)
-            .forEach(::add)
-
-        library
-            .sortedByDescending { it.dateModified }
-            .take(40)
-            .forEach(::add)
-
-        val remaining = maxCandidates - selected.size
-        if (remaining > 0) {
-            val sortedLibrary = library.sortedWith(
-                compareBy<Song, String>(String.CASE_INSENSITIVE_ORDER) { it.artist.ifBlank { it.albumArtist } }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.album }
-                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title }
-            )
-            val step = (sortedLibrary.size / remaining.coerceAtLeast(1)).coerceAtLeast(1)
-            sortedLibrary.forEachIndexed { index, song ->
-                if (selected.size < maxCandidates && index % step == 0) add(song)
-            }
-        }
-
-        return selected.values.toList().ifEmpty { library.take(maxCandidates) }
-    }
-}
-
-data class AiPlaylistRecommendationResult(
-    val title: String,
-    val reason: String,
-    val songs: List<Song>
-)
-
-data class AiLibraryChatResult(
-    val answer: String,
-    val songs: List<Song>,
-    val playlistName: String
-)
-
-data class MetadataCategoryItem(
-    val name: String,
-    val songCount: Int,
-    val albumCount: Int,
-    val duration: Long,
-    val dateModified: Long = 0L,
-    val coverAlbumIds: List<Long> = emptyList()
-)
-
-private data class ArtistAccumulator(
-    val name: String,
-    var songCount: Int = 0
-)
-
-private fun Song.metadataCategoryNames(type: String): List<String> {
-    return when (type) {
-        "genre" -> splitGenreNames(genre)
-        "year" -> listOfNotNull(year.extractYear())
-        "composer" -> splitArtistNames(composer)
-        "lyricist" -> splitArtistNames(lyricist)
-        "folder" -> listOfNotNull(parentFolderPath())
-        else -> emptyList()
-    }
-}
-
-private fun String.extractYear(): String? {
-    return Regex("""\d{4}""").find(this)?.value
-}
-
-private fun Song.parentFolderPath(): String? {
-    val normalized = path.replace('\\', '/')
-    return normalized.substringBeforeLast('/', missingDelimiterValue = "")
-        .trim()
-        .ifBlank { null }
 }

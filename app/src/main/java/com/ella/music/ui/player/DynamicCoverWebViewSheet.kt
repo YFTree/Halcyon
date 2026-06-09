@@ -224,7 +224,7 @@ private fun DynamicCoverWebViewContent(
  *
  * Priority:
  * 1. Song's parent folder as {albumName}.mp4
- * 2. Movies/Ella/DynamicCovers/Album/{albumName}.mp4
+ * 2. Movies/Halcyon/DynamicCovers/Album/{albumName}.mp4
  */
 private class DynamicCoverDownloadHelper(
     private val context: Context,
@@ -282,10 +282,10 @@ private class DynamicCoverDownloadHelper(
             }
         }
 
-        // Fallback: Movies/Ella/DynamicCovers/Album/
+        // Fallback: Movies/Halcyon/DynamicCovers/Album/
         val publicDir = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES),
-            "Ella/DynamicCovers/Album"
+            "Halcyon/DynamicCovers/Album"
         )
         return File(publicDir, fileName)
     }

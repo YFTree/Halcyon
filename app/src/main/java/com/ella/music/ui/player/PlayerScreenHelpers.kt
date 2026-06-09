@@ -184,7 +184,7 @@ internal fun enqueuePlayerDownload(context: Context, song: Song) {
         .setDescription("${song.title} - ${song.artist}")
         .setMimeType(song.mimeType.ifBlank { "audio/*" })
         .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-        .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "Ella/$fileName")
+        .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "Halcyon/$fileName")
         .setAllowedOverMetered(true)
         .setAllowedOverRoaming(true)
     val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager

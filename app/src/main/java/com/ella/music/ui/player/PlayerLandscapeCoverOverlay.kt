@@ -1,0 +1,216 @@
+package com.ella.music.ui.player
+
+import android.graphics.Bitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ella.music.R
+import com.ella.music.data.model.AudioInfo
+import com.ella.music.data.model.LyricLine
+import com.ella.music.data.model.Song
+import kotlin.math.abs
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Music
+
+@Composable
+internal fun LandscapeCoverPlaybackOverlay(
+    song: Song?,
+    embeddedCover: Bitmap?,
+    annotation: String,
+    dynamicCoverSource: DynamicCoverSource?,
+    isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
+    shuffleEnabled: Boolean,
+    repeatMode: Int,
+    audioInfo: AudioInfo?,
+    palette: PlayerPalette,
+    lyrics: List<LyricLine>,
+    currentLyricIndex: Int,
+    showTranslation: Boolean,
+    showPronunciation: Boolean,
+    fontFamily: FontFamily?,
+    fontPath: String,
+    fontWeight: FontWeight,
+    fontScale: Float,
+    queueExpanded: Boolean,
+    playlist: List<Song>,
+    audioSessionId: Int,
+    visualizerEnabled: Boolean,
+    flowEffectMode: Int,
+    onDynamicCoverFailed: (String) -> Unit,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onToggleQueue: () -> Unit,
+    onDismissQueue: () -> Unit,
+    onShowLyrics: () -> Unit,
+    onLyricLineClick: (LyricLine) -> Unit,
+    onLyricLineLongClick: (LyricLine) -> Unit,
+    onSeek: (Float) -> Unit,
+    onCyclePlaybackMode: () -> Unit,
+    onPrevious: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onQueueSongClick: (Int) -> Unit,
+    onRemoveQueueSong: (Int) -> Unit,
+    onMoveQueueSong: (Int, Int) -> Unit,
+    onAddQueueToPlaylist: () -> Unit,
+    onClearQueue: () -> Unit,
+    onArtist: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val coverItems = remember(playlist, song?.id) {
+        val source = playlist.takeIf { it.isNotEmpty() } ?: listOfNotNull(song)
+        val centerIndex = source.indexOfFirst { it.id == song?.id }.takeIf { it >= 0 } ?: 0
+        listOf(-3, -2, -1, 0, 1, 2, 3)
+            .mapNotNull { offset -> source.getOrNull(centerIndex + offset)?.let { offset to it } }
+            .ifEmpty { listOfNotNull(song?.let { 0 to it }) }
+    }
+    val swipeThresholdPx = with(LocalDensity.current) { 92.dp.toPx() }
+    var swipeDragX by remember { mutableFloatStateOf(0f) }
+
+    Box(
+        modifier = modifier
+            .background(palette.middle)
+            .pointerInput(onPrevious, onNext) {
+                detectDragGestures(
+                    onDragStart = { swipeDragX = 0f },
+                    onDragCancel = { swipeDragX = 0f },
+                    onDragEnd = {
+                        when {
+                            swipeDragX > swipeThresholdPx -> onPrevious()
+                            swipeDragX < -swipeThresholdPx -> onNext()
+                        }
+                        swipeDragX = 0f
+                    },
+                    onDrag = { change, dragAmount ->
+                        if (abs(dragAmount.x) > abs(dragAmount.y)) {
+                            swipeDragX += dragAmount.x
+                            change.consume()
+                        }
+                    }
+                )
+            }
+    ) {
+        LandscapeCoverModeBackground(
+            palette = palette,
+            currentPosition = currentPosition,
+            isPlaying = isPlaying,
+            flowEffectMode = flowEffectMode,
+            dynamicFlowEnabled = false,
+            visualizerEnabled = visualizerEnabled,
+            customBackgroundUri = "",
+            modifier = Modifier.fillMaxSize()
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                LandscapeCoverStack(
+                    currentSong = song,
+                    embeddedCover = embeddedCover,
+                    dynamicCoverSource = dynamicCoverSource,
+                    isPlaying = isPlaying,
+                    coverItems = coverItems,
+                    onDynamicCoverFailed = onDynamicCoverFailed,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = song?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.app_name),
+                color = Color.White.copy(alpha = 0.96f),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 34.dp)
+            )
+            Text(
+                text = song?.artist?.takeIf { it.isNotBlank() } ?: stringResource(R.string.player_unknown_artist),
+                color = Color.White.copy(alpha = 0.52f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 34.dp, vertical = 2.dp)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 26.dp, end = 92.dp)
+                .size(56.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onShowLyrics),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Regular.Music,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.92f),
+                modifier = Modifier.size(26.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 26.dp, end = 28.dp)
+                .size(56.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center
+        ) {
+            CloseIcon(
+                color = Color.White.copy(alpha = 0.92f),
+                modifier = Modifier.size(26.dp)
+            )
+        }
+    }
+}

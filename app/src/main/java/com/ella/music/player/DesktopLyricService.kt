@@ -8,9 +8,7 @@ import android.app.Service
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -20,7 +18,9 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -29,9 +29,15 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.ella.music.R
+import com.ella.music.data.model.LyricLine
+import com.ella.music.data.model.LyricWord
+import com.ella.music.ui.components.buildLyriconRichLineConfig
+import com.ella.music.ui.components.loadAndroidTypeface
+import com.ella.music.ui.components.toLyriconSong
 import com.google.common.util.concurrent.FutureCallback
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import io.github.proify.lyricon.lyric.view.RawsLyricView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -39,14 +45,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.math.max
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 class DesktopLyricService : Service() {
 
     private lateinit var windowManager: WindowManager
     private lateinit var notificationManager: NotificationManager
     private var rootView: LinearLayout? = null
-    private var lyricView: DesktopLyricView? = null
+    private var lyricView: DesktopSmoothLyricView? = null
     private var controlsView: LinearLayout? = null
     private var playPauseButton: ImageButton? = null
     private var layoutParams: WindowManager.LayoutParams? = null
@@ -100,6 +105,7 @@ class DesktopLyricService : Service() {
                         result?.addListener(object : Player.Listener {
                             override fun onIsPlayingChanged(isPlaying: Boolean) {
                                 controllerIsPlaying = isPlaying
+                                lyricView?.setPlaybackActive(isPlaying)
                                 updatePlayPauseIcon()
                                 updateStatusBarModeVisibility()
                             }
@@ -162,10 +168,14 @@ class DesktopLyricService : Service() {
             pronunciation = intent.getStringExtra(EXTRA_PRONUNCIATION).orEmpty(),
             translation = intent.getStringExtra(EXTRA_TRANSLATION).orEmpty(),
             positionMs = intent.getLongExtra(EXTRA_POSITION, 0L),
+            lineStartMs = intent.getLongExtra(EXTRA_LINE_START, -1L),
+            lineEndMs = intent.getLongExtra(EXTRA_LINE_END, -1L).takeIf { it >= 0L },
             agent = intent.getStringExtra(EXTRA_AGENT).orEmpty(),
             isTtml = intent.getBooleanExtra(EXTRA_IS_TTML, false),
             backgroundText = intent.getStringExtra(EXTRA_BACKGROUND_TEXT).orEmpty(),
             backgroundTranslation = intent.getStringExtra(EXTRA_BACKGROUND_TRANSLATION).orEmpty(),
+            backgroundStartMs = intent.getLongExtra(EXTRA_BACKGROUND_START, -1L).takeIf { it >= 0L },
+            backgroundEndMs = intent.getLongExtra(EXTRA_BACKGROUND_END, -1L).takeIf { it >= 0L },
             wordTexts = intent.getStringArrayExtra(EXTRA_WORD_TEXTS)?.toList().orEmpty(),
             wordStarts = intent.getLongArrayExtra(EXTRA_WORD_STARTS) ?: LongArray(0),
             wordEnds = intent.getLongArrayExtra(EXTRA_WORD_ENDS) ?: LongArray(0),
@@ -176,6 +186,7 @@ class DesktopLyricService : Service() {
             backgroundWordStarts = intent.getLongArrayExtra(EXTRA_BACKGROUND_WORD_STARTS) ?: LongArray(0),
             backgroundWordEnds = intent.getLongArrayExtra(EXTRA_BACKGROUND_WORD_ENDS) ?: LongArray(0)
         )
+        lyricView?.setPlaybackActive(controller?.isPlaying ?: true)
     }
 
     private fun addLyricView() {
@@ -194,7 +205,9 @@ class DesktopLyricService : Service() {
         } else {
             dp(150)
         }
-        val lyric = DesktopLyricView(this)
+        val lyric = DesktopSmoothLyricView(this).apply {
+            windowTouchHandler = ::onDrag
+        }
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -448,6 +461,7 @@ class DesktopLyricService : Service() {
     private fun onDrag(view: View, event: MotionEvent): Boolean {
         if (statusBarMode) return false
         if (locked) return false
+        val windowView = rootView ?: view
         val params = layoutParams ?: return false
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -464,8 +478,8 @@ class DesktopLyricService : Service() {
                 if (kotlin.math.abs(dx) > dp(4) || kotlin.math.abs(dy) > dp(4)) movedDuringTouch = true
                 params.x = startX + dx.toInt()
                 params.y = startY + dy.toInt()
-                clampToScreen(view, params)
-                windowManager.updateViewLayout(view, params)
+                clampToScreen(windowView, params)
+                windowManager.updateViewLayout(windowView, params)
                 return true
             }
             MotionEvent.ACTION_UP -> {
@@ -641,86 +655,67 @@ class DesktopLyricService : Service() {
 
     private fun isTabletDevice(): Boolean = resources.configuration.smallestScreenWidthDp >= 600
 
-    private class DesktopLyricView(context: Context) : View(context) {
-        private val pendingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(150, 255, 255, 255)
-            textSize = 20f * resources.displayMetrics.scaledDensity
-            typeface = Typeface.DEFAULT_BOLD
-            textAlign = Paint.Align.CENTER
-            setShadowLayer(8f, 0f, 2f, Color.argb(180, 0, 0, 0))
-        }
+    private class DesktopSmoothLyricView(context: Context) : FrameLayout(context) {
+        var windowTouchHandler: ((View, MotionEvent) -> Boolean)? = null
 
-        private val activePaint = Paint(pendingPaint).apply {
-            color = Color.WHITE
-            typeface = Typeface.DEFAULT_BOLD
-            setShadowLayer(10f, 0f, 2f, Color.argb(210, 0, 0, 0))
+        private val lyricView = RawsLyricView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setPadding(0, 0, 0, 0)
+            setEdgeFadeEnabled(false)
+            setLineAlphaAnimationsEnabled(false)
+            setNonCurrentLineBlurEnabled(false)
+            setContinuousFrameUpdatesEnabled(true)
+            setPronunciationAboveMainEnabled(true)
+            setAutoScrollResumeEnabled(false)
+            updateDisplayTranslation(true, true)
         }
-
-        private val glowPaint = Paint(activePaint).apply {
-            color = Color.argb(150, 125, 205, 255)
-            setShadowLayer(18f, 0f, 0f, color)
-        }
-
-        private val pronunciationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(155, 255, 255, 255)
-            textSize = 12f * resources.displayMetrics.scaledDensity
-            textAlign = Paint.Align.CENTER
-            setShadowLayer(7f, 0f, 2f, Color.argb(180, 0, 0, 0))
-        }
-
-        private val translationPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(165, 255, 255, 255)
-            textSize = 13f * resources.displayMetrics.scaledDensity
-            textAlign = Paint.Align.CENTER
-            setShadowLayer(7f, 0f, 2f, Color.argb(180, 0, 0, 0))
-        }
-
-        private var lyricText = "Halcyon"
-        private var pronunciation = ""
-        private var translation = ""
-        private var agent = ""
-        private var isTtml = false
-        private var backgroundText = ""
-        private var backgroundTranslation = ""
+        private var currentLine: LyricLine = LyricLine(timeMs = 0L, text = "Halcyon", endMs = 4_000L)
+        private var currentPositionMs = 0L
         private var fontScale = 1f
         private var translationScale = 1.1f
-        private var opacity = 1f
+        private var opacityPercent = 100
         private var textColor = Color.WHITE
-        private var shadowStrength = 1f
         private var statusBarMode = false
         private var statusBarSecondaryMode = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF
-        private var positionMs = 0L
-        private var words = emptyList<DesktopWord>()
-        private var pronunciationWords = emptyList<DesktopWord>()
-        private var backgroundWords = emptyList<DesktopWord>()
+        private var songKey: String? = null
+
+        init {
+            addView(
+                lyricView,
+                LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+            )
+        }
+
+        override fun onInterceptTouchEvent(ev: MotionEvent): Boolean = true
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            return windowTouchHandler?.invoke(this, event) ?: true
+        }
+
+        fun setPlaybackActive(isPlaying: Boolean) {
+            lyricView.setPlaybackActive(isPlaying)
+        }
 
         fun setStyle(
             fontScale: Float,
             translationScale: Float,
             opacityPercent: Int,
             textColor: Int,
-            shadowStrength: Float,
+            @Suppress("UNUSED_PARAMETER") shadowStrength: Float,
             statusBarMode: Boolean = false,
             statusBarSecondaryMode: Int = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF
         ) {
             this.fontScale = fontScale.coerceIn(0.8f, 2.2f)
             this.translationScale = translationScale.coerceIn(0.8f, 2.2f)
-            this.opacity = (opacityPercent.coerceIn(35, 100) / 100f)
+            this.opacityPercent = opacityPercent.coerceIn(35, 100)
             this.textColor = textColor
-            this.shadowStrength = shadowStrength.coerceIn(0f, 1.6f)
             this.statusBarMode = statusBarMode
             this.statusBarSecondaryMode = statusBarSecondaryMode.coerceIn(0, 2)
-            pendingPaint.color = colorWithAlpha(textColor, 150)
-            activePaint.color = colorWithAlpha(textColor, 255)
-            glowPaint.color = colorWithAlpha(textColor, 150)
-            pronunciationPaint.color = colorWithAlpha(textColor, 155)
-            translationPaint.color = colorWithAlpha(textColor, 180)
-            applyTextShadow(pendingPaint, 8f, 180)
-            applyTextShadow(activePaint, 10f, 210)
-            applyTextGlow(glowPaint, 18f, 170)
-            applyTextShadow(pronunciationPaint, 7f, 180)
-            applyTextShadow(translationPaint, 7f, 180)
-            invalidate()
+            applySmoothStyle()
+            updateSong(force = true)
         }
 
         fun setLyric(
@@ -728,10 +723,14 @@ class DesktopLyricService : Service() {
             pronunciation: String,
             translation: String,
             positionMs: Long,
+            lineStartMs: Long,
+            lineEndMs: Long?,
             agent: String,
             isTtml: Boolean,
             backgroundText: String,
             backgroundTranslation: String,
+            backgroundStartMs: Long?,
+            backgroundEndMs: Long?,
             wordTexts: List<String>,
             wordStarts: LongArray,
             wordEnds: LongArray,
@@ -742,7 +741,27 @@ class DesktopLyricService : Service() {
             backgroundWordStarts: LongArray,
             backgroundWordEnds: LongArray
         ) {
-            this.lyricText = text.ifBlank { if (backgroundText.isBlank()) "♪" else "" }
+            currentPositionMs = positionMs
+            val words = buildLyricWords(wordTexts, wordStarts, wordEnds)
+            val pronunciationWords = buildLyricWords(pronunciationWordTexts, pronunciationWordStarts, pronunciationWordEnds)
+            val backgroundWords = buildLyricWords(backgroundWordTexts, backgroundWordStarts, backgroundWordEnds)
+            val inferredStart = sequenceOf(
+                lineStartMs.takeIf { it >= 0L },
+                words.minOfOrNull { it.startMs },
+                pronunciationWords.minOfOrNull { it.startMs },
+                backgroundStartMs,
+                backgroundWords.minOfOrNull { it.startMs },
+                positionMs
+            ).filterNotNull().first()
+            val inferredEnd = sequenceOf(
+                lineEndMs,
+                words.maxOfOrNull { it.endMs },
+                pronunciationWords.maxOfOrNull { it.endMs },
+                backgroundEndMs,
+                backgroundWords.maxOfOrNull { it.endMs },
+                inferredStart + 4_000L
+            ).filterNotNull().first().coerceAtLeast(inferredStart + 1L)
+
             val inferredPronunciation = pronunciation.ifBlank {
                 when {
                     isLikelyRomanizationSecondary(text, translation) -> translation
@@ -750,12 +769,8 @@ class DesktopLyricService : Service() {
                     else -> ""
                 }
             }
-            this.pronunciation = inferredPronunciation
-            this.translation = if (pronunciation.isBlank() && isLikelyRomanizationSecondary(text, translation)) "" else translation
-            this.agent = agent
-            this.isTtml = isTtml
-            this.backgroundText = backgroundText
-            this.backgroundTranslation = if (
+            val displayTranslation = if (pronunciation.isBlank() && isLikelyRomanizationSecondary(text, translation)) "" else translation
+            val displayBackgroundTranslation = if (
                 pronunciation.isBlank() &&
                 isLikelyRomanizationSecondary(backgroundText.ifBlank { text }, backgroundTranslation)
             ) {
@@ -763,427 +778,117 @@ class DesktopLyricService : Service() {
             } else {
                 backgroundTranslation
             }
-            this.positionMs = positionMs
-            words = wordTexts.mapIndexedNotNull { index, word ->
-                val start = wordStarts.getOrNull(index) ?: return@mapIndexedNotNull null
-                val end = wordEnds.getOrNull(index) ?: return@mapIndexedNotNull null
-                DesktopWord(word, start, end)
+
+            currentLine = if (statusBarMode) {
+                val mainText = text.ifBlank { backgroundText }.ifBlank { "♪" }
+                LyricLine(
+                    timeMs = inferredStart,
+                    text = mainText,
+                    words = if (text.isBlank() && backgroundText.isNotBlank()) backgroundWords else words,
+                    translation = if (statusBarSecondaryMode == SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_TRANSLATION) displayTranslation else null,
+                    pronunciation = if (statusBarSecondaryMode == SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_PRONUNCIATION) inferredPronunciation else null,
+                    pronunciationWords = if (statusBarSecondaryMode == SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_PRONUNCIATION) pronunciationWords else emptyList(),
+                    agent = null,
+                    isTtml = isTtml,
+                    endMs = inferredEnd
+                )
+            } else {
+                LyricLine(
+                    timeMs = inferredStart,
+                    text = text,
+                    words = words,
+                    translation = displayTranslation,
+                    pronunciation = inferredPronunciation,
+                    pronunciationWords = pronunciationWords,
+                    agent = agent,
+                    backgroundText = backgroundText,
+                    backgroundWords = backgroundWords,
+                    backgroundTranslation = displayBackgroundTranslation,
+                    backgroundStartMs = backgroundStartMs,
+                    backgroundEndMs = backgroundEndMs,
+                    isTtml = isTtml,
+                    endMs = inferredEnd
+                )
             }
-            pronunciationWords = pronunciationWordTexts.mapIndexedNotNull { index, word ->
-                val start = pronunciationWordStarts.getOrNull(index) ?: return@mapIndexedNotNull null
-                val end = pronunciationWordEnds.getOrNull(index) ?: return@mapIndexedNotNull null
-                DesktopWord(word, start, end)
-            }
-            backgroundWords = backgroundWordTexts.mapIndexedNotNull { index, word ->
-                val start = backgroundWordStarts.getOrNull(index) ?: return@mapIndexedNotNull null
-                val end = backgroundWordEnds.getOrNull(index) ?: return@mapIndexedNotNull null
-                DesktopWord(word, start, end)
-            }
-            invalidate()
+            updateSong(force = false)
+            lyricView.setPosition(positionMs)
         }
 
-        override fun onDraw(canvas: Canvas) {
-            super.onDraw(canvas)
-            if (statusBarMode) {
-                drawStatusBarLyric(canvas)
+        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            updateLyricLayoutOffsets()
+        }
+
+        private fun applySmoothStyle() {
+            val scaledDensity = resources.displayMetrics.scaledDensity
+            val primarySp = if (statusBarMode) 12.5f else 24f
+            val secondarySp = if (statusBarMode) 9.5f else 14f
+            val primaryTypeface = loadAndroidTypeface(
+                fontPath = "",
+                weight = 800,
+                italic = false,
+                boldFallback = true
+            )
+            val secondaryTypeface = loadAndroidTypeface(
+                fontPath = "",
+                weight = 600,
+                italic = false,
+                boldFallback = false
+            )
+            lyricView.setStyle(
+                buildLyriconRichLineConfig(
+                    primaryTextSizePx = primarySp * scaledDensity * fontScale,
+                    secondaryTextSizePx = secondarySp * scaledDensity * fontScale * translationScale,
+                    primaryTypeface = primaryTypeface,
+                    secondaryTypeface = secondaryTypeface,
+                    primaryTextColor = colorWithAlpha(textColor, 255),
+                    secondaryTextColor = colorWithAlpha(textColor, if (statusBarMode) 170 else 190),
+                    syllableHighlightColor = colorWithAlpha(textColor, 255),
+                    syllableBackgroundColor = colorWithAlpha(textColor, if (statusBarMode) 42 else 88)
+                )
+            )
+            lyricView.updateDisplayTranslation(true, true)
+            updateLyricLayoutOffsets()
+        }
+
+        private fun updateSong(force: Boolean) {
+            val key = "${currentLine.timeMs}|${currentLine.endMs}|${currentLine.text}|${currentLine.translation}|${currentLine.pronunciation}|${currentLine.backgroundText}|$statusBarMode|$statusBarSecondaryMode"
+            if (!force && key == songKey) {
+                lyricView.setPosition(currentPositionMs)
                 return
             }
-            val hasBackground = backgroundText.isNotBlank() || backgroundWords.isNotEmpty()
-            val hasPronunciation = pronunciation.isNotBlank() || pronunciationWords.isNotEmpty()
-            val primaryAlign = ttmlAlignForPrimary()
-            val backgroundAlign = ttmlAlignForBackground()
-            val primaryMaxWidth = maxWidthForAlign(primaryAlign)
-            val backgroundMaxWidth = maxWidthForAlign(backgroundAlign)
-            if (hasPronunciation && !hasBackground) {
-                val hasTranslation = translation.isNotBlank()
-                val baselines = centeredPrimaryBaselines(hasPronunciation = true, hasTranslation = hasTranslation)
-                drawSmallLine(
-                    canvas = canvas,
-                    fallbackText = pronunciation,
-                    lineWords = pronunciationWords,
-                    anchorX = primaryAlign.anchorX(width),
-                    baseline = baselines.pronunciation,
-                    maxWidth = primaryMaxWidth,
-                    align = primaryAlign
-                )
-                drawLine(canvas, lyricText, words, primaryAlign.anchorX(width), baselines.primary, primaryMaxWidth, primaryAlign, true)
-                if (hasTranslation) {
-                    drawTranslationText(canvas, translation, primaryAlign.anchorX(width), baselines.translation, primaryMaxWidth, primaryAlign)
-                }
-            } else if (hasBackground) {
-                val hasTranslation = translation.isNotBlank() || backgroundTranslation.isNotBlank()
-                val primaryBaseline = height * if (hasTranslation) 0.25f else 0.34f
-                val backgroundBaseline = height * if (hasTranslation) 0.64f else 0.62f
-                drawLine(canvas, lyricText, words, primaryAlign.anchorX(width), primaryBaseline, primaryMaxWidth, primaryAlign, true)
-                if (translation.isNotBlank()) {
-                    drawTranslationText(
-                        canvas = canvas,
-                        value = translation,
-                        anchorX = primaryAlign.anchorX(width),
-                        baseline = height * 0.43f,
-                        maxWidth = primaryMaxWidth,
-                        align = primaryAlign
-                    )
-                }
-                drawLine(
-                    canvas = canvas,
-                    fallbackText = backgroundText.ifBlank { backgroundWords.joinToString("") { it.text } },
-                    lineWords = backgroundWords,
-                    anchorX = backgroundAlign.anchorX(width),
-                    baseline = backgroundBaseline,
-                    maxWidth = backgroundMaxWidth,
-                    align = backgroundAlign,
-                    primary = true
-                )
-                if (backgroundTranslation.isNotBlank()) {
-                    drawTranslationText(
-                        canvas = canvas,
-                        value = backgroundTranslation,
-                        anchorX = backgroundAlign.anchorX(width),
-                        baseline = height * 0.82f,
-                        maxWidth = backgroundMaxWidth,
-                        align = backgroundAlign
-                    )
-                }
-            } else {
-                val baselines = if (translation.isNotBlank()) {
-                    centeredPrimaryBaselines(hasPronunciation = false, hasTranslation = true)
-                } else {
-                    null
-                }
-                val baseline = if (baselines == null) {
-                    height / 2f + 5f
-                } else {
-                    baselines.primary
-                }
-                drawLine(canvas, lyricText, words, primaryAlign.anchorX(width), baseline, primaryMaxWidth, primaryAlign, true)
-                if (translation.isNotBlank()) {
-                    drawTranslationText(
-                        canvas = canvas,
-                        value = translation,
-                        anchorX = primaryAlign.anchorX(width),
-                        baseline = baselines?.translation ?: baseline,
-                        maxWidth = primaryMaxWidth,
-                        align = primaryAlign
-                    )
-                }
-            }
-        }
-
-        private fun centeredPrimaryBaselines(hasPronunciation: Boolean, hasTranslation: Boolean): LyricBaselines {
-            val oldPronunciationSize = pronunciationPaint.textSize
-            val oldPrimarySize = activePaint.textSize
-            val oldTranslationSize = translationPaint.textSize
-            pronunciationPaint.textSize = 12f * resources.displayMetrics.scaledDensity * fontScale
-            activePaint.textSize = 20f * resources.displayMetrics.scaledDensity * fontScale
-            translationPaint.textSize = 15f * resources.displayMetrics.scaledDensity * fontScale * translationScale
-
-            val topGap = 5f * resources.displayMetrics.density
-            val bottomGap = 6f * resources.displayMetrics.density
-            val pronunciationMetrics = pronunciationPaint.fontMetrics
-            val primaryMetrics = activePaint.fontMetrics
-            val translationMetrics = translationPaint.fontMetrics
-            val pronunciationHeight = pronunciationMetrics.height()
-            val primaryHeight = primaryMetrics.height()
-            val translationHeight = translationMetrics.height()
-            val totalHeight =
-                (if (hasPronunciation) pronunciationHeight + topGap else 0f) +
-                    primaryHeight +
-                    (if (hasTranslation) bottomGap + translationHeight else 0f)
-            var top = (height - totalHeight) / 2f
-
-            val pronunciationBaseline = if (hasPronunciation) {
-                val baseline = top - pronunciationMetrics.ascent
-                top += pronunciationHeight + topGap
-                baseline
-            } else {
-                0f
-            }
-            val primaryBaseline = top - primaryMetrics.ascent
-            top += primaryHeight + bottomGap
-            val translationBaseline = if (hasTranslation) top - translationMetrics.ascent else 0f
-
-            pronunciationPaint.textSize = oldPronunciationSize
-            activePaint.textSize = oldPrimarySize
-            translationPaint.textSize = oldTranslationSize
-            return LyricBaselines(pronunciationBaseline, primaryBaseline, translationBaseline)
-        }
-
-        private fun drawStatusBarLyric(canvas: Canvas) {
-            val value = lyricText
-                .ifBlank { backgroundText }
-                .ifBlank { "♪" }
-            val secondary = when (statusBarSecondaryMode) {
-                SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_TRANSLATION -> translation
-                SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_PRONUNCIATION -> pronunciation
-                else -> ""
-            }.ifBlank { "" }
-            val oldSize = activePaint.textSize
-            val oldAlign = activePaint.textAlign
-            val oldTranslationSize = translationPaint.textSize
-            val oldTranslationAlign = translationPaint.textAlign
-            activePaint.textSize = 12f * resources.displayMetrics.scaledDensity * fontScale.coerceIn(0.8f, 1.35f)
-            activePaint.textAlign = Paint.Align.CENTER
-            translationPaint.textSize = 9.5f * resources.displayMetrics.scaledDensity * fontScale.coerceIn(0.8f, 1.25f)
-            translationPaint.textAlign = Paint.Align.CENTER
-            val metrics = activePaint.fontMetrics
-            val secondaryMetrics = translationPaint.fontMetrics
-            val primaryBaseline = if (secondary.isBlank()) {
-                height / 2f - (metrics.ascent + metrics.descent) / 2f
-            } else {
-                height * 0.42f - (metrics.ascent + metrics.descent) / 2f
-            }
-            drawFittedText(
-                canvas = canvas,
-                value = value,
-                anchorX = width / 2f,
-                baseline = primaryBaseline,
-                maxWidth = width * 0.96f,
-                align = AnchorAlign.Center,
-                paint = activePaint
+            val currentSong = listOf(currentLine).toLyriconSong(
+                songId = -1L,
+                songTitle = "Halcyon",
+                songArtist = ""
             )
-            if (secondary.isNotBlank()) {
-                drawFittedText(
-                    canvas = canvas,
-                    value = secondary,
-                    anchorX = width / 2f,
-                    baseline = height * 0.74f - (secondaryMetrics.ascent + secondaryMetrics.descent) / 2f,
-                    maxWidth = width * 0.94f,
-                    align = AnchorAlign.Center,
-                    paint = translationPaint
-                )
-            }
-            activePaint.textSize = oldSize
-            activePaint.textAlign = oldAlign
-            translationPaint.textSize = oldTranslationSize
-            translationPaint.textAlign = oldTranslationAlign
+            lyricView.song = currentSong
+            lyricView.tag = currentSong
+            songKey = key
         }
 
-        private fun maxWidthForAlign(align: AnchorAlign): Float {
-            return if (isTtml && align != AnchorAlign.Center) width * 0.44f else width * 0.88f
+        private fun updateLyricLayoutOffsets() {
+            if (height <= 0) return
+            lyricView.updateAnchorOffset(if (statusBarMode) 0f else -height * 0.04f)
+            lyricView.setTopContentPadding(0f)
         }
 
-        private fun drawLine(canvas: Canvas, fallbackText: String, lineWords: List<DesktopWord>, anchorX: Float, baseline: Float, maxWidth: Float, align: AnchorAlign, primary: Boolean) {
-            val oldPending = pendingPaint.textSize
-            val oldActive = activePaint.textSize
-            val oldGlow = glowPaint.textSize
-            val targetSize = 20f * resources.displayMetrics.scaledDensity * fontScale
-            pendingPaint.textSize = targetSize
-            activePaint.textSize = targetSize
-            glowPaint.textSize = targetSize
-            if (lineWords.isEmpty()) {
-                drawFittedText(canvas, fallbackText, anchorX, baseline, maxWidth, align, if (primary) activePaint else pendingPaint)
-            } else {
-                drawWords(canvas, anchorX, baseline, maxWidth, align, fallbackText, lineWords, primary)
+        private fun buildLyricWords(
+            texts: List<String>,
+            starts: LongArray,
+            ends: LongArray
+        ): List<LyricWord> =
+            texts.mapIndexedNotNull { index, text ->
+                val start = starts.getOrNull(index) ?: return@mapIndexedNotNull null
+                val end = ends.getOrNull(index) ?: return@mapIndexedNotNull null
+                if (text.isBlank() || end <= start) return@mapIndexedNotNull null
+                LyricWord(text = text, startMs = start, endMs = end)
             }
-            pendingPaint.textSize = oldPending
-            activePaint.textSize = oldActive
-            glowPaint.textSize = oldGlow
-        }
-
-        private fun drawSmallLine(canvas: Canvas, fallbackText: String, lineWords: List<DesktopWord>, anchorX: Float, baseline: Float, maxWidth: Float, align: AnchorAlign) {
-            val oldPendingSize = pendingPaint.textSize
-            val oldActiveSize = activePaint.textSize
-            val oldGlowSize = glowPaint.textSize
-            val oldPronunciationSize = pronunciationPaint.textSize
-            val targetSize = 12f * resources.displayMetrics.scaledDensity * fontScale
-            pendingPaint.textSize = targetSize
-            activePaint.textSize = targetSize
-            glowPaint.textSize = targetSize
-            pronunciationPaint.textSize = targetSize
-            if (lineWords.isEmpty()) {
-                drawFittedText(canvas, fallbackText, anchorX, baseline, maxWidth, align, pronunciationPaint)
-            } else {
-                drawWords(canvas, anchorX, baseline, maxWidth, align, fallbackText, lineWords, false)
-            }
-            pendingPaint.textSize = oldPendingSize
-            activePaint.textSize = oldActiveSize
-            glowPaint.textSize = oldGlowSize
-            pronunciationPaint.textSize = oldPronunciationSize
-        }
-
-        private fun drawWords(
-            canvas: Canvas,
-            anchorX: Float,
-            baseline: Float,
-            maxWidth: Float,
-            align: AnchorAlign,
-            lineText: String,
-            lineWords: List<DesktopWord>,
-            primary: Boolean
-        ) {
-            val originalPending = pendingPaint.textSize
-            val originalActive = activePaint.textSize
-            val originalGlow = glowPaint.textSize
-            val originalPendingAlign = pendingPaint.textAlign
-            val originalActiveAlign = activePaint.textAlign
-            val originalGlowAlign = glowPaint.textAlign
-            val hasNaturalSpacing = lineText.any { it.isWhitespace() }
-            val compactCjkLine = !hasNaturalSpacing && lineText.any { it.isCjkChar() }
-            val displayWords = lineWords.mapNotNull { word ->
-                val text = if (hasNaturalSpacing) word.text else word.text.trim()
-                text.takeIf { it.isNotBlank() }?.let { word.copy(text = it) }
-            }
-            if (displayWords.isEmpty()) return
-            val widths = displayWords.map { pendingPaint.measureText(it.text) }
-            val rawGap = if (hasNaturalSpacing || compactCjkLine) 0f else 6f * resources.displayMetrics.density
-            val totalWidth = widths.sum() + rawGap * (widths.size - 1).coerceAtLeast(0)
-            val scale = (maxWidth / totalWidth.coerceAtLeast(1f)).coerceAtMost(1f)
-            val gap = rawGap * scale
-            pendingPaint.textSize *= scale
-            activePaint.textSize *= scale
-            glowPaint.textSize *= scale
-            pendingPaint.textAlign = Paint.Align.LEFT
-            activePaint.textAlign = Paint.Align.LEFT
-            glowPaint.textAlign = Paint.Align.LEFT
-            val scaledWidths = displayWords.map { pendingPaint.measureText(it.text) }
-            val scaledTotalWidth = scaledWidths.sum() + gap * (scaledWidths.size - 1).coerceAtLeast(0)
-            var x = align.startX(anchorX, scaledTotalWidth)
-            displayWords.forEachIndexed { index, word ->
-                val token = word.text
-                val isCurrent = positionMs in word.startMs..word.endMs
-                val isPast = positionMs > word.endMs
-                val paint = when {
-                    isCurrent && primary -> activePaint
-                    isPast -> Paint(activePaint).apply { color = colorWithAlpha(textColor, 210) }
-                    else -> pendingPaint
-                }
-                if (isCurrent && word.endMs - word.startMs >= 900L) {
-                    val pulse = 0.42f + 0.34f * ((sin(positionMs / 145.0).toFloat() + 1f) / 2f)
-                    glowPaint.alpha = (pulse * 170f * opacity).roundToInt().coerceIn(0, 255)
-                    canvas.drawText(token, x, baseline, glowPaint)
-                }
-                canvas.drawText(token, x, baseline, paint)
-                x += scaledWidths[index] + gap
-            }
-            pendingPaint.textSize = originalPending
-            activePaint.textSize = originalActive
-            glowPaint.textSize = originalGlow
-            pendingPaint.textAlign = originalPendingAlign
-            activePaint.textAlign = originalActiveAlign
-            glowPaint.textAlign = originalGlowAlign
-        }
-
-        private fun drawFittedText(canvas: Canvas, value: String, anchorX: Float, baseline: Float, maxWidth: Float, align: AnchorAlign, paint: Paint) {
-            if (value.isBlank()) return
-            val oldSize = paint.textSize
-            val oldAlign = paint.textAlign
-            val measured = paint.measureText(value)
-            if (measured > maxWidth) paint.textSize = oldSize * (maxWidth / measured).coerceIn(0.28f, 1f)
-            paint.textAlign = align.paintAlign
-            canvas.drawText(value, anchorX, baseline, paint)
-            paint.textSize = oldSize
-            paint.textAlign = oldAlign
-        }
-
-        private fun drawTranslationText(canvas: Canvas, value: String, anchorX: Float, baseline: Float, maxWidth: Float, align: AnchorAlign) {
-            val oldSize = translationPaint.textSize
-            translationPaint.textSize = 15f * resources.displayMetrics.scaledDensity * fontScale * translationScale
-            drawWrappedFittedText(canvas, value, anchorX, baseline, maxWidth, align, translationPaint, maxLines = 2)
-            translationPaint.textSize = oldSize
-        }
-
-        private fun drawWrappedFittedText(
-            canvas: Canvas,
-            value: String,
-            anchorX: Float,
-            baseline: Float,
-            maxWidth: Float,
-            align: AnchorAlign,
-            paint: Paint,
-            maxLines: Int
-        ) {
-            if (value.isBlank()) return
-            val oldSize = paint.textSize
-            val oldAlign = paint.textAlign
-            paint.textAlign = align.paintAlign
-
-            var lines = wrapText(value, paint, maxWidth)
-            val minSize = oldSize * 0.42f
-            while ((lines.size > maxLines || lines.any { paint.measureText(it) > maxWidth }) && paint.textSize > minSize) {
-                paint.textSize *= 0.92f
-                lines = wrapText(value, paint, maxWidth)
-            }
-
-            val visibleLines = if (lines.size <= maxLines) {
-                lines
-            } else {
-                lines.take(maxLines - 1) + lines.drop(maxLines - 1).joinToString("")
-            }
-            val lineHeight = paint.fontMetrics.run { (descent - ascent) * 0.86f }
-            visibleLines.forEachIndexed { index, line ->
-                val lineOldSize = paint.textSize
-                val measured = paint.measureText(line)
-                if (measured > maxWidth) {
-                    paint.textSize = lineOldSize * (maxWidth / measured).coerceIn(0.34f, 1f)
-                }
-                canvas.drawText(line, anchorX, baseline + index * lineHeight, paint)
-                paint.textSize = lineOldSize
-            }
-
-            paint.textSize = oldSize
-            paint.textAlign = oldAlign
-        }
-
-        private fun wrapText(value: String, paint: Paint, maxWidth: Float): List<String> {
-            val text = value.trim()
-            if (text.isBlank()) return emptyList()
-            val tokens = if (text.any { it.isWhitespace() }) {
-                text.split(Regex("""(?<=\s)|(?=\s)""")).filter { it.isNotEmpty() }
-            } else {
-                text.map { it.toString() }
-            }
-            val lines = mutableListOf<String>()
-            var current = ""
-            tokens.forEach { token ->
-                val candidate = current + token
-                if (current.isNotEmpty() && paint.measureText(candidate) > maxWidth) {
-                    lines += current.trim()
-                    current = token.trimStart()
-                } else {
-                    current = candidate
-                }
-            }
-            if (current.isNotBlank()) lines += current.trim()
-            return lines
-        }
 
         private fun colorWithAlpha(color: Int, alpha: Int): Int {
-            val appliedAlpha = (alpha * opacity).roundToInt().coerceIn(0, 255)
+            val appliedAlpha = (alpha * (opacityPercent / 100f)).roundToInt().coerceIn(0, 255)
             return Color.argb(appliedAlpha, Color.red(color), Color.green(color), Color.blue(color))
         }
-
-        private fun shadowAlpha(base: Int): Int =
-            (base * shadowStrength).roundToInt().coerceIn(0, 255)
-
-        private fun applyTextShadow(paint: Paint, radius: Float, alpha: Int) {
-            val appliedAlpha = shadowAlpha(alpha)
-            if (appliedAlpha <= 0) {
-                paint.clearShadowLayer()
-            } else {
-                paint.setShadowLayer(radius * shadowStrength.coerceAtLeast(0.2f), 0f, 2f, colorWithAlpha(Color.BLACK, appliedAlpha))
-            }
-        }
-
-        private fun applyTextGlow(paint: Paint, radius: Float, alpha: Int) {
-            val appliedAlpha = shadowAlpha(alpha)
-            if (appliedAlpha <= 0) {
-                paint.clearShadowLayer()
-            } else {
-                paint.setShadowLayer(radius * shadowStrength.coerceAtLeast(0.2f), 0f, 0f, colorWithAlpha(textColor, appliedAlpha))
-            }
-        }
-
-        private fun Char.isCjkChar(): Boolean =
-            Character.UnicodeBlock.of(this) in setOf(
-                Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
-                Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A,
-                Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B,
-                Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS,
-                Character.UnicodeBlock.HIRAGANA,
-                Character.UnicodeBlock.KATAKANA,
-                Character.UnicodeBlock.HANGUL_SYLLABLES
-            )
 
         private fun isLikelyRomanizationSecondary(primary: String, candidate: String): Boolean {
             val primaryText = primary.takeIf { it.isNotBlank() } ?: return false
@@ -1213,52 +918,6 @@ class DesktopLyricService : Service() {
         }
 
         private fun Char.isLatinLetter(): Boolean = this in 'A'..'Z' || this in 'a'..'z'
-
-        private fun Paint.FontMetrics.height(): Float = descent - ascent
-
-        private fun ttmlAlignForPrimary(): AnchorAlign {
-            return agentAlignOrCenter()
-        }
-
-        private fun ttmlAlignForBackground(): AnchorAlign {
-            return agentAlignOrCenter()
-        }
-
-        private fun agentAlignOrCenter(): AnchorAlign {
-            return when (agent.trim().lowercase()) {
-                "v2" -> AnchorAlign.Right
-                "v1" -> AnchorAlign.Left
-                "" -> AnchorAlign.Center
-                else -> AnchorAlign.Left
-            }
-        }
-    }
-
-    private data class DesktopWord(val text: String, val startMs: Long, val endMs: Long)
-    private data class LyricBaselines(val pronunciation: Float, val primary: Float, val translation: Float)
-
-    private enum class AnchorAlign(val paintAlign: Paint.Align) {
-        Left(Paint.Align.LEFT),
-        Center(Paint.Align.CENTER),
-        Right(Paint.Align.RIGHT);
-
-        fun anchorX(width: Int): Float = when (this) {
-            Left -> width * 0.08f
-            Center -> width / 2f
-            Right -> width * 0.92f
-        }
-
-        fun startX(anchorX: Float, lineWidth: Float): Float = when (this) {
-            Left -> anchorX
-            Center -> anchorX - lineWidth / 2f
-            Right -> anchorX - lineWidth
-        }
-
-        fun opposite(): AnchorAlign = when (this) {
-            Left -> Right
-            Right -> Left
-            Center -> Center
-        }
     }
 
     companion object {
@@ -1275,10 +934,14 @@ class DesktopLyricService : Service() {
         const val EXTRA_PRONUNCIATION = "pronunciation"
         const val EXTRA_TRANSLATION = "translation"
         const val EXTRA_POSITION = "position"
+        const val EXTRA_LINE_START = "line_start"
+        const val EXTRA_LINE_END = "line_end"
         const val EXTRA_AGENT = "agent"
         const val EXTRA_IS_TTML = "is_ttml"
         const val EXTRA_BACKGROUND_TEXT = "background_text"
         const val EXTRA_BACKGROUND_TRANSLATION = "background_translation"
+        const val EXTRA_BACKGROUND_START = "background_start"
+        const val EXTRA_BACKGROUND_END = "background_end"
         const val EXTRA_WORD_TEXTS = "word_texts"
         const val EXTRA_WORD_STARTS = "word_starts"
         const val EXTRA_WORD_ENDS = "word_ends"

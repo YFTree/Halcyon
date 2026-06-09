@@ -1008,47 +1008,6 @@ fun PlayerScreen(
                 }
             }
 
-            if (artistChoices.isNotEmpty()) {
-                Popup(
-                    alignment = Alignment.BottomCenter,
-                    onDismissRequest = { artistChoices = emptyList() },
-                    properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true)
-                ) {
-                    ArtistPickerSheet(
-                        artists = artistChoices,
-                        onArtistSelected = { artist ->
-                            artistChoices = emptyList()
-                            onNavigateToArtist(artist)
-                        },
-                        onDismiss = { artistChoices = emptyList() }
-                    )
-                }
-            }
-
-            if (songInfoExpanded && song != null) {
-                WindowBottomSheet(
-                    show = true,
-                    enableNestedScroll = false,
-                title = stringResource(R.string.player_song_info),
-                    onDismissRequest = { songInfoExpanded = false }
-                ) {
-                    SongInfoSheet(
-                        song = song,
-                        audioInfoLoader = playerViewModel::getAudioInfo,
-                        tagInfoLoader = playerViewModel::getSongTagInfo,
-                        onDismiss = { songInfoExpanded = false }
-                    )
-                }
-            }
-
-            if (dynamicCoverSheetSong != null) {
-                DynamicCoverWebViewSheet(
-                    show = true,
-                    song = dynamicCoverSheetSong,
-                    onDismissRequest = { dynamicCoverSheetSong = null }
-                )
-            }
-
             if (landscapeExpanded) {
                 ForceLandscapePlayerBars(
                     onDismiss = {
@@ -1171,211 +1130,56 @@ fun PlayerScreen(
                 }
             }
 
-            ratingSheetSong?.let { currentSong ->
-                WindowBottomSheet(
-                    show = true,
-                    enableNestedScroll = false,
-                    title = stringResource(R.string.song_more_rating_title),
-                    onDismissRequest = { ratingSheetSong = null }
-                ) {
-                    RatingSheet(
-                        currentRating = mainViewModel.getSongRating(currentSong),
-                        onDismiss = { ratingSheetSong = null },
-                        onRatingSelected = { rating ->
-                            scope.launch {
-                                val result = mainViewModel.writeSongRating(currentSong, rating)
-                                if (result.isSuccess) {
-                                    Toast.makeText(context, context.getString(R.string.song_more_rating_saved), Toast.LENGTH_SHORT).show()
-                                    ratingSheetSong = null
-                                } else {
-                                    val error = result.exceptionOrNull()
-                                    if (error is WritePermissionRequiredException) {
-                                        pendingWriteRetry = {
-                                            val retryResult = mainViewModel.writeSongRating(currentSong, rating)
-                                            if (retryResult.isSuccess) {
-                                                Toast.makeText(context, context.getString(R.string.song_more_rating_saved), Toast.LENGTH_SHORT).show()
-                                                ratingSheetSong = null
-                                            } else {
-                                                Toast.makeText(context, retryResult.exceptionOrNull()?.localizedMessage ?: context.getString(R.string.song_more_rating_failed), Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                        deletePermissionLauncher.launch(
-                                            IntentSenderRequest.Builder(error.intentSender).build()
-                                        )
-                                    } else {
-                                        Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_rating_failed), Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
-                        }
-                    )
-                }
-            }
-
-            aiSheetSong?.let { currentSong ->
-                WindowBottomSheet(
-                    show = true,
-                    enableNestedScroll = false,
-                    title = stringResource(R.string.song_more_ai_title),
-                    onDismissRequest = { aiSheetSong = null }
-                ) {
-                    SongAiInterpretationSheet(
-                        song = currentSong,
-                        mainViewModel = mainViewModel,
-                        onDismiss = { aiSheetSong = null }
-                    )
-                }
-            }
-
-            ConfirmDangerDialog(
-                show = deleteConfirmSong != null,
-                title = stringResource(R.string.song_more_delete_song_title),
-                message = deleteConfirmSong?.let {
-                    context.getString(
-                        R.string.song_more_delete_song_message,
-                        it.title.ifBlank { it.fileName.ifBlank { context.getString(R.string.common_this_song) } }
-                    )
-                }.orEmpty(),
-                confirmText = stringResource(R.string.song_more_delete_permanently),
-                onDismiss = { deleteConfirmSong = null },
-                onConfirm = {
-                    val currentSong = deleteConfirmSong ?: return@ConfirmDangerDialog
-                    deleteConfirmSong = null
-                    scope.launch {
-                        val result = mainViewModel.deleteSongsResult(listOf(currentSong))
-                        if (result.isSuccess) {
-                            Toast.makeText(context, context.getString(R.string.library_deleted_songs, 1), Toast.LENGTH_SHORT).show()
-                        } else {
-                            val error = result.exceptionOrNull()
-                            if (error is WritePermissionRequiredException) {
-                                pendingWriteRetry = {
-                                    mainViewModel.removeSongsFromLibrary(listOf(currentSong))
-                                    Toast.makeText(context, context.getString(R.string.library_deleted_songs, 1), Toast.LENGTH_SHORT).show()
-                                }
-                                deletePermissionLauncher.launch(
-                                    IntentSenderRequest.Builder(error.intentSender).build()
-                                )
-                            } else {
-                                Toast.makeText(context, error?.localizedMessage ?: context.getString(R.string.song_more_metadata_save_failed), Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                }
-            )
-
-            playlistPickerSong?.let { currentSong ->
-                WindowBottomSheet(
-                    show = true,
-                    enableNestedScroll = false,
-                    title = stringResource(R.string.player_add_to_playlist),
-                    onDismissRequest = { playlistPickerSong = null }
-                ) {
-                    AddToPlaylistSheet(
-                        playlists = playlists
-                            .sortedWith(compareByDescending<com.ella.music.data.model.UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }.thenByDescending { it.createdAt }),
-                        onDismiss = { playlistPickerSong = null },
-                        onCreatePlaylist = {
-                            createPlaylistSong = currentSong
-                            playlistPickerSong = null
-                        },
-                        onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
-                            selectedPlaylists.forEach { playlist ->
-                                mainViewModel.addSongsToPlaylist(playlist.id, listOf(currentSong), appendToEnd)
-                            }
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.player_added_to_playlists, selectedPlaylists.size),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            playlistPickerSong = null
-                        }
-                    )
-                }
-            }
-
-            playlistPickerSongs?.let { songsToAdd ->
-                WindowBottomSheet(
-                    show = true,
-                    enableNestedScroll = false,
-                    title = stringResource(R.string.player_add_to_playlist),
-                    onDismissRequest = { playlistPickerSongs = null }
-                ) {
-                    AddToPlaylistSheet(
-                        playlists = playlists
-                            .sortedWith(compareByDescending<com.ella.music.data.model.UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }.thenByDescending { it.createdAt }),
-                        onDismiss = { playlistPickerSongs = null },
-                        onCreatePlaylist = {
-                            createPlaylistSongs = songsToAdd
-                            playlistPickerSongs = null
-                        },
-                        onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
-                            selectedPlaylists.forEach { playlist ->
-                                mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd, appendToEnd)
-                            }
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.player_added_to_playlists, selectedPlaylists.size),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            playlistPickerSongs = null
-                        }
-                    )
-                }
-            }
-
-            createPlaylistSong?.let { currentSong ->
-                CreatePlaylistAndAddSheet(
-                    onDismiss = { createPlaylistSong = null },
-                    onCreate = { name ->
-                        mainViewModel.createPlaylist(name) { playlist ->
-                            if (playlist != null) {
-                                mainViewModel.addSongsToPlaylist(playlist.id, listOf(currentSong))
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.player_added_to_playlist_named, playlist.name),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                        createPlaylistSong = null
-                    }
-                )
-            }
-
-            createPlaylistSongs?.let { songsToAdd ->
-                CreatePlaylistAndAddSheet(
-                    onDismiss = { createPlaylistSongs = null },
-                    onCreate = { name ->
-                        mainViewModel.createPlaylist(name) { playlist ->
-                            if (playlist != null) {
-                                mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.player_added_to_playlist_named, playlist.name),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                        createPlaylistSongs = null
-                    }
-                )
-            }
-        }
-
-        lyricShareInitialLine?.let { initialLine ->
-            LyricSharePicker(
+            PlayerScreenSheetHost(
+                context = context,
+                scope = scope,
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
                 song = song,
-                lyrics = lyrics,
-                initialLine = initialLine,
-                cover = embeddedCover ?: paletteBitmap,
-                backgroundColors = listOf(palette.top, palette.middle, palette.bottom),
-                annotation = songAnnotation,
-                customInfo = lyricShareCustomInfo,
-                shareTypeface = lyricShareTypeface,
-                onDismiss = { lyricShareInitialLine = null },
-                onShare = ::shareSelectedLyrics
+                playlists = playlists,
+                artistChoices = artistChoices,
+                onArtistChoicesChange = { artistChoices = it },
+                onNavigateToArtist = onNavigateToArtist,
+                songInfoExpanded = songInfoExpanded,
+                onSongInfoExpandedChange = { songInfoExpanded = it },
+                dynamicCoverSheetSong = dynamicCoverSheetSong,
+                onDynamicCoverSheetSongChange = { dynamicCoverSheetSong = it },
+                ratingSheetSong = ratingSheetSong,
+                onRatingSheetSongChange = { ratingSheetSong = it },
+                aiSheetSong = aiSheetSong,
+                onAiSheetSongChange = { aiSheetSong = it },
+                deleteConfirmSong = deleteConfirmSong,
+                onDeleteConfirmSongChange = { deleteConfirmSong = it },
+                onWritePermissionRequired = { error, retry ->
+                    pendingWriteRetry = retry
+                    deletePermissionLauncher.launch(
+                        IntentSenderRequest.Builder(error.intentSender).build()
+                    )
+                },
+                playlistPickerSong = playlistPickerSong,
+                onPlaylistPickerSongChange = { playlistPickerSong = it },
+                playlistPickerSongs = playlistPickerSongs,
+                onPlaylistPickerSongsChange = { playlistPickerSongs = it },
+                createPlaylistSong = createPlaylistSong,
+                onCreatePlaylistSongChange = { createPlaylistSong = it },
+                createPlaylistSongs = createPlaylistSongs,
+                onCreatePlaylistSongsChange = { createPlaylistSongs = it }
             )
         }
+
+        PlayerLyricShareHost(
+            song = song,
+            lyrics = lyrics,
+            initialLine = lyricShareInitialLine,
+            embeddedCover = embeddedCover,
+            paletteBitmap = paletteBitmap,
+            palette = palette,
+            annotation = songAnnotation,
+            customInfo = lyricShareCustomInfo,
+            shareTypeface = lyricShareTypeface,
+            onDismiss = { lyricShareInitialLine = null },
+            onShare = ::shareSelectedLyrics
+        )
     }
 }
 

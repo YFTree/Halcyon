@@ -135,7 +135,7 @@ Music/专辑名文件夹/
 支持集中管理：
 
 ```text
-Movies/Ella/DynamicCovers/
+Movies/Halcyon/DynamicCovers/
 ├── Album/
 │   └── Album Name.mp4
 ├── Song/

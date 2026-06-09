@@ -295,39 +295,17 @@ internal fun LyricsPlayerPage(
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(horizontal = 28.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 28.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                SmallCover(
-                    song = song,
-                    embeddedCover = embeddedCover,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clickable(onClick = onDismissLyrics)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                PlayerSongMetaText(
-                    song = song,
-                    annotation = annotation,
-                    titleFontSize = 22.sp,
-                    artistFontSize = 14.sp,
-                    artistAlpha = 0.72f,
-                    onArtistClick = onArtist,
-                    modifier = Modifier
-                        .weight(1f)
-                        .widthIn(max = 230.dp)
-                )
-                Spacer(modifier = Modifier.width(20.dp))
-                PlayerHeaderAction(
-                    kind = PlayerHeaderActionKind.Favorite,
-                    selected = isFavorite,
-                    onClick = onToggleFavorite
-                )
-                PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = { lyricMenuExpanded = true })
-            }
+            LyricsPlayerHeader(
+                song = song,
+                embeddedCover = embeddedCover,
+                annotation = annotation,
+                isFavorite = isFavorite,
+                onDismissLyrics = onDismissLyrics,
+                onArtist = onArtist,
+                onToggleFavorite = onToggleFavorite,
+                onShowMenu = { lyricMenuExpanded = true },
+                modifier = Modifier.padding(top = 28.dp)
+            )
 
             Box(
                 modifier = Modifier
@@ -369,45 +347,38 @@ internal fun LyricsPlayerPage(
                 .height(42.dp)
         )
 
-        if (lyricMenuExpanded) {
-            WindowBottomSheet(
-                show = true,
-                enableNestedScroll = false,
-                title = stringResource(R.string.player_lyrics_display),
-                onDismissRequest = { lyricMenuExpanded = false }
-            ) {
-                LyricActionMenu(
-                    showPronunciation = showPronunciation,
-                    showTranslation = showTranslation,
-                    keepScreenOn = keepScreenOn,
-                    lyricFormatAvailability = lyricFormatAvailability,
-                    preferTtmlLyrics = preferTtmlLyrics,
-                    lyricSourceMode = lyricSourceMode,
-                    fontScale = fontScale,
-                    onTogglePronunciation = {
-                        lyricMenuExpanded = false
-                        onTogglePronunciation()
-                    },
-                    onToggleTranslation = {
-                        lyricMenuExpanded = false
-                        onToggleTranslation()
-                    },
-                    onToggleKeepScreenOn = {
-                        lyricMenuExpanded = false
-                        onToggleKeepScreenOn()
-                    },
-                    onLyricSourceMode = { mode ->
-                        lyricMenuExpanded = false
-                        onLyricSourceMode(mode)
-                    },
-                    onLyricFormatPreference = { preferTtml ->
-                        lyricMenuExpanded = false
-                        onLyricFormatPreference(preferTtml)
-                    },
-                    onFontScale = onFontScale,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
+        LyricsPlayerMenuSheet(
+            show = lyricMenuExpanded,
+            showPronunciation = showPronunciation,
+            showTranslation = showTranslation,
+            keepScreenOn = keepScreenOn,
+            lyricFormatAvailability = lyricFormatAvailability,
+            preferTtmlLyrics = preferTtmlLyrics,
+            lyricSourceMode = lyricSourceMode,
+            fontScale = fontScale,
+            onDismiss = { lyricMenuExpanded = false },
+            onTogglePronunciation = {
+                lyricMenuExpanded = false
+                onTogglePronunciation()
+            },
+            onToggleTranslation = {
+                lyricMenuExpanded = false
+                onToggleTranslation()
+            },
+            onToggleKeepScreenOn = {
+                lyricMenuExpanded = false
+                onToggleKeepScreenOn()
+            },
+            onLyricSourceMode = { mode ->
+                lyricMenuExpanded = false
+                onLyricSourceMode(mode)
+            },
+            onLyricFormatPreference = { preferTtml ->
+                lyricMenuExpanded = false
+                onLyricFormatPreference(preferTtml)
+            },
+            onFontScale = onFontScale,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }

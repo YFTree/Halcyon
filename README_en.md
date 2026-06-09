@@ -135,7 +135,7 @@ All songs in the same album can share the same video, avoiding duplicate video f
 Centralized management is supported:
 
 ```text
-Movies/Ella/DynamicCovers/
+Movies/Halcyon/DynamicCovers/
 ├── Album/
 │   └── Album Name.mp4
 ├── Song/
