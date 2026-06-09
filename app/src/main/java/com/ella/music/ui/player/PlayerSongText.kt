@@ -3,6 +3,7 @@ package com.ella.music.ui.player
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,16 +62,19 @@ internal fun PlayerSongMetaText(
     artistAlpha: Float,
     modifier: Modifier = Modifier,
     fallbackTitle: String? = null,
-    onArtistClick: (() -> Unit)? = null
+    onArtistClick: (() -> Unit)? = null,
+    onAlbumClick: (() -> Unit)? = null
 ) {
     val artist = song?.artist.orEmpty()
-    val artistModifier = if (onArtistClick != null && artist.isNotBlank()) {
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onArtistClick)
-    } else {
-        Modifier.fillMaxWidth()
+    val album = song?.album.orEmpty()
+    fun clickableMetaModifier(enabled: Boolean, onClick: (() -> Unit)?): Modifier {
+        return if (enabled && onClick != null) {
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(onClick = onClick)
+        } else {
+            Modifier
+        }
     }
     Column(modifier = modifier) {
         PlayerSongTitleText(
@@ -91,13 +95,34 @@ internal fun PlayerSongMetaText(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        PlayerMarqueeText(
-            text = artist,
-            fontSize = artistFontSize,
-            fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = artistAlpha),
-            modifier = artistModifier
-        )
+        if (annotation.isBlank() && album.isNotBlank()) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                PlayerMarqueeText(
+                    text = artist,
+                    fontSize = artistFontSize,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = artistAlpha),
+                    modifier = clickableMetaModifier(artist.isNotBlank(), onArtistClick).weight(1f)
+                )
+                PlayerMarqueeText(
+                    text = " · $album",
+                    fontSize = artistFontSize,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = artistAlpha),
+                    modifier = clickableMetaModifier(album.isNotBlank(), onAlbumClick).weight(1f)
+                )
+            }
+        } else {
+            PlayerMarqueeText(
+                text = artist,
+                fontSize = artistFontSize,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = artistAlpha),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(clickableMetaModifier(artist.isNotBlank(), onArtistClick))
+            )
+        }
     }
 }
 

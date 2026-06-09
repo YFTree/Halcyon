@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,7 +22,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ella.music.BuildConfig
 import com.ella.music.R
-import com.ella.music.data.SettingsManager
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -39,7 +37,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun SettingsScreen(
     onNavigateToAbout: () -> Unit,
-    onNavigateToSettingsDetail: () -> Unit,
+    onNavigateToAppearanceSettings: () -> Unit,
+    onNavigateToLibrarySettings: () -> Unit,
+    onNavigateToIntegrationSettings: () -> Unit,
     onNavigateToLyricSettings: () -> Unit,
     onNavigateToAudioSettings: () -> Unit,
     onNavigateToBackupSettings: () -> Unit,
@@ -52,7 +52,6 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
-    val settingsManager = remember { SettingsManager.getInstance(context) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -81,24 +80,48 @@ fun SettingsScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            SmallTitle(text = stringResource(R.string.settings_app))
+            SmallTitle(text = stringResource(R.string.settings_customize))
 
             SettingsCardGroup {
                 Column {
                     ArrowPreference(
-                        title = stringResource(R.string.settings_preferences),
-                        summary = stringResource(R.string.settings_preferences_summary),
-                        onClick = onNavigateToSettingsDetail
+                        title = stringResource(R.string.settings_appearance_home),
+                        summary = stringResource(R.string.settings_appearance_home_summary),
+                        onClick = onNavigateToAppearanceSettings
                     )
                     ArrowPreference(
                         title = stringResource(R.string.settings_lyrics),
                         summary = stringResource(R.string.settings_lyrics_summary),
                         onClick = onNavigateToLyricSettings
                     )
+                }
+            }
+
+            SmallTitle(text = stringResource(R.string.settings_music_playback))
+
+            SettingsCardGroup {
+                Column {
                     ArrowPreference(
                         title = stringResource(R.string.settings_audio),
                         summary = stringResource(R.string.settings_audio_summary),
                         onClick = onNavigateToAudioSettings
+                    )
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_library_scan),
+                        summary = stringResource(R.string.settings_library_scan_summary),
+                        onClick = onNavigateToLibrarySettings
+                    )
+                }
+            }
+
+            SmallTitle(text = stringResource(R.string.settings_services))
+
+            SettingsCardGroup {
+                Column {
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_integrations),
+                        summary = stringResource(R.string.settings_integrations_summary),
+                        onClick = onNavigateToIntegrationSettings
                     )
                     ArrowPreference(
                         title = stringResource(R.string.settings_backup),
@@ -108,7 +131,7 @@ fun SettingsScreen(
                 }
             }
 
-            SmallTitle(text = stringResource(R.string.settings_other))
+            SmallTitle(text = stringResource(R.string.settings_maintenance))
 
             SettingsCardGroup {
                 Column {

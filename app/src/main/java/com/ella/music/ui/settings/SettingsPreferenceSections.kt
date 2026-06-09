@@ -69,6 +69,23 @@ internal fun SettingsHomeCustomizeSection(
 }
 
 @Composable
+internal fun SettingsLibrarySourceSection(
+    onOpenScanFolders: (() -> Unit)?
+) {
+    SmallTitle(text = stringResource(R.string.settings_library_source))
+
+    SettingsCardGroup {
+        Column {
+            ArrowPreference(
+                title = stringResource(R.string.settings_scan_folders),
+                summary = stringResource(R.string.settings_scan_folders_summary),
+                onClick = { onOpenScanFolders?.invoke() }
+            )
+        }
+    }
+}
+
+@Composable
 internal fun SettingsAiInterpretationSection() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

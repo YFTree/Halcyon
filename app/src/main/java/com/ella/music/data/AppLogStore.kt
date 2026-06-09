@@ -206,7 +206,11 @@ object AppLogStore {
         return removed
     }
 
-    fun buildDetailedReport(context: Context, entries: List<AppLogEntry> = read(context)): String {
+    fun buildDetailedReport(
+        context: Context,
+        entries: List<AppLogEntry> = read(context),
+        scopeDescription: String? = null
+    ): String {
         val appContext = context.applicationContext
         return buildString {
             appendLine("Halcyon diagnostic info")
@@ -216,6 +220,7 @@ object AppLogStore {
             appendLine("Package: ${appContext.packageName}")
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})")
             appendLine("Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+            scopeDescription?.takeIf { it.isNotBlank() }?.let { appendLine("Export scope: $it") }
             appendLine("Log count: ${entries.size}")
             appendLine("Error count: ${entries.count { it.level == "ERROR" }}")
             appendLine("Warning count: ${entries.count { it.level == "WARNING" }}")
@@ -239,10 +244,14 @@ object AppLogStore {
         }
     }
 
-    fun exportDetailedReport(context: Context, entries: List<AppLogEntry> = read(context)): File {
+    fun exportDetailedReport(
+        context: Context,
+        entries: List<AppLogEntry> = read(context),
+        scopeDescription: String? = null
+    ): File {
         val dir = File(context.cacheDir, "shared_logs").apply { mkdirs() }
         val file = File(dir, "ella-log-${exportTimeFormat()}.txt")
-        file.writeText(buildDetailedReport(context, entries))
+        file.writeText(buildDetailedReport(context, entries, scopeDescription))
         return file
     }
 

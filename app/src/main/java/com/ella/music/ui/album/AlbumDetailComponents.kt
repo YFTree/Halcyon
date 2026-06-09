@@ -285,7 +285,7 @@ private fun AlbumTrackRow(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (qualityTag == "Dolby") "ᴶᴶ" else qualityTag,
+                            text = qualityTag,
                             fontSize = 9.sp,
                             color = albumDetailQualityColor(qualityTag)
                         )

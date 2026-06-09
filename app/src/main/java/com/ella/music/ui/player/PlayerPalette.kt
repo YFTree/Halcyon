@@ -52,45 +52,32 @@ internal data class PlayerPalette(
         )
 
         fun from(bitmap: Bitmap?): PlayerPalette {
-            if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) return Default
-            val sampleStep = (minOf(bitmap.width, bitmap.height) / 36).coerceAtLeast(1)
-            var red = 0L
-            var green = 0L
-            var blue = 0L
-            var count = 0L
+            return fromCoverBackground(bitmap)
+        }
 
-            var y = 0
-            while (y < bitmap.height) {
-                var x = 0
-                while (x < bitmap.width) {
-                    val pixel = bitmap.getPixel(x, y)
-                    val alpha = AndroidColor.alpha(pixel)
-                    if (alpha > 24) {
-                        red += AndroidColor.red(pixel)
-                        green += AndroidColor.green(pixel)
-                        blue += AndroidColor.blue(pixel)
-                        count++
-                    }
-                    x += sampleStep
-                }
-                y += sampleStep
-            }
-            if (count == 0L) return Default
-
-            val r = (red / count).toInt()
-            val g = (green / count).toInt()
-            val b = (blue / count).toInt()
-            val accent = Color(r, g, b).boosted()
+        fun fromCoverBackground(bitmap: Bitmap?): PlayerPalette {
+            val representative = representativeAccent(bitmap) ?: return Default
+            val accent = representative.toPlayerAccent()
             return PlayerPalette(
-                top = accent.darken(0.58f),
-                middle = accent.darken(0.78f),
-                bottom = Color.Black,
+                top = accent.darken(0.40f),
+                middle = accent.darken(0.66f),
+                bottom = accent.darken(0.86f),
                 accent = accent
             )
         }
 
         fun fromLyricBackground(bitmap: Bitmap?): PlayerPalette {
-            if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) return Default
+            val accent = representativeAccent(bitmap)?.toPlayerAccent() ?: return Default
+            return PlayerPalette(
+                top = accent.darken(0.42f),
+                middle = accent.darken(0.68f),
+                bottom = accent.darken(0.88f),
+                accent = accent
+            )
+        }
+
+        private fun representativeAccent(bitmap: Bitmap?): Color? {
+            if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) return null
             val sampleStep = (minOf(bitmap.width, bitmap.height) / 36).coerceAtLeast(1)
             val buckets = linkedMapOf<Int, LongArray>()
             val fallback = LongArray(4)
@@ -128,7 +115,7 @@ internal data class PlayerPalette(
                 }
                 y += sampleStep
             }
-            if (fallback[0] == 0L) return Default
+            if (fallback[0] == 0L) return null
 
             val best = buckets.values.maxByOrNull { bucket ->
                 val count = bucket[0].coerceAtLeast(1L)
@@ -145,13 +132,7 @@ internal data class PlayerPalette(
             val r = (best[1] / count).toInt()
             val g = (best[2] / count).toInt()
             val b = (best[3] / count).toInt()
-            val accent = Color(r, g, b).toPlayerAccent()
-            return PlayerPalette(
-                top = accent.darken(0.42f),
-                middle = accent.darken(0.68f),
-                bottom = accent.darken(0.88f),
-                accent = accent
-            )
+            return Color(r, g, b)
         }
     }
 }

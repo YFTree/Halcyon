@@ -157,7 +157,7 @@ internal fun qualityTagColor(tag: String): Color {
         "LQ" -> Color(0xFF45D06B)
         "SQ" -> Color(0xFFD16CFF)
         "MQ" -> Color(0xFFFF6E40)
-        "Dolby" -> Color(0xFF2FD8FF)
+        "AC3", "EC3", "EAC3", "Surround" -> Color(0xFF2FD8FF)
         else -> Color.White.copy(alpha = 0.72f)
     }
 }

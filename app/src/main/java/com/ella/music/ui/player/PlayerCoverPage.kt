@@ -84,6 +84,7 @@ internal fun CoverPlayerPage(
     isFavorite: Boolean,
     audioSessionId: Int,
     visualizerEnabled: Boolean,
+    lyricOffsetMs: Long,
     metadataEditorId: String,
     lyricTimingEditorId: String,
     onVisualizerEnabled: (Boolean) -> Unit,
@@ -130,6 +131,7 @@ internal fun CoverPlayerPage(
     onCancelTimer: () -> Unit,
     onSpeed: (Float) -> Unit,
     onPitch: (Float) -> Unit,
+    onLyricOffset: (Long) -> Unit,
     actionMenuInitialPage: PlayerActionSheetPage,
     modifier: Modifier = Modifier
 ) {
@@ -374,7 +376,7 @@ internal fun CoverPlayerPage(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
-                                .clip(RoundedCornerShape(24.dp)),
+                                .clip(RoundedCornerShape(14.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             if (dynamicCoverSource != null) {
@@ -388,7 +390,7 @@ internal fun CoverPlayerPage(
                                 AlbumArtView(
                                     song = song,
                                     embeddedCover = embeddedCover,
-                                    cornerRadius = 24.dp,
+                                    cornerRadius = 14.dp,
                                     showHiResLogo = showHiResLogo,
                                     hiResLogoUri = hiResLogoUri,
                                     modifier = Modifier.fillMaxSize()
@@ -496,6 +498,7 @@ internal fun CoverPlayerPage(
             playbackPitch = playbackPitch,
             visualizerEnabled = visualizerEnabled,
             visualizerAvailable = immersiveAlbumCover,
+            lyricOffsetMs = lyricOffsetMs,
             metadataEditorId = metadataEditorId,
             lyricTimingEditorId = lyricTimingEditorId,
             sleepTimerEndRealtimeMs = sleepTimerEndRealtimeMs,
@@ -515,6 +518,7 @@ internal fun CoverPlayerPage(
             onSetRating = onSetRating,
             onAiInterpret = onAiInterpret,
             onSpectrum = onSpectrum,
+            onOpenEqualizer = { openSystemEqualizer(context, audioSessionId) },
             onDeleteSong = onDeleteSong,
             onMatchDynamicCover = onMatchDynamicCover,
             onStopAfterCurrent = onStopAfterCurrent,
@@ -523,6 +527,7 @@ internal fun CoverPlayerPage(
             onCancelTimer = onCancelTimer,
             onSpeed = onSpeed,
             onPitch = onPitch,
+            onLyricOffset = onLyricOffset,
             onVisualizerEnabled = onVisualizerEnabled,
             initialPage = actionMenuInitialPage
         )

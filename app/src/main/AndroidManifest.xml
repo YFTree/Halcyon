@@ -24,6 +24,10 @@
         <package android:name="com.example.LyricBox" />
         <package android:name="com.xjcheng.musictageditor" />
         <package android:name="com.andrewkhandr.aspectpro" />
+        <package android:name="com.android.musicfx" />
+        <intent>
+            <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
+        </intent>
         <intent>
             <action android:name="com.lonx.lyrico.action.EDIT_TAG" />
             <data android:mimeType="audio/*" />
@@ -37,6 +41,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:localeConfig="@xml/locale_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.Ella">
 
@@ -49,6 +54,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.Ella">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -73,6 +73,9 @@ class DesktopLyricService : Service() {
     private var statusBarTopOffsetDp = 16
     private var statusBarPosition = SettingsManager.DESKTOP_LYRIC_STATUS_POSITION_CENTER
     private var statusBarSecondaryMode = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF
+    private var lyricFontPath = ""
+    private var lyricFontWeight = 800
+    private var lyricFontItalic = false
     private var controllerIsPlaying = false
     private var savedX = Int.MIN_VALUE
     private var savedY = Int.MIN_VALUE
@@ -556,6 +559,9 @@ class DesktopLyricService : Service() {
             opacityPercent = settingsManager.desktopLyricOpacity.first().coerceIn(35, 100)
             lyricTextColor = settingsManager.desktopLyricTextColor.first()
             shadowStrength = settingsManager.desktopLyricShadowStrength.first().coerceIn(0, 160) / 100f
+            lyricFontPath = settingsManager.lyricFontPath.first()
+            lyricFontWeight = settingsManager.lyricFontWeight.first().coerceIn(100, 900)
+            lyricFontItalic = settingsManager.lyricFontItalic.first()
             savedX = settingsManager.desktopLyricX.first()
             savedY = settingsManager.desktopLyricY.first()
         }
@@ -595,7 +601,10 @@ class DesktopLyricService : Service() {
             textColor = lyricTextColor,
             shadowStrength = shadowStrength,
             statusBarMode = statusBarMode,
-            statusBarSecondaryMode = statusBarSecondaryMode
+            statusBarSecondaryMode = statusBarSecondaryMode,
+            lyricFontPath = lyricFontPath,
+            lyricFontWeight = lyricFontWeight,
+            lyricFontItalic = lyricFontItalic
         )
         rootView?.alpha = 1f
     }
@@ -680,6 +689,9 @@ class DesktopLyricService : Service() {
         private var textColor = Color.WHITE
         private var statusBarMode = false
         private var statusBarSecondaryMode = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF
+        private var lyricFontPath = ""
+        private var lyricFontWeight = 800
+        private var lyricFontItalic = false
         private var songKey: String? = null
 
         init {
@@ -706,7 +718,10 @@ class DesktopLyricService : Service() {
             textColor: Int,
             @Suppress("UNUSED_PARAMETER") shadowStrength: Float,
             statusBarMode: Boolean = false,
-            statusBarSecondaryMode: Int = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF
+            statusBarSecondaryMode: Int = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF,
+            lyricFontPath: String = "",
+            lyricFontWeight: Int = 800,
+            lyricFontItalic: Boolean = false
         ) {
             this.fontScale = fontScale.coerceIn(0.8f, 2.2f)
             this.translationScale = translationScale.coerceIn(0.8f, 2.2f)
@@ -714,6 +729,9 @@ class DesktopLyricService : Service() {
             this.textColor = textColor
             this.statusBarMode = statusBarMode
             this.statusBarSecondaryMode = statusBarSecondaryMode.coerceIn(0, 2)
+            this.lyricFontPath = lyricFontPath
+            this.lyricFontWeight = lyricFontWeight.coerceIn(100, 900)
+            this.lyricFontItalic = lyricFontItalic
             applySmoothStyle()
             updateSong(force = true)
         }
@@ -824,15 +842,15 @@ class DesktopLyricService : Service() {
             val primarySp = if (statusBarMode) 12.5f else 24f
             val secondarySp = if (statusBarMode) 9.5f else 14f
             val primaryTypeface = loadAndroidTypeface(
-                fontPath = "",
-                weight = 800,
-                italic = false,
+                fontPath = lyricFontPath,
+                weight = lyricFontWeight,
+                italic = lyricFontItalic,
                 boldFallback = true
             )
             val secondaryTypeface = loadAndroidTypeface(
-                fontPath = "",
-                weight = 600,
-                italic = false,
+                fontPath = lyricFontPath,
+                weight = (lyricFontWeight - 200).coerceIn(100, 900),
+                italic = lyricFontItalic,
                 boldFallback = false
             )
             lyricView.setStyle(

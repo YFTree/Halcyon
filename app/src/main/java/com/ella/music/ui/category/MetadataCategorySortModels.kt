@@ -6,6 +6,7 @@ import com.ella.music.R
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.formatPlaybackDuration
+import com.ella.music.ui.folder.musicSortKey
 import com.ella.music.viewmodel.MetadataCategoryItem
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -136,9 +137,9 @@ internal fun List<com.ella.music.data.model.Song>.sortedForMetadataDetail(
                 .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
                 .thenBy { it.title.lowercase(Locale.ROOT) }
         )
-        MetadataDetailSongSortMode.Title -> sortedBy { it.title.lowercase(Locale.ROOT) }
+        MetadataDetailSongSortMode.Title -> sortedBy { it.title.musicSortKey() }
         MetadataDetailSongSortMode.FileName -> sortedBy { song ->
-            song.fileName.ifBlank { song.path.substringAfterLast('/') }.lowercase(Locale.ROOT)
+            song.fileName.ifBlank { song.path.substringAfterLast('/') }.musicSortKey()
         }
         MetadataDetailSongSortMode.Duration -> sortedByDescending { it.duration }
         MetadataDetailSongSortMode.YearAsc -> sortedByReleaseDate(ascending = true)
@@ -148,6 +149,15 @@ internal fun List<com.ella.music.data.model.Song>.sortedForMetadataDetail(
         MetadataDetailSongSortMode.DateModified -> sortedByDescending { it.dateModified }
         MetadataDetailSongSortMode.DateModifiedAsc -> sortedBy { it.dateModified }
     }
+}
+
+internal fun Song.metadataDetailIndexLetter(mode: MetadataDetailSongSortMode): String {
+    val sortText = when (mode) {
+        MetadataDetailSongSortMode.FileName -> fileName.ifBlank { path.substringAfterLast('/') }
+        else -> title
+    }
+    val first = sortText.musicSortKey().firstOrNull()?.uppercaseChar()
+    return if (first != null && first in 'A'..'Z') first.toString() else "#"
 }
 
 internal enum class MetadataDetailTab {

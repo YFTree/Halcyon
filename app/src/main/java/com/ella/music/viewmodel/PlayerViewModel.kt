@@ -12,6 +12,7 @@ import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.playlistIdentityKey
+import com.ella.music.data.model.shiftedBy
 import com.ella.music.data.repository.CoverUsage
 import com.ella.music.data.repository.MusicRepository
 import com.ella.music.player.DesktopLyricBridge
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
@@ -37,6 +39,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.pow
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
@@ -76,8 +80,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, playlistStore.favoriteSongKeys())
 
+    private val _rawLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     private val _lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val lyrics: StateFlow<List<LyricLine>> = _lyrics.asStateFlow()
+    private val _currentLyricOffsetMs = MutableStateFlow(0L)
+    val currentLyricOffsetMs: StateFlow<Long> = _currentLyricOffsetMs.asStateFlow()
 
     private val _lyricFormatAvailability = MutableStateFlow(MusicRepository.LyricFormatAvailability())
     val lyricFormatAvailability: StateFlow<MusicRepository.LyricFormatAvailability> =
@@ -126,6 +133,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var superLyricTranslationEnabled = true
     private var superLyricPronunciationEnabled = false
     private var lyricSourceMode = SettingsManager.LYRIC_SOURCE_AUTO
+    private var lyricOffsetOverrides = emptyMap<String, Long>()
     private var appliedDecoderMode: Int? = null
     private var appliedAudioFocusDisabled: Boolean? = null
     private var appliedLyricSourceMode: Int? = null
@@ -152,7 +160,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         initPreviousButtonAction()
         initDecoderMode()
         initAudioFocusMode()
+        initReplayGain()
         initLyricSourceMode()
+        initLyricParsingOptions()
+        initLyricOffsetOverrides()
         initBluetoothAutoPlay()
         lazyOnlineQueueController.observePlaybackEnd()
     }
@@ -452,6 +463,48 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun initReplayGain() {
+        viewModelScope.launch {
+            combine(
+                settingsManager.replayGainEnabled.distinctUntilChanged(),
+                currentSong
+            ) { enabled, song -> enabled to song }
+                .collectLatest { (enabled, song) ->
+                    val volume = if (enabled && song != null) {
+                        withContext(Dispatchers.IO) {
+                            repository.getReplayGain(song)
+                        }.toReplayGainVolume()
+                    } else {
+                        1f
+                    }
+                    playerManager.setReplayGainVolume(volume)
+                }
+        }
+    }
+
+    private fun initLyricParsingOptions() {
+        viewModelScope.launch {
+            var initialized = false
+            settingsManager.ignoreSplMetadataLines.distinctUntilChanged().collect {
+                if (!initialized) {
+                    initialized = true
+                    return@collect
+                }
+                _preferTtmlLyrics.value = null
+                currentSong.value?.let { song -> reloadLyrics(song, force = true) }
+            }
+        }
+    }
+
+    private fun initLyricOffsetOverrides() {
+        viewModelScope.launch {
+            settingsManager.lyricOffsetOverrides.distinctUntilChanged().collect { overrides ->
+                lyricOffsetOverrides = overrides
+                applyCurrentLyricOffset(notifyExternal = true)
+            }
+        }
+    }
+
     private fun initBluetoothAutoPlay() {
         viewModelScope.launch {
             PlaybackService.bluetoothConnectEvent.collect {
@@ -546,20 +599,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         return@collectLatest
                     }
                     loadedLyricSongKey = songKey
-                    _lyrics.value = songLyrics
-                    _currentLyricIndex.value = -1
+                    setLoadedLyrics(song, songLyrics, notifyExternal = false)
+                    val displayedLyrics = _lyrics.value
 
                     if (lyriconBridge.isEnabled()) {
-                        lyriconBridge.sendSong(song, songLyrics)
+                        lyriconBridge.sendSong(song, displayedLyrics)
                     }
-                    if (songLyrics.isEmpty()) {
+                    if (displayedLyrics.isEmpty()) {
                         clearExternalLyrics(clearLyricon = false, clearSuperLyricSong = false)
                     } else {
                         scheduleExternalLyricResend()
                     }
                 } else {
                     loadedLyricSongKey = null
+                    _rawLyrics.value = emptyList()
                     _lyrics.value = emptyList()
+                    _currentLyricOffsetMs.value = 0L
                     _currentLyricIndex.value = -1
                     clearExternalLyrics(clearLyricon = true, clearSuperLyricSong = true)
                 }
@@ -641,8 +696,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val songKey = song.lyricIdentityKey()
         // Guard: if lyrics are loaded for a different song, skip this resend
         if (loadedLyricSongKey != null && loadedLyricSongKey != songKey) return
-        val songLyrics = _lyrics.value.ifEmpty { repository.getLyrics(song, lyricSourceMode) }
-        if (_lyrics.value.isEmpty()) _lyrics.value = songLyrics
+        if (_lyrics.value.isEmpty()) {
+            val loaded = repository.getLyrics(song, lyricSourceMode)
+            setLoadedLyrics(song, loaded, notifyExternal = false)
+        }
+        val songLyrics = _lyrics.value
         // Re-verify after potential async fetch
         if (playerManager.currentSong.value?.lyricIdentityKey() != songKey) return
         lyriconBridge.sendSong(song, songLyrics)
@@ -702,6 +760,46 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun resendLyricGetter(force: Boolean = false) {
         if (!lyricGetterBridge.isEnabled() || !isPlaying.value) return
         lyricGetterBridge.sendLyric(_lyrics.value.getOrNull(_currentLyricIndex.value), force)
+    }
+
+    private fun setLoadedLyrics(
+        song: Song,
+        rawLyrics: List<LyricLine>,
+        notifyExternal: Boolean
+    ) {
+        _rawLyrics.value = rawLyrics
+        applyCurrentLyricOffset(song = song, notifyExternal = notifyExternal)
+    }
+
+    private fun applyCurrentLyricOffset(
+        song: Song? = currentSong.value,
+        notifyExternal: Boolean = false
+    ) {
+        if (song == null) {
+            _currentLyricOffsetMs.value = 0L
+            _lyrics.value = _rawLyrics.value
+            _currentLyricIndex.value = -1
+            return
+        }
+        val offsetMs = lyricOffsetOverrides[song.lyricIdentityKey()] ?: 0L
+        _currentLyricOffsetMs.value = offsetMs
+        _lyrics.value = _rawLyrics.value.shiftedBy(offsetMs)
+        _currentLyricIndex.value = -1
+        lastTickerPayload = null
+        lastBluetoothLyricPayload = null
+        if (!notifyExternal) return
+        if (lyriconBridge.isEnabled()) lyriconBridge.sendSong(song, _lyrics.value)
+        superLyricBridge.sendSong(song)
+        if (_lyrics.value.isEmpty()) {
+            clearExternalLyrics(clearLyricon = false, clearSuperLyricSong = false)
+        } else {
+            resendTickerLyric(force = true)
+            resendDesktopLyric()
+            resendSuperLyric(force = true)
+            resendLyricGetter(force = true)
+            resendBluetoothLyric(force = true)
+            scheduleExternalLyricResend()
+        }
     }
 
     private fun scheduleExternalLyricResend() {
@@ -919,6 +1017,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerManager.setPlaybackParameters(playbackSpeed.value, pitch)
     }
 
+    private fun Float?.toReplayGainVolume(): Float {
+        val gainDb = this?.coerceIn(-24f, 0f) ?: return 1f
+        return 10f.pow(gainDb / 20f).coerceIn(0.05f, 1f)
+    }
+
     fun setLyricSourceMode(mode: Int) {
         viewModelScope.launch {
             _preferTtmlLyrics.value = null
@@ -933,6 +1036,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             _preferTtmlLyrics.value = preferTtml
             currentSong.value?.let { reloadLyrics(it, force = true) }
+        }
+    }
+
+    fun setCurrentLyricOffsetMs(offsetMs: Long) {
+        val song = currentSong.value ?: return
+        val safeOffset = offsetMs.coerceIn(-5000L, 5000L)
+        viewModelScope.launch {
+            settingsManager.setLyricOffsetOverride(song.lyricIdentityKey(), safeOffset)
         }
     }
 
@@ -977,11 +1088,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             repository.getLyrics(song, lyricSourceMode)
         }
         loadedLyricSongKey = song.lyricIdentityKey()
-        _lyrics.value = songLyrics
-        _currentLyricIndex.value = -1
-        if (lyriconBridge.isEnabled()) lyriconBridge.sendSong(song, songLyrics)
+        setLoadedLyrics(song, songLyrics, notifyExternal = false)
+        val displayedLyrics = _lyrics.value
+        if (lyriconBridge.isEnabled()) lyriconBridge.sendSong(song, displayedLyrics)
         superLyricBridge.sendSong(song)
-        if (songLyrics.isEmpty()) {
+        if (displayedLyrics.isEmpty()) {
             clearExternalLyrics(clearLyricon = false, clearSuperLyricSong = false)
         } else {
             if (tickerBridge.isEnabled()) resendTickerLyric(force = true)

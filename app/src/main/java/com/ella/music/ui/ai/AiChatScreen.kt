@@ -2,30 +2,18 @@ package com.ella.music.ui.ai
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,32 +23,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.ConfirmDangerDialog
-import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.UUID
 
 // ── Composable ──
@@ -74,10 +46,8 @@ fun AiChatScreen(
     onNavigateToPlayer: () -> Unit
 ) {
     val context = LocalContext.current
-    val keyboardController = LocalSoftwareKeyboardController.current
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
-    val inputFocusRequester = remember { FocusRequester() }
     var input by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
     val background = ellaPageBackground()
@@ -217,11 +187,6 @@ fun AiChatScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        inputFocusRequester.requestFocus()
-        keyboardController?.show()
-    }
-
     // ── Delete confirmation dialog ──
     showDeleteDialog?.let { meta ->
         ConfirmDangerDialog(
@@ -242,131 +207,51 @@ fun AiChatScreen(
             .background(background)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        // ── Top bar ──
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = MiuixIcons.Regular.Back,
-                    contentDescription = stringResource(R.string.common_back),
-                    tint = MiuixTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                Text(
-                    text = stringResource(R.string.ai_chat_title),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = stringResource(R.string.ai_chat_disclaimer),
-                    fontSize = 11.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-            }
-        }
-
-        // ── Session selector ──
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            sessionIndex.forEach { meta ->
-                val selected = meta.id == currentSessionId
-                val chipBackground = if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f)
-                val chipTextColor = if (selected) MiuixTheme.colorScheme.primary
-                    else MiuixTheme.colorScheme.onSurfaceVariantSummary
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(chipBackground)
-                        .combinedClickable(
-                            onClick = { switchSession(meta.id) },
-                            onLongClick = { showDeleteDialog = meta }
-                        )
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = meta.title,
-                        fontSize = 13.sp,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        color = chipTextColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-            if (sessionIndex.size < MAX_SESSIONS) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f))
-                        .clickable { createNewSession() }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Add,
-                        contentDescription = stringResource(R.string.ai_chat_new_session),
-                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-            }
-        }
+        AiChatTopBar(onBack = onBack)
+        AiChatSessionStrip(
+            sessions = sessionIndex,
+            currentSessionId = currentSessionId,
+            onSessionClick = ::switchSession,
+            onSessionLongClick = { showDeleteDialog = it },
+            onCreateSession = ::createNewSession,
+        )
 
         // ── Messages + Input (Box layout to handle mini player overlay) ──
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 96.dp),
+                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 124.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(messages) { message ->
                     AiChatBubble(
-                    message = message,
-                    onPlaySongs = { playSongs(message.songs) },
-                    onPlaySingleSong = { playSingleSong(it) },
-                    onAddSongsToQueue = { addSongsToQueue(message.songs) },
-                    onCreatePlaylist = { createPlaylistFromSongs(message.songs, message.playlistName) }
+                        message = message,
+                        onPlaySongs = { playSongs(message.songs) },
+                        onPlaySingleSong = { playSingleSong(it) },
+                        onAddSongsToQueue = { addSongsToQueue(message.songs) },
+                        onCreatePlaylist = { createPlaylistFromSongs(message.songs, message.playlistName) }
+                    )
+                }
+            }
+
+            if (messages.isEmpty()) {
+                AiChatEmptyState(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 34.dp, vertical = 80.dp)
                 )
             }
-        }
 
-        // ── Input bar (positioned above mini player overlay) ──
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .imePadding()
-                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            EllaMiuixTextField(
-                value = input,
-                onValueChange = { input = it },
-                label = stringResource(R.string.ai_chat_input_hint),
-                singleLine = false,
+            // ── Input bar (fixed to the bottom; IME only moves this layer) ──
+            AiChatInputBar(
+                input = input,
+                sending = sending,
+                onInputChange = { input = it },
+                onSend = ::send,
                 modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(inputFocusRequester)
+                    .align(Alignment.BottomCenter)
             )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = { if (input.isNotBlank() && !sending) send() }) {
-                Text(stringResource(R.string.ai_chat_send))
-            }
-        }
         } // end Box
     }
 }

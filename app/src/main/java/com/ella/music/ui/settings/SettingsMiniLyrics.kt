@@ -28,6 +28,7 @@ internal fun SettingsMiniLyricsControls(
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
     val lyricSourcePriority by settingsManager.lyricSourcePriority.collectAsState(initial = SettingsManager.DEFAULT_LYRIC_SOURCE_PRIORITY)
     val lyricFontName by settingsManager.lyricFontName.collectAsState(initial = "")
+    val ignoreSplMetadataLines by settingsManager.ignoreSplMetadataLines.collectAsState(initial = false)
 
     val statusLyricSecondaryLabels = listOf(
         stringResource(R.string.settings_status_secondary_off),
@@ -91,6 +92,15 @@ internal fun SettingsMiniLyricsControls(
         title = stringResource(R.string.settings_lyric_font),
         summary = lyricFontName.ifBlank { stringResource(R.string.settings_system_default) },
         onClick = onNavigateToLyricFont
+    )
+
+    SwitchPreference(
+        title = stringResource(R.string.settings_ignore_spl_metadata_lines),
+        summary = stringResource(R.string.settings_ignore_spl_metadata_lines_summary),
+        checked = ignoreSplMetadataLines,
+        onCheckedChange = { enabled ->
+            scope.launch { settingsManager.setIgnoreSplMetadataLines(enabled) }
+        }
     )
 
     LyricSourcePriorityBlock(

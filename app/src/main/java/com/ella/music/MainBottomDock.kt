@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -125,6 +126,7 @@ internal fun FloatingBottomControls(
         modifier = modifier
             .fillMaxWidth()
             .then(if (useGlass) Modifier.navigationBarsPadding() else Modifier)
+            .consumeBottomDockPassthrough(showMiniPlayer, showBottomBar, effectiveMode)
     ) { mode ->
         if (mode == BottomDockMode.Compact && currentSong != null) {
             CompactBottomDock(
@@ -150,18 +152,6 @@ internal fun FloatingBottomControls(
             )
         } else {
             Box(modifier = Modifier.fillMaxWidth()) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .pointerInput(showMiniPlayer, showBottomBar) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    event.changes.forEach { it.consume() }
-                                }
-                            }
-                        }
-                )
                 Column(modifier = Modifier.fillMaxWidth()) {
                     AnimatedVisibility(
                         visible = showMiniPlayer,
@@ -193,65 +183,53 @@ internal fun FloatingBottomControls(
                     }
 
                     AnimatedVisibility(visible = showBottomBar) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (useGlass) {
-                                Box(modifier = Modifier.weight(1f)) {
-                                    val selectedBottomTabIndex = tabs
-                                        .indexOfFirst { currentTabRoute == it.route }
-                                        .takeIf { it >= 0 }
-                                    LiquidGlassBottomBar(
-                                        backdrop = backdrop,
-                                        isBlurEnabled = true,
-                                        glassEffect = glassEffect,
-                                        selectedIndex = selectedBottomTabIndex,
-                                        itemCount = tabs.size,
-                                        onSelected = { index ->
-                                            tabs.getOrNull(index)?.let { onNavigate(it.route) }
-                                        }
-                                    ) {
-                                        tabs.forEach { tab ->
-                                            LiquidGlassBottomBarItem(
-                                                selected = currentTabRoute == tab.route,
-                                                onClick = {},
-                                                backdrop = backdrop,
-                                                isBlurEnabled = true,
-                                                showSelectedIndicator = glassEffect == BottomBarGlassEffect.LiquidGlass,
-                                                icon = {
-                                                    Icon(
-                                                        imageVector = tab.icon,
-                                                        contentDescription = tab.label,
-                                                        tint = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
-                                                        else MiuixTheme.colorScheme.onSurface,
-                                                        modifier = Modifier
-                                                    )
-                                                },
-                                                label = {
-                                                    top.yukonga.miuix.kmp.basic.Text(
-                                                        text = tab.label,
-                                                        fontSize = 11.sp,
-                                                        color = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
-                                                        else MiuixTheme.colorScheme.onSurface
-                                                    )
-                                                }
-                                            )
-                                        }
+                        if (useGlass && tabs.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                            ) {
+                                val selectedBottomTabIndex = tabs
+                                    .indexOfFirst { currentTabRoute == it.route }
+                                    .takeIf { it >= 0 }
+                                LiquidGlassBottomBar(
+                                    backdrop = backdrop,
+                                    isBlurEnabled = true,
+                                    glassEffect = glassEffect,
+                                    selectedIndex = selectedBottomTabIndex,
+                                    itemCount = tabs.size,
+                                    onSelected = { index ->
+                                        tabs.getOrNull(index)?.let { onNavigate(it.route) }
+                                    }
+                                ) {
+                                    tabs.forEachIndexed { index, tab ->
+                                        LiquidGlassBottomBarItem(
+                                            selected = currentTabRoute == tab.route,
+                                            onClick = {},
+                                            backdrop = backdrop,
+                                            isBlurEnabled = true,
+                                            showSelectedIndicator = glassEffect == BottomBarGlassEffect.LiquidGlass,
+                                            index = index,
+                                            icon = {
+                                                Icon(
+                                                    imageVector = tab.icon,
+                                                    contentDescription = tab.label,
+                                                    tint = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
+                                                    else MiuixTheme.colorScheme.onSurface,
+                                                    modifier = Modifier
+                                                )
+                                            },
+                                            label = {
+                                                top.yukonga.miuix.kmp.basic.Text(
+                                                    text = tab.label,
+                                                    fontSize = 11.sp,
+                                                    color = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
+                                                    else MiuixTheme.colorScheme.onSurface
+                                                )
+                                            }
+                                        )
                                     }
                                 }
-                                BottomDockActionPill(
-                                    icon = MiuixIcons.Basic.Search,
-                                    label = stringResource(R.string.common_search),
-                                    selected = currentRoute.isSearchRoute(),
-                                    onClick = onNavigateSearch,
-                                    backdrop = backdrop,
-                                    glassEffect = glassEffect,
-                                    modifier = Modifier.size(64.dp)
-                                )
                             }
                         }
                     }
@@ -370,7 +348,7 @@ private fun CompactBottomDock(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
             .height(64.dp)
             .clickable(
                 interactionSource = interactionSource,
@@ -418,6 +396,16 @@ private fun CompactBottomDock(
         )
     }
 }
+
+private fun Modifier.consumeBottomDockPassthrough(vararg keys: Any?): Modifier =
+    pointerInput(*keys) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(pass = PointerEventPass.Final)
+                event.changes.forEach { it.consume() }
+            }
+        }
+    }
 
 @Composable
 private fun BottomDockActionPill(

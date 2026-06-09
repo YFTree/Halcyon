@@ -5,11 +5,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -20,13 +28,206 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
+import com.ella.music.data.model.Song
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.round
+
+@Composable
+internal fun PlayerActionMenuHeader(
+    song: Song?,
+    onArtist: () -> Unit,
+    onAlbum: () -> Unit
+) {
+    val title = song?.let {
+        it.title.ifBlank { it.fileName.ifBlank { stringResource(R.string.player_unknown_song) } }
+    } ?: stringResource(R.string.player_no_song_playing)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SmallCover(
+            song = song,
+            embeddedCover = null,
+            modifier = Modifier.size(68.dp)
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 19.sp,
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(5.dp))
+            PlayerActionMenuSubtitle(
+                song = song,
+                onArtist = onArtist,
+                onAlbum = onAlbum
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerActionMenuSubtitle(
+    song: Song?,
+    onArtist: () -> Unit,
+    onAlbum: () -> Unit
+) {
+    if (song == null) {
+        Text(
+            text = stringResource(R.string.app_name),
+            fontSize = 13.sp,
+            lineHeight = 17.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+        return
+    }
+    val unknownArtist = stringResource(R.string.player_unknown_artist)
+    val artist = song.artist.ifBlank { unknownArtist }
+    val album = song.album.trim()
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = artist,
+            fontSize = 13.sp,
+            lineHeight = 17.sp,
+            fontWeight = FontWeight.Medium,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(enabled = song.artist.isNotBlank(), onClick = onArtist)
+        )
+        if (album.isNotBlank()) {
+            Text(
+                text = " · $album",
+                fontSize = 13.sp,
+                lineHeight = 17.sp,
+                fontWeight = FontWeight.Medium,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(onClick = onAlbum)
+            )
+        }
+    }
+}
+
+@Composable
+internal fun PlayerActionShortcutRow(
+    onAddToPlaylist: () -> Unit,
+    onPlayNext: () -> Unit,
+    onTimer: () -> Unit,
+    onSpeed: () -> Unit,
+    onOpenEqualizer: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        PlayerActionShortcut(
+            label = stringResource(R.string.player_speed_pitch),
+            kind = PlayerQuickActionKind.Speed,
+            onClick = onSpeed,
+            modifier = Modifier.weight(1f)
+        )
+        PlayerActionShortcut(
+            label = stringResource(R.string.player_equalizer),
+            kind = PlayerQuickActionKind.Equalizer,
+            onClick = onOpenEqualizer,
+            modifier = Modifier.weight(1f)
+        )
+        PlayerActionShortcut(
+            label = stringResource(R.string.player_sleep_timer),
+            kind = PlayerQuickActionKind.Timer,
+            onClick = onTimer,
+            modifier = Modifier.weight(1f)
+        )
+        PlayerActionShortcut(
+            label = stringResource(R.string.player_add_to_playlist),
+            kind = PlayerQuickActionKind.Add,
+            onClick = onAddToPlaylist,
+            modifier = Modifier.weight(1f)
+        )
+        PlayerActionShortcut(
+            label = stringResource(R.string.song_more_play_next),
+            kind = PlayerQuickActionKind.PlayNext,
+            onClick = onPlayNext,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun PlayerActionShortcut(
+    label: String,
+    kind: PlayerQuickActionKind,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .height(82.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        QuickActionIcon(
+            kind = kind,
+            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.82f),
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+internal fun PlayerActionMenuGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.60f))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        content = content
+    )
+}
 
 @Composable
 internal fun HalfSheetTitle(title: String, onBack: () -> Unit) {

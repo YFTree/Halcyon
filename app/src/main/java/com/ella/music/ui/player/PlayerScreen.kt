@@ -190,6 +190,7 @@ fun PlayerScreen(
     val lyrics by playerViewModel.lyrics.collectAsState()
     val lyricFormatAvailability by playerViewModel.lyricFormatAvailability.collectAsState()
     val preferTtmlLyrics by playerViewModel.preferTtmlLyrics.collectAsState()
+    val currentLyricOffsetMs by playerViewModel.currentLyricOffsetMs.collectAsState()
     val currentLyricIndex by playerViewModel.currentLyricIndex.collectAsState()
     val showLyrics by playerViewModel.showLyrics.collectAsState()
     val showLyricTranslation by playerViewModel.showLyricTranslation.collectAsState()
@@ -421,6 +422,7 @@ fun PlayerScreen(
                         isCurrentSongFavorite = isCurrentSongFavorite,
                         audioSessionId = audioSessionId,
                         audioVisualizerEnabled = audioVisualizerEnabled,
+                        lyricOffsetMs = currentLyricOffsetMs,
                         metadataEditorId = metadataEditorId,
                         lyricTimingEditorId = lyricTimingEditorId,
                         onVisualizerEnabled = setAudioVisualizerEnabled,
@@ -513,7 +515,7 @@ fun PlayerScreen(
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
                 audioInfo = audioInfo,
-                palette = lyricPalette,
+                palette = if (landscapeState.coverMode) palette else lyricPalette,
                 lyrics = lyrics,
                 currentLyricIndex = currentLyricIndex,
                 showTranslation = showLyricTranslation,

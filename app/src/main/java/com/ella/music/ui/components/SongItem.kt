@@ -319,7 +319,7 @@ private fun AudioQualityBadge(tag: String) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = if (tag == "Dolby") "ᴰᴰ" else tag,
+            text = tag,
             fontSize = 9.sp,
             color = audioQualityColor(tag)
         )
@@ -328,7 +328,7 @@ private fun AudioQualityBadge(tag: String) {
 
 private fun audioQualityColor(tag: String): Color {
     return when (tag) {
-        "Dolby" -> Color(0xFF6EE7FF)
+        "AC3", "EC3", "EAC3", "SUR" -> Color(0xFF6EE7FF)
         "MQ" -> Color(0xFFFF8F3D)
         "HR" -> Color(0xFFFFC23A)
         "SQ" -> Color(0xFF9B59FF)

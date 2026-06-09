@@ -1,6 +1,8 @@
 package com.ella.music.ui.player
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -27,6 +29,7 @@ internal fun PlayerActionMenu(
     pitch: Float,
     visualizerEnabled: Boolean,
     visualizerAvailable: Boolean,
+    lyricOffsetMs: Long,
     metadataEditorId: String,
     lyricTimingEditorId: String,
     sleepTimerEndRealtimeMs: Long?,
@@ -46,6 +49,7 @@ internal fun PlayerActionMenu(
     onSetRating: () -> Unit,
     onAiInterpret: () -> Unit,
     onSpectrum: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     onDeleteSong: () -> Unit,
     onMatchDynamicCover: () -> Unit,
     onStopAfterCurrent: (Boolean) -> Unit,
@@ -54,26 +58,13 @@ internal fun PlayerActionMenu(
     onCancelTimer: () -> Unit,
     onSpeed: (Float) -> Unit,
     onPitch: (Float) -> Unit,
+    onLyricOffset: (Long) -> Unit,
     onVisualizerEnabled: (Boolean) -> Unit,
     initialPage: PlayerActionSheetPage = PlayerActionSheetPage.Main,
     modifier: Modifier = Modifier
 ) {
     var page by remember(initialPage) { mutableStateOf(initialPage) }
     val context = LocalContext.current
-    val artistEntryLabel = remember(song?.artist) {
-        context.getString(
-            R.string.player_view_artist_named,
-            song?.artist?.ifBlank { context.getString(R.string.player_unknown_artist) }
-                ?: context.getString(R.string.player_unknown_artist)
-        )
-    }
-    val albumEntryLabel = remember(song?.album) {
-        context.getString(
-            R.string.player_view_album_named,
-            song?.album?.ifBlank { context.getString(R.string.player_unknown_album) }
-                ?: context.getString(R.string.player_unknown_album)
-        )
-    }
     val metadataOptions = remember(song?.id, song?.path, song?.mimeType) {
         song?.let { buildTagEditorOptions(context, it) }
             .orEmpty()
@@ -110,30 +101,44 @@ internal fun PlayerActionMenu(
     ) {
         when (page) {
             PlayerActionSheetPage.Main -> {
-                PlayerActionMenuItem(stringResource(R.string.player_landscape_lyrics), onLandscape)
-                PlayerActionMenuItem(albumEntryLabel, onAlbum)
-                PlayerActionMenuItem(artistEntryLabel, onArtist)
-                PlayerActionMenuItem(stringResource(R.string.player_add_to_playlist), onAddToPlaylist)
-                PlayerActionMenuItem(stringResource(R.string.common_add_to_queue), onAddToQueue)
-                PlayerActionMenuItem(stringResource(R.string.song_more_play_next), onPlayNext)
-                PlayerActionMenuItem(stringResource(R.string.common_share), onShare)
-                PlayerActionMenuItem(stringResource(R.string.song_more_view_spectrum), onSpectrum)
-                PlayerActionMenuItem(stringResource(R.string.song_more_ai_title), onAiInterpret)
-                PlayerActionMenuItem(stringResource(R.string.player_song_info), onSongInfo)
-                PlayerActionMenuItem(stringResource(R.string.song_more_set_rating), onSetRating)
-                PlayerActionMenuItem(stringResource(R.string.player_match_dynamic_cover), onMatchDynamicCover)
-                PlayerActionMenuItem(stringResource(R.string.player_edit_metadata), { openEditorPage(TagEditorOptionKind.Metadata, metadataEditorId) })
-                PlayerActionMenuItem(stringResource(R.string.player_lyric_timing), { openEditorPage(TagEditorOptionKind.LyricTiming, lyricTimingEditorId) })
-                if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
-                    PlayerActionMenuItem(stringResource(R.string.player_download_lx_song), onDownload)
+                PlayerActionMenuHeader(
+                    song = song,
+                    onArtist = onArtist,
+                    onAlbum = onAlbum
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                PlayerActionShortcutRow(
+                    onAddToPlaylist = onAddToPlaylist,
+                    onPlayNext = onPlayNext,
+                    onTimer = { page = PlayerActionSheetPage.Timer },
+                    onSpeed = { page = PlayerActionSheetPage.Speed },
+                    onOpenEqualizer = onOpenEqualizer,
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                PlayerActionMenuGroup {
+                    PlayerActionMenuItem(stringResource(R.string.common_add_to_queue), onAddToQueue)
+                    PlayerActionMenuItem(stringResource(R.string.common_share), onShare)
+                    PlayerActionMenuItem(stringResource(R.string.song_more_ai_title), onAiInterpret)
+                    PlayerActionMenuItem(stringResource(R.string.player_song_info), onSongInfo)
                 }
-                PlayerActionMenuItem(stringResource(R.string.player_sleep_timer), { page = PlayerActionSheetPage.Timer })
-                PlayerActionMenuItem(stringResource(R.string.player_speed_pitch), { page = PlayerActionSheetPage.Speed })
-                if (visualizerAvailable) {
-                    PlayerActionMenuItem(stringResource(R.string.player_visualizer_settings), { page = PlayerActionSheetPage.Visualizer })
-                }
-                if (song != null && !song.path.startsWith("http://", ignoreCase = true) && !song.path.startsWith("https://", ignoreCase = true)) {
-                    PlayerActionMenuItem(stringResource(R.string.song_more_delete_permanently), onDeleteSong, danger = true)
+                Spacer(modifier = Modifier.height(12.dp))
+                PlayerActionMenuGroup {
+                    PlayerActionMenuItem(stringResource(R.string.player_landscape_lyrics), onLandscape)
+                    PlayerActionMenuItem(stringResource(R.string.song_more_view_spectrum), onSpectrum)
+                    PlayerActionMenuItem(stringResource(R.string.song_more_set_rating), onSetRating)
+                    PlayerActionMenuItem(stringResource(R.string.player_match_dynamic_cover), onMatchDynamicCover)
+                    if (visualizerAvailable) {
+                        PlayerActionMenuItem(stringResource(R.string.player_visualizer_settings), { page = PlayerActionSheetPage.Visualizer })
+                    }
+                    PlayerActionMenuItem(stringResource(R.string.player_edit_metadata), { openEditorPage(TagEditorOptionKind.Metadata, metadataEditorId) })
+                    PlayerActionMenuItem(stringResource(R.string.player_lyric_timing), { openEditorPage(TagEditorOptionKind.LyricTiming, lyricTimingEditorId) })
+                    PlayerActionMenuItem(stringResource(R.string.player_lyric_offset), { page = PlayerActionSheetPage.LyricOffset })
+                    if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
+                        PlayerActionMenuItem(stringResource(R.string.player_download_lx_song), onDownload)
+                    }
+                    if (song != null && !song.path.startsWith("http://", ignoreCase = true) && !song.path.startsWith("https://", ignoreCase = true)) {
+                        PlayerActionMenuItem(stringResource(R.string.song_more_delete_permanently), onDeleteSong, danger = true)
+                    }
                 }
             }
             PlayerActionSheetPage.Timer -> {
@@ -156,6 +161,13 @@ internal fun PlayerActionMenu(
                     onBack = { page = PlayerActionSheetPage.Main },
                     onSpeed = onSpeed,
                     onPitch = onPitch
+                )
+            }
+            PlayerActionSheetPage.LyricOffset -> {
+                LyricOffsetSheetContent(
+                    offsetMs = lyricOffsetMs,
+                    onBack = { page = PlayerActionSheetPage.Main },
+                    onOffsetChange = onLyricOffset
                 )
             }
             PlayerActionSheetPage.Visualizer -> {
@@ -191,6 +203,7 @@ internal enum class PlayerActionSheetPage {
     Main,
     Timer,
     Speed,
+    LyricOffset,
     Visualizer,
     MetadataEditor,
     LyricTimingEditor

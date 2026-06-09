@@ -33,11 +33,15 @@ internal fun Intent.resolveShortcutRoute(): String {
 }
 
 internal fun String?.toCurrentTabRoute(): String? {
-    return when (this) {
-        null,
-        Screen.Home.route -> Screen.Home.route
-
-        Screen.Library.route -> Screen.Library.route
+    return when {
+        this == null -> null
+        this == Screen.Home.route -> Screen.Home.route
+        this == Screen.Library.route -> Screen.Library.route
+        this.isSearchRoute() -> Screen.LibrarySearch.createRoute()
+        this == Screen.Playlists.route -> Screen.Playlists.route
+        this == Screen.Folder.route -> Screen.Folder.route
+        this == Screen.Artist.route -> Screen.Artist.route
+        this == Screen.Album.route -> Screen.Album.route
         else -> null
     }
 }
@@ -53,6 +57,10 @@ internal fun String?.isBottomDockRoute(): Boolean {
         this.isSearchRoute() -> true
         this == Screen.Home.route -> true
         this == Screen.Library.route -> true
+        this == Screen.Playlists.route -> true
+        this == Screen.Folder.route -> true
+        this == Screen.Artist.route -> true
+        this == Screen.Album.route -> true
         else -> false
     }
 }

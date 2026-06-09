@@ -115,7 +115,7 @@ fun MiniPlayer(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = if (useGlassLayout) 16.dp else 0.dp, vertical = if (useGlassLayout) 6.dp else 0.dp)
+            .padding(horizontal = if (useGlassLayout) 16.dp else 0.dp, vertical = if (useGlassLayout) 2.dp else 0.dp)
             .pointerInput(song.id) {
                 var dragAmount = 0f
                 detectHorizontalDragGestures(

@@ -3,6 +3,7 @@ package com.ella.music.data.parser
 import android.text.Html
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
+import com.ella.music.data.model.shiftedBy
 import java.io.StringReader
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
@@ -13,21 +14,28 @@ import kotlin.math.abs
 internal object EllaLyricsParser {
     private val lrcTimePattern = Regex("""\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,6}))?]""")
     private val lrcMetaPattern = Regex("""\[(ti|ar|al|by|offset|re|ve):\s*(.*)]""", RegexOption.IGNORE_CASE)
+    private val splMetadataPattern = Regex("""\[(ti|ar|al|by|offset|kana|trans|roma):\s*.*]""", RegexOption.IGNORE_CASE)
     private val timedWordMarkerPattern = Regex("""<([^>]+)>|\[([^\]]+)]""")
     private val backgroundLinePattern = Regex("""^\[bg:\s*(.*)]$""", RegexOption.IGNORE_CASE)
     private val lyricifySyllablePattern = Regex("""(.*?)\((\d+),(\d+)\)""")
     private val lyricifyAttributePattern = Regex("""^\[(\d+)]""")
     private val timestampOnlyPattern = Regex("""\d+(?::\d{1,2}){1,2}(?:[.:]\d{1,6})?""")
 
-    fun parse(content: String): LrcParser.LrcResult {
+    fun parse(
+        content: String,
+        ignoreSplMetadataLines: Boolean = false
+    ): LrcParser.LrcResult {
         parseTtml(content)?.let { return it }
         if (lyricifySyllablePattern.containsMatchIn(content)) {
             parseLyricify(content)?.let { return it }
         }
-        return parseLrc(content)
+        return parseLrc(content, ignoreSplMetadataLines)
     }
 
-    private fun parseLrc(content: String): LrcParser.LrcResult {
+    private fun parseLrc(
+        content: String,
+        ignoreSplMetadataLines: Boolean
+    ): LrcParser.LrcResult {
         val lines = mutableListOf<LyricLine>()
         var title: String? = null
         var artist: String? = null
@@ -52,6 +60,10 @@ internal object EllaLyricsParser {
                 companionTargetIndexes = emptyList()
                 return@forEach
             }
+            if (ignoreSplMetadataLines && isSplMetadataLine(line)) {
+                companionTargetIndexes = emptyList()
+                return@forEach
+            }
 
             parseTimestampOnlyLine(line)?.let { endMs ->
                 lines.applyLineEnd(companionTargetIndexes, endMs)
@@ -70,7 +82,7 @@ internal object EllaLyricsParser {
         }
 
         return LrcParser.LrcResult(
-            lyrics = mergeCompanionLines(lines),
+            lyrics = mergeCompanionLines(lines).shiftedBy(-offset),
             title = title,
             artist = artist,
             album = album,
@@ -296,7 +308,7 @@ internal object EllaLyricsParser {
                 isCoalescing = true
             }.newDocumentBuilder().parse(InputSource(StringReader(content.preformatTtml())))
 
-            val agentAlignment = parseAgentAlignment(document.documentElement)
+            val agentInfo = parseAgentInfo(document.documentElement)
             val translations = parseTimedTextMap(document.documentElement, "translation")
             val transliterations = parseTransliterations(document.documentElement)
             val paragraphs = document.getElementsByTagName("p")
@@ -337,7 +349,8 @@ internal object EllaLyricsParser {
                     translation = inlineTranslation?.takeUsefulText() ?: translations[key]?.splitAppleTranslation()?.first,
                     pronunciation = pronunciation?.takeUsefulText(),
                     pronunciationWords = pronunciationWords.toDisplayWords(pronunciation.orEmpty()),
-                    agent = agentAlignment[agent] ?: agent,
+                    agent = agentInfo[agent]?.alignment ?: agent,
+                    agentName = agentInfo[agent]?.name,
                     backgroundText = bg?.text,
                     backgroundWords = bg?.words.orEmpty().toDisplayWords(bg?.text.orEmpty()),
                     backgroundTranslation = bg?.translation,
@@ -352,11 +365,25 @@ internal object EllaLyricsParser {
         }.getOrNull()?.takeIf { it.lyrics.isNotEmpty() }
     }
 
-    private fun parseAgentAlignment(root: Element): Map<String, String> {
+    private data class TtmlAgentInfo(
+        val alignment: String,
+        val name: String?
+    )
+
+    private fun parseAgentInfo(root: Element): Map<String, TtmlAgentInfo> {
         val agents = root.allElements()
             .filter { it.localTagName() == "agent" }
-            .mapNotNull { it.attr("xml:id").ifBlank { it.attr("id") }.takeIf(String::isNotBlank) }
-        return agents.mapIndexed { index, id -> id to if (index == 1) "v2" else "v1" }.toMap()
+            .mapNotNull { agent ->
+                val id = agent.attr("xml:id").ifBlank { agent.attr("id") }.takeIf(String::isNotBlank)
+                    ?: return@mapNotNull null
+                id to agent.displayName()
+            }
+        return agents.mapIndexed { index, (id, name) ->
+            id to TtmlAgentInfo(
+                alignment = if (index == 1) "v2" else "v1",
+                name = name
+            )
+        }.toMap()
     }
 
     private fun parseTimedTextMap(root: Element, tag: String): Map<String, String> {
@@ -657,6 +684,9 @@ internal object EllaLyricsParser {
             .replace(Regex("""[ \t\r\n]+"""), " ")
             .trim()
 
+    fun isSplMetadataLine(line: String): Boolean =
+        splMetadataPattern.matches(line.trim())
+
     private fun String.cleanTimedLyricText(): String =
         replace(timedWordMarkerPattern) { match ->
             val time = match.groupValues.getOrNull(1).orEmpty()
@@ -807,6 +837,19 @@ internal object EllaLyricsParser {
             }
         }
         return ""
+    }
+
+    private fun Element.displayName(): String? {
+        val attrName = attr("name")
+            .ifBlank { attr("ttm:name") }
+            .ifBlank { attr("xml:name") }
+        val textName = textContent
+            .orEmpty()
+            .replace(Regex("""[ \t\r\n]+"""), " ")
+            .trim()
+        return attrName
+            .ifBlank { textName }
+            .takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
     }
 
     private fun Element.hasRole(role: String): Boolean =

@@ -79,6 +79,9 @@ internal fun LyricsPlayerPage(
 ) {
     var lyricMenuExpanded by remember { mutableStateOf(false) }
     var dismissDragX by remember { mutableFloatStateOf(0f) }
+    val activeAgentLabel = remember(lyrics, currentPosition) {
+        lyrics.activeTtmlAgentLabel(currentPosition)
+    }
 
     val lyricBackgroundMotion = 0.42f
 
@@ -132,7 +135,7 @@ internal fun LyricsPlayerPage(
             LyricsPlayerHeader(
                 song = song,
                 embeddedCover = embeddedCover,
-                annotation = annotation,
+                annotation = activeAgentLabel ?: annotation,
                 isFavorite = isFavorite,
                 onDismissLyrics = onDismissLyrics,
                 onArtist = onArtist,
@@ -215,4 +218,20 @@ internal fun LyricsPlayerPage(
             modifier = Modifier.fillMaxWidth()
         )
     }
+}
+
+private fun List<LyricLine>.activeTtmlAgentLabel(positionMs: Long): String? {
+    val names = asSequence()
+        .filter { line ->
+            line.isTtml &&
+                !line.agentName.isNullOrBlank() &&
+                positionMs >= line.timeMs &&
+                positionMs < (line.endMs ?: (line.timeMs + 3_500L))
+        }
+        .mapNotNull { it.agentName?.trim()?.takeIf(String::isNotBlank) }
+        .distinct()
+        .take(3)
+        .toList()
+    if (names.isEmpty()) return null
+    return "\uD83C\uDFA4 ${names.joinToString("/")}"
 }

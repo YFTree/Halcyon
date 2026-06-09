@@ -174,10 +174,9 @@ fun FolderDetailScreen(
         }
     }
 
-    val folderName = remember(normalizedFolderPath) {
-        normalizedFolderPath
-            .substringAfterLast('/')
-            .ifBlank { normalizedFolderPath.substringAfterLast('\\') }
+    val folderRootName = stringResource(R.string.folder_root)
+    val folderName = remember(normalizedFolderPath, folderRootName) {
+        normalizedFolderPath.folderDisplayName(folderRootName)
     }
     val deleteRequestLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()

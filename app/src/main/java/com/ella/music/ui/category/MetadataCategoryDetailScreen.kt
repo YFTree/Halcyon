@@ -89,8 +89,10 @@ import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixSheetActions
 import com.ella.music.ui.components.EllaMiuixTextField
+import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.FolderOutlineIcon
 import com.ella.music.ui.components.LazyGridScrollIndicator
+import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SafeCoverImage
@@ -100,6 +102,7 @@ import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.ui.components.requestPinnedEllaShortcut
+import com.ella.music.ui.folder.folderDisplayName
 import com.ella.music.ui.navigation.Screen
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
@@ -117,6 +120,7 @@ import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -149,6 +153,9 @@ fun MetadataCategoryDetailScreen(
     val sortIndex by detailSongSortIndexFlow.collectAsState(initial = 0)
     val albumSortIndex by detailAlbumSortIndexFlow.collectAsState(initial = 0)
     val sortMode = MetadataDetailSongSortMode.entries.getOrElse(sortIndex) { MetadataDetailSongSortMode.AlbumTrack }
+        .let { mode ->
+            if (type == "folder" && mode == MetadataDetailSongSortMode.AlbumTrack) MetadataDetailSongSortMode.Title else mode
+        }
     val albumSortMode = MetadataDetailAlbumSortMode.entries.getOrElse(albumSortIndex) { MetadataDetailAlbumSortMode.YearAsc }
     var selectedTab by rememberSaveable(type, name) { mutableStateOf(MetadataDetailTab.Songs) }
     var actionSong by remember { mutableStateOf<com.ella.music.data.model.Song?>(null) }
@@ -160,24 +167,34 @@ fun MetadataCategoryDetailScreen(
     var pendingSystemDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     val sortedSongs = remember(songs, sortMode) { songs.sortedForMetadataDetail(sortMode) }
     val showAlbumTab = type == "genre" || type == "year" || type == "composer" || type == "lyricist"
-    val detailAlbums = remember(songs, libraryAlbums) {
-        LibraryAlbumAggregator.toAlbumsForSongs(
-            songs = songs,
-            libraryAlbums = libraryAlbums,
-            unknownAlbumName = context.getString(R.string.player_unknown_album)
-        )
+    val shouldBuildAlbumTabContent = showAlbumTab && selectedTab == MetadataDetailTab.Albums
+    val detailAlbums = remember(songs, libraryAlbums, shouldBuildAlbumTabContent) {
+        if (shouldBuildAlbumTabContent) {
+            LibraryAlbumAggregator.toAlbumsForSongs(
+                songs = songs,
+                libraryAlbums = libraryAlbums,
+                unknownAlbumName = context.getString(R.string.player_unknown_album)
+            )
+        } else {
+            emptyList()
+        }
     }
-    val albumDurations = remember(songs) {
-        LibraryAlbumAggregator.durationsByAlbumIdentity(songs)
+    val albumDurations = remember(songs, shouldBuildAlbumTabContent) {
+        if (shouldBuildAlbumTabContent) LibraryAlbumAggregator.durationsByAlbumIdentity(songs) else emptyMap()
     }
-    val sortedAlbums = remember(detailAlbums, albumSortMode, albumDurations) {
-        detailAlbums.sortedForMetadataAlbumDetail(albumSortMode, albumDurations)
+    val sortedAlbums = remember(detailAlbums, albumSortMode, albumDurations, shouldBuildAlbumTabContent) {
+        if (shouldBuildAlbumTabContent) {
+            detailAlbums.sortedForMetadataAlbumDetail(albumSortMode, albumDurations)
+        } else {
+            emptyList()
+        }
     }
-    val albumArtUrisByAlbumId = remember(sortedAlbums) {
-        sortedAlbums.associate { album -> album.id to mainViewModel.getAlbumArtUri(album.artAlbumId) }
-    }
-    val albumArtUrisBySongId = remember(sortedSongs) {
-        sortedSongs.associate { song -> song.id to mainViewModel.getAlbumArtUri(song.albumId) }
+    val albumArtUrisByAlbumId = remember(sortedAlbums, shouldBuildAlbumTabContent) {
+        if (shouldBuildAlbumTabContent) {
+            sortedAlbums.associate { album -> album.id to mainViewModel.getAlbumArtUri(album.artAlbumId) }
+        } else {
+            emptyMap()
+        }
     }
     val hasSameNameArtist = remember(type, name, librarySongs) {
         (type == "composer" || type == "lyricist") && mainViewModel.getSongsForArtist(name).isNotEmpty()
@@ -189,8 +206,14 @@ fun MetadataCategoryDetailScreen(
         type == "composer" && mainViewModel.getSongsForMetadataCategory("lyricist", name).isNotEmpty()
     }
     val pageBackground = ellaPageBackground()
+    val folderRootName = stringResource(R.string.folder_root)
+    val defaultCategoryTitle = type.categoryTitle()
+    val pageTitle = remember(type, name, folderRootName, defaultCategoryTitle) {
+        if (type == "folder") name.folderDisplayName(folderRootName) else name.ifBlank { defaultCategoryTitle }
+    }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val deleteRequestLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -228,8 +251,14 @@ fun MetadataCategoryDetailScreen(
         if (selectedTab != MetadataDetailTab.Songs || selectionMode) return@remember -1
         sortedSongs.indexOfFirst { it.id == currentSong?.id }
             .takeIf { it >= 0 }
-            ?.plus(if (showAlbumTab) 2 else 1)
+            ?.plus(1)
             ?: -1
+    }
+    val fastIndexTargets = remember(sortedSongs, sortMode) {
+        sortedSongs
+            .mapIndexed { index, song -> song.metadataDetailIndexLetter(sortMode) to (index + 1) }
+            .distinctBy { it.first }
+            .toMap()
     }
     BackHandler(enabled = selectionMode || sortExpanded) {
         when {
@@ -246,6 +275,14 @@ fun MetadataCategoryDetailScreen(
             selectionMode = false
         }
     }
+    LaunchedEffect(type, sortIndex) {
+        if (type == "folder" && sortIndex == MetadataDetailSongSortMode.AlbumTrack.ordinal) {
+            mainViewModel.settingsManager.setMetadataCategoryDetailSongSortIndex(
+                type,
+                MetadataDetailSongSortMode.Title.ordinal
+            )
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -255,7 +292,7 @@ fun MetadataCategoryDetailScreen(
     ) {
         Box {
             EllaSmallTopAppBar(
-                title = name.ifBlank { type.categoryTitle() },
+                title = pageTitle,
                 color = pageBackground,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -361,7 +398,9 @@ fun MetadataCategoryDetailScreen(
                         )
                     }
                 } else {
-                    MetadataDetailSongSortMode.entries.forEach { mode ->
+                    MetadataDetailSongSortMode.entries
+                        .filterNot { type == "folder" && it == MetadataDetailSongSortMode.AlbumTrack }
+                        .forEach { mode ->
                     Text(
                         text = mode.label(),
                         fontSize = 14.sp,
@@ -465,7 +504,7 @@ fun MetadataCategoryDetailScreen(
                         SongItem(
                             song = song,
                             isCurrent = currentSong?.id == song.id,
-                            albumArtUri = albumArtUrisBySongId[song.id],
+                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
                             loadCoverArt = mainViewModel::getCoverArtBitmap,
                             loadAudioInfo = mainViewModel::getAudioInfo,
                             showPlayNextInLists = showPlayNextInLists,
@@ -491,6 +530,32 @@ fun MetadataCategoryDetailScreen(
                     }
                 }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
+            }
+
+            if (selectedTab == MetadataDetailTab.Songs && sortedSongs.size > 30) {
+                if (sortMode == MetadataDetailSongSortMode.Title || sortMode == MetadataDetailSongSortMode.FileName) {
+                    FastIndexBar(
+                        letters = sortedSongs.map { it.metadataDetailIndexLetter(sortMode) },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .padding(end = 2.dp),
+                        onLetterClick = { letter ->
+                            val index = fastIndexTargets[letter]
+                            if (index != null) {
+                                fastScrollJob?.cancel()
+                                fastScrollJob = scope.launch { listState.scrollToItem(index) }
+                            }
+                        }
+                    )
+                } else {
+                    LazyListScrollIndicator(
+                        state = listState,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                    )
+                }
             }
 
             LocateCurrentSongFloatingButton(

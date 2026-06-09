@@ -8,6 +8,7 @@ data class LyricLine(
     val pronunciation: String? = null,
     val pronunciationWords: List<LyricWord> = emptyList(),
     val agent: String? = null,
+    val agentName: String? = null,
     val backgroundText: String? = null,
     val backgroundWords: List<LyricWord> = emptyList(),
     val backgroundTranslation: String? = null,
@@ -22,3 +23,22 @@ data class LyricWord(
     val startMs: Long,
     val endMs: Long
 )
+
+fun List<LyricLine>.shiftedBy(offsetMs: Long): List<LyricLine> {
+    if (offsetMs == 0L || isEmpty()) return this
+    fun Long.shift() = (this + offsetMs).coerceAtLeast(0L)
+    fun Long?.shiftNullable() = this?.let { (it + offsetMs).coerceAtLeast(0L) }
+    fun LyricWord.shifted() = copy(startMs = startMs.shift(), endMs = endMs.shift())
+
+    return map { line ->
+        line.copy(
+            timeMs = line.timeMs.shift(),
+            words = line.words.map { it.shifted() },
+            pronunciationWords = line.pronunciationWords.map { it.shifted() },
+            backgroundWords = line.backgroundWords.map { it.shifted() },
+            backgroundStartMs = line.backgroundStartMs.shiftNullable(),
+            backgroundEndMs = line.backgroundEndMs.shiftNullable(),
+            endMs = line.endMs.shiftNullable()
+        )
+    }
+}

@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
+import android.media.audiofx.AudioEffect
 import android.net.Uri
 import android.util.Log
 import android.util.LruCache
@@ -78,6 +79,7 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var notificationProvider: NoArtworkMediaNotificationProvider
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var bluetoothReceiver: BluetoothAutoPlayReceiver? = null
+    private var openedAudioEffectSessionId = -1
     @Volatile
     private var previousButtonAction = SettingsManager.PREVIOUS_BUTTON_PREVIOUS
     @Volatile
@@ -158,6 +160,15 @@ class PlaybackService : MediaLibraryService() {
         player.addListener(object : Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
                 PlaybackAudioSession.update(audioSessionId)
+                if (player.isPlaying) openAudioEffectSession(audioSessionId)
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) {
+                    openAudioEffectSession(player.audioSessionId)
+                } else {
+                    closeAudioEffectSession()
+                }
             }
 
             override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -239,6 +250,7 @@ class PlaybackService : MediaLibraryService() {
             bluetoothReceiver = null
         }
         mediaSession?.run {
+            closeAudioEffectSession()
             player.release()
             release()
         }
@@ -250,6 +262,28 @@ class PlaybackService : MediaLibraryService() {
 
     fun launchServiceJob(block: suspend () -> Unit) {
         serviceScope.launch { block() }
+    }
+
+    private fun openAudioEffectSession(audioSessionId: Int) {
+        if (audioSessionId <= 0) return
+        if (openedAudioEffectSessionId == audioSessionId) return
+        closeAudioEffectSession()
+        sendBroadcast(Intent(AudioEffect.ACTION_OPEN_AUDIO_EFFECT_CONTROL_SESSION).apply {
+            putExtra(AudioEffect.EXTRA_AUDIO_SESSION, audioSessionId)
+            putExtra(AudioEffect.EXTRA_PACKAGE_NAME, packageName)
+            putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+        })
+        openedAudioEffectSessionId = audioSessionId
+    }
+
+    private fun closeAudioEffectSession() {
+        val audioSessionId = openedAudioEffectSessionId
+        if (audioSessionId <= 0) return
+        sendBroadcast(Intent(AudioEffect.ACTION_CLOSE_AUDIO_EFFECT_CONTROL_SESSION).apply {
+            putExtra(AudioEffect.EXTRA_AUDIO_SESSION, audioSessionId)
+            putExtra(AudioEffect.EXTRA_PACKAGE_NAME, packageName)
+        })
+        openedAudioEffectSessionId = -1
     }
 
     fun handleNotificationCustomAction(action: String): Boolean {

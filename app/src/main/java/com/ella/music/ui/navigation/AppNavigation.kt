@@ -40,6 +40,7 @@ import com.ella.music.ui.settings.BackupSettingsScreen
 import com.ella.music.ui.settings.LyricFontScreen
 import com.ella.music.ui.settings.LogScreen
 import com.ella.music.ui.settings.SettingsDetailScreen
+import com.ella.music.ui.settings.SettingsDetailMode
 import com.ella.music.ui.settings.SettingsScreen
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -89,6 +90,8 @@ sealed class Screen(val route: String) {
     data object LibraryAnalysis : Screen("library_analysis")
     data object Settings : Screen("settings")
     data object SettingsDetail : Screen("settings_detail")
+    data object LibrarySettings : Screen("library_settings")
+    data object IntegrationSettings : Screen("integration_settings")
     data object LyricSettings : Screen("lyric_settings")
     data object AudioSettings : Screen("audio_settings")
     data object BackupSettings : Screen("backup_settings")
@@ -408,7 +411,9 @@ fun AppNavigation(
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onNavigateToAbout = { navController.navigate(Screen.About.route) },
-                onNavigateToSettingsDetail = { navController.navigate(Screen.SettingsDetail.route) },
+                onNavigateToAppearanceSettings = { navController.navigate(Screen.SettingsDetail.route) },
+                onNavigateToLibrarySettings = { navController.navigate(Screen.LibrarySettings.route) },
+                onNavigateToIntegrationSettings = { navController.navigate(Screen.IntegrationSettings.route) },
                 onNavigateToLyricSettings = { navController.navigate(Screen.LyricSettings.route) },
                 onNavigateToAudioSettings = { navController.navigate(Screen.AudioSettings.route) },
                 onNavigateToBackupSettings = { navController.navigate(Screen.BackupSettings.route) },
@@ -436,7 +441,25 @@ fun AppNavigation(
         composable(Screen.SettingsDetail.route) {
             SettingsDetailScreen(
                 onBack = { navController.popBackStack() },
-                onNavigateToLyricFont = { navController.navigate(Screen.LyricFont.route) }
+                onNavigateToLyricFont = { navController.navigate(Screen.LyricFont.route) },
+                mode = SettingsDetailMode.AppearanceHome
+            )
+        }
+
+        composable(Screen.LibrarySettings.route) {
+            SettingsDetailScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToLyricFont = { navController.navigate(Screen.LyricFont.route) },
+                mode = SettingsDetailMode.LibraryScanning,
+                onNavigateToScanFolders = { navController.navigate(Screen.ScanSettings.route) }
+            )
+        }
+
+        composable(Screen.IntegrationSettings.route) {
+            SettingsDetailScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToLyricFont = { navController.navigate(Screen.LyricFont.route) },
+                mode = SettingsDetailMode.Integrations
             )
         }
 

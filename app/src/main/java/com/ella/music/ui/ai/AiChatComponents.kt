@@ -1,6 +1,5 @@
 package com.ella.music.ui.ai
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -11,11 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -27,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.EllaMiuixSurfaceCard
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -49,15 +47,14 @@ internal fun AiChatBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
-        Column(
+        EllaMiuixSurfaceCard(
             modifier = Modifier
-                .fillMaxWidth(if (isUser) 0.84f else 0.96f)
-                .clip(RoundedCornerShape(18.dp))
-                .background(
-                    if (isUser) MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f)
-                )
-                .padding(14.dp)
+                .fillMaxWidth(if (isUser) 0.84f else 0.96f),
+            color = if (isUser) {
+                MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
+            } else {
+                MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f)
+            }
         ) {
             AiMarkdownText(
                 text = message.text,

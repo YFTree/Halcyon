@@ -2,6 +2,7 @@ package com.ella.music
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.content.pm.PackageManager
@@ -132,6 +133,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Search
+import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.icon.extended.Music
 import top.yukonga.miuix.kmp.icon.extended.Playlist
 import top.yukonga.miuix.kmp.icon.extended.Settings
@@ -157,6 +159,13 @@ class MainActivity : ComponentActivity() {
     var latestIntent: Intent? = null
         private set
     var onNewIntentCallback: ((Intent) -> Unit)? = null
+
+    override fun attachBaseContext(newBase: Context) {
+        val language = runBlocking(Dispatchers.IO) {
+            SettingsManager.getInstance(newBase).appLanguage.first()
+        }
+        super.attachBaseContext(newBase.withHalcyonLocale(language))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         applySavedAppLanguage()
@@ -272,14 +281,22 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun applyAppLanguage(languageTag: String): Boolean {
-        if (appliedLanguageTag == languageTag) return false
         val locales = when (languageTag) {
             SettingsManager.APP_LANGUAGE_ZH_CN -> LocaleListCompat.forLanguageTags("zh-CN")
             SettingsManager.APP_LANGUAGE_ZH_TW -> LocaleListCompat.forLanguageTags("zh-TW")
             SettingsManager.APP_LANGUAGE_EN -> LocaleListCompat.forLanguageTags("en")
             SettingsManager.APP_LANGUAGE_JA -> LocaleListCompat.forLanguageTags("ja")
+            SettingsManager.APP_LANGUAGE_KO -> LocaleListCompat.forLanguageTags("ko")
+            SettingsManager.APP_LANGUAGE_DE -> LocaleListCompat.forLanguageTags("de")
+            SettingsManager.APP_LANGUAGE_FR -> LocaleListCompat.forLanguageTags("fr")
+            SettingsManager.APP_LANGUAGE_RU -> LocaleListCompat.forLanguageTags("ru")
+            SettingsManager.APP_LANGUAGE_TR -> LocaleListCompat.forLanguageTags("tr")
+            SettingsManager.APP_LANGUAGE_ID -> LocaleListCompat.forLanguageTags("id")
+            SettingsManager.APP_LANGUAGE_VI -> LocaleListCompat.forLanguageTags("vi")
+            SettingsManager.APP_LANGUAGE_TH -> LocaleListCompat.forLanguageTags("th")
             else -> LocaleListCompat.getEmptyLocaleList()
         }
+        if (appliedLanguageTag == languageTag && AppCompatDelegate.getApplicationLocales() == locales) return false
         appliedLanguageTag = languageTag
         if (AppCompatDelegate.getApplicationLocales() != locales) {
             AppCompatDelegate.setApplicationLocales(locales)
@@ -504,6 +521,9 @@ fun EllaApp(
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
     val miniPlayerRightButton by settingsManager.miniPlayerRightButton.collectAsState(initial = 0)
     val bottomBarGlassEffect by settingsManager.bottomBarGlassEffect.collectAsState(initial = BottomBarGlassEffect.LiquidGlass)
+    val bottomDockItemIds by settingsManager.bottomDockItems.collectAsState(
+        initial = SettingsManager.DEFAULT_BOTTOM_DOCK_ITEMS.split(',')
+    )
     val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
     val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     val startupPosterEnabled by settingsManager.startupPosterEnabled.collectAsState(initial = false)
@@ -583,10 +603,53 @@ fun EllaApp(
 
     val backdrop = rememberLayerBackdrop()
     val useGlass = true
-    val tabs = listOf(
-        BottomDockTab(Screen.Home.route, stringResource(R.string.tab_home), MiuixIcons.Regular.Music),
-        BottomDockTab(Screen.Library.route, stringResource(R.string.tab_library), MiuixIcons.Regular.Playlist),
+    val bottomDockSpecs = mapOf(
+        SettingsManager.BOTTOM_DOCK_ITEM_HOME to BottomDockTab(
+            route = Screen.Home.route,
+            label = stringResource(R.string.tab_home),
+            icon = MiuixIcons.Regular.Music
+        ),
+        SettingsManager.BOTTOM_DOCK_ITEM_LIBRARY to BottomDockTab(
+            route = Screen.Library.route,
+            label = stringResource(R.string.tab_library),
+            icon = MiuixIcons.Regular.Playlist
+        ),
+        SettingsManager.BOTTOM_DOCK_ITEM_SEARCH to BottomDockTab(
+            route = Screen.LibrarySearch.createRoute(),
+            label = stringResource(R.string.common_search),
+            icon = MiuixIcons.Basic.Search
+        ),
+        SettingsManager.BOTTOM_DOCK_ITEM_PLAYLISTS to BottomDockTab(
+            route = Screen.Playlists.route,
+            label = stringResource(R.string.category_playlist),
+            icon = MiuixIcons.Regular.Playlist
+        ),
+        SettingsManager.BOTTOM_DOCK_ITEM_FOLDER to BottomDockTab(
+            route = Screen.Folder.route,
+            label = stringResource(R.string.category_folder),
+            icon = MiuixIcons.Regular.Folder
+        ),
+        SettingsManager.BOTTOM_DOCK_ITEM_ARTIST to BottomDockTab(
+            route = Screen.Artist.route,
+            label = stringResource(R.string.category_artist),
+            icon = MiuixIcons.Regular.Music
+        ),
+        SettingsManager.BOTTOM_DOCK_ITEM_ALBUM to BottomDockTab(
+            route = Screen.Album.route,
+            label = stringResource(R.string.category_album),
+            icon = MiuixIcons.Regular.Music
+        )
     )
+    val tabs = bottomDockItemIds
+        .mapNotNull { bottomDockSpecs[it] }
+        .take(4)
+        .ifEmpty {
+            listOfNotNull(
+                bottomDockSpecs[SettingsManager.BOTTOM_DOCK_ITEM_HOME],
+                bottomDockSpecs[SettingsManager.BOTTOM_DOCK_ITEM_LIBRARY],
+                bottomDockSpecs[SettingsManager.BOTTOM_DOCK_ITEM_SEARCH]
+            )
+        }
     val currentTabRoute = currentRoute.toCurrentTabRoute()
 
     val wallpaperVisible = appWallpaperEnabled && appWallpaperUri.isNotBlank()

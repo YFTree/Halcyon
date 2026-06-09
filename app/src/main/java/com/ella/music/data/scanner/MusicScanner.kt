@@ -654,12 +654,9 @@ class MusicScanner(private val context: Context) {
             if (!file.exists()) return null
             readTagsBlocking(path)
                 ?.let { tagInfo ->
-                    firstNonBlank(
-                        tagInfo.replayGainTrackGain,
-                        tagInfo.customTagValue("R128_TRACK_GAIN")
-                    )
+                    tagInfo.replayGainTrackGain?.parseReplayGain()
+                        ?: tagInfo.customTagValue("R128_TRACK_GAIN")?.parseR128Gain()
                 }
-                ?.parseReplayGain()
                 ?.let { return it }
             null
         } catch (e: Exception) {
@@ -776,6 +773,11 @@ class MusicScanner(private val context: Context) {
             ?.groupValues
             ?.getOrNull(1)
             ?.toFloatOrNull()
+    }
+
+    private fun String.parseR128Gain(): Float? {
+        val raw = trim().toFloatOrNull() ?: return parseReplayGain()
+        return raw / 256f
     }
 
     private fun ratingStarsFromTagValues(vararg values: String?): Int {

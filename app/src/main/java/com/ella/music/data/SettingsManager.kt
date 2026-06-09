@@ -51,6 +51,7 @@ class SettingsManager(private val context: Context) {
         val KEY_THEME_MODE = intPreferencesKey("theme_mode")
         val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
         val KEY_BOTTOM_BAR_GLASS_EFFECT = stringPreferencesKey("bottom_bar_glass_effect")
+        val KEY_BOTTOM_DOCK_ITEMS = stringPreferencesKey("bottom_dock_items")
         val KEY_TICKER_ENABLED = booleanPreferencesKey("ticker_enabled")
         val KEY_TICKER_HIDE_NOTIFICATION = booleanPreferencesKey("ticker_hide_notification")
         val KEY_TICKER_HEADS_UP_LYRICS = booleanPreferencesKey("ticker_heads_up_lyrics")
@@ -81,9 +82,10 @@ class SettingsManager(private val context: Context) {
         val KEY_PREVIOUS_BUTTON_ACTION = intPreferencesKey("previous_button_action")
         val KEY_LYRIC_SOURCE_MODE = intPreferencesKey("lyric_source_mode")
         val KEY_LYRIC_SOURCE_PRIORITY = stringPreferencesKey("lyric_source_priority")
+        val KEY_IGNORE_SPL_METADATA_LINES = booleanPreferencesKey("ignore_spl_metadata_lines")
+        val KEY_LYRIC_OFFSET_OVERRIDES = stringPreferencesKey("lyric_offset_overrides")
         val KEY_LYRIC_PAGE_TRANSLATION = booleanPreferencesKey("lyric_page_translation")
         val KEY_LYRIC_PAGE_KEEP_SCREEN_ON = booleanPreferencesKey("lyric_page_keep_screen_on")
-        val KEY_SMOOTH_LYRIC_VIEW = booleanPreferencesKey("smooth_lyric_view")
         val KEY_MINI_PLAYER_LYRIC_TRANSLATION = booleanPreferencesKey("mini_player_lyric_translation")
         val KEY_MINI_PLAYER_LYRIC_SECONDARY = intPreferencesKey("mini_player_lyric_secondary")
         val KEY_MINI_PLAYER_COVER_ROTATION = booleanPreferencesKey("mini_player_cover_rotation")
@@ -210,6 +212,22 @@ class SettingsManager(private val context: Context) {
         const val APP_LANGUAGE_ZH_TW = "zh-TW"
         const val APP_LANGUAGE_EN = "en"
         const val APP_LANGUAGE_JA = "ja"
+        const val APP_LANGUAGE_KO = "ko"
+        const val APP_LANGUAGE_DE = "de"
+        const val APP_LANGUAGE_FR = "fr"
+        const val APP_LANGUAGE_RU = "ru"
+        const val APP_LANGUAGE_TR = "tr"
+        const val APP_LANGUAGE_ID = "id"
+        const val APP_LANGUAGE_VI = "vi"
+        const val APP_LANGUAGE_TH = "th"
+        const val BOTTOM_DOCK_ITEM_HOME = "home"
+        const val BOTTOM_DOCK_ITEM_LIBRARY = "library"
+        const val BOTTOM_DOCK_ITEM_SEARCH = "search"
+        const val BOTTOM_DOCK_ITEM_PLAYLISTS = "playlists"
+        const val BOTTOM_DOCK_ITEM_FOLDER = "folder"
+        const val BOTTOM_DOCK_ITEM_ARTIST = "artist"
+        const val BOTTOM_DOCK_ITEM_ALBUM = "album"
+        const val DEFAULT_BOTTOM_DOCK_ITEMS = "$BOTTOM_DOCK_ITEM_HOME,$BOTTOM_DOCK_ITEM_LIBRARY,$BOTTOM_DOCK_ITEM_SEARCH"
         const val DESKTOP_LYRIC_STATUS_POSITION_LEFT = 0
         const val DESKTOP_LYRIC_STATUS_POSITION_CENTER = 1
         const val DESKTOP_LYRIC_STATUS_POSITION_RIGHT = 2
@@ -252,6 +270,15 @@ class SettingsManager(private val context: Context) {
             LYRIC_SOURCE_EXTERNAL_TTML,
             LYRIC_SOURCE_EXTERNAL_PLAIN
         )
+        val BOTTOM_DOCK_ITEM_IDS = listOf(
+            BOTTOM_DOCK_ITEM_HOME,
+            BOTTOM_DOCK_ITEM_LIBRARY,
+            BOTTOM_DOCK_ITEM_SEARCH,
+            BOTTOM_DOCK_ITEM_PLAYLISTS,
+            BOTTOM_DOCK_ITEM_FOLDER,
+            BOTTOM_DOCK_ITEM_ARTIST,
+            BOTTOM_DOCK_ITEM_ALBUM
+        )
 
         fun normalizeLyricSourcePriority(value: String): String {
             val requested = value
@@ -260,6 +287,18 @@ class SettingsManager(private val context: Context) {
                 .filter { it in LYRIC_SOURCE_PRIORITY_IDS }
             return (requested + LYRIC_SOURCE_PRIORITY_IDS)
                 .distinct()
+                .joinToString(",")
+        }
+
+        fun normalizeBottomDockItems(value: String): String {
+            val requested = value
+                .split(',', '，', ';', '；', '\n')
+                .map { it.trim().lowercase(Locale.ROOT) }
+                .filter { it in BOTTOM_DOCK_ITEM_IDS }
+                .distinct()
+                .take(4)
+            return requested
+                .ifEmpty { DEFAULT_BOTTOM_DOCK_ITEMS.split(',') }
                 .joinToString(",")
         }
     }
@@ -293,6 +332,12 @@ class SettingsManager(private val context: Context) {
             )
         }.getOrDefault(BottomBarGlassEffect.LiquidGlass)
     }
+    val bottomDockItems: Flow<List<String>> =
+        context.dataStore.data.map {
+            normalizeBottomDockItems(it[KEY_BOTTOM_DOCK_ITEMS] ?: DEFAULT_BOTTOM_DOCK_ITEMS)
+                .split(',')
+                .filter(String::isNotBlank)
+        }
     val tickerEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_ENABLED] ?: false }
     val tickerHideNotification: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_HIDE_NOTIFICATION] ?: true }
     val tickerHeadsUpLyrics: Flow<Boolean> = context.dataStore.data.map { it[KEY_TICKER_HEADS_UP_LYRICS] ?: false }
@@ -338,10 +383,13 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map {
             normalizeLyricSourcePriority(it[KEY_LYRIC_SOURCE_PRIORITY] ?: DEFAULT_LYRIC_SOURCE_PRIORITY)
         }
+    val ignoreSplMetadataLines: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_IGNORE_SPL_METADATA_LINES] ?: false }
+    val lyricOffsetOverrides: Flow<Map<String, Long>> =
+        context.dataStore.data.map { parseLyricOffsetOverrides(it[KEY_LYRIC_OFFSET_OVERRIDES]) }
     val lyricPageTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PAGE_TRANSLATION] ?: true }
     val lyricPageKeepScreenOn: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] ?: false }
-    val smoothLyricView: Flow<Boolean> = context.dataStore.data.map { it[KEY_SMOOTH_LYRIC_VIEW] ?: true }
     val miniPlayerLyricTranslation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_MINI_PLAYER_LYRIC_TRANSLATION] ?: true }
     val miniPlayerLyricSecondary: Flow<Int> = context.dataStore.data.map {
@@ -559,6 +607,14 @@ class SettingsManager(private val context: Context) {
             APP_LANGUAGE_ZH_TW -> APP_LANGUAGE_ZH_TW
             APP_LANGUAGE_EN -> APP_LANGUAGE_EN
             APP_LANGUAGE_JA -> APP_LANGUAGE_JA
+            APP_LANGUAGE_KO -> APP_LANGUAGE_KO
+            APP_LANGUAGE_DE -> APP_LANGUAGE_DE
+            APP_LANGUAGE_FR -> APP_LANGUAGE_FR
+            APP_LANGUAGE_RU -> APP_LANGUAGE_RU
+            APP_LANGUAGE_TR -> APP_LANGUAGE_TR
+            APP_LANGUAGE_ID, "in" -> APP_LANGUAGE_ID
+            APP_LANGUAGE_VI -> APP_LANGUAGE_VI
+            APP_LANGUAGE_TH -> APP_LANGUAGE_TH
             else -> APP_LANGUAGE_SYSTEM
         }
         context.dataStore.edit { it[KEY_APP_LANGUAGE] = normalized }
@@ -566,6 +622,12 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setBottomBarGlassEffect(effect: BottomBarGlassEffect) {
         context.dataStore.edit { it[KEY_BOTTOM_BAR_GLASS_EFFECT] = effect.name }
+    }
+
+    suspend fun setBottomDockItems(items: List<String>) {
+        context.dataStore.edit {
+            it[KEY_BOTTOM_DOCK_ITEMS] = normalizeBottomDockItems(items.joinToString(","))
+        }
     }
 
     suspend fun setTickerEnabled(enabled: Boolean) {
@@ -708,16 +770,26 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_LYRIC_SOURCE_PRIORITY] = normalizeLyricSourcePriority(priority) }
     }
 
+    suspend fun setIgnoreSplMetadataLines(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_IGNORE_SPL_METADATA_LINES] = enabled }
+    }
+
+    suspend fun setLyricOffsetOverride(songKey: String, offsetMs: Long) {
+        val key = songKey.trim()
+        if (key.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val offsets = parseLyricOffsetOverrides(prefs[KEY_LYRIC_OFFSET_OVERRIDES]).toMutableMap()
+            if (offsetMs == 0L) offsets.remove(key) else offsets[key] = offsetMs.coerceIn(-5000L, 5000L)
+            prefs[KEY_LYRIC_OFFSET_OVERRIDES] = JSONObject(offsets.mapValues { it.value }).toString()
+        }
+    }
+
     suspend fun setLyricPageTranslation(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRIC_PAGE_TRANSLATION] = enabled }
     }
 
     suspend fun setLyricPageKeepScreenOn(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] = enabled }
-    }
-
-    suspend fun setSmoothLyricView(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_SMOOTH_LYRIC_VIEW] = enabled }
     }
 
     suspend fun setLyricPerspectiveEffect(enabled: Boolean) {
@@ -1244,9 +1316,9 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_LYRIC_GETTER_ENABLED)
             setBoolean(KEY_REPLAYGAIN_ENABLED)
             setBoolean(KEY_AUDIO_FOCUS_DISABLED)
+            setBoolean(KEY_IGNORE_SPL_METADATA_LINES)
             setBoolean(KEY_LYRIC_PAGE_TRANSLATION)
             setBoolean(KEY_LYRIC_PAGE_KEEP_SCREEN_ON)
-            setBoolean(KEY_SMOOTH_LYRIC_VIEW)
             setBoolean(KEY_LYRIC_FONT_ITALIC)
             setBoolean(KEY_LYRIC_FONT_APPLY_TO_PAGE)
             setBoolean(KEY_LYRIC_PERSPECTIVE_EFFECT)
@@ -1372,6 +1444,8 @@ class SettingsManager(private val context: Context) {
             setString(KEY_HOME_HIDDEN_LIBRARY_TILES)
             setString(KEY_APP_LANGUAGE)
             setString(KEY_BOTTOM_BAR_GLASS_EFFECT)
+            setString(KEY_BOTTOM_DOCK_ITEMS)
+            setString(KEY_LYRIC_OFFSET_OVERRIDES)
             setString(KEY_PLAYLIST_CUSTOM_ORDER)
         }
     }
@@ -1445,6 +1519,21 @@ class SettingsManager(private val context: Context) {
                 )
             }.filter { it.id.isNotBlank() && it.script.isNotBlank() }
         }.getOrDefault(emptyList())
+    }
+
+    private fun parseLyricOffsetOverrides(json: String?): Map<String, Long> {
+        if (json.isNullOrBlank()) return emptyMap()
+        return runCatching {
+            val root = JSONObject(json)
+            root.keys().asSequence()
+                .mapNotNull { key ->
+                    val value = root.optLong(key, Long.MIN_VALUE)
+                        .takeIf { it != Long.MIN_VALUE && it != 0L }
+                        ?.coerceIn(-5000L, 5000L)
+                    value?.let { key to it }
+                }
+                .toMap()
+        }.getOrDefault(emptyMap())
     }
 
     private fun List<LxSourceConfig>.toJson(): String {

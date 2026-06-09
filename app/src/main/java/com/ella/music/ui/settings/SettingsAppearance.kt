@@ -1,14 +1,5 @@
 package com.ella.music.ui.settings
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -17,8 +8,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.ella.music.R
 import com.ella.music.data.BottomBarGlassEffect
 import com.ella.music.data.SettingsManager
@@ -38,6 +27,9 @@ internal fun SettingsAppearanceSection() {
     val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
     val appLanguage by settingsManager.appLanguage.collectAsState(initial = SettingsManager.APP_LANGUAGE_SYSTEM)
     val bottomBarGlassEffect by settingsManager.bottomBarGlassEffect.collectAsState(initial = BottomBarGlassEffect.LiquidGlass)
+    val bottomDockItems by settingsManager.bottomDockItems.collectAsState(
+        initial = SettingsManager.DEFAULT_BOTTOM_DOCK_ITEMS.split(',')
+    )
     val startupPosterEnabled by settingsManager.startupPosterEnabled.collectAsState(initial = false)
     val startupPosterUri by settingsManager.startupPosterUri.collectAsState(initial = "")
     val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
@@ -70,7 +62,15 @@ internal fun SettingsAppearanceSection() {
         SettingsManager.APP_LANGUAGE_ZH_CN to stringResource(R.string.settings_language_simplified_chinese),
         SettingsManager.APP_LANGUAGE_ZH_TW to stringResource(R.string.settings_language_traditional_chinese),
         SettingsManager.APP_LANGUAGE_EN to stringResource(R.string.settings_language_english),
-        SettingsManager.APP_LANGUAGE_JA to stringResource(R.string.settings_language_japanese)
+        SettingsManager.APP_LANGUAGE_JA to stringResource(R.string.settings_language_japanese),
+        SettingsManager.APP_LANGUAGE_KO to stringResource(R.string.settings_language_korean),
+        SettingsManager.APP_LANGUAGE_DE to stringResource(R.string.settings_language_german),
+        SettingsManager.APP_LANGUAGE_FR to stringResource(R.string.settings_language_french),
+        SettingsManager.APP_LANGUAGE_RU to stringResource(R.string.settings_language_russian),
+        SettingsManager.APP_LANGUAGE_TR to stringResource(R.string.settings_language_turkish),
+        SettingsManager.APP_LANGUAGE_ID to stringResource(R.string.settings_language_indonesian),
+        SettingsManager.APP_LANGUAGE_VI to stringResource(R.string.settings_language_vietnamese),
+        SettingsManager.APP_LANGUAGE_TH to stringResource(R.string.settings_language_thai)
     )
     val selectedLanguageIndex = languageOptions.indexOfFirst { it.first == appLanguage }.takeIf { it >= 0 } ?: 0
     val languageEntries = remember(languageOptions) {
@@ -81,7 +81,50 @@ internal fun SettingsAppearanceSection() {
         SettingsManager.APP_LANGUAGE_ZH_TW -> stringResource(R.string.settings_language_summary_traditional_chinese)
         SettingsManager.APP_LANGUAGE_EN -> stringResource(R.string.settings_language_summary_english)
         SettingsManager.APP_LANGUAGE_JA -> stringResource(R.string.settings_language_summary_japanese)
+        SettingsManager.APP_LANGUAGE_KO -> stringResource(R.string.settings_language_summary_korean)
+        SettingsManager.APP_LANGUAGE_DE -> stringResource(R.string.settings_language_summary_german)
+        SettingsManager.APP_LANGUAGE_FR -> stringResource(R.string.settings_language_summary_french)
+        SettingsManager.APP_LANGUAGE_RU -> stringResource(R.string.settings_language_summary_russian)
+        SettingsManager.APP_LANGUAGE_TR -> stringResource(R.string.settings_language_summary_turkish)
+        SettingsManager.APP_LANGUAGE_ID -> stringResource(R.string.settings_language_summary_indonesian)
+        SettingsManager.APP_LANGUAGE_VI -> stringResource(R.string.settings_language_summary_vietnamese)
+        SettingsManager.APP_LANGUAGE_TH -> stringResource(R.string.settings_language_summary_thai)
         else -> stringResource(R.string.settings_language_summary_system)
+    }
+
+    val bottomDockOptions = listOf(
+        "" to stringResource(R.string.settings_bottom_dock_item_none),
+        SettingsManager.BOTTOM_DOCK_ITEM_HOME to stringResource(R.string.tab_home),
+        SettingsManager.BOTTOM_DOCK_ITEM_LIBRARY to stringResource(R.string.tab_library),
+        SettingsManager.BOTTOM_DOCK_ITEM_SEARCH to stringResource(R.string.common_search),
+        SettingsManager.BOTTOM_DOCK_ITEM_PLAYLISTS to stringResource(R.string.category_playlist),
+        SettingsManager.BOTTOM_DOCK_ITEM_FOLDER to stringResource(R.string.category_folder),
+        SettingsManager.BOTTOM_DOCK_ITEM_ARTIST to stringResource(R.string.category_artist),
+        SettingsManager.BOTTOM_DOCK_ITEM_ALBUM to stringResource(R.string.category_album)
+    )
+    val bottomDockEntries = remember(bottomDockOptions) {
+        bottomDockOptions.map { (_, label) -> DropdownItem(title = label) }
+    }
+    val normalizedBottomDockItems = remember(bottomDockItems) {
+        SettingsManager.normalizeBottomDockItems(bottomDockItems.joinToString(","))
+            .split(',')
+            .filter(String::isNotBlank)
+            .take(4)
+    }
+    fun updateBottomDockSlot(slotIndex: Int, itemId: String) {
+        val updated = normalizedBottomDockItems
+            .toMutableList()
+            .apply {
+                while (size <= slotIndex) add("")
+                if (itemId.isNotBlank()) {
+                    replaceAll { existing -> if (existing == itemId) "" else existing }
+                }
+                this[slotIndex] = itemId
+            }
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(4)
+        scope.launch { settingsManager.setBottomDockItems(updated) }
     }
 
     val bottomBarGlassEffects = remember {
@@ -117,116 +160,27 @@ internal fun SettingsAppearanceSection() {
         }
     }
 
-    val startupPosterPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        context.persistImageReadPermission(uri)
-        scope.launch {
-            val persisted = context.copyCustomImageIntoApp(uri, "startup_poster")
-            if (persisted == null) {
-                Toast.makeText(context, context.getString(R.string.settings_custom_image_save_failed), Toast.LENGTH_SHORT).show()
-            } else {
-                context.deletePersistedCustomImage(startupPosterUri)
-                settingsManager.setStartupPosterUri(persisted)
-            }
-        }
-    }
-    val appWallpaperPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        context.persistImageReadPermission(uri)
-        scope.launch {
-            val persisted = context.copyCustomImageIntoApp(uri, "app_wallpaper")
-            if (persisted == null) {
-                Toast.makeText(context, context.getString(R.string.settings_custom_image_save_failed), Toast.LENGTH_SHORT).show()
-            } else {
-                context.deletePersistedCustomImage(appWallpaperUri)
-                settingsManager.setAppWallpaperUri(persisted)
-            }
-        }
-    }
-    val playerBackgroundPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        context.persistImageReadPermission(uri)
-        scope.launch {
-            val persisted = context.copyCustomImageIntoApp(uri, "player_background")
-            if (persisted == null) {
-                Toast.makeText(context, context.getString(R.string.settings_custom_image_save_failed), Toast.LENGTH_SHORT).show()
-            } else {
-                context.deletePersistedCustomImage(playerBackgroundUri)
-                settingsManager.setPlayerBackgroundUri(persisted)
-            }
-        }
-    }
-    val hiResLogoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        context.persistImageReadPermission(uri)
-        scope.launch {
-            val persisted = context.copyCustomImageIntoApp(uri, "hi_res_logo")
-            if (persisted == null) {
-                Toast.makeText(context, context.getString(R.string.settings_custom_image_save_failed), Toast.LENGTH_SHORT).show()
-            } else {
-                context.deletePersistedCustomImage(hiResLogoUri)
-                settingsManager.setHiResLogoUri(persisted)
-            }
-        }
-    }
-
-    val dynamicCoverPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        scope.launch { settingsManager.setDynamicCoverEnabled(granted) }
-        if (granted) {
-            Toast.makeText(context, context.getString(R.string.settings_dynamic_cover_enabled), Toast.LENGTH_SHORT).show()
-        } else {
-            val activity = context as? android.app.Activity
-            val shouldShowRationale = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && activity != null) {
-                ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.READ_MEDIA_VIDEO)
-            } else {
-                true
-            }
-            if (!shouldShowRationale && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                Toast.makeText(context, context.getString(R.string.settings_dynamic_cover_permission_grant), Toast.LENGTH_LONG).show()
-                runCatching {
-                    context.startActivity(
-                        Intent(
-                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            Uri.parse("package:${context.packageName}")
-                        )
-                    )
-                }
-            } else {
-                Toast.makeText(context, context.getString(R.string.settings_dynamic_cover_permission_denied), Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    fun setDynamicCoverEnabled(enabled: Boolean) {
-        if (!enabled) {
-            scope.launch { settingsManager.setDynamicCoverEnabled(false) }
-            return
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.READ_MEDIA_VIDEO
-            ) == PackageManager.PERMISSION_GRANTED
-            if (granted) {
-                scope.launch { settingsManager.setDynamicCoverEnabled(true) }
-            } else {
-                scope.launch { settingsManager.setDynamicCoverEnabled(false) }
-                dynamicCoverPermissionLauncher.launch(Manifest.permission.READ_MEDIA_VIDEO)
-            }
-        } else {
-            scope.launch { settingsManager.setDynamicCoverEnabled(true) }
-        }
-    }
+    val startupPosterPicker = rememberAppearanceImagePicker(
+        currentUri = startupPosterUri,
+        imageName = "startup_poster",
+        onImagePersisted = settingsManager::setStartupPosterUri
+    )
+    val appWallpaperPicker = rememberAppearanceImagePicker(
+        currentUri = appWallpaperUri,
+        imageName = "app_wallpaper",
+        onImagePersisted = settingsManager::setAppWallpaperUri
+    )
+    val playerBackgroundPicker = rememberAppearanceImagePicker(
+        currentUri = playerBackgroundUri,
+        imageName = "player_background",
+        onImagePersisted = settingsManager::setPlayerBackgroundUri
+    )
+    val hiResLogoPicker = rememberAppearanceImagePicker(
+        currentUri = hiResLogoUri,
+        imageName = "hi_res_logo",
+        onImagePersisted = settingsManager::setHiResLogoUri
+    )
+    val dynamicCoverPermissionLauncher = rememberDynamicCoverPermissionLauncher(settingsManager)
 
     SmallTitle(text = stringResource(R.string.settings_appearance))
 
@@ -263,6 +217,27 @@ internal fun SettingsAppearanceSection() {
                     }
                 }
             )
+            repeat(4) { slotIndex ->
+                val selectedItem = normalizedBottomDockItems.getOrNull(slotIndex).orEmpty()
+                val selectedIndex = bottomDockOptions.indexOfFirst { it.first == selectedItem }
+                    .takeIf { it >= 0 }
+                    ?: 0
+                WindowSpinnerPreference(
+                    title = stringResource(R.string.settings_bottom_dock_slot, slotIndex + 1),
+                    summary = if (slotIndex == 0) {
+                        stringResource(R.string.settings_bottom_dock_items_summary)
+                    } else {
+                        bottomDockOptions.getOrNull(selectedIndex)?.second.orEmpty()
+                    },
+                    items = bottomDockEntries,
+                    selectedIndex = selectedIndex,
+                    onSelectedIndexChange = { index ->
+                        bottomDockOptions.getOrNull(index)?.first?.let { itemId ->
+                            updateBottomDockSlot(slotIndex, itemId)
+                        }
+                    }
+                )
+            }
             SwitchPreference(
                 title = stringResource(R.string.settings_startup_poster),
                 summary = stringResource(R.string.settings_startup_poster_summary),
@@ -398,7 +373,9 @@ internal fun SettingsAppearanceSection() {
                 title = stringResource(R.string.settings_dynamic_cover),
                 summary = stringResource(R.string.settings_dynamic_cover_summary),
                 checked = dynamicCoverEnabled,
-                onCheckedChange = ::setDynamicCoverEnabled
+                onCheckedChange = {
+                    setDynamicCoverEnabled(context, scope, settingsManager, dynamicCoverPermissionLauncher, it)
+                }
             )
             SwitchPreference(
                 title = stringResource(R.string.settings_hi_res_logo),

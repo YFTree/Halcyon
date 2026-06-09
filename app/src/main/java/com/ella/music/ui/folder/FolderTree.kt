@@ -47,7 +47,7 @@ internal fun List<Song>.childFoldersOf(context: Context, parentPath: String): Li
         .map { (path, songs) ->
             FolderTreeEntry(
                 path = path,
-                name = path.substringAfterLast('/').ifBlank { rootName },
+                name = path.folderDisplayName(rootName),
                 songCount = songs.size,
                 albumCount = songs.map { it.albumIdentityId() }.distinct().size,
                 duration = songs.sumOf { it.duration },
@@ -73,6 +73,12 @@ internal fun List<Song>.recursiveSongsInFolder(folderPath: String): List<Song> {
 internal fun String.normalizeFolderPath(): String {
     val normalized = replace('\\', '/').trim().trimEnd('/')
     return normalized.ifBlank { "/" }
+}
+
+internal fun String.folderDisplayName(rootName: String): String {
+    val normalized = normalizeFolderPath()
+    if (normalized == "/") return rootName
+    return normalized.substringAfterLast('/').ifBlank { rootName }
 }
 
 internal fun String.parentFolderPath(): String {

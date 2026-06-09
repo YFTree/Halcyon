@@ -63,7 +63,11 @@ internal enum class PlayerQuickActionKind {
     Share,
     Timer,
     Edit,
-    More
+    More,
+    Add,
+    PlayNext,
+    Speed,
+    Equalizer
 }
 
 @Composable
@@ -129,6 +133,54 @@ internal fun QuickActionIcon(
             PlayerQuickActionKind.More -> {
                 listOf(0.25f, 0.5f, 0.75f).forEach { x ->
                     drawCircle(color = color, radius = stroke * 0.95f, center = Offset(size.width * x, cy))
+                }
+            }
+            PlayerQuickActionKind.Add -> {
+                drawLine(color, Offset(cx, size.height * 0.22f), Offset(cx, size.height * 0.78f), stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(size.width * 0.22f, cy), Offset(size.width * 0.78f, cy), stroke, cap = StrokeCap.Round)
+                drawRect(
+                    color = color,
+                    topLeft = Offset(size.width * 0.18f, size.height * 0.18f),
+                    size = androidx.compose.ui.geometry.Size(size.width * 0.64f, size.height * 0.64f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = StrokeCap.Round)
+                )
+            }
+            PlayerQuickActionKind.PlayNext -> {
+                drawLine(color, Offset(size.width * 0.20f, size.height * 0.30f), Offset(size.width * 0.54f, size.height * 0.30f), stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(size.width * 0.20f, size.height * 0.50f), Offset(size.width * 0.54f, size.height * 0.50f), stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(size.width * 0.20f, size.height * 0.70f), Offset(size.width * 0.42f, size.height * 0.70f), stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(size.width * 0.70f, size.height * 0.30f), Offset(size.width * 0.70f, size.height * 0.70f), stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(size.width * 0.58f, size.height * 0.58f), Offset(size.width * 0.70f, size.height * 0.70f), stroke, cap = StrokeCap.Round)
+                drawLine(color, Offset(size.width * 0.82f, size.height * 0.58f), Offset(size.width * 0.70f, size.height * 0.70f), stroke, cap = StrokeCap.Round)
+            }
+            PlayerQuickActionKind.Speed -> {
+                drawArc(
+                    color = color,
+                    startAngle = 190f,
+                    sweepAngle = 220f,
+                    useCenter = false,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke, cap = StrokeCap.Round),
+                    topLeft = Offset(size.width * 0.16f, size.height * 0.24f),
+                    size = androidx.compose.ui.geometry.Size(size.width * 0.68f, size.height * 0.68f)
+                )
+                drawLine(color, Offset(cx, cy), Offset(size.width * 0.72f, size.height * 0.40f), stroke, cap = StrokeCap.Round)
+            }
+            PlayerQuickActionKind.Equalizer -> {
+                val xs = listOf(0.24f, 0.50f, 0.76f)
+                val heights = listOf(0.68f, 0.42f, 0.58f)
+                xs.forEachIndexed { index, x ->
+                    drawLine(
+                        color = color,
+                        start = Offset(size.width * x, size.height * 0.22f),
+                        end = Offset(size.width * x, size.height * 0.78f),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round
+                    )
+                    drawCircle(
+                        color = color,
+                        radius = stroke * 1.35f,
+                        center = Offset(size.width * x, size.height * heights[index])
+                    )
                 }
             }
         }

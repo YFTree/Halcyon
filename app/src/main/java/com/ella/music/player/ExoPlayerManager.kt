@@ -87,6 +87,7 @@ class ExoPlayerManager(private val context: Context) {
     private var playlistBeforeShuffle: List<Song>? = null
     private var playNextAnchorKey: String? = null
     private var playNextForwardCount = 0
+    private var replayGainVolume = 1f
 
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val artworkRepository = MusicRepository.getInstance(context)
@@ -218,6 +219,7 @@ class ExoPlayerManager(private val context: Context) {
             }
         }
         mediaController?.addListener(playerListener!!)
+        mediaController?.volume = replayGainVolume
 
         val pending = pendingPlaylist
         if (pending != null) {
@@ -660,6 +662,11 @@ class ExoPlayerManager(private val context: Context) {
         _playbackSpeed.value = safeSpeed
         _playbackPitch.value = safePitch
         savePlaybackState()
+    }
+
+    fun setReplayGainVolume(volume: Float) {
+        replayGainVolume = volume.coerceIn(0f, 1f)
+        mediaController?.volume = replayGainVolume
     }
 
     fun updatePosition() {

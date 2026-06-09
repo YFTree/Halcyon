@@ -1,21 +1,38 @@
 package com.ella.music.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TextFieldDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -154,6 +171,135 @@ fun EllaMiuixTextField(
         modifier = modifier
             .fillMaxWidth()
             .then(focusModifier)
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun EllaMiuixChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    horizontalPadding: Dp = 14.dp,
+    verticalPadding: Dp = 8.dp,
+    content: @Composable RowScope.(contentColor: Color) -> Unit
+) {
+    val chipBackground = if (selected) {
+        MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
+    } else {
+        MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f)
+    }
+    val chipContentColor = if (selected) {
+        MiuixTheme.colorScheme.primary
+    } else {
+        MiuixTheme.colorScheme.onSurfaceVariantSummary
+    }
+    val clickModifier = if (onLongClick != null) {
+        Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+    } else {
+        Modifier.clickable(onClick = onClick)
+    }
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(chipBackground)
+            .then(clickModifier)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        content = { content(chipContentColor) }
+    )
+}
+
+@Composable
+fun EllaMiuixChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    horizontalPadding: Dp = 14.dp,
+    verticalPadding: Dp = 8.dp
+) {
+    EllaMiuixChip(
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier,
+        onLongClick = onLongClick,
+        horizontalPadding = horizontalPadding,
+        verticalPadding = verticalPadding
+    ) { contentColor ->
+        Text(
+            text = text,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = contentColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+fun EllaMiuixSurfaceCard(
+    modifier: Modifier = Modifier,
+    color: Color = MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f),
+    shape: Shape = RoundedCornerShape(18.dp),
+    contentPadding: PaddingValues = PaddingValues(14.dp),
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(color)
+            .padding(contentPadding),
+        content = content
+    )
+}
+
+@Composable
+fun EllaMiuixListItem(
+    title: String,
+    summary: String? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    shape: Shape = RoundedCornerShape(14.dp)
+) {
+    BasicComponent(
+        title = title,
+        summary = summary,
+        modifier = modifier
+            .clip(shape)
+            .clickable(enabled = enabled, onClick = onClick)
+    )
+}
+
+@Composable
+fun EllaMiuixBadge(
+    text: String,
+    color: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(6.dp),
+    horizontalPadding: Dp = 7.dp,
+    verticalPadding: Dp = 2.dp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
+    fontWeight: FontWeight = FontWeight.Bold
+) {
+    Text(
+        text = text,
+        modifier = modifier
+            .clip(shape)
+            .background(color)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        color = contentColor,
+        fontWeight = fontWeight,
+        maxLines = 1,
+        fontSize = fontSize
     )
 }
 

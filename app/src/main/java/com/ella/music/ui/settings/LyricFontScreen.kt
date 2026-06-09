@@ -1,5 +1,7 @@
 package com.ella.music.ui.settings
 
+import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,8 +32,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
+import com.ella.music.player.DesktopLyricService
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Icon
@@ -69,6 +73,7 @@ fun LyricFontScreen(
                 withContext(Dispatchers.IO) { copyImportedFont(context, uri) }
             }.onSuccess { font ->
                 settingsManager.setLyricFont(font.name, font.path)
+                notifyDesktopLyricFontChanged(context, settingsManager)
                 fonts = withContext(Dispatchers.IO) { collectFontChoices(context) }
                 Toast.makeText(
                     context,
@@ -122,6 +127,7 @@ fun LyricFontScreen(
                     onClick = {
                         scope.launch {
                             settingsManager.clearLyricFont()
+                            notifyDesktopLyricFontChanged(context, settingsManager)
                             Toast.makeText(
                                 context,
                                 context.getString(R.string.settings_lyric_font_system_default_applied),
@@ -134,7 +140,10 @@ fun LyricFontScreen(
                     selectedFontPath = selectedFontPath,
                     lyricFontWeight = lyricFontWeight,
                     onWeightChange = { weight ->
-                        scope.launch { settingsManager.setLyricFontWeight(weight) }
+                        scope.launch {
+                            settingsManager.setLyricFontWeight(weight)
+                            notifyDesktopLyricFontChanged(context, settingsManager)
+                        }
                     }
                 )
                 LyricFontListTitle()
@@ -149,6 +158,7 @@ fun LyricFontScreen(
                     onClick = {
                         scope.launch {
                             settingsManager.setLyricFont(font.name, font.path)
+                            notifyDesktopLyricFontChanged(context, settingsManager)
                             Toast.makeText(
                                 context,
                                 context.getString(R.string.settings_lyric_font_applied, font.name),
@@ -165,6 +175,7 @@ fun LyricFontScreen(
 
                                 if (selectedFontPath == font.path) {
                                     settingsManager.clearLyricFont()
+                                    notifyDesktopLyricFontChanged(context, settingsManager)
                                 }
 
                                 fonts = withContext(Dispatchers.IO) { collectFontChoices(context) }
@@ -191,4 +202,15 @@ fun LyricFontScreen(
             }
         }
     }
+}
+
+private suspend fun notifyDesktopLyricFontChanged(
+    context: Context,
+    settingsManager: SettingsManager
+) {
+    if (!settingsManager.desktopLyricEnabled.first()) return
+    context.startService(
+        Intent(context, DesktopLyricService::class.java)
+            .setAction(DesktopLyricService.ACTION_APPLY_SETTINGS)
+    )
 }

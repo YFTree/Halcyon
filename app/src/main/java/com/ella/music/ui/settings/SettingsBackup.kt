@@ -1,27 +1,21 @@
 package com.ella.music.ui.settings
 
 import android.content.Context
-import android.content.ContextWrapper
 import android.net.Uri
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,16 +39,13 @@ import com.ella.music.data.PlaylistStore
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.webdav.WebDavClient
 import com.ella.music.data.webdav.WebDavConfig
-import com.ella.music.ui.components.EllaMiuixDialog
+import com.ella.music.ui.components.EllaMiuixListItem
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
-import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTitle
@@ -324,95 +315,93 @@ fun BackupSettingsScreen(
                         summary = stringResource(R.string.settings_backup_webdav_path_summary),
                         onValueChange = { webDavBackupPath = it }
                     )
-                    BasicComponent(
+                    EllaMiuixListItem(
                         title = stringResource(R.string.settings_backup_webdav_upload),
                         summary = stringResource(R.string.settings_backup_webdav_upload_summary),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable(enabled = !webDavUploading && !webDavDownloading) {
-                                backupScope.launch {
-                                    val effectiveUrl = webDavBackupUrl.trim().ifBlank { savedWebDavUrl }
-                                    if (effectiveUrl.isBlank()) {
-                                        Toast.makeText(context, context.getString(R.string.settings_backup_webdav_not_configured), Toast.LENGTH_SHORT).show()
-                                        return@launch
-                                    }
-                                    val effectiveUser = webDavBackupUser.trim().ifBlank { savedWebDavUser }
-                                    val effectivePassword = webDavBackupPassword.ifBlank { savedWebDavPassword }
-                                    // Persist the backup URL and path
-                                    settingsManager.setWebDavBackupUrl(effectiveUrl)
-                                    settingsManager.setWebDavBackupPath(webDavBackupPath)
-                                    webDavUploading = true
-                                    runCatching {
-                                        val config = WebDavConfig(
-                                            url = effectiveUrl,
-                                            username = effectiveUser,
-                                            password = effectivePassword
-                                        )
-                                        val path = webDavBackupPath.trim().ifBlank { "halcyon_backup" }
-                                        val fileName = "halcyon_backup_${System.currentTimeMillis()}.json"
-                                        val fullUrl = "${effectiveUrl.trimEnd('/')}/$path/$fileName"
-                                        val backupContent = withContext(Dispatchers.IO) { buildBackupJson() }
-                                        withContext(Dispatchers.IO) {
-                                            WebDavClient.uploadFileFromString(fullUrl, config, backupContent)
-                                        }
-                                    }.onSuccess {
-                                        Toast.makeText(context, context.getString(R.string.settings_backup_webdav_upload_success), Toast.LENGTH_SHORT).show()
-                                    }.onFailure {
-                                        Toast.makeText(context, context.getString(R.string.settings_backup_webdav_upload_failed) + ": " + (it.message ?: ""), Toast.LENGTH_LONG).show()
-                                    }
-                                    webDavUploading = false
+                        enabled = !webDavUploading && !webDavDownloading,
+                        onClick = {
+                            backupScope.launch {
+                                val effectiveUrl = webDavBackupUrl.trim().ifBlank { savedWebDavUrl }
+                                if (effectiveUrl.isBlank()) {
+                                    Toast.makeText(context, context.getString(R.string.settings_backup_webdav_not_configured), Toast.LENGTH_SHORT).show()
+                                    return@launch
                                 }
+                                val effectiveUser = webDavBackupUser.trim().ifBlank { savedWebDavUser }
+                                val effectivePassword = webDavBackupPassword.ifBlank { savedWebDavPassword }
+                                // Persist the backup URL and path
+                                settingsManager.setWebDavBackupUrl(effectiveUrl)
+                                settingsManager.setWebDavBackupPath(webDavBackupPath)
+                                webDavUploading = true
+                                runCatching {
+                                    val config = WebDavConfig(
+                                        url = effectiveUrl,
+                                        username = effectiveUser,
+                                        password = effectivePassword
+                                    )
+                                    val path = webDavBackupPath.trim().ifBlank { "halcyon_backup" }
+                                    val fileName = "halcyon_backup_${System.currentTimeMillis()}.json"
+                                    val fullUrl = "${effectiveUrl.trimEnd('/')}/$path/$fileName"
+                                    val backupContent = withContext(Dispatchers.IO) { buildBackupJson() }
+                                    withContext(Dispatchers.IO) {
+                                        WebDavClient.uploadFileFromString(fullUrl, config, backupContent)
+                                    }
+                                }.onSuccess {
+                                    Toast.makeText(context, context.getString(R.string.settings_backup_webdav_upload_success), Toast.LENGTH_SHORT).show()
+                                }.onFailure {
+                                    Toast.makeText(context, context.getString(R.string.settings_backup_webdav_upload_failed) + ": " + (it.message ?: ""), Toast.LENGTH_LONG).show()
+                                }
+                                webDavUploading = false
                             }
+                        }
                     )
-                    BasicComponent(
+                    EllaMiuixListItem(
                         title = stringResource(R.string.settings_backup_webdav_download),
                         summary = stringResource(R.string.settings_backup_webdav_download_summary),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable(enabled = !webDavUploading && !webDavDownloading) {
-                                backupScope.launch {
-                                    val effectiveUrl = webDavBackupUrl.trim().ifBlank { savedWebDavUrl }
-                                    if (effectiveUrl.isBlank()) {
-                                        Toast.makeText(context, context.getString(R.string.settings_backup_webdav_not_configured), Toast.LENGTH_SHORT).show()
-                                        return@launch
-                                    }
-                                    val effectiveUser = webDavBackupUser.trim().ifBlank { savedWebDavUser }
-                                    val effectivePassword = webDavBackupPassword.ifBlank { savedWebDavPassword }
-                                    // Persist the backup URL and path
-                                    settingsManager.setWebDavBackupUrl(effectiveUrl)
-                                    settingsManager.setWebDavBackupPath(webDavBackupPath)
-                                    webDavDownloading = true
-                                    runCatching {
-                                        val config = WebDavConfig(
-                                            url = effectiveUrl,
-                                            username = effectiveUser,
-                                            password = effectivePassword
+                        enabled = !webDavUploading && !webDavDownloading,
+                        onClick = {
+                            backupScope.launch {
+                                val effectiveUrl = webDavBackupUrl.trim().ifBlank { savedWebDavUrl }
+                                if (effectiveUrl.isBlank()) {
+                                    Toast.makeText(context, context.getString(R.string.settings_backup_webdav_not_configured), Toast.LENGTH_SHORT).show()
+                                    return@launch
+                                }
+                                val effectiveUser = webDavBackupUser.trim().ifBlank { savedWebDavUser }
+                                val effectivePassword = webDavBackupPassword.ifBlank { savedWebDavPassword }
+                                // Persist the backup URL and path
+                                settingsManager.setWebDavBackupUrl(effectiveUrl)
+                                settingsManager.setWebDavBackupPath(webDavBackupPath)
+                                webDavDownloading = true
+                                runCatching {
+                                    val config = WebDavConfig(
+                                        url = effectiveUrl,
+                                        username = effectiveUser,
+                                        password = effectivePassword
+                                    )
+                                    val path = webDavBackupPath.trim().ifBlank { "halcyon_backup" }
+                                    val backupDirUrl = "${effectiveUrl.trimEnd('/')}/$path/"
+                                    val items = withContext(Dispatchers.IO) {
+                                        WebDavClient.list(
+                                            config,
+                                            backupDirUrl,
+                                            forceRefresh = true,
+                                            includeNonAudioFiles = true
                                         )
-                                        val path = webDavBackupPath.trim().ifBlank { "halcyon_backup" }
-                                        val backupDirUrl = "${effectiveUrl.trimEnd('/')}/$path/"
-                                        val items = withContext(Dispatchers.IO) {
-                                            WebDavClient.list(
-                                                config,
-                                                backupDirUrl,
-                                                forceRefresh = true,
-                                                includeNonAudioFiles = true
-                                            )
-                                        }
-                                        val backupFiles = items
-                                            .filterNot { it.isDirectory }
-                                            .filter { it.name.endsWith(".json") && it.name.isHalcyonBackupFileName() }
-                                            .sortedByDescending { it.name }
-                                        if (backupFiles.isEmpty()) {
-                                            throw IllegalStateException(context.getString(R.string.settings_backup_webdav_file_not_found))
-                                        }
-                                        webDavRestoreConfig = config
-                                        webDavBackupFiles = backupFiles
-                                    }.onFailure {
-                                        webDavDownloading = false
-                                        Toast.makeText(context, context.getString(R.string.settings_backup_webdav_download_failed) + ": " + (it.message ?: ""), Toast.LENGTH_LONG).show()
                                     }
+                                    val backupFiles = items
+                                        .filterNot { it.isDirectory }
+                                        .filter { it.name.endsWith(".json") && it.name.isHalcyonBackupFileName() }
+                                        .sortedByDescending { it.name }
+                                    if (backupFiles.isEmpty()) {
+                                        throw IllegalStateException(context.getString(R.string.settings_backup_webdav_file_not_found))
+                                    }
+                                    webDavRestoreConfig = config
+                                    webDavBackupFiles = backupFiles
+                                }.onFailure {
+                                    webDavDownloading = false
+                                    Toast.makeText(context, context.getString(R.string.settings_backup_webdav_download_failed) + ": " + (it.message ?: ""), Toast.LENGTH_LONG).show()
                                 }
                             }
+                        }
                     )
                 }
             }
@@ -422,179 +411,61 @@ fun BackupSettingsScreen(
     }
 
     if (showPlaybackExportFormatDialog) {
-        EllaMiuixDialog(
-            show = true,
-            title = stringResource(R.string.settings_backup_export_format_title),
-            onDismissRequest = { showPlaybackExportFormatDialog = false }
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                BackupExportFormatRow(
-                    title = stringResource(R.string.settings_backup_export_format_ella),
-                    summary = stringResource(R.string.settings_backup_export_format_ella_summary),
-                    onClick = {
-                        playbackExportFormat = PlaybackExportFormat.Ella
-                        showPlaybackExportFormatDialog = false
-                        playbackExportLauncher.launch("ella_listening_stats_${System.currentTimeMillis()}.json")
-                    }
-                )
-                BackupExportFormatRow(
-                    title = stringResource(R.string.settings_backup_export_format_sollin),
-                    summary = stringResource(R.string.settings_backup_export_format_sollin_summary),
-                    onClick = {
-                        playbackExportFormat = PlaybackExportFormat.Sollin
-                        showPlaybackExportFormatDialog = false
-                        playbackExportLauncher.launch("prism-listening-stats_${System.currentTimeMillis()}.json")
-                    }
-                )
+        BackupFormatDialog(
+            onDismissRequest = { showPlaybackExportFormatDialog = false },
+            onFormatSelected = { format ->
+                playbackExportFormat = format
+                showPlaybackExportFormatDialog = false
+                val fileName = when (format) {
+                    PlaybackExportFormat.Ella -> "ella_listening_stats_${System.currentTimeMillis()}.json"
+                    PlaybackExportFormat.Sollin -> "prism-listening-stats_${System.currentTimeMillis()}.json"
+                }
+                playbackExportLauncher.launch(fileName)
             }
-        }
+        )
     }
 
     if (webDavBackupFiles.isNotEmpty()) {
-        EllaMiuixDialog(
-            show = true,
-            title = stringResource(R.string.settings_backup_webdav_download),
+        WebDavBackupPickerDialog(
+            backupFiles = webDavBackupFiles,
             onDismissRequest = {
                 webDavBackupFiles = emptyList()
                 webDavRestoreConfig = null
                 webDavDownloading = false
-            }
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                webDavBackupFiles.forEach { item ->
-                    val displayName = item.name
-                        .removePrefix("halcyon_backup_")
-                        .removePrefix("ella_backup_")
-                        .removeSuffix(".json")
-                        .ifBlank { item.name }
-                    BasicComponent(
-                        title = item.name,
-                        summary = displayName,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable {
-                                val selectedFile = item
-                                val config = webDavRestoreConfig
-                                webDavBackupFiles = emptyList()
-                                webDavRestoreConfig = null
-                                if (config != null) {
-                                    backupScope.launch {
-                                        runCatching {
-                                            val tempFile = withContext(Dispatchers.IO) {
-                                                val tmp = java.io.File(context.cacheDir, "webdav_restore.json")
-                                                WebDavClient.downloadToFile(selectedFile.url, config, tmp)
-                                                tmp
-                                            }
-                                            val text = withContext(Dispatchers.IO) {
-                                                tempFile.readText(Charsets.UTF_8)
-                                            }
-                                            val root = JSONObject(text)
-                                            settingsManager.restoreSettingsJson(root.optJSONObject("settings") ?: root)
-                                            val playlistPayload = root.optJSONObject("playlists")
-                                                ?: root.takeIf { it.has("playlists") }
-                                            if (playlistPayload != null) {
-                                                playlistStore.restoreJson(playlistPayload)
-                                            }
-                                            root.optJSONObject("aiChat")?.let { restoreAiChatBackupJson(context, it) }
-                                            withContext(Dispatchers.IO) { tempFile.delete() }
-                                        }.onSuccess {
-                                            Toast.makeText(context, context.getString(R.string.settings_backup_webdav_download_success), Toast.LENGTH_SHORT).show()
-                                        }.onFailure {
-                                            Toast.makeText(context, context.getString(R.string.settings_backup_webdav_download_failed) + ": " + (it.message ?: ""), Toast.LENGTH_LONG).show()
-                                        }
-                                        webDavDownloading = false
-                                    }
-                                }
+            },
+            onFileSelected = { selectedFile ->
+                val config = webDavRestoreConfig
+                webDavBackupFiles = emptyList()
+                webDavRestoreConfig = null
+                if (config != null) {
+                    backupScope.launch {
+                        runCatching {
+                            val tempFile = withContext(Dispatchers.IO) {
+                                val tmp = java.io.File(context.cacheDir, "webdav_restore.json")
+                                WebDavClient.downloadToFile(selectedFile.url, config, tmp)
+                                tmp
                             }
-                    )
+                            val text = withContext(Dispatchers.IO) {
+                                tempFile.readText(Charsets.UTF_8)
+                            }
+                            val root = JSONObject(text)
+                            settingsManager.restoreSettingsJson(root.optJSONObject("settings") ?: root)
+                            val playlistPayload = root.optJSONObject("playlists")
+                                ?: root.takeIf { it.has("playlists") }
+                            if (playlistPayload != null) {
+                                playlistStore.restoreJson(playlistPayload)
+                            }
+                            root.optJSONObject("aiChat")?.let { restoreAiChatBackupJson(context, it) }
+                            withContext(Dispatchers.IO) { tempFile.delete() }
+                        }.onSuccess {
+                            Toast.makeText(context, context.getString(R.string.settings_backup_webdav_download_success), Toast.LENGTH_SHORT).show()
+                        }.onFailure {
+                            Toast.makeText(context, context.getString(R.string.settings_backup_webdav_download_failed) + ": " + (it.message ?: ""), Toast.LENGTH_LONG).show()
+                        }
+                        webDavDownloading = false
+                    }
                 }
             }
-        }
+        )
     }
 }
-
-private enum class PlaybackExportFormat {
-    Ella,
-    Sollin
-}
-
-private tailrec fun Context.findComponentActivity(): ComponentActivity? = when (this) {
-    is ComponentActivity -> this
-    is ContextWrapper -> baseContext.findComponentActivity()
-    else -> null
-}
-
-private fun aiChatSessionsDir(context: Context): File =
-    File(context.filesDir, "ai_chat_sessions")
-
-private fun exportAiChatBackupJson(context: Context): JSONObject {
-    val dir = aiChatSessionsDir(context)
-    val sessions = JSONArray()
-    if (dir.exists()) {
-        dir.listFiles()
-            ?.filter { it.isFile && it.extension.equals("json", ignoreCase = true) && it.name != "index.json" }
-            ?.sortedBy { it.name }
-            ?.forEach { file ->
-                runCatching {
-                    sessions.put(
-                        JSONObject()
-                            .put("fileName", file.name)
-                            .put("messages", JSONArray(file.readText(Charsets.UTF_8)))
-                    )
-                }
-            }
-    }
-    val index = runCatching {
-        val file = File(dir, "index.json")
-        if (file.exists()) JSONArray(file.readText(Charsets.UTF_8)) else JSONArray()
-    }.getOrDefault(JSONArray())
-    return JSONObject()
-        .put("version", 1)
-        .put("index", index)
-        .put("sessions", sessions)
-}
-
-private fun restoreAiChatBackupJson(context: Context, payload: JSONObject) {
-    val dir = aiChatSessionsDir(context).apply { mkdirs() }
-    dir.listFiles()
-        ?.filter { it.isFile && it.extension.equals("json", ignoreCase = true) }
-        ?.forEach { it.delete() }
-
-    val index = payload.optJSONArray("index") ?: JSONArray()
-    File(dir, "index.json").writeText(index.toString(), Charsets.UTF_8)
-
-    val sessions = payload.optJSONArray("sessions") ?: JSONArray()
-    for (i in 0 until sessions.length()) {
-        val item = sessions.optJSONObject(i) ?: continue
-        val fileName = item.optString("fileName").takeIf { it.isSafeAiChatBackupFileName() } ?: continue
-        val messages = item.optJSONArray("messages") ?: continue
-        File(dir, fileName).writeText(messages.toString(), Charsets.UTF_8)
-    }
-}
-
-private fun String.isSafeAiChatBackupFileName(): Boolean =
-    matches(Regex("""[A-Za-z0-9._-]+\.json""")) && this != "index.json"
-
-@Composable
-private fun BackupExportFormatRow(
-    title: String,
-    summary: String,
-    onClick: () -> Unit
-) {
-    BasicComponent(
-        title = title,
-        summary = summary,
-        modifier = Modifier
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-    )
-}
-
-private fun String.isHalcyonBackupFileName(): Boolean =
-    startsWith("halcyon_backup_") || startsWith("ella_backup_")

@@ -1,9 +1,11 @@
 package com.ella.music.ui.player
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
@@ -16,6 +18,7 @@ internal fun PlayerCoverActionSheet(
     playbackPitch: Float,
     visualizerEnabled: Boolean,
     visualizerAvailable: Boolean,
+    lyricOffsetMs: Long,
     metadataEditorId: String,
     lyricTimingEditorId: String,
     sleepTimerEndRealtimeMs: Long?,
@@ -35,6 +38,7 @@ internal fun PlayerCoverActionSheet(
     onSetRating: () -> Unit,
     onAiInterpret: () -> Unit,
     onSpectrum: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     onDeleteSong: () -> Unit,
     onMatchDynamicCover: () -> Unit,
     onStopAfterCurrent: (Boolean) -> Unit,
@@ -43,6 +47,7 @@ internal fun PlayerCoverActionSheet(
     onCancelTimer: () -> Unit,
     onSpeed: (Float) -> Unit,
     onPitch: (Float) -> Unit,
+    onLyricOffset: (Long) -> Unit,
     onVisualizerEnabled: (Boolean) -> Unit,
     initialPage: PlayerActionSheetPage
 ) {
@@ -55,12 +60,15 @@ internal fun PlayerCoverActionSheet(
         onDismissRequest = onDismiss
     ) {
         PlayerActionMenu(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp),
             song = song,
             speed = playbackSpeed,
             pitch = playbackPitch,
             visualizerEnabled = visualizerEnabled,
             visualizerAvailable = visualizerAvailable,
+            lyricOffsetMs = lyricOffsetMs,
             metadataEditorId = metadataEditorId,
             lyricTimingEditorId = lyricTimingEditorId,
             sleepTimerEndRealtimeMs = sleepTimerEndRealtimeMs,
@@ -80,6 +88,7 @@ internal fun PlayerCoverActionSheet(
             onSetRating = onSetRating,
             onAiInterpret = onAiInterpret,
             onSpectrum = onSpectrum,
+            onOpenEqualizer = onOpenEqualizer,
             onDeleteSong = onDeleteSong,
             onMatchDynamicCover = onMatchDynamicCover,
             onStopAfterCurrent = onStopAfterCurrent,
@@ -88,6 +97,7 @@ internal fun PlayerCoverActionSheet(
             onCancelTimer = onCancelTimer,
             onSpeed = onSpeed,
             onPitch = onPitch,
+            onLyricOffset = onLyricOffset,
             onVisualizerEnabled = onVisualizerEnabled,
             initialPage = initialPage
         )

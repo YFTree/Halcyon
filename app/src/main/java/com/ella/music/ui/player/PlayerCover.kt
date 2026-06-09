@@ -57,7 +57,8 @@ internal fun FullBleedCover(
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
-                sizePx = 768
+                sizePx = 768,
+                cornerRadius = 0.dp
             )
         } else {
             DefaultAlbumCover(modifier = Modifier.fillMaxSize())
@@ -81,7 +82,8 @@ internal fun PlayerCoverImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
-    sizePx: Int = 1200
+    sizePx: Int = 1200,
+    cornerRadius: Dp = 20.dp
 ) {
     val context = LocalContext.current
     val request = remember(context, model, sizePx) {
@@ -98,7 +100,9 @@ internal fun PlayerCoverImage(
         AsyncImage(
             model = request,
             contentDescription = contentDescription,
-            modifier = modifier.clip(RoundedCornerShape(20.dp)),
+            modifier = modifier.then(
+                if (cornerRadius > 0.dp) Modifier.clip(RoundedCornerShape(cornerRadius)) else Modifier
+            ),
             contentScale = contentScale
         )
     }

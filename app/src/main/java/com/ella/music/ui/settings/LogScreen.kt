@@ -83,7 +83,6 @@ fun LogScreen(
     }
     val allLabel = stringResource(R.string.common_all)
     val shareSubject = stringResource(R.string.logs_share_subject)
-    val shareText = stringResource(R.string.logs_share_text, AppLogStore.formatTime(System.currentTimeMillis()))
     val shareChooserTitle = stringResource(R.string.logs_share_chooser_title)
     val noShareApp = stringResource(R.string.share_no_available_app)
     val logClipLabel = stringResource(R.string.logs_clip_label)
@@ -95,18 +94,47 @@ fun LogScreen(
 
     fun shareLogs() {
         scope.launch {
-            val file = withContext(Dispatchers.IO) { AppLogStore.exportDetailedReport(context, filteredEntries) }
+            val filterDescription = buildString {
+                append("all persisted logs")
+                append("; visible before export=${filteredEntries.size}/${entries.size}")
+                append("; level=${selectedLevel?.name ?: "ALL"}")
+                append("; type=${selectedType?.name ?: "ALL"}")
+                query.trim().takeIf { it.isNotBlank() }?.let { append("; query=${it.take(80)}") }
+            }
+            val file = withContext(Dispatchers.IO) {
+                AppLogStore.info(
+                    context,
+                    "LogExport",
+                    "Export requested: $filterDescription"
+                )
+                val persistedEntries = AppLogStore.read(context)
+                val exportScope = "$filterDescription; persisted after request=${persistedEntries.size}"
+                AppLogStore.exportDetailedReport(
+                    context = context,
+                    entries = persistedEntries,
+                    scopeDescription = exportScope
+                ).also { exportedFile ->
+                    AppLogStore.info(
+                        context,
+                        "LogExport",
+                        "Export finished: entries=${persistedEntries.size}, bytes=${exportedFile.length()}, file=${exportedFile.name}"
+                    )
+                }
+            }
             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_SUBJECT, shareSubject)
-                putExtra(Intent.EXTRA_TEXT, shareText)
+                putExtra(Intent.EXTRA_TITLE, file.name)
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 clipData = ClipData.newUri(context.contentResolver, shareSubject, uri)
             }
             runCatching {
-                context.startActivity(Intent.createChooser(intent, shareChooserTitle))
+                context.startActivity(
+                    Intent.createChooser(intent, shareChooserTitle)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                )
             }.onFailure {
                 showToast(noShareApp)
             }
@@ -135,7 +163,6 @@ fun LogScreen(
                 },
                 actions = {
                     IconButton(
-                        enabled = filteredEntries.isNotEmpty(),
                         onClick = ::shareLogs
                     ) {
                         Icon(

@@ -1,6 +1,5 @@
 package com.ella.music.ui.folder
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,11 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -26,6 +23,7 @@ import com.ella.music.ui.components.EllaMiuixAction
 import com.ella.music.ui.components.EllaMiuixActionRow
 import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixTextField
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
@@ -43,21 +41,17 @@ internal fun WebDavItemRow(
     onClick: () -> Unit,
     onAddToQueue: () -> Unit
 ) {
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MiuixTheme.colorScheme.surfaceContainer)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        cornerRadius = 16.dp,
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MiuixTheme.colorScheme.surfaceContainer)
-                .padding(0.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -70,8 +64,6 @@ internal fun WebDavItemRow(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MiuixTheme.colorScheme.surfaceContainer)
             ) {
                 Text(
                     text = item.name,
@@ -92,14 +84,14 @@ internal fun WebDavItemRow(
                     tint = MiuixTheme.colorScheme.onSurface
                 )
             }
-        }
-        if (!item.isDirectory) {
-            IconButton(onClick = onAddToQueue) {
-                Icon(
-                    imageVector = MiuixIcons.Regular.Add,
-                    contentDescription = stringResource(R.string.common_add_to_queue),
-                    tint = MiuixTheme.colorScheme.onSurface
-                )
+            if (!item.isDirectory) {
+                IconButton(onClick = onAddToQueue) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Add,
+                        contentDescription = stringResource(R.string.common_add_to_queue),
+                        tint = MiuixTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     }

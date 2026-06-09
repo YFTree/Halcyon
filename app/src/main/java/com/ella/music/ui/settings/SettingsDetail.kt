@@ -1,7 +1,6 @@
 package com.ella.music.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,7 +20,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -39,12 +37,21 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+enum class SettingsDetailMode {
+    AppearanceHome,
+    LibraryScanning,
+    Integrations,
+    Lyrics
+}
+
 @Composable
 fun SettingsDetailScreen(
     onBack: () -> Unit,
     onNavigateToLyricFont: () -> Unit,
     playerViewModel: PlayerViewModel? = null,
-    showOnlyLyrics: Boolean = false
+    showOnlyLyrics: Boolean = false,
+    mode: SettingsDetailMode = SettingsDetailMode.AppearanceHome,
+    onNavigateToScanFolders: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -79,9 +86,7 @@ fun SettingsDetailScreen(
     LaunchedEffect(showHomeDisplayPage) {
         contentScrollState.scrollTo(0)
     }
-    fun applyDesktopLyricSettings() {
-        playerViewModel?.applyDesktopLyricSettings()
-    }
+    val effectiveMode = if (showOnlyLyrics) SettingsDetailMode.Lyrics else mode
 
     Column(
         modifier = Modifier
@@ -92,8 +97,10 @@ fun SettingsDetailScreen(
         EllaSmallTopAppBar(
             title = when {
                 showHomeDisplayPage -> stringResource(R.string.settings_home_display)
-                showOnlyLyrics -> stringResource(R.string.settings_lyrics)
-                else -> stringResource(R.string.settings_preferences)
+                effectiveMode == SettingsDetailMode.AppearanceHome -> stringResource(R.string.settings_appearance_home)
+                effectiveMode == SettingsDetailMode.LibraryScanning -> stringResource(R.string.settings_library_scan)
+                effectiveMode == SettingsDetailMode.Integrations -> stringResource(R.string.settings_integrations)
+                else -> stringResource(R.string.settings_lyrics)
             },
             color = pageBackground,
             navigationIcon = {
@@ -145,25 +152,32 @@ fun SettingsDetailScreen(
                 return@Column
             }
 
-            if (!showOnlyLyrics) {
-                SettingsAppearanceSection()
-
-                SettingsHomeCustomizeSection(
-                    onOpenHomeDisplay = { showHomeDisplayPage = true }
-                )
-                SettingsAiInterpretationSection()
-                SettingsMcpSection()
-                SettingsLyricShareSection()
-                SettingsTagScrapingSection()
-                SettingsDesktopShortcutSection()
-                SettingsScanSection()
-            }
-
-            if (showOnlyLyrics) {
-                SettingsLyricsSection(
-                    onNavigateToLyricFont = onNavigateToLyricFont,
-                    playerViewModel = playerViewModel
-                )
+            when (effectiveMode) {
+                SettingsDetailMode.AppearanceHome -> {
+                    SettingsAppearanceSection()
+                    SettingsHomeCustomizeSection(
+                        onOpenHomeDisplay = { showHomeDisplayPage = true }
+                    )
+                }
+                SettingsDetailMode.LibraryScanning -> {
+                    SettingsLibrarySourceSection(
+                        onOpenScanFolders = onNavigateToScanFolders
+                    )
+                    SettingsScanSection()
+                    SettingsTagScrapingSection()
+                    SettingsDesktopShortcutSection()
+                }
+                SettingsDetailMode.Integrations -> {
+                    SettingsAiInterpretationSection()
+                    SettingsMcpSection()
+                }
+                SettingsDetailMode.Lyrics -> {
+                    SettingsLyricsSection(
+                        onNavigateToLyricFont = onNavigateToLyricFont,
+                        playerViewModel = playerViewModel
+                    )
+                    SettingsLyricShareSection()
+                }
             }
 
             Spacer(modifier = Modifier.height(160.dp))

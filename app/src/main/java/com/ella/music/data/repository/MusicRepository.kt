@@ -10,6 +10,7 @@ import android.media.MediaMetadataRetriever
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.util.LruCache
@@ -37,6 +38,7 @@ import com.ella.music.data.metadata.AudioTagRepository
 import com.ella.music.data.metadata.LyricoAudioTagReaderWriter
 import com.ella.music.data.metadata.WavMetadataReader
 import com.ella.music.data.parser.LrcParser
+import com.ella.music.data.parser.EllaLyricsParser
 import com.ella.music.data.scanner.MediaStoreAudioItem
 import com.ella.music.data.scanner.MusicScanner
 import com.ella.music.data.webdav.WebDavClient
@@ -415,7 +417,8 @@ class MusicRepository(private val context: Context) {
     ): List<LyricLine> = withContext(Dispatchers.IO) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
         val sourcePriority = settingsManager.lyricSourcePriority.first()
-        val cacheKey = "${song.id}:$safeMode:$sourcePriority"
+        val ignoreSplMetadataLines = settingsManager.ignoreSplMetadataLines.first()
+        val cacheKey = "${song.id}:$safeMode:$sourcePriority:spl=$ignoreSplMetadataLines"
         lyricsCache[cacheKey]?.let { return@withContext it }
 
         Log.d("MusicRepo", "Loading lyrics for: ${song.title} path=${song.path}")
@@ -429,7 +432,7 @@ class MusicRepository(private val context: Context) {
 
         val effectivePath = song.effectiveLocalPathForMetadata()
         for (sourceId in orderedLyricSourceIds(sourcePriority, safeMode)) {
-            loadLyricsBySourceId(song, effectivePath, sourceId)?.let { lyrics ->
+            loadLyricsBySourceId(song, effectivePath, sourceId, ignoreSplMetadataLines)?.let { lyrics ->
                 lyricsCache[cacheKey] = lyrics
                 return@withContext lyrics
             }
@@ -455,16 +458,21 @@ class MusicRepository(private val context: Context) {
         }
     }
 
-    private fun loadLyricsBySourceId(song: Song, effectivePath: String, sourceId: String): List<LyricLine>? {
+    private fun loadLyricsBySourceId(
+        song: Song,
+        effectivePath: String,
+        sourceId: String,
+        ignoreSplMetadataLines: Boolean
+    ): List<LyricLine>? {
         return when (sourceId) {
             SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML ->
-                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true)
+                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true, ignoreSplMetadataLines)
             SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN ->
-                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false)
+                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false, ignoreSplMetadataLines)
             SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML ->
-                loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
+                loadExternalLyricsByFormat(song, effectivePath, preferTtml = true, ignoreSplMetadataLines)
             SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN ->
-                loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
+                loadExternalLyricsByFormat(song, effectivePath, preferTtml = false, ignoreSplMetadataLines)
             else -> null
         }
     }
@@ -476,9 +484,17 @@ class MusicRepository(private val context: Context) {
         return parsed.lyrics.takeIf { it.isNotEmpty() }
     }
 
-    private fun loadExternalLyricsByFormat(song: Song, effectivePath: String, preferTtml: Boolean): List<LyricLine>? {
+    private fun loadExternalLyricsByFormat(
+        song: Song,
+        effectivePath: String,
+        preferTtml: Boolean,
+        ignoreSplMetadataLines: Boolean
+    ): List<LyricLine>? {
         val content = findExternalLyricContentByFormat(effectivePath, preferTtml) ?: return null
-        val parsed = LrcParser.parse(content)
+        val parsed = LrcParser.parse(
+            content,
+            ignoreSplMetadataLines = ignoreSplMetadataLines
+        )
         val lyrics = parsed.lyrics.takeIf { it.isNotEmpty() } ?: return null
         return lyrics.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
             .also { Log.d("MusicRepo", "External lyric format ${if (preferTtml) "TTML" else "LRC/ELRC"} parsed: ${lyrics.size} lines for ${song.title}") }
@@ -491,21 +507,30 @@ class MusicRepository(private val context: Context) {
             ?: audioTagRepository.readEmbeddedLyricsBlocking(effectivePath)
         if (!embedded.isNullOrBlank()) {
             Log.d("MusicRepo", "Embedded lyrics found (${embedded.length} chars) for ${song.title}")
-            return parseEmbeddedLyrics(song, embedded)
+            return parseEmbeddedLyrics(song, embedded, ignoreSplMetadataLines = false)
         }
         return null
     }
 
-    private fun loadEmbeddedLyricsByFormat(song: Song, effectivePath: String, preferTtml: Boolean): List<LyricLine>? {
+    private fun loadEmbeddedLyricsByFormat(
+        song: Song,
+        effectivePath: String,
+        preferTtml: Boolean,
+        ignoreSplMetadataLines: Boolean
+    ): List<LyricLine>? {
         val embedded = audioTagRepository.readTagsBlocking(effectivePath)
             ?.embeddedLyricsContent(preferTtml = preferTtml)
             ?: return null
-        val parsed = parseEmbeddedLyrics(song, embedded) ?: return null
+        val parsed = parseEmbeddedLyrics(song, embedded, ignoreSplMetadataLines) ?: return null
         return parsed.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
     }
 
-    private fun parseEmbeddedLyrics(song: Song, embedded: String): List<LyricLine>? {
-        val parsed = LrcParser.parse(embedded)
+    private fun parseEmbeddedLyrics(
+        song: Song,
+        embedded: String,
+        ignoreSplMetadataLines: Boolean
+    ): List<LyricLine>? {
+        val parsed = LrcParser.parse(embedded, ignoreSplMetadataLines = ignoreSplMetadataLines)
         if (parsed.lyrics.isNotEmpty()) {
             Log.d("MusicRepo", "Embedded lyrics parsed: ${parsed.lyrics.size} lines for ${song.title}")
             return parsed.lyrics
@@ -516,6 +541,7 @@ class MusicRepository(private val context: Context) {
         var timeOffset = 0L
         embedded.lines().forEach { line ->
             val trimmed = line.trim()
+            if (ignoreSplMetadataLines && EllaLyricsParser.isSplMetadataLine(trimmed)) return@forEach
             if (trimmed.isNotEmpty()) {
                 result.add(LyricLine(timeMs = timeOffset, text = trimmed, words = emptyList()))
                 timeOffset += 3000L
@@ -527,22 +553,25 @@ class MusicRepository(private val context: Context) {
     suspend fun reloadLyrics(song: Song, sourceMode: Int): List<LyricLine> = withContext(Dispatchers.IO) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
         val sourcePriority = settingsManager.lyricSourcePriority.first()
-        lyricsCache.remove("${song.id}:$safeMode:$sourcePriority")
+        val ignoreSplMetadataLines = settingsManager.ignoreSplMetadataLines.first()
+        lyricsCache.remove("${song.id}:$safeMode:$sourcePriority:spl=$ignoreSplMetadataLines")
         getLyrics(song, safeMode)
     }
 
     suspend fun getLyricFormatAvailability(song: Song): LyricFormatAvailability = withContext(Dispatchers.IO) {
         val effectivePath = song.effectiveLocalPathForMetadata()
-        val ttml = loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
-            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true)
-        val plain = loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
-            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false)
+        val ignoreSplMetadataLines = settingsManager.ignoreSplMetadataLines.first()
+        val ttml = loadExternalLyricsByFormat(song, effectivePath, preferTtml = true, ignoreSplMetadataLines)
+            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true, ignoreSplMetadataLines)
+        val plain = loadExternalLyricsByFormat(song, effectivePath, preferTtml = false, ignoreSplMetadataLines)
+            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false, ignoreSplMetadataLines)
         LyricFormatAvailability(hasTtml = !ttml.isNullOrEmpty(), hasPlain = !plain.isNullOrEmpty())
     }
 
     suspend fun reloadLyricsByFormat(song: Song, preferTtml: Boolean): List<LyricLine> = withContext(Dispatchers.IO) {
         val sourcePriority = settingsManager.lyricSourcePriority.first()
-        val cacheKey = "${song.id}:format:$preferTtml:$sourcePriority"
+        val ignoreSplMetadataLines = settingsManager.ignoreSplMetadataLines.first()
+        val cacheKey = "${song.id}:format:$preferTtml:$sourcePriority:spl=$ignoreSplMetadataLines"
         lyricsCache.remove(cacheKey)
         val effectivePath = song.effectiveLocalPathForMetadata()
         val lyrics = orderedLyricSourceIds(sourcePriority, SettingsManager.LYRIC_SOURCE_AUTO)
@@ -553,7 +582,7 @@ class MusicRepository(private val context: Context) {
                     id == SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN || id == SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN
                 }
             }
-            .firstNotNullOfOrNull { sourceId -> loadLyricsBySourceId(song, effectivePath, sourceId) }
+            .firstNotNullOfOrNull { sourceId -> loadLyricsBySourceId(song, effectivePath, sourceId, ignoreSplMetadataLines) }
             ?: emptyList()
         lyricsCache[cacheKey] = lyrics
         lyrics
@@ -563,7 +592,7 @@ class MusicRepository(private val context: Context) {
         if (song.onlineSource != "kw" || song.onlineId.isBlank()) return null
         val request = Request.Builder()
             .url("https://www.kuwo.cn/newh5/singles/songinfoandlrc?musicId=${song.onlineId}")
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 EllaMusic/1.0")
+            .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Halcyon/1.0")
             .build()
         return runCatching {
             httpClient.newCall(request).execute().use { response ->
@@ -957,6 +986,12 @@ class MusicRepository(private val context: Context) {
         coverBitmapCache.get(cacheKey)?.let { return it }
         return synchronized(coverArtLock) {
             coverBitmapCache.get(cacheKey)?.let { return it }
+            if (usage == CoverUsage.ListThumbnail) {
+                val thumbnailBitmap = decodeExternalThumbnailBitmap(song, targetSize, cacheKey)
+                if (thumbnailBitmap != null) {
+                    return thumbnailBitmap
+                }
+            }
             if (usage == CoverUsage.ListThumbnail && !song.prefersEmbeddedArtworkForThumbnail()) {
                 val albumBitmap = decodeAlbumArtBitmap(song.albumId, targetSize, usage)
                 if (albumBitmap != null) {
@@ -994,6 +1029,43 @@ class MusicRepository(private val context: Context) {
                 null
             }
         }
+    }
+
+    private fun decodeExternalThumbnailBitmap(
+        song: Song,
+        targetSize: Int,
+        cacheKey: String
+    ): Bitmap? {
+        val thumbnail = song.externalThumbnailCandidates()
+            .firstOrNull { it.exists() && it.isFile && it.length() > 0L }
+            ?: return null
+        return runCatching {
+            decodeBitmapFile(thumbnail, targetSize, Bitmap.Config.RGB_565)
+                ?.also { coverBitmapCache.put(cacheKey, it) }
+        }.getOrElse { error ->
+            Log.d("MusicRepo", "Failed to decode external thumbnail ${thumbnail.absolutePath}", error)
+            null
+        }
+    }
+
+    private fun decodeBitmapFile(
+        file: File,
+        targetSize: Int,
+        preferredConfig: Bitmap.Config
+    ): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sampleSize = 1
+        while ((bounds.outWidth / sampleSize) > targetSize || (bounds.outHeight / sampleSize) > targetSize) {
+            sampleSize *= 2
+        }
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize.coerceAtLeast(1)
+            inPreferredConfig = preferredConfig
+        }
+        return BitmapFactory.decodeFile(file.absolutePath, options)
     }
 
     private fun decodeAlbumArtBitmap(
@@ -1039,6 +1111,31 @@ class MusicRepository(private val context: Context) {
     private fun Song.prefersEmbeddedArtworkForThumbnail(): Boolean =
         fileName.substringAfterLast('.', path.substringAfterLast('.'))
             .lowercase() in embeddedArtworkThumbnailExtensions
+
+    private fun Song.externalThumbnailCandidates(): List<File> {
+        val metadataPath = effectiveLocalPathForMetadata()
+        val songFile = File(metadataPath)
+        if (!songFile.isFile) return emptyList()
+        val fileNameBase = fileName.ifBlank { songFile.name }
+        val stem = fileNameBase.substringBeforeLast('.').ifBlank { songFile.nameWithoutExtension }
+        val directories = buildList {
+            songFile.parentFile?.let { add(File(it, ".thumbnails")) }
+            add(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), ".thumbnails"))
+        }.distinctBy { it.absolutePath }
+        val keys = listOf(
+            stem,
+            fileNameBase,
+            id.takeIf { it > 0L }?.toString().orEmpty(),
+            albumId.takeIf { it > 0L }?.toString().orEmpty(),
+            path.sha256()
+        ).filter { it.isNotBlank() }.distinct()
+        val extensions = listOf("jpg", "jpeg", "png", "webp")
+        return directories.flatMap { dir ->
+            keys.flatMap { key ->
+                extensions.map { ext -> File(dir, "$key.$ext") }
+            }
+        }
+    }
 
     fun getAlbumArtUri(albumId: Long): Uri? {
         if (albumId <= 0L) return null
@@ -1310,8 +1407,12 @@ class MusicRepository(private val context: Context) {
             "flac" in source || extension == "flac" -> "FLAC"
             "mpeg" in source || "mp3" in source || extension == "mp3" -> "MP3"
             "wav" in source || extension == "wav" -> "WAV"
+            "eac3" in source || "e-ac-3" in source || "ec-3" in source || extension == "ec3" || extension == "eac3" -> "EC3"
+            "ac3" in source || "ac-3" in source || extension == "ac3" -> "AC3"
             "aac" in source || extension == "aac" -> "AAC"
-            "alac" in source -> "ALAC/M4A"
+            "alac" in source || "audio/alac" in source -> "ALAC"
+            extension == "m4a" && estimatedBitRate() >= 700_000 -> "ALAC"
+            extension == "m4a" -> "AAC"
             "mp4" in source || "m4a" in source || extension == "m4a" || extension == "mp4" -> "M4A"
             "ogg" in source || extension == "ogg" -> "OGG"
             "opus" in source || extension == "opus" -> "OPUS"

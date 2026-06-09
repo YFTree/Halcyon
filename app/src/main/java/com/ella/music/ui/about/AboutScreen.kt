@@ -36,8 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ella.music.R
 import com.ella.music.BuildConfig
+import com.ella.music.R
 import com.ella.music.ui.effect.BgEffectBackground
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -50,7 +50,6 @@ import top.yukonga.miuix.kmp.basic.SmallTitle
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
-import top.yukonga.miuix.kmp.blur.BlurBlendMode
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -90,11 +89,7 @@ fun AboutScreen(
             EllaSmallTopAppBar(
                 title = stringResource(R.string.about),
                 scrollBehavior = scrollBehavior,
-                color = if (isDark) {
-                    Color.Black.copy(alpha = scrollProgress.coerceIn(0f, 1f))
-                } else {
-                    colorScheme.surface.copy(alpha = scrollProgress.coerceIn(0f, 1f))
-                },
+                color = colorScheme.surface.copy(alpha = scrollProgress.coerceIn(0f, 1f)),
                 titleColor = colorScheme.onSurface.copy(alpha = scrollProgress),
                 defaultWindowInsetsPadding = false,
                 navigationIcon = {
@@ -141,32 +136,8 @@ private fun AboutContent(
     val heroTopPadding = 148.dp
     val heroBottomPadding = 112.dp
 
-    val titleBlend = remember(isDark) {
-        if (isDark) {
-            emptyList()
-        } else {
-            listOf(
-                BlendColorEntry(Color(0xcc4a4a4a.toInt()), BlurBlendMode.ColorBurn),
-                BlendColorEntry(Color(0xff4f4f4f.toInt()), BlurBlendMode.LinearLight),
-                BlendColorEntry(Color(0xff1af200.toInt()), BlurBlendMode.Lab),
-            )
-        }
-    }
-
-    val cardBlendColors = remember(isDark) {
-        if (isDark) {
-            listOf(
-                BlendColorEntry(Color(0x4D1D2A7A), BlurBlendMode.Screen),
-                BlendColorEntry(Color(0x332B1C60), BlurBlendMode.Lighten),
-                BlendColorEntry(Color(0x1A3E2C78), BlurBlendMode.Luminosity),
-            )
-        } else {
-            listOf(
-                BlendColorEntry(Color(0x34F7D6FF), BlurBlendMode.Overlay),
-                BlendColorEntry(Color(0xB3FFFFFF.toInt()), BlurBlendMode.HardLight),
-            )
-        }
-    }
+    val titleBlend = remember(isDark) { aboutTitleBlendColors(isDark) }
+    val cardBlendColors = remember(isDark) { aboutCardBlendColors(isDark) }
 
     BgEffectBackground(
         dynamicBackground = true,
@@ -176,7 +147,7 @@ private fun AboutContent(
         isDarkTheme = isDark,
         alpha = {
             val fade = 1f - scrollProgress
-            if (isDark) 0.84f * fade else fade
+            fade
         },
     ) {
         Column(
@@ -194,7 +165,7 @@ private fun AboutContent(
                 modifier = Modifier
                     .padding(top = 0.dp, bottom = 5.dp)
                     .then(
-                        if (blurEnable && !isDark) Modifier.textureBlur(
+                        if (blurEnable) Modifier.textureBlur(
                             backdrop = backdrop,
                             shape = RoundedCornerShape(16.dp),
                             blurRadius = 150f,
@@ -388,20 +359,20 @@ private fun FrostedCard(
             .padding(horizontal = 12.dp)
             .padding(bottom = 12.dp)
             .then(
-                if (blurEnable && !isDark) Modifier.textureBlur(
+                if (blurEnable) Modifier.textureBlur(
                     backdrop = backdrop,
                     shape = RoundedCornerShape(16.dp),
-                    blurRadius = 64f,
+                    blurRadius = if (isDark) 72f else 64f,
                     noiseCoefficient = BlurDefaults.NoiseCoefficient,
                     colors = BlurColors(blendColors = cardBlendColors),
                     enabled = true,
                 ) else Modifier
             ),
         colors = CardDefaults.defaultColors(
-            if (isDark) {
-                colorScheme.surfaceContainer.copy(alpha = 0.66f + 0.26f * scrollProgress.coerceIn(0f, 1f))
-            } else if (blurEnable) {
+            if (blurEnable) {
                 Color.Transparent
+            } else if (isDark) {
+                aboutCardFallbackColor(isDark).copy(alpha = 0.86f + 0.08f * scrollProgress.coerceIn(0f, 1f))
             } else {
                 colorScheme.surfaceContainer
             },
