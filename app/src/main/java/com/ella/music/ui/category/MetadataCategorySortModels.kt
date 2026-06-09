@@ -1,0 +1,264 @@
+package com.ella.music.ui.category
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import com.ella.music.R
+import com.ella.music.data.model.Album
+import com.ella.music.data.model.Song
+import com.ella.music.data.model.formatPlaybackDuration
+import com.ella.music.viewmodel.MetadataCategoryItem
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+internal enum class MetadataCategorySortMode {
+    Name,
+    NameDesc,
+    SongCount,
+    AlbumCount,
+    Duration,
+    DateModified,
+    DateModifiedAsc
+}
+
+internal fun MetadataCategorySortMode.availableFor(type: String): Boolean {
+    return when (this) {
+        MetadataCategorySortMode.NameDesc -> type == "year"
+        MetadataCategorySortMode.DateModified,
+        MetadataCategorySortMode.DateModifiedAsc -> type == "folder"
+        else -> true
+    }
+}
+
+@Composable
+internal fun MetadataCategorySortMode.displayLabel(type: String): String {
+    val context = LocalContext.current
+    return when {
+        type == "year" && this == MetadataCategorySortMode.Name -> context.getString(R.string.category_sort_year_asc)
+        (type == "composer" || type == "lyricist") && this == MetadataCategorySortMode.AlbumCount -> context.getString(R.string.category_sort_participating_albums)
+        else -> context.getString(when (this) {
+            MetadataCategorySortMode.Name -> R.string.category_sort_name
+            MetadataCategorySortMode.NameDesc -> R.string.category_sort_year_desc
+            MetadataCategorySortMode.SongCount -> R.string.playlist_sort_song_count
+            MetadataCategorySortMode.AlbumCount -> R.string.category_sort_album_count
+            MetadataCategorySortMode.Duration -> R.string.playlist_sort_duration
+            MetadataCategorySortMode.DateModified -> R.string.playlist_song_sort_date_modified
+            MetadataCategorySortMode.DateModifiedAsc -> R.string.category_sort_date_modified_asc
+        })
+    }
+}
+
+internal fun List<MetadataCategoryItem>.sortedForCategory(mode: MetadataCategorySortMode): List<MetadataCategoryItem> {
+    return when (mode) {
+        MetadataCategorySortMode.Name -> sortedBy { it.name.lowercase(Locale.ROOT) }
+        MetadataCategorySortMode.NameDesc -> sortedByDescending { it.name.toIntOrNull() ?: Int.MIN_VALUE }
+        MetadataCategorySortMode.SongCount -> sortedByDescending { it.songCount }
+        MetadataCategorySortMode.AlbumCount -> sortedByDescending { it.albumCount }
+        MetadataCategorySortMode.Duration -> sortedByDescending { it.duration }
+        MetadataCategorySortMode.DateModified -> sortedByDescending { it.dateModified }
+        MetadataCategorySortMode.DateModifiedAsc -> sortedBy { it.dateModified }
+    }
+}
+
+internal fun MetadataCategoryItem.matchesCategorySearch(query: String, type: String): Boolean {
+    return name.contains(query, ignoreCase = true) ||
+        (type == "folder" && name.substringAfterLast('/').contains(query, ignoreCase = true))
+}
+
+@Composable
+internal fun MetadataCategoryItem.categorySortSummary(sortMode: MetadataCategorySortMode): String {
+    val context = LocalContext.current
+    return when (sortMode) {
+        MetadataCategorySortMode.AlbumCount -> context.getString(R.string.category_album_count_detail, albumCount)
+        MetadataCategorySortMode.Duration -> duration.formatDuration()
+        else -> context.getString(R.string.category_song_count_card, songCount)
+    }
+}
+
+@Composable
+internal fun MetadataCategoryItem.folderSortSummary(sortMode: MetadataCategorySortMode): String {
+    val context = LocalContext.current
+    return when (sortMode) {
+        MetadataCategorySortMode.AlbumCount -> context.getString(R.string.category_album_count_detail, albumCount)
+        MetadataCategorySortMode.Duration -> duration.formatDuration()
+        MetadataCategorySortMode.DateModified,
+        MetadataCategorySortMode.DateModifiedAsc -> dateModified.formatDateTimeText(context)
+        else -> context.getString(R.string.analytics_song_count_value, songCount)
+    }
+}
+
+@Composable
+internal fun MetadataCategoryItem.personSortSummary(sortMode: MetadataCategorySortMode): String {
+    val context = LocalContext.current
+    return when (sortMode) {
+        MetadataCategorySortMode.Duration -> context.getString(R.string.category_person_sort_duration, duration.formatDuration(), albumCount)
+        else -> context.getString(R.string.category_person_sort, songCount, albumCount)
+    }
+}
+
+internal enum class MetadataDetailSongSortMode {
+    AlbumTrack,
+    Title,
+    FileName,
+    Duration,
+    YearAsc,
+    YearDesc,
+    DateAdded,
+    DateAddedAsc,
+    DateModified,
+    DateModifiedAsc
+}
+
+@Composable
+internal fun MetadataDetailSongSortMode.label(): String {
+    val context = LocalContext.current
+    return context.getString(when (this) {
+        MetadataDetailSongSortMode.AlbumTrack -> R.string.category_sort_album_track
+        MetadataDetailSongSortMode.Title -> R.string.playlist_song_sort_title
+        MetadataDetailSongSortMode.FileName -> R.string.playlist_song_sort_file_name
+        MetadataDetailSongSortMode.Duration -> R.string.playlist_sort_duration
+        MetadataDetailSongSortMode.YearAsc -> R.string.playlist_song_sort_year_asc
+        MetadataDetailSongSortMode.YearDesc -> R.string.playlist_song_sort_year_desc
+        MetadataDetailSongSortMode.DateAdded -> R.string.playlist_song_sort_date_added
+        MetadataDetailSongSortMode.DateAddedAsc -> R.string.category_sort_date_added_asc
+        MetadataDetailSongSortMode.DateModified -> R.string.playlist_song_sort_date_modified
+        MetadataDetailSongSortMode.DateModifiedAsc -> R.string.category_sort_date_modified_asc
+    })
+}
+
+internal fun List<com.ella.music.data.model.Song>.sortedForMetadataDetail(
+    mode: MetadataDetailSongSortMode
+): List<com.ella.music.data.model.Song> {
+    return when (mode) {
+        MetadataDetailSongSortMode.AlbumTrack -> sortedWith(
+            compareBy<com.ella.music.data.model.Song> { it.album.lowercase(Locale.ROOT) }
+                .thenBy { if (it.discNumber > 0) it.discNumber else Int.MAX_VALUE }
+                .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
+                .thenBy { it.title.lowercase(Locale.ROOT) }
+        )
+        MetadataDetailSongSortMode.Title -> sortedBy { it.title.lowercase(Locale.ROOT) }
+        MetadataDetailSongSortMode.FileName -> sortedBy { song ->
+            song.fileName.ifBlank { song.path.substringAfterLast('/') }.lowercase(Locale.ROOT)
+        }
+        MetadataDetailSongSortMode.Duration -> sortedByDescending { it.duration }
+        MetadataDetailSongSortMode.YearAsc -> sortedByReleaseDate(ascending = true)
+        MetadataDetailSongSortMode.YearDesc -> sortedByReleaseDate(ascending = false)
+        MetadataDetailSongSortMode.DateAdded -> sortedByDescending { it.dateAdded }
+        MetadataDetailSongSortMode.DateAddedAsc -> sortedBy { it.dateAdded }
+        MetadataDetailSongSortMode.DateModified -> sortedByDescending { it.dateModified }
+        MetadataDetailSongSortMode.DateModifiedAsc -> sortedBy { it.dateModified }
+    }
+}
+
+internal enum class MetadataDetailTab {
+    Songs,
+    Albums
+}
+
+@Composable
+internal fun MetadataDetailTab.label(): String {
+    val context = LocalContext.current
+    return context.getString(when (this) {
+        MetadataDetailTab.Songs -> R.string.album_stat_songs
+        MetadataDetailTab.Albums -> R.string.category_album
+    })
+}
+
+internal enum class MetadataDetailAlbumSortMode {
+    YearAsc,
+    YearDesc,
+    SongCount,
+    Duration,
+    Name
+}
+
+@Composable
+internal fun MetadataDetailAlbumSortMode.label(): String {
+    val context = LocalContext.current
+    return context.getString(when (this) {
+        MetadataDetailAlbumSortMode.YearAsc -> R.string.playlist_song_sort_year_asc
+        MetadataDetailAlbumSortMode.YearDesc -> R.string.playlist_song_sort_year_desc
+        MetadataDetailAlbumSortMode.SongCount -> R.string.playlist_sort_song_count
+        MetadataDetailAlbumSortMode.Duration -> R.string.playlist_sort_duration
+        MetadataDetailAlbumSortMode.Name -> R.string.category_sort_album_name
+    })
+}
+
+internal fun List<Album>.sortedForMetadataAlbumDetail(
+    mode: MetadataDetailAlbumSortMode,
+    durations: Map<Long, Long>
+): List<Album> {
+    return when (mode) {
+        MetadataDetailAlbumSortMode.YearAsc -> sortedWith(compareBy<Album> { it.yearInt <= 0 }.thenBy { it.yearInt }.thenBy { it.name.lowercase(Locale.ROOT) })
+        MetadataDetailAlbumSortMode.YearDesc -> sortedWith(compareBy<Album> { it.yearInt <= 0 }.thenByDescending { it.yearInt }.thenBy { it.name.lowercase(Locale.ROOT) })
+        MetadataDetailAlbumSortMode.SongCount -> sortedByDescending { it.songCount }
+        MetadataDetailAlbumSortMode.Duration -> sortedByDescending { durations[it.id] ?: 0L }
+        MetadataDetailAlbumSortMode.Name -> sortedBy { it.name.lowercase(Locale.ROOT) }
+    }
+}
+
+internal fun List<Song>.sortedByReleaseDate(ascending: Boolean): List<Song> {
+    val comparator = if (ascending) {
+        compareBy<Song> { it.releaseYearOrNull() == null }
+            .thenBy { it.releaseYearOrNull() ?: Int.MAX_VALUE }
+    } else {
+        compareBy<Song> { it.releaseYearOrNull() == null }
+            .thenByDescending { it.releaseYearOrNull() ?: Int.MIN_VALUE }
+    }
+    return sortedWith(
+        comparator
+            .thenBy { it.album.lowercase(Locale.ROOT) }
+            .thenBy { if (it.discNumber > 0) it.discNumber else Int.MAX_VALUE }
+            .thenBy { if (it.trackNumber > 0) it.trackNumber else Int.MAX_VALUE }
+            .thenBy { it.title.lowercase(Locale.ROOT) }
+    )
+}
+
+internal fun Song.releaseYearOrNull(): Int? =
+    Regex("""\d{4}""").find(year)?.value?.toIntOrNull()
+
+@Composable
+internal fun String.categoryTitle(): String {
+    val context = LocalContext.current
+    return when (this) {
+        "genre" -> context.getString(R.string.category_genre)
+        "year" -> context.getString(R.string.category_year)
+        "composer" -> context.getString(R.string.category_composer)
+        "lyricist" -> context.getString(R.string.category_lyricist)
+        "folder" -> context.getString(R.string.category_folder)
+        else -> context.getString(R.string.category_general)
+    }
+}
+
+@Composable
+internal fun String.categoryCountSummary(count: Int): String {
+    val context = LocalContext.current
+    return when (this) {
+        "genre" -> context.getString(R.string.category_count_genres, count)
+        "composer" -> context.getString(R.string.category_count_composers, count)
+        "lyricist" -> context.getString(R.string.category_count_lyricists, count)
+        "folder" -> context.getString(R.string.category_count_folders, count)
+        "year" -> context.getString(R.string.category_count_years, count)
+        else -> context.getString(R.string.category_count_general, count)
+    }
+}
+
+internal fun String.usesSingleColumnCategory(): Boolean {
+    return this == "composer" || this == "lyricist" || this == "folder"
+}
+
+internal fun Long.formatDuration(): String {
+    return formatPlaybackDuration()
+}
+
+internal fun Long.formatDateText(context: android.content.Context): String {
+    if (this <= 0L) return context.getString(R.string.folder_unknown_modified_time)
+    val millis = if (this < 10_000_000_000L) this * 1000L else this
+    return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(millis))
+}
+
+internal fun Long.formatDateTimeText(context: android.content.Context): String {
+    if (this <= 0L) return context.getString(R.string.folder_unknown_modified_time)
+    val millis = if (this < 10_000_000_000L) this * 1000L else this
+    return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(millis))
+}

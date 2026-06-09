@@ -1,6 +1,5 @@
 package com.ella.music.ui.ai
 
-import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,8 +8,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,17 +36,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
@@ -60,8 +53,6 @@ import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -69,166 +60,12 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.io.File
 import java.util.UUID
-
-private const val MAX_SESSIONS = 20
-private const val MAX_MESSAGES_PER_SESSION = 100
-
-// ── Session persistence ──
-
-private data class AiChatSession(
-    val id: String,
-    val title: String,
-    val createdAt: Long,
-    val messages: List<AiChatMessage>
-)
-
-private fun sessionsDir(context: Context): File =
-    File(context.filesDir, "ai_chat_sessions").also { it.mkdirs() }
-
-private fun defaultSessionTitle(context: Context): String =
-    context.getString(R.string.ai_chat_new_session)
-
-private fun String.isDefaultAiChatSessionTitle(): Boolean =
-    trim() in setOf("New chat", "New Chat", "新对话", "新對話", "新しい会話")
-
-private fun loadSessionIndex(context: Context): List<AiChatSessionMeta> {
-    return runCatching {
-        val file = File(sessionsDir(context), "index.json")
-        if (!file.exists()) return@runCatching emptyList()
-        val array = JSONArray(file.readText())
-        (0 until array.length()).map { i ->
-            val obj = array.getJSONObject(i)
-            val rawTitle = obj.getString("title")
-            AiChatSessionMeta(
-                id = obj.getString("id"),
-                title = if (rawTitle.isDefaultAiChatSessionTitle()) defaultSessionTitle(context) else rawTitle,
-                createdAt = obj.getLong("createdAt")
-            )
-        }
-    }.getOrDefault(emptyList())
-}
-
-private fun saveSessionIndex(context: Context, index: List<AiChatSessionMeta>) {
-    runCatching {
-        val array = JSONArray()
-        index.forEach { meta ->
-            array.put(JSONObject().put("id", meta.id).put("title", meta.title).put("createdAt", meta.createdAt))
-        }
-        File(sessionsDir(context), "index.json").writeText(array.toString())
-    }
-}
-
-private fun loadSessionMessages(context: Context, sessionId: String): List<AiChatMessage> {
-    return runCatching {
-        val file = File(sessionsDir(context), "$sessionId.json")
-        if (!file.exists()) return@runCatching emptyList()
-        val array = JSONArray(file.readText())
-        (0 until array.length()).map { i ->
-            val obj = array.getJSONObject(i)
-            AiChatMessage(
-                role = if (obj.getString("role") == "user") AiChatRole.User else AiChatRole.Assistant,
-                text = obj.getString("text"),
-                songs = obj.optJSONArray("songs")?.toSongList().orEmpty(),
-                loading = false,
-                playlistName = obj.optString("playlistName")
-            )
-        }
-    }.getOrDefault(emptyList())
-}
-
-private fun saveSessionMessages(context: Context, sessionId: String, messages: List<AiChatMessage>) {
-    runCatching {
-        val array = JSONArray()
-        messages.filter { !it.loading }.takeLast(MAX_MESSAGES_PER_SESSION).forEach { msg ->
-            array.put(
-                JSONObject()
-                    .put("role", if (msg.role == AiChatRole.User) "user" else "assistant")
-                    .put("text", msg.text)
-                    .put("playlistName", msg.playlistName)
-                    .put("songs", JSONArray().apply {
-                        msg.songs.forEach { put(it.toJson()) }
-                    })
-            )
-        }
-        File(sessionsDir(context), "$sessionId.json").writeText(array.toString())
-    }
-}
-
-private fun JSONArray.toSongList(): List<Song> =
-    (0 until length()).mapNotNull { index ->
-        optJSONObject(index)?.toSong()
-    }
-
-private fun Song.toJson(): JSONObject =
-    JSONObject()
-        .put("id", id)
-        .put("title", title)
-        .put("artist", artist)
-        .put("album", album)
-        .put("albumId", albumId)
-        .put("duration", duration)
-        .put("path", path)
-        .put("fileName", fileName)
-        .put("fileSize", fileSize)
-        .put("mimeType", mimeType)
-        .put("dateAdded", dateAdded)
-        .put("dateModified", dateModified)
-        .put("trackNumber", trackNumber)
-        .put("discNumber", discNumber)
-        .put("albumArtist", albumArtist)
-        .put("genre", genre)
-        .put("year", year)
-        .put("composer", composer)
-        .put("lyricist", lyricist)
-        .put("coverUrl", coverUrl)
-        .put("onlineSource", onlineSource)
-        .put("onlineId", onlineId)
-        .put("onlineLyrics", onlineLyrics)
-        .put("onlineLyricTranslation", onlineLyricTranslation)
-
-private fun JSONObject.toSong(): Song =
-    Song(
-        id = optLong("id"),
-        title = optString("title"),
-        artist = optString("artist"),
-        album = optString("album"),
-        albumId = optLong("albumId"),
-        duration = optLong("duration"),
-        path = optString("path"),
-        fileName = optString("fileName"),
-        fileSize = optLong("fileSize"),
-        mimeType = optString("mimeType"),
-        dateAdded = optLong("dateAdded"),
-        dateModified = optLong("dateModified"),
-        trackNumber = optInt("trackNumber"),
-        discNumber = optInt("discNumber"),
-        albumArtist = optString("albumArtist"),
-        genre = optString("genre"),
-        year = optString("year"),
-        composer = optString("composer"),
-        lyricist = optString("lyricist"),
-        coverUrl = optString("coverUrl"),
-        onlineSource = optString("onlineSource"),
-        onlineId = optString("onlineId"),
-        onlineLyrics = optString("onlineLyrics"),
-        onlineLyricTranslation = optString("onlineLyricTranslation")
-    )
-
-private fun deleteSession(context: Context, sessionId: String) {
-    runCatching {
-        File(sessionsDir(context), "$sessionId.json").delete()
-    }
-}
-
-private data class AiChatSessionMeta(val id: String, val title: String, val createdAt: Long)
 
 // ── Composable ──
 
-@OptIn(ExperimentalLayoutApi::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun AiChatScreen(
     mainViewModel: MainViewModel,
@@ -533,202 +370,3 @@ fun AiChatScreen(
         } // end Box
     }
 }
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun AiChatBubble(
-    message: AiChatMessage,
-    onPlaySongs: () -> Unit,
-    onPlaySingleSong: (Song) -> Unit,
-    onAddSongsToQueue: () -> Unit,
-    onCreatePlaylist: () -> Unit
-) {
-    val isUser = message.role == AiChatRole.User
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(if (isUser) 0.84f else 0.96f)
-                .clip(RoundedCornerShape(18.dp))
-                .background(
-                    if (isUser) MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
-                    else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f)
-                )
-                .padding(14.dp)
-        ) {
-            AiMarkdownText(
-                text = message.text,
-                color = MiuixTheme.colorScheme.onSurface
-            )
-            if (message.songs.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                message.songs.take(5).forEach { song ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "${song.title} · ${song.artist}",
-                            fontSize = 12.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(
-                            onClick = { onPlaySingleSong(song) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.Regular.Play,
-                                contentDescription = "Play",
-                                tint = MiuixTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                }
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    Button(onClick = onPlaySongs) {
-                        Text(
-                            stringResource(R.string.ai_chat_play_songs, message.songs.size),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Button(onClick = onAddSongsToQueue) {
-                        Text(
-                            stringResource(R.string.ai_chat_add_to_queue),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Button(onClick = onCreatePlaylist) {
-                        Text(
-                            stringResource(R.string.ai_chat_create_playlist),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AiMarkdownText(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-        val lines = text.trim().lines().ifEmpty { listOf(text) }
-        lines.forEach { rawLine ->
-            val line = rawLine.trimEnd()
-            if (line.isBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                return@forEach
-            }
-            val trimmed = line.trimStart()
-            val headingLevel = trimmed.takeWhile { it == '#' }.length.takeIf { it in 1..3 && trimmed.getOrNull(it) == ' ' }
-            val bullet = trimmed.removePrefix("- ").takeIf { trimmed.startsWith("- ") }
-                ?: trimmed.removePrefix("* ").takeIf { trimmed.startsWith("* ") }
-            val numbered = Regex("""^(\d+)[.)]\s+(.+)$""").find(trimmed)
-
-            when {
-                headingLevel != null -> {
-                    Text(
-                        text = inlineAiMarkdown(trimmed.drop(headingLevel + 1), MiuixTheme.colorScheme.primary),
-                        fontSize = when (headingLevel) {
-                            1 -> 18.sp
-                            2 -> 16.sp
-                            else -> 15.sp
-                        },
-                        lineHeight = 23.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = color,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                bullet != null -> {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("•", fontSize = 14.sp, color = color.copy(alpha = 0.78f))
-                        Text(
-                            text = inlineAiMarkdown(bullet, MiuixTheme.colorScheme.primary),
-                            fontSize = 14.sp,
-                            lineHeight = 21.sp,
-                            color = color,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-                numbered != null -> {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("${numbered.groupValues[1]}.", fontSize = 14.sp, color = color.copy(alpha = 0.78f))
-                        Text(
-                            text = inlineAiMarkdown(numbered.groupValues[2], MiuixTheme.colorScheme.primary),
-                            fontSize = 14.sp,
-                            lineHeight = 21.sp,
-                            color = color,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-                else -> {
-                    Text(
-                        text = inlineAiMarkdown(trimmed, MiuixTheme.colorScheme.primary),
-                        fontSize = 14.sp,
-                        lineHeight = 21.sp,
-                        color = color,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun inlineAiMarkdown(text: String, accent: Color) = buildAnnotatedString {
-    val pattern = Regex("""(\*\*[^*]+\*\*|`[^`]+`)""")
-    var cursor = 0
-    pattern.findAll(text).forEach { match ->
-        append(text.substring(cursor, match.range.first))
-        val token = match.value
-        when {
-            token.startsWith("**") -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                append(token.removeSurrounding("**"))
-            }
-            token.startsWith("`") -> withStyle(SpanStyle(color = accent, background = accent.copy(alpha = 0.10f))) {
-                append(token.removeSurrounding("`"))
-            }
-            else -> append(token)
-        }
-        cursor = match.range.last + 1
-    }
-    append(text.substring(cursor))
-}
-
-private enum class AiChatRole { User, Assistant }
-
-private data class AiChatMessage(
-    val role: AiChatRole,
-    val text: String,
-    val songs: List<Song>,
-    val loading: Boolean = false,
-    val playlistName: String = ""
-)
