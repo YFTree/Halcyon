@@ -402,7 +402,15 @@ private fun Modifier.consumeBottomDockPassthrough(vararg keys: Any?): Modifier =
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent(pass = PointerEventPass.Final)
-                event.changes.forEach { it.consume() }
+                event.changes.forEach { change ->
+                    val dx = change.position.x - change.previousPosition.x
+                    val dy = change.position.y - change.previousPosition.y
+                    // Only consume vertical events; let horizontal drags pass through
+                    // so the MiniPlayer's swipe-to-skip gesture works
+                    if (kotlin.math.abs(dy) >= kotlin.math.abs(dx)) {
+                        change.consume()
+                    }
+                }
             }
         }
     }

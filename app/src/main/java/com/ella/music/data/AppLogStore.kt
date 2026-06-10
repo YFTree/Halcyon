@@ -382,7 +382,7 @@ object AppLogStore {
         val haystack = lowercase(Locale.ROOT)
         return when {
             listOf("crash", "fatal", "exception", "闪退", "崩溃").any { it in haystack } -> AppLogType.CRASH
-            listOf("http", "network", "okhttp", "webdav", "download", "api", "request", "response", "网络", "下载").any { it in haystack } -> AppLogType.NETWORK
+            listOf("http", "network", "okhttp", "webdav", "download", "api", "url=", "网络", "下载").any { it in haystack } -> AppLogType.NETWORK
             listOf("player", "playback", "exo", "media3", "decoder", "queue", "audio focus", "播放", "解码", "队列").any { it in haystack } -> AppLogType.PLAYBACK
             listOf("lyric", "ticker", "superlyric", "lyricon", "flyme", "samsung", "歌词", "词幕").any { it in haystack } -> AppLogType.LYRICS
             listOf("scan", "scanner", "library", "folder", "album", "artist", "cover", "音乐库", "扫描", "封面").any { it in haystack } -> AppLogType.LIBRARY

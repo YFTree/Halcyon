@@ -1,113 +1,49 @@
 package com.ella.music.ui.artist
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.widget.Toast
-import androidx.activity.compose.BackHandler
-import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.style.TextOverflow
-import com.ella.music.data.detailedAudioInfo
-import com.ella.music.data.model.AudioInfo
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.stringResource
 import com.ella.music.R
-import com.ella.music.data.LibraryAlbumAggregator
-import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
-import com.ella.music.data.model.Album
+import com.ella.music.data.detailedAudioInfo
+import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.UserPlaylist
-import com.ella.music.data.model.formatPlaybackDuration
-import com.ella.music.data.model.playlistIdentityKey
-import com.ella.music.ui.LibrarySortUiState
-import com.ella.music.ui.components.AppleStylePlayButton
-import com.ella.music.ui.components.DefaultAlbumCover
-import com.ella.music.ui.components.DoubleTapScrollOverlay
-import com.ella.music.ui.components.LocateCurrentSongFloatingButton
-import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixMenuItem
 import com.ella.music.ui.components.EllaMiuixSheetActions
+import com.ella.music.ui.components.EllaMiuixSheetColumn
+import com.ella.music.ui.components.EllaMiuixSheetHandle
 import com.ella.music.ui.components.EllaMiuixTextField
-import com.ella.music.ui.components.ellaPageBackground
-import com.ella.music.ui.components.buildTagEditorOptions
 import com.ella.music.ui.components.TagEditorOptionKind
-import com.ella.music.ui.components.launchTagEditorOption
-import com.ella.music.ui.components.openSongSpectrumWithAspectPro
-import com.ella.music.ui.components.shareLocalSong
-import com.ella.music.ui.components.SongItem
-import com.ella.music.ui.components.AddToPlaylistSheet
-import com.ella.music.ui.components.ArtworkUsage
-import com.ella.music.ui.components.SongMoreActionHost
-import com.ella.music.ui.components.rememberSongArtworkState
+import com.ella.music.ui.components.buildTagEditorOptions
 import com.ella.music.viewmodel.MainViewModel
-import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.basic.ArrowRight
-import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.MapAlbum
-import top.yukonga.miuix.kmp.icon.extended.SelectAll
-import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -343,34 +279,12 @@ internal fun ArtistAiInterpretationMenu(
 
 @Composable
 internal fun ArtistSheetColumn(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(MiuixTheme.colorScheme.background.copy(alpha = 0.98f))
-            .heightIn(max = 400.dp)
-            .verticalScroll(rememberScrollState())
-            .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        content = content
-    )
+    EllaMiuixSheetColumn(maxHeight = 400.dp, verticalPadding = 16.dp, showHandle = false, content = content)
 }
 
 @Composable
 internal fun ArtistSheetHandle() {
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .width(52.dp)
-                .height(5.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.28f))
-        )
-    }
+    EllaMiuixSheetHandle()
 }
 
 @Composable
@@ -379,19 +293,7 @@ internal fun ArtistMenuItem(
     onClick: () -> Unit,
     danger: Boolean = false
 ) {
-    Text(
-        text = text,
-        fontSize = 16.sp,
-        fontWeight = FontWeight.Bold,
-        color = if (danger) Color(0xFFE5484D) else MiuixTheme.colorScheme.onSurface,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 13.dp)
-    )
+    EllaMiuixMenuItem(text = text, onClick = onClick, danger = danger)
 }
 
 @Composable

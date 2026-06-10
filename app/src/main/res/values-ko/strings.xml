@@ -858,8 +858,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">데스크톱 가사에 대해 독립적으로 번역 줄 크기 조정</string>
     <string name="settings_desktop_lyric_opacity">데스크톱 가사 불투명도 %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">가사를 더 가볍게 만들려면 이 값을 줄이세요. 잠겨 있어도 값은 유지됩니다.</string>
-    <string name="settings_desktop_lyric_shadow_strength">데스크톱 가사 섀도우 %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">밝은 배경화면의 가독성을 향상합니다. 그림자를 비활성화하려면 0으로 설정하십시오.</string>
     <string name="settings_desktop_lyric_color">데스크톱 가사 색상</string>
     <string name="settings_enable_super_lyric">SuperLyric 활성화</string>
     <string name="settings_enable_super_lyric_summary">SuperLyricApi를 통해 SuperLyric 생태계에 단어별 가사 게시</string>

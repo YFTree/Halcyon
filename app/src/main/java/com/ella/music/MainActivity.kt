@@ -18,7 +18,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
@@ -84,7 +83,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -96,6 +94,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.ella.music.data.BottomBarGlassEffect
 import com.ella.music.data.SettingsManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
@@ -183,7 +182,9 @@ class MainActivity : ComponentActivity() {
 
             val settingsManager = remember { SettingsManager.getInstance(this@MainActivity) }
             val themeMode by settingsManager.themeMode.collectAsState(initial = 0)
-            val appLanguage by settingsManager.appLanguage.collectAsState(initial = SettingsManager.APP_LANGUAGE_SYSTEM)
+            val appLanguage by settingsManager.appLanguage.collectAsState(
+                initial = appliedLanguageTag ?: SettingsManager.APP_LANGUAGE_SYSTEM
+            )
             val appFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
             val appFontWeight by settingsManager.lyricFontWeight.collectAsState(initial = 800)
 
@@ -195,7 +196,8 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(appLanguage) {
                 if (applyAppLanguage(appLanguage)) {
-                    recreate()
+                    delay(260L)
+                    if (!isFinishing && !isDestroyed) recreate()
                 }
             }
 
@@ -281,28 +283,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun applyAppLanguage(languageTag: String): Boolean {
-        val locales = when (languageTag) {
-            SettingsManager.APP_LANGUAGE_ZH_CN -> LocaleListCompat.forLanguageTags("zh-CN")
-            SettingsManager.APP_LANGUAGE_ZH_TW -> LocaleListCompat.forLanguageTags("zh-TW")
-            SettingsManager.APP_LANGUAGE_EN -> LocaleListCompat.forLanguageTags("en")
-            SettingsManager.APP_LANGUAGE_JA -> LocaleListCompat.forLanguageTags("ja")
-            SettingsManager.APP_LANGUAGE_KO -> LocaleListCompat.forLanguageTags("ko")
-            SettingsManager.APP_LANGUAGE_DE -> LocaleListCompat.forLanguageTags("de")
-            SettingsManager.APP_LANGUAGE_FR -> LocaleListCompat.forLanguageTags("fr")
-            SettingsManager.APP_LANGUAGE_RU -> LocaleListCompat.forLanguageTags("ru")
-            SettingsManager.APP_LANGUAGE_TR -> LocaleListCompat.forLanguageTags("tr")
-            SettingsManager.APP_LANGUAGE_ID -> LocaleListCompat.forLanguageTags("id")
-            SettingsManager.APP_LANGUAGE_VI -> LocaleListCompat.forLanguageTags("vi")
-            SettingsManager.APP_LANGUAGE_TH -> LocaleListCompat.forLanguageTags("th")
-            else -> LocaleListCompat.getEmptyLocaleList()
-        }
-        if (appliedLanguageTag == languageTag && AppCompatDelegate.getApplicationLocales() == locales) return false
+        if (appliedLanguageTag == languageTag) return false
         appliedLanguageTag = languageTag
-        if (AppCompatDelegate.getApplicationLocales() != locales) {
-            AppCompatDelegate.setApplicationLocales(locales)
-            return true
-        }
-        return false
+        return true
     }
 
     override fun onNewIntent(intent: Intent) {

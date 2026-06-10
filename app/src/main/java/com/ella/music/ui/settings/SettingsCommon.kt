@@ -22,6 +22,7 @@ import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.preference.SliderPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -95,4 +96,31 @@ internal fun SplitSettingTextField(
             modifier = Modifier.fillMaxWidth()
         )
     }
+}
+
+@Composable
+internal fun SettingsIntSliderPreference(
+    title: String,
+    summary: String,
+    value: Int,
+    valueRange: IntRange,
+    valueText: String,
+    enabled: Boolean = true,
+    steps: Int = 0,
+    onValueChange: (Int) -> Unit
+) {
+    val safeRange = valueRange.first.toFloat()..valueRange.last.toFloat()
+    SliderPreference(
+        title = title,
+        summary = summary,
+        valueText = valueText,
+        value = value.coerceIn(valueRange).toFloat(),
+        valueRange = safeRange,
+        steps = steps,
+        showKeyPoints = steps > 0,
+        enabled = enabled,
+        onValueChange = { next ->
+            onValueChange(next.toInt().coerceIn(valueRange))
+        }
+    )
 }

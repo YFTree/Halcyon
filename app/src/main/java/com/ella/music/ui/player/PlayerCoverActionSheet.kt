@@ -8,7 +8,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ella.music.R
 import com.ella.music.data.model.Song
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import com.ella.music.ui.components.EllaMiuixBottomSheet
 
 @Composable
 internal fun PlayerCoverActionSheet(
@@ -53,7 +53,7 @@ internal fun PlayerCoverActionSheet(
 ) {
     if (!show) return
 
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
         enableNestedScroll = false,
         title = stringResource(R.string.player_more_actions),

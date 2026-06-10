@@ -662,15 +662,6 @@ class PlaybackService : MediaLibraryService() {
             return true
         }
 
-        private fun restartCurrentInRepeatOne(): Boolean {
-            if (repeatMode != Player.REPEAT_MODE_ONE) return false
-            val index = currentMediaItemIndex
-            if (mediaItemCount <= 0 || index !in 0 until mediaItemCount) return false
-            seekToDefaultPosition(index)
-            play()
-            return true
-        }
-
         private fun seekAdjacentMediaItemInRepeatOne(offset: Int): Boolean {
             if (repeatMode != Player.REPEAT_MODE_ONE) return false
             val index = currentMediaItemIndex

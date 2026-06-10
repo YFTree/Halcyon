@@ -596,6 +596,8 @@
     <string name="settings_backup_export_failed">Backup export failed</string>
     <string name="settings_backup_restore_success">Backup restored</string>
     <string name="settings_backup_restore_failed">Backup restore failed</string>
+    <string name="settings_backup_restore_wrong_type">This is a listening history backup. Please restore from the listening history section.</string>
+    <string name="settings_backup_restore_wrong_type_settings">This is a settings backup. Please restore from the settings section.</string>
     <string name="settings_backup_webdav_section">WebDAV Cloud Backup</string>
     <string name="settings_backup_webdav_url_label">WebDAV Server URL</string>
     <string name="settings_backup_webdav_url_summary">e.g. https://dav.example.com/remote.php/dav/files/user/</string>
@@ -858,8 +860,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">Scale the translation line independently for desktop lyrics</string>
     <string name="settings_desktop_lyric_opacity">Desktop lyric opacity %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">Reduce this to make the lyric lighter; the value is kept even when locked</string>
-    <string name="settings_desktop_lyric_shadow_strength">Desktop lyric shadow %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">Improve readability on bright wallpapers; set to 0 to disable the shadow</string>
     <string name="settings_desktop_lyric_color">Desktop lyric color</string>
     <string name="settings_enable_super_lyric">Enable SuperLyric</string>
     <string name="settings_enable_super_lyric_summary">Publish per-word lyrics to the SuperLyric ecosystem through SuperLyricApi</string>

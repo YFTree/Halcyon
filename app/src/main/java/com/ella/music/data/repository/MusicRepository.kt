@@ -46,7 +46,6 @@ import com.ella.music.data.webdav.WebDavConfig
 import java.io.File
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -54,6 +53,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -61,7 +61,6 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
@@ -393,7 +392,7 @@ class MusicRepository(private val context: Context) {
 
         runCatching {
             val root = JSONObject(libraryCacheFile.readText())
-            val songs = root.getJSONArray("songs").toSongList()
+            val songs = root.getJSONArray("songs").toLibraryCacheSongList()
             _songs.value = songs
             _albums.value = songs.toAlbums()
         }.onFailure {
@@ -404,7 +403,7 @@ class MusicRepository(private val context: Context) {
     private fun readCachedSongs(): List<Song> {
         if (!libraryCacheFile.exists()) return emptyList()
         return runCatching {
-            JSONObject(libraryCacheFile.readText()).getJSONArray("songs").toSongList()
+            JSONObject(libraryCacheFile.readText()).getJSONArray("songs").toLibraryCacheSongList()
         }.getOrElse {
             Log.w("MusicRepo", "Failed to read music library cache for sync", it)
             emptyList()
@@ -477,13 +476,6 @@ class MusicRepository(private val context: Context) {
         }
     }
 
-    private fun loadExternalLyrics(song: Song, effectivePath: String): List<LyricLine>? {
-        val lrcContent = LrcParser.findLrcFile(effectivePath) ?: return null
-        val parsed = LrcParser.parse(lrcContent)
-        Log.d("MusicRepo", "LRC parsed: ${parsed.lyrics.size} lines for ${song.title}")
-        return parsed.lyrics.takeIf { it.isNotEmpty() }
-    }
-
     private fun loadExternalLyricsByFormat(
         song: Song,
         effectivePath: String,
@@ -498,18 +490,6 @@ class MusicRepository(private val context: Context) {
         val lyrics = parsed.lyrics.takeIf { it.isNotEmpty() } ?: return null
         return lyrics.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
             .also { Log.d("MusicRepo", "External lyric format ${if (preferTtml) "TTML" else "LRC/ELRC"} parsed: ${lyrics.size} lines for ${song.title}") }
-    }
-
-    private fun loadEmbeddedLyrics(song: Song, effectivePath: String): List<LyricLine>? {
-        Log.d("MusicRepo", "Trying embedded lyrics for ${song.title}")
-        val embedded = audioTagRepository.readTagsBlocking(effectivePath)
-            ?.embeddedLyricsContent(preferTtml = true)
-            ?: audioTagRepository.readEmbeddedLyricsBlocking(effectivePath)
-        if (!embedded.isNullOrBlank()) {
-            Log.d("MusicRepo", "Embedded lyrics found (${embedded.length} chars) for ${song.title}")
-            return parseEmbeddedLyrics(song, embedded, ignoreSplMetadataLines = false)
-        }
-        return null
     }
 
     private fun loadEmbeddedLyricsByFormat(
@@ -1296,31 +1276,41 @@ class MusicRepository(private val context: Context) {
         }
     }
 
-    suspend fun prefetchWebDavMetadataHeaders(songs: List<Song>, maxItems: Int = 80) = coroutineScope {
+    suspend fun prefetchWebDavMetadataHeaders(songs: List<Song>, maxItems: Int = 80) = supervisorScope {
         val targets = songs
             .asSequence()
             .filter { it.isWebDavRemoteSong() }
             .distinctBy { it.path }
             .take(maxItems.coerceIn(1, 100))
             .toList()
-        if (targets.isEmpty()) return@coroutineScope
-        val config = loadWebDavConfig() ?: return@coroutineScope
+        if (targets.isEmpty()) return@supervisorScope
+        val config = loadWebDavConfig() ?: return@supervisorScope
         val semaphore = Semaphore(3)
         targets.forEach { song ->
             launch(Dispatchers.IO) {
-                semaphore.withPermit {
-                    val headerFile = song.webDavHeaderCacheFile()
-                    if (headerFile.exists() && headerFile.length() > 0L) {
-                        Log.d("MusicRepo", "WebDAV header prefetch hit cache url=${song.path.webDavSafeLogUrl()}")
-                        return@withPermit
+                runCatching {
+                    semaphore.withPermit {
+                        val headerFile = song.webDavHeaderCacheFile()
+                        if (headerFile.exists() && headerFile.length() > 0L) {
+                            Log.d("MusicRepo", "WebDAV header prefetch hit cache url=${song.path.webDavSafeLogUrl()}")
+                            return@withPermit
+                        }
+                        Log.d("MusicRepo", "WebDAV header prefetch start url=${song.path.webDavSafeLogUrl()}")
+                        val cached = downloadWebDavMetadataHeader(song, config)
+                        if (cached != null) {
+                            Log.d("MusicRepo", "WebDAV header prefetch success url=${song.path.webDavSafeLogUrl()} bytes=${headerFile.length()}")
+                        } else {
+                            Log.d("MusicRepo", "WebDAV header prefetch skipped url=${song.path.webDavSafeLogUrl()}")
+                        }
                     }
-                    Log.d("MusicRepo", "WebDAV header prefetch start url=${song.path.webDavSafeLogUrl()}")
-                    val cached = downloadWebDavMetadataHeader(song, config)
-                    if (cached != null) {
-                        Log.d("MusicRepo", "WebDAV header prefetch success url=${song.path.webDavSafeLogUrl()} bytes=${headerFile.length()}")
-                    } else {
-                        Log.d("MusicRepo", "WebDAV header prefetch skipped url=${song.path.webDavSafeLogUrl()}")
-                    }
+                }.onFailure { error ->
+                    AppLogStore.warn(
+                        context,
+                        "MusicRepoWebDav",
+                        "WebDAV header prefetch failed url=${song.path.webDavSafeLogUrl()}",
+                        error,
+                        AppLogType.NETWORK
+                    )
                 }
             }
         }
@@ -1425,8 +1415,8 @@ class MusicRepository(private val context: Context) {
         runCatching {
             val root = JSONObject()
                 .put("version", 1)
-                .put("songs", songsToJsonArray(songs))
-                .put("albums", albumsToJsonArray(albums))
+                .put("songs", songsToLibraryCacheJsonArray(songs))
+                .put("albums", albumsToLibraryCacheJsonArray(albums))
             libraryCacheFile.writeText(root.toString())
         }.onFailure {
             Log.w("MusicRepo", "Failed to save music library cache", it)
@@ -1501,104 +1491,6 @@ class MusicRepository(private val context: Context) {
             lyricist == other.lyricist &&
             trackNumber == other.trackNumber &&
             discNumber == other.discNumber
-
-    private fun songsToJsonArray(songs: List<Song>): JSONArray {
-        val array = JSONArray()
-        songs.forEach { song ->
-            array.put(
-                JSONObject()
-                    .put("id", song.id)
-                    .put("title", song.title)
-                    .put("artist", song.artist)
-                    .put("album", song.album)
-                    .put("albumId", song.albumId)
-                    .put("duration", song.duration)
-                    .put("path", song.path)
-                    .put("fileName", song.fileName)
-                    .put("fileSize", song.fileSize)
-                    .put("mimeType", song.mimeType)
-                    .put("dateAdded", song.dateAdded)
-                    .put("dateModified", song.dateModified)
-                    .put("trackNumber", song.trackNumber)
-                    .put("discNumber", song.discNumber)
-                    .put("albumArtist", song.albumArtist)
-                    .put("genre", song.genre)
-                    .put("year", song.year)
-                    .put("composer", song.composer)
-                    .put("lyricist", song.lyricist)
-                    .put("coverUrl", song.coverUrl)
-                    .put("onlineSource", song.onlineSource)
-                    .put("onlineId", song.onlineId)
-                    .put("onlineLyrics", song.onlineLyrics)
-                    .put("onlineLyricTranslation", song.onlineLyricTranslation)
-            )
-        }
-        return array
-    }
-
-    private fun albumsToJsonArray(albums: List<Album>): JSONArray {
-        val array = JSONArray()
-        albums.forEach { album ->
-            array.put(
-                JSONObject()
-                    .put("id", album.id)
-                    .put("name", album.name)
-                    .put("artist", album.artist)
-                    .put("songCount", album.songCount)
-                    .put("year", album.year)
-                    .put("artAlbumId", album.artAlbumId)
-                    .put("albumArtist", album.albumArtist)
-            )
-        }
-        return array
-    }
-
-    private fun JSONArray.toSongList(): List<Song> {
-        return List(length()) { index ->
-            val item = getJSONObject(index)
-            Song(
-                id = item.getLong("id"),
-                title = item.optString("title"),
-                artist = item.optString("artist"),
-                album = item.optString("album"),
-                albumId = item.optLong("albumId"),
-                duration = item.optLong("duration"),
-                path = item.optString("path"),
-                fileName = item.optString("fileName"),
-                fileSize = item.optLong("fileSize"),
-                mimeType = item.optString("mimeType"),
-                dateAdded = item.optLong("dateAdded"),
-                dateModified = item.optLong("dateModified"),
-                trackNumber = item.optInt("trackNumber"),
-                discNumber = item.optInt("discNumber"),
-                albumArtist = item.optString("albumArtist"),
-                genre = item.optString("genre"),
-                year = item.optString("year"),
-                composer = item.optString("composer"),
-                lyricist = item.optString("lyricist"),
-                coverUrl = item.optString("coverUrl"),
-                onlineSource = item.optString("onlineSource"),
-                onlineId = item.optString("onlineId"),
-                onlineLyrics = item.optString("onlineLyrics"),
-                onlineLyricTranslation = item.optString("onlineLyricTranslation")
-            )
-        }
-    }
-
-    private fun JSONArray.toAlbumList(): List<Album> {
-        return List(length()) { index ->
-            val item = getJSONObject(index)
-            Album(
-                id = item.getLong("id"),
-                name = item.optString("name"),
-                artist = item.optString("artist"),
-                songCount = item.optInt("songCount"),
-                year = item.optString("year", "").ifBlank { item.optInt("year").takeIf { it > 0 }?.toString() ?: "" },
-                artAlbumId = item.optLong("artAlbumId", item.optLong("id")),
-                albumArtist = item.optString("albumArtist")
-            )
-        }
-    }
 
     private suspend fun scanEditedFile(song: Song) = suspendCoroutine<Unit> { continuation ->
         val path = song.path.takeIf { it.isNotBlank() }

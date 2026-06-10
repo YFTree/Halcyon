@@ -858,8 +858,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">Übersetzungszeile für Desktop-Lyrics separat skalieren</string>
     <string name="settings_desktop_lyric_opacity">Deckkraft der Desktop-Lyrics %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">Verringern, damit der Liedtext dezenter wirkt; der Wert bleibt auch im gesperrten Zustand erhalten</string>
-    <string name="settings_desktop_lyric_shadow_strength">Schatten der Desktop-Lyrics %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">Lesbarkeit auf hellen Hintergründen verbessern; auf 0 setzen, um den Schatten zu deaktivieren</string>
     <string name="settings_desktop_lyric_color">Farbe der Desktop-Lyrics</string>
     <string name="settings_enable_super_lyric">SuperLyric aktivieren</string>
     <string name="settings_enable_super_lyric_summary">Wortgenaue Liedtexte über SuperLyricApi im SuperLyric-Ökosystem veröffentlichen</string>

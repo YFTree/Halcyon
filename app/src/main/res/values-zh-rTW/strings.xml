@@ -858,8 +858,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">單獨放大桌面歌詞的翻譯行</string>
     <string name="settings_desktop_lyric_opacity">桌面歌詞透明度 %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">調低後歌詞會更淡，鎖定狀態也會保留</string>
-    <string name="settings_desktop_lyric_shadow_strength">桌面歌詞陰影 %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">增強淺色桌布上的可讀性；設為 0 可關閉陰影</string>
     <string name="settings_desktop_lyric_color">桌面歌詞顏色</string>
     <string name="settings_enable_super_lyric">啟用 SuperLyric</string>
     <string name="settings_enable_super_lyric_summary">透過 SuperLyricApi 向 SuperLyric 生態發布逐字歌詞</string>

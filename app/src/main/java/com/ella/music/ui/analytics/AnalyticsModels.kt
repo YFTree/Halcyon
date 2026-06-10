@@ -438,11 +438,6 @@ private fun historyDateKey(timestampMs: Long): String {
     return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timestampMs))
 }
 
-private fun formatHistoryClock(timestampMs: Long): String {
-    if (timestampMs <= 0L) return ""
-    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestampMs))
-}
-
 internal fun formatHistoryDateChip(dateKey: String): String {
     val date = parseHistoryDateKey(dateKey) ?: return dateKey
     val then = Calendar.getInstance().apply { time = date }
@@ -450,23 +445,6 @@ internal fun formatHistoryDateChip(dateKey: String): String {
         then.get(Calendar.MONTH) + 1,
         then.get(Calendar.DAY_OF_MONTH)
     )
-}
-
-private fun formatHistoryDateTitle(dateKey: String): String {
-    val date = parseHistoryDateKey(dateKey) ?: return dateKey
-    val today = Calendar.getInstance()
-    val then = Calendar.getInstance().apply { time = date }
-    val label = when {
-        today.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
-            today.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR) -> "TODAY"
-        today.apply { add(Calendar.DAY_OF_YEAR, -1) }.let {
-            it.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
-                it.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
-        } -> "YESTERDAY"
-        else -> SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
-    }
-    val week = SimpleDateFormat("EEEE", Locale.getDefault()).format(date)
-    return "$label · $week"
 }
 
 private fun parseHistoryDateKey(dateKey: String): Date? {

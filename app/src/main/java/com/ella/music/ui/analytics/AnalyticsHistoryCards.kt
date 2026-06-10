@@ -235,39 +235,3 @@ private fun HistoryRow(
         )
     }
 }
-
-@Composable
-private fun DateChip(
-    dateKey: String,
-    count: Int,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.widthIn(min = 88.dp),
-        colors = analyticsWallpaperCardColors(alpha = 0.42f)
-    ) {
-        Column(
-            modifier = Modifier
-                .background(
-                    if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
-                    else Color.Transparent
-                )
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = formatHistoryDateChip(dateKey),
-                fontSize = 13.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface
-            )
-            Text(
-                text = stringResource(R.string.analytics_times_count, count),
-                fontSize = 11.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-            )
-        }
-    }
-}

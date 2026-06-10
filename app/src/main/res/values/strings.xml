@@ -596,6 +596,8 @@
     <string name="settings_backup_export_failed">备份导出失败</string>
     <string name="settings_backup_restore_success">备份已恢复</string>
     <string name="settings_backup_restore_failed">备份恢复失败</string>
+    <string name="settings_backup_restore_wrong_type">这是听歌历史备份，请从听歌历史恢复</string>
+    <string name="settings_backup_restore_wrong_type_settings">这是设置备份，请从设置恢复</string>
     <string name="settings_backup_webdav_section">WebDAV 云备份</string>
     <string name="settings_backup_webdav_url_label">WebDAV 服务器地址</string>
     <string name="settings_backup_webdav_url_summary">例如 https://dav.example.com/remote.php/dav/files/user/</string>
@@ -858,8 +860,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">单独放大桌面歌词的翻译行</string>
     <string name="settings_desktop_lyric_opacity">桌面歌词透明度 %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">调低后歌词会更淡，锁定状态也会保留</string>
-    <string name="settings_desktop_lyric_shadow_strength">桌面歌词阴影 %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">增强浅色壁纸上的可读性；设为 0 可关闭阴影</string>
     <string name="settings_desktop_lyric_color">桌面歌词颜色</string>
     <string name="settings_enable_super_lyric">启用 SuperLyric</string>
     <string name="settings_enable_super_lyric_summary">通过 SuperLyricApi 向 SuperLyric 生态发布逐字歌词</string>

@@ -858,8 +858,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">Ajuster indépendamment l’échelle de la ligne de traduction pour les paroles flottantes</string>
     <string name="settings_desktop_lyric_opacity">Opacité des paroles flottantes %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">Réduisez cette valeur pour rendre les paroles plus légères ; la valeur est conservée même verrouillée</string>
-    <string name="settings_desktop_lyric_shadow_strength">Ombre des paroles flottantes %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">Améliorer la lisibilité sur les fonds clairs ; régler sur 0 pour désactiver l’ombre</string>
     <string name="settings_desktop_lyric_color">Couleur des paroles flottantes</string>
     <string name="settings_enable_super_lyric">Activer SuperLyric</string>
     <string name="settings_enable_super_lyric_summary">Publier les paroles mot à mot dans l’écosystème SuperLyric via SuperLyricApi</string>

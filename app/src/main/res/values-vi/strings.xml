@@ -858,8 +858,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">Chia tỷ lệ dòng dịch độc lập cho lời bài hát trên máy tính để bàn</string>
     <string name="settings_desktop_lyric_opacity">Độ mờ của lời bài hát trên máy tính để bàn %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">Giảm điều này để làm cho lời bài hát nhẹ nhàng hơn; giá trị được giữ ngay cả khi bị khóa</string>
-    <string name="settings_desktop_lyric_shadow_strength">Bóng lời bài hát trên máy tính để bàn %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">Cải thiện khả năng đọc trên hình nền sáng; đặt thành 0 để tắt bóng</string>
     <string name="settings_desktop_lyric_color">Màu lời bài hát trên máy tính để bàn</string>
     <string name="settings_enable_super_lyric">Bật SuperLyric</string>
     <string name="settings_enable_super_lyric_summary">Xuất bản lời bài hát theo từng từ lên hệ sinh thái SuperLyric thông qua SuperLyricApi</string>

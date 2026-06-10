@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.EllaMiuixMenuItem
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.round
@@ -371,15 +372,5 @@ internal fun PlayerActionMenuItem(
     onClick: () -> Unit,
     danger: Boolean = false
 ) {
-    Text(
-        text = text,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        color = if (danger) Color(0xFFE5484D) else MiuixTheme.colorScheme.onSurface,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 13.dp)
-    )
+    EllaMiuixMenuItem(text = text, onClick = onClick, danger = danger)
 }

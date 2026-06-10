@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.data.repository.MusicRepository
-import top.yukonga.miuix.kmp.window.WindowBottomSheet
+import com.ella.music.ui.components.EllaMiuixBottomSheet
 
 @Composable
 internal fun LyricsPlayerHeader(
@@ -84,7 +84,7 @@ internal fun LyricsPlayerMenuSheet(
     modifier: Modifier = Modifier
 ) {
     if (!show) return
-    WindowBottomSheet(
+    EllaMiuixBottomSheet(
         show = true,
         enableNestedScroll = false,
         title = stringResource(R.string.player_lyrics_display),

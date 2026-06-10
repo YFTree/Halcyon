@@ -5,17 +5,25 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
@@ -348,6 +356,93 @@ fun EllaMiuixActionRow(
                     modifier = buttonModifier
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun EllaMiuixSheetColumn(
+    modifier: Modifier = Modifier,
+    maxHeight: Dp = 560.dp,
+    horizontalPadding: Dp = 18.dp,
+    verticalPadding: Dp = 12.dp,
+    spacing: Dp = 6.dp,
+    showHandle: Boolean = true,
+    scrollable: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val scrollModifier = if (scrollable) {
+        Modifier.verticalScroll(rememberScrollState())
+    } else {
+        Modifier
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(max = maxHeight)
+            .navigationBarsPadding()
+            .then(scrollModifier)
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+        verticalArrangement = Arrangement.spacedBy(spacing)
+    ) {
+        if (showHandle) EllaMiuixSheetHandle()
+        content()
+    }
+}
+
+@Composable
+fun EllaMiuixSheetHandle(
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(42.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.18f))
+        )
+    }
+}
+
+@Composable
+fun EllaMiuixMenuItem(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    danger: Boolean = false
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.78f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = if (subtitle == null) 13.dp else 11.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (danger) Color(0xFFE5484D) else MiuixTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
     }
 }

@@ -68,7 +68,6 @@ class DesktopLyricService : Service() {
     private var translationScale = 1.1f
     private var opacityPercent = 100
     private var lyricTextColor = Color.WHITE
-    private var shadowStrength = 1f
     private var statusBarMode = false
     private var statusBarTopOffsetDp = 16
     private var statusBarPosition = SettingsManager.DESKTOP_LYRIC_STATUS_POSITION_CENTER
@@ -524,16 +523,11 @@ class DesktopLyricService : Service() {
         return if (id > 0) resources.getDimensionPixelSize(id) else dp(24)
     }
 
-    private fun displayCutoutSafeInsetTop(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            windowManager.currentWindowMetrics.windowInsets.displayCutout?.safeInsetTop ?: 0
-        } else {
-            0
-        }
-    }
-
     private fun statusBarLyricTopY(): Int =
-        displayCutoutSafeInsetTop() + dp(statusBarTopOffsetDp)
+        (dp(statusBarTopOffsetDp) - statusBarLyricVisualLift()).coerceAtLeast(-dp(8))
+
+    private fun statusBarLyricVisualLift(): Int =
+        dp(if (statusBarSecondaryMode == SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF) 6 else 4)
 
     private fun statusBarLyricWidth(): Int =
         (resources.displayMetrics.widthPixels - dp(144)).coerceIn(dp(160), dp(520))
@@ -558,7 +552,6 @@ class DesktopLyricService : Service() {
             translationScale = settingsManager.desktopLyricTranslationScale.first().coerceIn(80, 220) / 100f
             opacityPercent = settingsManager.desktopLyricOpacity.first().coerceIn(35, 100)
             lyricTextColor = settingsManager.desktopLyricTextColor.first()
-            shadowStrength = settingsManager.desktopLyricShadowStrength.first().coerceIn(0, 160) / 100f
             lyricFontPath = settingsManager.lyricFontPath.first()
             lyricFontWeight = settingsManager.lyricFontWeight.first().coerceIn(100, 900)
             lyricFontItalic = settingsManager.lyricFontItalic.first()
@@ -599,7 +592,6 @@ class DesktopLyricService : Service() {
             translationScale = translationScale,
             opacityPercent = opacityPercent,
             textColor = lyricTextColor,
-            shadowStrength = shadowStrength,
             statusBarMode = statusBarMode,
             statusBarSecondaryMode = statusBarSecondaryMode,
             lyricFontPath = lyricFontPath,
@@ -716,7 +708,6 @@ class DesktopLyricService : Service() {
             translationScale: Float,
             opacityPercent: Int,
             textColor: Int,
-            @Suppress("UNUSED_PARAMETER") shadowStrength: Float,
             statusBarMode: Boolean = false,
             statusBarSecondaryMode: Int = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF,
             lyricFontPath: String = "",
@@ -729,6 +720,7 @@ class DesktopLyricService : Service() {
             this.textColor = textColor
             this.statusBarMode = statusBarMode
             this.statusBarSecondaryMode = statusBarSecondaryMode.coerceIn(0, 2)
+            lyricView.setMaxMainLines(1)
             this.lyricFontPath = lyricFontPath
             this.lyricFontWeight = lyricFontWeight.coerceIn(100, 900)
             this.lyricFontItalic = lyricFontItalic
@@ -875,7 +867,7 @@ class DesktopLyricService : Service() {
                 lyricView.setPosition(currentPositionMs)
                 return
             }
-            lyricView.setCenterUnalignedLinesEnabled(!currentLine.isTtml)
+            lyricView.setCenterUnalignedLinesEnabled(currentLine.shouldCenterUnalignedDesktopLine())
             val currentSong = listOf(currentLine).toLyriconSong(
                 songId = -1L,
                 songTitle = "Halcyon",
@@ -885,6 +877,12 @@ class DesktopLyricService : Service() {
             lyricView.tag = currentSong
             songKey = key
         }
+
+        private fun LyricLine.shouldCenterUnalignedDesktopLine(): Boolean =
+            !isTtml && !agent.isDuetAgent()
+
+        private fun String?.isDuetAgent(): Boolean =
+            equals("v1", ignoreCase = true) || equals("v2", ignoreCase = true)
 
         private fun updateLyricLayoutOffsets() {
             if (height <= 0) return

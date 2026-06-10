@@ -858,8 +858,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">デスクトップ歌詞の翻訳行のみ拡大</string>
     <string name="settings_desktop_lyric_opacity">デスクトップ歌詞の透明度 %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">低くすると歌詞が薄くなりますが、ロック状態でも維持されます</string>
-    <string name="settings_desktop_lyric_shadow_strength">デスクトップ歌詞の影 %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">明るい壁紙の可読性を向上。0 にすると影を無効化</string>
     <string name="settings_desktop_lyric_color">デスクトップ歌詞の色</string>
     <string name="settings_enable_super_lyric">SuperLyric を有効化</string>
     <string name="settings_enable_super_lyric_summary">SuperLyricApi 経由で SuperLyric エコシステムに単語単位の歌詞を公開</string>

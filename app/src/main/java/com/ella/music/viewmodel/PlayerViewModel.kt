@@ -40,7 +40,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.pow
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
@@ -177,7 +176,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 lyriconTranslationEnabled = false
                 settingsManager.setLyriconTranslation(false)
             }
-            lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
+            lyriconBridge.setSecondaryMode(currentLyriconSecondaryMode())
             lyriconBridge.setEnabled(enabled)
             if (enabled) resendExternalLyrics()
         }
@@ -188,7 +187,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     lyriconPronunciationEnabled = false
                     settingsManager.setLyriconPronunciation(false)
                 }
-                lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
+                lyriconBridge.setSecondaryMode(currentLyriconSecondaryMode())
                 if (lyriconBridge.isEnabled()) resendExternalLyrics(force = true)
             }
         }
@@ -199,7 +198,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     lyriconTranslationEnabled = false
                     settingsManager.setLyriconTranslation(false)
                 }
-                lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
+                lyriconBridge.setSecondaryMode(currentLyriconSecondaryMode())
                 if (lyriconBridge.isEnabled()) resendExternalLyrics(force = true)
             }
         }
@@ -291,7 +290,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 superLyricTranslationEnabled = false
                 settingsManager.setSuperLyricTranslation(false)
             }
-            superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
+            superLyricBridge.setSecondaryMode(currentSuperLyricSecondaryMode())
             superLyricBridge.setEnabled(enabled)
             if (enabled) resendSuperLyric()
         }
@@ -302,7 +301,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     superLyricPronunciationEnabled = false
                     settingsManager.setSuperLyricPronunciation(false)
                 }
-                superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
+                superLyricBridge.setSecondaryMode(currentSuperLyricSecondaryMode())
                 if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
             }
         }
@@ -313,7 +312,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     superLyricTranslationEnabled = false
                     settingsManager.setSuperLyricTranslation(false)
                 }
-                superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
+                superLyricBridge.setSecondaryMode(currentSuperLyricSecondaryMode())
                 if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
             }
         }
@@ -328,21 +327,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun lyriconSecondaryMode(): LyriconBridge.SecondaryMode {
-        return when {
-            lyriconPronunciationEnabled -> LyriconBridge.SecondaryMode.Pronunciation
-            lyriconTranslationEnabled -> LyriconBridge.SecondaryMode.Translation
-            else -> LyriconBridge.SecondaryMode.Off
-        }
-    }
+    private fun currentLyriconSecondaryMode(): LyriconBridge.SecondaryMode =
+        lyriconSecondaryMode(
+            translationEnabled = lyriconTranslationEnabled,
+            pronunciationEnabled = lyriconPronunciationEnabled
+        )
 
-    private fun superLyricSecondaryMode(): SuperLyricBridge.SecondaryMode {
-        return when {
-            superLyricPronunciationEnabled -> SuperLyricBridge.SecondaryMode.Pronunciation
-            superLyricTranslationEnabled -> SuperLyricBridge.SecondaryMode.Translation
-            else -> SuperLyricBridge.SecondaryMode.Off
-        }
-    }
+    private fun currentSuperLyricSecondaryMode(): SuperLyricBridge.SecondaryMode =
+        superLyricSecondaryMode(
+            translationEnabled = superLyricTranslationEnabled,
+            pronunciationEnabled = superLyricPronunciationEnabled
+        )
 
     private fun initBluetoothLyric() {
         viewModelScope.launch {
@@ -889,8 +884,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             manualSeekAfterPreviousButton = false
             return false
         }
-        return previousButtonAction == SettingsManager.PREVIOUS_BUTTON_REPLAY_CURRENT &&
-            currentPosition.value >= SettingsManager.PREVIOUS_REPLAY_THRESHOLD_MS
+        return shouldReplayFromPreviousButton(
+            manualSeekAfterPreviousButton = false,
+            previousButtonAction = previousButtonAction,
+            currentPositionMs = currentPosition.value
+        )
     }
 
     fun seekTo(positionMs: Long) {
@@ -1015,11 +1013,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setPlaybackPitch(pitch: Float) {
         playerManager.setPlaybackParameters(playbackSpeed.value, pitch)
-    }
-
-    private fun Float?.toReplayGainVolume(): Float {
-        val gainDb = this?.coerceIn(-24f, 0f) ?: return 1f
-        return 10f.pow(gainDb / 20f).coerceIn(0.05f, 1f)
     }
 
     fun setLyricSourceMode(mode: Int) {
@@ -1156,7 +1149,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 lyriconPronunciationEnabled = false
                 settingsManager.setLyriconPronunciation(false)
             }
-            lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
+            lyriconBridge.setSecondaryMode(currentLyriconSecondaryMode())
             if (lyriconBridge.isEnabled()) resendExternalLyrics(force = true)
         }
     }
@@ -1230,7 +1223,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 lyriconTranslationEnabled = false
                 settingsManager.setLyriconTranslation(false)
             }
-            lyriconBridge.setSecondaryMode(lyriconSecondaryMode())
+            lyriconBridge.setSecondaryMode(currentLyriconSecondaryMode())
             if (lyriconBridge.isEnabled()) resendExternalLyrics(force = true)
         }
     }
@@ -1287,7 +1280,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 superLyricPronunciationEnabled = false
                 settingsManager.setSuperLyricPronunciation(false)
             }
-            superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
+            superLyricBridge.setSecondaryMode(currentSuperLyricSecondaryMode())
             if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
         }
     }
@@ -1300,7 +1293,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 superLyricTranslationEnabled = false
                 settingsManager.setSuperLyricTranslation(false)
             }
-            superLyricBridge.setSecondaryMode(superLyricSecondaryMode())
+            superLyricBridge.setSecondaryMode(currentSuperLyricSecondaryMode())
             if (superLyricBridge.isEnabled()) resendSuperLyric(force = true)
         }
     }

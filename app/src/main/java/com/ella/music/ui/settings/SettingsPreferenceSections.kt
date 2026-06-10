@@ -1,33 +1,22 @@
 package com.ella.music.ui.settings
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.ui.components.TagEditorOptionIds
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.DropdownItem
-import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun SettingsHomeCustomizeSection(
@@ -329,32 +318,14 @@ internal fun SettingsScanSection() {
                 }
             )
 
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_min_duration_filter),
-                    fontSize = 15.sp,
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(R.string.settings_min_duration_filter_summary, minDurationSec),
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Slider(
-                    value = minDurationSec.toFloat() / 60f,
-                    onValueChange = { fraction ->
-                        val sec = (fraction * 60f).toInt().coerceIn(0, 60)
-                        scope.launch { settingsManager.setMinDurationSec(sec) }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text(text = stringResource(R.string.settings_seconds_value, 0), fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(text = stringResource(R.string.settings_seconds_value, 60), fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                }
-            }
+            SettingsIntSliderPreference(
+                title = stringResource(R.string.settings_min_duration_filter),
+                summary = stringResource(R.string.settings_min_duration_filter_summary, minDurationSec),
+                value = minDurationSec,
+                valueRange = 0..60,
+                valueText = stringResource(R.string.settings_seconds_value, minDurationSec.coerceIn(0, 60)),
+                onValueChange = { sec -> scope.launch { settingsManager.setMinDurationSec(sec) } }
+            )
 
             SplitSettingTextField(
                 label = stringResource(R.string.settings_artist_separators),

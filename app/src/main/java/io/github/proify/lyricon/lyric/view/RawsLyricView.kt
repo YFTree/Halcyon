@@ -57,7 +57,6 @@ class RawsLyricView @JvmOverloads constructor(
         private const val POP_UP_MS = 300L
         private const val POP_DOWN_MS = 200L
         private const val EXIT_MS = 250L
-        private const val TOP_FADE_RATIO = 0.07f
         private const val BOTTOM_FADE_RATIO = 0.2775f
         private const val TOP_OFFSET_RATIO = 0.08f
         private const val BOTTOM_OFFSET_RATIO = 0.5f
@@ -68,7 +67,6 @@ class RawsLyricView @JvmOverloads constructor(
         private const val FEATHER_WIDTH_DP = 30f
         private const val SCROLL_ANIM_MS = 400L
         private const val AUTO_SCROLL_RESUME_MS = 5000L
-        private const val INTERLUDE_FADE_MS = 600L
         private const val INTERLUDE_MIN_GAP_MS = 7000L
         private const val INTERLUDE_DOT_SIZE_DP = 10f
         private const val INTERLUDE_DOT_SPACING_DP = 6f
@@ -77,11 +75,9 @@ class RawsLyricView @JvmOverloads constructor(
         private const val INTERLUDE_PULSE_AMPLITUDE = 0.2f
         private const val INTERLUDE_EXIT_UP_MS = 750L
         private const val INTERLUDE_EXIT_DOWN_MS = 250L
-        private const val INTERLUDE_EXIT_MIN_SCALE = 0.5f
         private const val INTERLUDE_EXTRA_DP = 48f
         private const val INTERLUDE_EXPAND_MS = 500L
         private const val INTERLUDE_COLLAPSE_MS = 300L
-        private const val FLING_FRICTION = 0.97f
         private const val LINE_BLUR_RADIUS_DP = 4f
         private const val LINE_OFFSET_MIN_MS = 480L
         private const val LINE_OFFSET_MAX_MS = 750L
@@ -146,11 +142,11 @@ class RawsLyricView @JvmOverloads constructor(
     private var pronunciationAboveMainEnabled = false
     private var autoScrollResumeEnabled = true
     private var centerUnalignedLinesEnabled = false
+    private var maxMainLines = 0 // 0 = unlimited
     private var placeholderFormat = PlaceholderFormat.NAME_ARTIST
     private var currentStyleConfig: RichLyricLineConfig? = null
     private var songName: String? = null
     private var songArtist: String? = null
-    private var isTextMode = false
     private var enableAnim = true
     private var topContentPadding = 0f
 
@@ -276,6 +272,13 @@ class RawsLyricView @JvmOverloads constructor(
     fun setCenterUnalignedLinesEnabled(enabled: Boolean) {
         if (centerUnalignedLinesEnabled == enabled) return
         centerUnalignedLinesEnabled = enabled
+        rebuildEntries()
+        invalidate()
+    }
+
+    fun setMaxMainLines(lines: Int) {
+        if (maxMainLines == lines) return
+        maxMainLines = lines
         rebuildEntries()
         invalidate()
     }
@@ -655,7 +658,7 @@ class RawsLyricView @JvmOverloads constructor(
     private fun measureMainHeight(text: String): Float {
         val w = width - paddingLeft - paddingRight
         if (w <= 0) return mainPaint.fontSpacing
-        val layout = buildLayout(text, mainPaint, w)
+        val layout = buildLayout(text, mainPaint, w, forMain = true)
         return layout.height.toFloat()
     }
 
@@ -698,18 +701,22 @@ class RawsLyricView @JvmOverloads constructor(
         paint: TextPaint,
         widthPx: Int,
         alignedRight: Boolean = false,
-        centered: Boolean = false
+        centered: Boolean = false,
+        forMain: Boolean = false
     ): StaticLayout {
         val alignment = when {
             alignedRight -> Layout.Alignment.ALIGN_OPPOSITE
             centered -> Layout.Alignment.ALIGN_CENTER
             else -> Layout.Alignment.ALIGN_NORMAL
         }
-        return StaticLayout.Builder.obtain(text, 0, text.length, paint, max(1, widthPx))
+        val builder = StaticLayout.Builder.obtain(text, 0, text.length, paint, max(1, widthPx))
             .setAlignment(alignment)
             .setLineSpacing(0f, 1f)
             .setIncludePad(true)
-            .build()
+        if (forMain && maxMainLines > 0) {
+            builder.setMaxLines(maxMainLines)
+        }
+        return builder.build()
     }
 
     private fun findCurrentLine(posMs: Long): Int {
@@ -918,9 +925,6 @@ class RawsLyricView @JvmOverloads constructor(
         scrollToCurrentLine(false)
     }
 
-    private fun buildEdgeFadeShader(w: Int, h: Int) {
-    }
-
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (entries.isEmpty()) {
@@ -1045,7 +1049,7 @@ class RawsLyricView @JvmOverloads constructor(
                 index == previousIndex -> dimPaint
                 else -> dimPaint
             }
-            drawTextAligned(canvas, entry.mainText ?: "", paint, textStartX, mainBaseline, entry.alignedRight, entry.centered, farBlur)
+            drawTextAligned(canvas, entry.mainText ?: "", paint, textStartX, mainBaseline, entry.alignedRight, entry.centered, farBlur, forMain = true)
         }
         var secondaryBaseY = mainBottomY
         if (entry.transText != null) {
@@ -1103,13 +1107,14 @@ class RawsLyricView @JvmOverloads constructor(
         baseline: Float,
         alignedRight: Boolean,
         centered: Boolean,
-        blur: Boolean = false
+        blur: Boolean = false,
+        forMain: Boolean = false
     ) {
         val w = width - paddingLeft - paddingRight
         if (w <= 0) return
         val oldMask = paint.maskFilter
         if (blur) paint.maskFilter = distantLineBlur
-        val layout = buildLayout(text, paint, w, alignedRight, centered)
+        val layout = buildLayout(text, paint, w, alignedRight, centered, forMain)
         canvas.save()
         // StaticLayout line 0 baseline is at getLineTop(0) + getLineBaseline(0) - getLineTop(0)
         // = getLineBaseline(0). With includePad=true, getLineTop(0) includes top padding.
@@ -1248,13 +1253,6 @@ class RawsLyricView @JvmOverloads constructor(
         }
 
         canvas.restore()
-    }
-
-    private fun entryIsRtl(text: String): Boolean {
-        if (text.isEmpty()) return false
-        val first = text.first()
-        return Character.getDirectionality(first) == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
-                Character.getDirectionality(first) == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC
     }
 
     private fun drawKaraokeWords(

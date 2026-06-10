@@ -856,8 +856,6 @@
     <string name="settings_desktop_lyric_translation_scale_summary">Masaüstü şarkı sözleri için çeviri satırını bağımsız olarak ölçeklendirin</string>
     <string name="settings_desktop_lyric_opacity">Masaüstü şarkı sözü opaklığı %1$d%%</string>
     <string name="settings_desktop_lyric_opacity_summary">Şarkı sözünü daha hafif hale getirmek için bunu azaltın; değer kilitliyken bile korunur</string>
-    <string name="settings_desktop_lyric_shadow_strength">Masaüstü şarkı sözü gölgesi %1$d%%</string>
-    <string name="settings_desktop_lyric_shadow_strength_summary">Parlak duvar kağıtlarında okunabilirliği artırın; gölgeyi devre dışı bırakmak için 0\'a ayarlayın</string>
     <string name="settings_desktop_lyric_color">Masaüstü şarkı sözü rengi</string>
     <string name="settings_enable_super_lyric">SuperLyric\'yi etkinleştir</string>
     <string name="settings_enable_super_lyric_summary">SuperLyricApi aracılığıyla kelime başına şarkı sözlerini SuperLyric ekosisteminde yayınlayın</string>

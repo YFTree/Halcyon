@@ -1,9 +1,7 @@
 package com.ella.music.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -19,8 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,7 +27,6 @@ import com.ella.music.data.model.SongTagInfo
 import com.ella.music.viewmodel.MainViewModel
 import com.lonx.audiotag.model.AudioTagKeys
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -60,50 +54,6 @@ internal fun RatingSheet(
             )
         }
         SongMenuItem(stringResource(R.string.common_cancel), onDismiss)
-    }
-}
-
-@Composable
-private fun BuiltInCustomTagSheet(
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
-) {
-    var key by remember { mutableStateOf("") }
-    var value by remember { mutableStateOf("") }
-    val focusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    LaunchedEffect(Unit) {
-        delay(220L)
-        focusRequester.requestFocus()
-        keyboardController?.show()
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .background(MiuixTheme.colorScheme.background)
-            .padding(horizontal = 18.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        EllaMiuixTextField(
-            value = key,
-            onValueChange = { key = it },
-            label = stringResource(R.string.song_more_custom_tag_name),
-            focusRequester = focusRequester
-        )
-        EllaMiuixTextField(
-            value = value,
-            onValueChange = { value = it },
-            label = stringResource(R.string.song_more_custom_tag_value),
-            singleLine = false,
-            modifier = Modifier.fillMaxWidth()
-        )
-        EllaMiuixSheetActions(
-            cancelText = stringResource(R.string.common_cancel),
-            confirmText = stringResource(R.string.common_save),
-            onCancel = onDismiss,
-            onConfirm = { onSave(key, value) }
-        )
     }
 }
 

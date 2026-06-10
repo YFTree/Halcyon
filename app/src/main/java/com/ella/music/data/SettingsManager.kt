@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import androidx.annotation.StringRes
 import com.ella.music.R
-import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
@@ -68,7 +67,6 @@ class SettingsManager(private val context: Context) {
         val KEY_DESKTOP_LYRIC_TRANSLATION_SCALE = intPreferencesKey("desktop_lyric_translation_scale")
         val KEY_DESKTOP_LYRIC_OPACITY = intPreferencesKey("desktop_lyric_opacity")
         val KEY_DESKTOP_LYRIC_TEXT_COLOR = intPreferencesKey("desktop_lyric_text_color")
-        val KEY_DESKTOP_LYRIC_SHADOW_STRENGTH = intPreferencesKey("desktop_lyric_shadow_strength")
         val KEY_DESKTOP_LYRIC_X = intPreferencesKey("desktop_lyric_x")
         val KEY_DESKTOP_LYRIC_Y = intPreferencesKey("desktop_lyric_y")
         val KEY_SUPER_LYRIC_ENABLED = booleanPreferencesKey("super_lyric_enabled")
@@ -362,8 +360,6 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_TRANSLATION_SCALE] ?: 90 }
     val desktopLyricOpacity: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_OPACITY] ?: 100 }
     val desktopLyricTextColor: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_TEXT_COLOR] ?: -1 }
-    val desktopLyricShadowStrength: Flow<Int> =
-        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_SHADOW_STRENGTH] ?: 100 }
     val desktopLyricX: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_X] ?: Int.MIN_VALUE }
     val desktopLyricY: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_Y] ?: Int.MIN_VALUE }
     val superLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_SUPER_LYRIC_ENABLED] ?: false }
@@ -694,10 +690,6 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_DESKTOP_LYRIC_TEXT_COLOR] = color }
     }
 
-    suspend fun setDesktopLyricShadowStrength(strength: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_SHADOW_STRENGTH] = strength.coerceIn(0, 160) }
-    }
-
     suspend fun setDesktopLyricPosition(x: Int, y: Int) {
         context.dataStore.edit {
             it[KEY_DESKTOP_LYRIC_X] = x
@@ -1015,7 +1007,7 @@ class SettingsManager(private val context: Context) {
                 script = script
             )
             val sources = it.lxSources().filterNot { existing -> existing.id == source.id } + source
-            it[KEY_LX_SOURCES_JSON] = sources.toJson()
+            it[KEY_LX_SOURCES_JSON] = sources.toLxSourcesJson()
             it[KEY_LX_SELECTED_SOURCE_ID] = source.id
             it[KEY_LX_SOURCE_URL] = source.url
             it[KEY_LX_SOURCE_NAME] = source.name
@@ -1054,7 +1046,7 @@ class SettingsManager(private val context: Context) {
                 prefs.remove(KEY_LX_SOURCE_SCRIPT)
             } else {
                 val selected = sources.firstOrNull { it.id == prefs[KEY_LX_SELECTED_SOURCE_ID] } ?: sources.first()
-                prefs[KEY_LX_SOURCES_JSON] = sources.toJson()
+                prefs[KEY_LX_SOURCES_JSON] = sources.toLxSourcesJson()
                 prefs[KEY_LX_SELECTED_SOURCE_ID] = selected.id
                 prefs[KEY_LX_SOURCE_URL] = selected.url
                 prefs[KEY_LX_SOURCE_NAME] = selected.name
@@ -1369,7 +1361,6 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_DESKTOP_LYRIC_TRANSLATION_SCALE)
             setInt(KEY_DESKTOP_LYRIC_OPACITY)
             setInt(KEY_DESKTOP_LYRIC_TEXT_COLOR)
-            setInt(KEY_DESKTOP_LYRIC_SHADOW_STRENGTH)
             setInt(KEY_DESKTOP_LYRIC_X)
             setInt(KEY_DESKTOP_LYRIC_Y)
             setInt(KEY_DECODER_MODE)
@@ -1488,7 +1479,8 @@ class SettingsManager(private val context: Context) {
     }
 
     private fun Preferences.lxSources(): List<LxSourceConfig> {
-        val parsed = parseLxSources(this[KEY_LX_SOURCES_JSON].orEmpty())
+        val defaultName = context.getString(R.string.settings_default_lx_source_name)
+        val parsed = parseLxSourcesJson(this[KEY_LX_SOURCES_JSON].orEmpty(), defaultName)
         if (parsed.isNotEmpty()) return parsed
 
         val legacyUrl = this[KEY_LX_SOURCE_URL].orEmpty()
@@ -1499,26 +1491,10 @@ class SettingsManager(private val context: Context) {
             LxSourceConfig(
                 id = legacyUrl.toLxSourceId(legacyScript),
                 url = legacyUrl,
-                name = this[KEY_LX_SOURCE_NAME].orEmpty().ifBlank { context.getString(R.string.settings_default_lx_source_name) },
+                name = this[KEY_LX_SOURCE_NAME].orEmpty().ifBlank { defaultName },
                 script = legacyScript
             )
         )
-    }
-
-    private fun parseLxSources(json: String): List<LxSourceConfig> {
-        if (json.isBlank()) return emptyList()
-        return runCatching {
-            val array = JSONArray(json)
-            List(array.length()) { index ->
-                val item = array.getJSONObject(index)
-                LxSourceConfig(
-                    id = item.optString("id"),
-                    url = item.optString("url"),
-                    name = item.optString("name").ifBlank { context.getString(R.string.settings_default_lx_source_name) },
-                    script = item.optString("script")
-                )
-            }.filter { it.id.isNotBlank() && it.script.isNotBlank() }
-        }.getOrDefault(emptyList())
     }
 
     private fun parseLyricOffsetOverrides(json: String?): Map<String, Long> {
@@ -1536,22 +1512,4 @@ class SettingsManager(private val context: Context) {
         }.getOrDefault(emptyMap())
     }
 
-    private fun List<LxSourceConfig>.toJson(): String {
-        val array = JSONArray()
-        forEach { source ->
-            array.put(
-                JSONObject()
-                    .put("id", source.id)
-                    .put("url", source.url)
-                    .put("name", source.name)
-                    .put("script", source.script)
-            )
-        }
-        return array.toString()
-    }
-
-    private fun String.toLxSourceId(script: String): String {
-        val source = trim().ifBlank { script.take(64) }
-        return "lx_${source.hashCode()}"
-    }
 }

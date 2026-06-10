@@ -135,6 +135,13 @@ fun BackupSettingsScreen(
                     } ?: error(context.getString(R.string.settings_backup_read_failed))
                 }
                 val root = JSONObject(text)
+                // Detect if this is a listening history backup
+                if (root.has("playback") || root.has("sessions") || root.has("stats") || root.has("history")) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, context.getString(R.string.settings_backup_restore_wrong_type), Toast.LENGTH_LONG).show()
+                    }
+                    return@runCatching
+                }
                 settingsManager.restoreSettingsJson(root.optJSONObject("settings") ?: root)
                 val playlistPayload = root.optJSONObject("playlists")
                     ?: root.takeIf { it.has("playlists") }
@@ -161,6 +168,13 @@ fun BackupSettingsScreen(
                     } ?: error(context.getString(R.string.settings_backup_read_failed))
                 }
                 val root = JSONObject(text)
+                // Detect if this is a settings backup
+                if (root.has("settings")) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, context.getString(R.string.settings_backup_restore_wrong_type_settings), Toast.LENGTH_LONG).show()
+                    }
+                    return@runCatching
+                }
                 playbackStatsStore.restoreJson(root.optJSONObject("playback") ?: root)
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_restore_success), Toast.LENGTH_SHORT).show()
@@ -251,7 +265,7 @@ fun BackupSettingsScreen(
                         title = stringResource(R.string.settings_backup_export_settings_title),
                         summary = stringResource(R.string.settings_backup_export_settings_summary),
                         onClick = {
-                            settingsExportLauncher.launch("ella_settings_${System.currentTimeMillis()}.json")
+                            settingsExportLauncher.launch("halcyon_settings_${System.currentTimeMillis()}.json")
                         }
                     )
                     ArrowPreference(
@@ -417,7 +431,7 @@ fun BackupSettingsScreen(
                 playbackExportFormat = format
                 showPlaybackExportFormatDialog = false
                 val fileName = when (format) {
-                    PlaybackExportFormat.Ella -> "ella_listening_stats_${System.currentTimeMillis()}.json"
+                    PlaybackExportFormat.Ella -> "halcyon_listening_stats_${System.currentTimeMillis()}.json"
                     PlaybackExportFormat.Sollin -> "prism-listening-stats_${System.currentTimeMillis()}.json"
                 }
                 playbackExportLauncher.launch(fileName)

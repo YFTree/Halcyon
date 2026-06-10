@@ -4,6 +4,8 @@ import android.content.Context
 import android.text.Html
 import android.util.Log
 import com.ella.music.R
+import com.ella.music.data.AppLogStore
+import com.ella.music.data.AppLogType
 import com.ella.music.data.AppNetworkLoggingInterceptor
 import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaType
@@ -246,17 +248,17 @@ object WebDavClient {
         target: File,
         maxBytes: Long = 512 * 1024L
     ): File? {
-        val safeMaxBytes = maxBytes.coerceAtLeast(16 * 1024L)
-        val requestUrl = normalizeRequestUrl(url)
-        val request = Request.Builder()
-            .url(requestUrl)
-            .get()
-            .tag(WebDavConfig::class.java, config)
-            .header("Range", "bytes=0-${safeMaxBytes - 1}")
-            .apply { applyPreemptiveBasicAuth(config) }
-            .build()
-
         return runCatching {
+            val safeMaxBytes = maxBytes.coerceAtLeast(16 * 1024L)
+            val requestUrl = normalizeRequestUrl(url)
+            val request = Request.Builder()
+                .url(requestUrl)
+                .get()
+                .tag(WebDavConfig::class.java, config)
+                .header("Range", "bytes=0-${safeMaxBytes - 1}")
+                .apply { applyPreemptiveBasicAuth(config) }
+                .build()
+
             httpClient.newCall(request).execute().use { response ->
                 when (response.code) {
                     200, 206 -> Unit
@@ -284,7 +286,7 @@ object WebDavClient {
                 }
             }
         }.getOrElse { error ->
-            Log.w(TAG, "WebDAV header prefetch failed url=${requestUrl.safeLogUrl()}", error)
+            Log.w(TAG, "WebDAV header prefetch failed url=${url.safeLogUrl()}", error)
             target.delete()
             null
         }
@@ -318,7 +320,17 @@ object WebDavClient {
                     mimeType = mimeType
                 )
             }
-        }.getOrDefault(emptyList())
+        }.getOrElse { error ->
+            Log.e(TAG, "WebDAV XML parse failed: ${baseUrl.safeLogUrl()}", error)
+            AppLogStore.error(
+                requireContext(),
+                TAG,
+                "WebDAV XML parse failed: ${baseUrl.safeLogUrl()}",
+                error,
+                AppLogType.NETWORK
+            )
+            emptyList()
+        }
     }
 
     private fun executePropfind(url: String, config: WebDavConfig, depth: String): WebDavResponse {

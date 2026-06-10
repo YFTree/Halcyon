@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ella.music.R
+import com.ella.music.data.AppLogStore
+import com.ella.music.data.AppLogType
 import com.ella.music.data.webdav.WebDavClient
 import com.ella.music.data.webdav.WebDavConfig
 import com.ella.music.data.webdav.WebDavItem
@@ -73,6 +75,16 @@ fun WebDavScreen(
     var testStatus by remember { mutableStateOf<String?>(null) }
     var loadedKey by remember { mutableStateOf("") }
 
+    fun logWebDavError(action: String, error: Throwable) {
+        AppLogStore.error(
+            context,
+            "WebDavScreen",
+            "$action: ${error.localizedMessage ?: error.javaClass.name}",
+            error,
+            AppLogType.NETWORK
+        )
+    }
+
     fun load(url: String, forceRefresh: Boolean = false) {
         scope.launch {
             val config = WebDavConfig(webDavUrl, webDavUser, webDavPassword)
@@ -86,6 +98,7 @@ fun WebDavScreen(
             }.onFailure {
                 items = emptyList()
                 error = it.localizedMessage ?: context.getString(R.string.webdav_load_failed)
+                logWebDavError("Load failed", it)
             }
             loading = false
         }
@@ -128,7 +141,11 @@ fun WebDavScreen(
             .take(80)
             .toList()
         if (songsToPrefetch.isEmpty()) return@LaunchedEffect
-        mainViewModel.prefetchWebDavMetadataHeaders(songsToPrefetch, maxItems = 80)
+        runCatching {
+            mainViewModel.prefetchWebDavMetadataHeaders(songsToPrefetch, maxItems = 80)
+        }.onFailure {
+            logWebDavError("Metadata prefetch failed", it)
+        }
     }
 
     Column(
@@ -178,7 +195,10 @@ fun WebDavScreen(
                             withContext(Dispatchers.IO) {
                                 WebDavClient.testDetailed(WebDavConfig(webDavUrl, webDavUser, webDavPassword))
                             }
-                        }.getOrElse { WebDavTestResult(ok = false, message = it.localizedMessage ?: context.getString(R.string.webdav_connection_failed)) }
+                        }.getOrElse {
+                            logWebDavError("Connection test failed", it)
+                            WebDavTestResult(ok = false, message = it.localizedMessage ?: context.getString(R.string.webdav_connection_failed))
+                        }
                         testStatus = result.message
                         error = if (result.ok) null else result.message
                         Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
@@ -246,21 +266,39 @@ fun WebDavScreen(
                                 load(item.url)
                             } else {
                                 scope.launch {
-                                    val resolvedSong = withContext(Dispatchers.IO) {
-                                        mainViewModel.resolveSongForPlayback(item.toRemoteSong())
+                                    runCatching {
+                                        val resolvedSong = withContext(Dispatchers.IO) {
+                                            mainViewModel.resolveSongForPlayback(item.toRemoteSong())
+                                        }
+                                        playerViewModel.setPlaylist(listOf(resolvedSong), 0)
+                                        if (openPlayerOnPlay) onNavigateToPlayer()
+                                    }.onFailure {
+                                        logWebDavError("Play remote item failed", it)
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.webdav_load_failed) + ": " + (it.localizedMessage ?: ""),
+                                            Toast.LENGTH_LONG
+                                        ).show()
                                     }
-                                    playerViewModel.setPlaylist(listOf(resolvedSong), 0)
-                                    if (openPlayerOnPlay) onNavigateToPlayer()
                                 }
                             }
                         },
                         onAddToQueue = { item ->
                             scope.launch {
-                                val resolvedSong = withContext(Dispatchers.IO) {
-                                    mainViewModel.resolveSongForPlayback(item.toRemoteSong())
+                                runCatching {
+                                    val resolvedSong = withContext(Dispatchers.IO) {
+                                        mainViewModel.resolveSongForPlayback(item.toRemoteSong())
+                                    }
+                                    playerViewModel.addToPlaylist(resolvedSong)
+                                    Toast.makeText(context, R.string.webdav_added_to_queue, Toast.LENGTH_SHORT).show()
+                                }.onFailure {
+                                    logWebDavError("Add remote item to queue failed", it)
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.webdav_load_failed) + ": " + (it.localizedMessage ?: ""),
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                 }
-                                playerViewModel.addToPlaylist(resolvedSong)
-                                Toast.makeText(context, R.string.webdav_added_to_queue, Toast.LENGTH_SHORT).show()
                             }
                         }
                     )

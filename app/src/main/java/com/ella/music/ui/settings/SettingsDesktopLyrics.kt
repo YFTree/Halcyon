@@ -5,21 +5,12 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.player.DesktopLyricService
@@ -28,12 +19,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.DropdownItem
-import top.yukonga.miuix.kmp.basic.Slider
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun SettingsDesktopLyricControls(
@@ -53,8 +41,6 @@ internal fun SettingsDesktopLyricControls(
     val desktopLyricTranslationScale by settingsManager.desktopLyricTranslationScale.collectSettingsState(initialValue = 110)
     val desktopLyricOpacity by settingsManager.desktopLyricOpacity.collectSettingsState(initialValue = 100)
     val desktopLyricTextColor by settingsManager.desktopLyricTextColor.collectSettingsState(initialValue = -1)
-    val desktopLyricShadowStrength by settingsManager.desktopLyricShadowStrength.collectSettingsState(initialValue = 100)
-
     val desktopLyricColorPresets = listOf(
         stringResource(R.string.settings_color_white) to android.graphics.Color.WHITE,
         stringResource(R.string.settings_color_silver_gray) to android.graphics.Color.rgb(191, 191, 191),
@@ -144,36 +130,20 @@ internal fun SettingsDesktopLyricControls(
         }
     )
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(
-            text = stringResource(R.string.settings_status_lyric_top_offset_value, desktopLyricStatusBarTopOffset),
-            fontSize = 15.sp,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(R.string.settings_status_lyric_top_offset_summary),
-            fontSize = 13.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Slider(
-            value = (desktopLyricStatusBarTopOffset.coerceIn(0, 120).toFloat() / 120f).coerceIn(0f, 1f),
-            onValueChange = { fraction ->
-                val offset = (fraction * 120f).toInt().coerceIn(0, 120)
+    SettingsIntSliderPreference(
+        title = stringResource(R.string.settings_status_lyric_top_offset_value, desktopLyricStatusBarTopOffset),
+        summary = stringResource(R.string.settings_status_lyric_top_offset_summary),
+        value = desktopLyricStatusBarTopOffset,
+        valueRange = 0..120,
+        valueText = "${desktopLyricStatusBarTopOffset.coerceIn(0, 120)}dp",
+        enabled = desktopLyricEnabled && desktopLyricStatusBarMode,
+        onValueChange = { offset ->
                 scope.launch {
                     settingsManager.setDesktopLyricStatusBarTopOffset(offset)
                     applyDesktopLyricSettings()
                 }
-            },
-            enabled = desktopLyricEnabled && desktopLyricStatusBarMode,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "0dp", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-            Spacer(modifier = Modifier.weight(1f))
-            Text(text = "120dp", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
-    }
+    )
 
     WindowSpinnerPreference(
         title = stringResource(R.string.settings_status_bar_lyric_position),
@@ -240,129 +210,50 @@ internal fun SettingsDesktopLyricControls(
         }
     )
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(
-            text = stringResource(R.string.settings_desktop_lyric_font_scale, desktopLyricFontScale),
-            fontSize = 15.sp,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(R.string.settings_desktop_lyric_font_scale_summary),
-            fontSize = 13.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Slider(
-            value = ((desktopLyricFontScale.coerceIn(80, 220) - 80).toFloat() / 140f).coerceIn(0f, 1f),
-            onValueChange = { fraction ->
-                val scale = (80 + fraction * 140f).toInt().coerceIn(80, 220)
+    SettingsIntSliderPreference(
+        title = stringResource(R.string.settings_desktop_lyric_font_scale, desktopLyricFontScale),
+        summary = stringResource(R.string.settings_desktop_lyric_font_scale_summary),
+        value = desktopLyricFontScale,
+        valueRange = 80..220,
+        valueText = "${desktopLyricFontScale.coerceIn(80, 220)}%",
+        enabled = desktopLyricEnabled,
+        onValueChange = { scale ->
                 scope.launch {
                     settingsManager.setDesktopLyricFontScale(scale)
                     applyDesktopLyricSettings()
                 }
-            },
-            enabled = desktopLyricEnabled,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "80%", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-            Spacer(modifier = Modifier.weight(1f))
-            Text(text = "220%", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
-    }
+    )
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(
-            text = stringResource(R.string.settings_desktop_lyric_translation_scale, desktopLyricTranslationScale),
-            fontSize = 15.sp,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(R.string.settings_desktop_lyric_translation_scale_summary),
-            fontSize = 13.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Slider(
-            value = ((desktopLyricTranslationScale.coerceIn(80, 220) - 80).toFloat() / 140f).coerceIn(0f, 1f),
-            onValueChange = { fraction ->
-                val scale = (80 + fraction * 140f).toInt().coerceIn(80, 220)
+    SettingsIntSliderPreference(
+        title = stringResource(R.string.settings_desktop_lyric_translation_scale, desktopLyricTranslationScale),
+        summary = stringResource(R.string.settings_desktop_lyric_translation_scale_summary),
+        value = desktopLyricTranslationScale,
+        valueRange = 80..220,
+        valueText = "${desktopLyricTranslationScale.coerceIn(80, 220)}%",
+        enabled = desktopLyricEnabled,
+        onValueChange = { scale ->
                 scope.launch {
                     settingsManager.setDesktopLyricTranslationScale(scale)
                     applyDesktopLyricSettings()
                 }
-            },
-            enabled = desktopLyricEnabled,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "80%", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-            Spacer(modifier = Modifier.weight(1f))
-            Text(text = "220%", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
-    }
+    )
 
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(
-            text = stringResource(R.string.settings_desktop_lyric_opacity, desktopLyricOpacity),
-            fontSize = 15.sp,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(R.string.settings_desktop_lyric_opacity_summary),
-            fontSize = 13.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Slider(
-            value = ((desktopLyricOpacity.coerceIn(35, 100) - 35).toFloat() / 65f).coerceIn(0f, 1f),
-            onValueChange = { fraction ->
-                val opacity = (35 + fraction * 65f).toInt().coerceIn(35, 100)
+    SettingsIntSliderPreference(
+        title = stringResource(R.string.settings_desktop_lyric_opacity, desktopLyricOpacity),
+        summary = stringResource(R.string.settings_desktop_lyric_opacity_summary),
+        value = desktopLyricOpacity,
+        valueRange = 35..100,
+        valueText = "${desktopLyricOpacity.coerceIn(35, 100)}%",
+        enabled = desktopLyricEnabled,
+        onValueChange = { opacity ->
                 scope.launch {
                     settingsManager.setDesktopLyricOpacity(opacity)
                     applyDesktopLyricSettings()
                 }
-            },
-            enabled = desktopLyricEnabled,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "35%", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-            Spacer(modifier = Modifier.weight(1f))
-            Text(text = "100%", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
-    }
-
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(
-            text = stringResource(R.string.settings_desktop_lyric_shadow_strength, desktopLyricShadowStrength),
-            fontSize = 15.sp,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        Text(
-            text = stringResource(R.string.settings_desktop_lyric_shadow_strength_summary),
-            fontSize = 13.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Slider(
-            value = (desktopLyricShadowStrength.coerceIn(0, 160).toFloat() / 160f).coerceIn(0f, 1f),
-            onValueChange = { fraction ->
-                val strength = (fraction * 160f).toInt().coerceIn(0, 160)
-                scope.launch {
-                    settingsManager.setDesktopLyricShadowStrength(strength)
-                    applyDesktopLyricSettings()
-                }
-            },
-            enabled = desktopLyricEnabled,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(text = "0%", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-            Spacer(modifier = Modifier.weight(1f))
-            Text(text = "160%", fontSize = 11.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-        }
-    }
+    )
 
     WindowSpinnerPreference(
         title = stringResource(R.string.settings_desktop_lyric_color),

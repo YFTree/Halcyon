@@ -36,7 +36,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import kotlin.random.Random
@@ -824,7 +823,7 @@ class ExoPlayerManager(private val context: Context) {
         val extras = toMediaItemExtras().apply {
             putString(EXTRA_ONLINE_SOURCE, onlineSource)
             putString(EXTRA_ONLINE_ID, onlineId)
-            putString(EXTRA_SONG_JSON, this@mediaMetadata.toJson().toString())
+            putString(EXTRA_SONG_JSON, this@mediaMetadata.toPlaybackQueueJson().toString())
         }
         return MediaMetadata.Builder()
             .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
@@ -1129,21 +1128,6 @@ class ExoPlayerManager(private val context: Context) {
         return localConfiguration?.uri?.toString().orEmpty() == song.path
     }
 
-    private fun Song?.isSamePlaybackIdentity(other: Song?): Boolean {
-        if (this == null || other == null) return this == other
-        if (id > 0L && id == other.id) return true
-        return path.isNotBlank() && path == other.path
-    }
-
-    private fun Song.playbackStackKey(): String = when {
-        id > 0L -> "id:$id"
-        path.isNotBlank() -> "path:$path"
-        else -> "title:$title|artist:$artist|album:$album"
-    }
-
-    private fun Song.notificationArtworkKey(): String =
-        "${id}:${path}:${dateModified}:${fileSize}:${coverUrl}"
-
     private fun shouldUseTrueRandomShuffle(): Boolean =
         shuffleMode == SettingsManager.SHUFFLE_MODE_TRUE_RANDOM && _shuffleEnabled.value
 
@@ -1167,20 +1151,6 @@ class ExoPlayerManager(private val context: Context) {
         controller.seekToDefaultPosition(randomIndex)
         if (shouldKeepPlaying) controller.play()
         updateCurrentSong()
-        return true
-    }
-
-    private fun restartCurrentInRepeatOne(): Boolean {
-        val controller = mediaController ?: return false
-        if (controller.repeatMode != Player.REPEAT_MODE_ONE) return false
-
-        val itemCount = controller.mediaItemCount
-        val currentIndex = controller.currentMediaItemIndex
-        if (itemCount <= 0 || currentIndex !in 0 until itemCount) return false
-
-        controller.seekToDefaultPosition(currentIndex)
-        controller.play()
-        _currentPosition.value = 0L
         return true
     }
 
@@ -1221,16 +1191,7 @@ class ExoPlayerManager(private val context: Context) {
         val snapshot = capturePlaybackState()
 
         persistenceScope.launch {
-            val payload = JSONObject()
-                .put("index", snapshot.index)
-                .put("positionMs", snapshot.positionMs)
-                .put("repeatMode", snapshot.repeatMode)
-                .put("shuffle", snapshot.shuffle)
-                .put("speed", snapshot.speed)
-                .put("pitch", snapshot.pitch)
-                .put("songs", JSONArray().apply {
-                    songs.forEach { song -> put(song.toJson()) }
-                })
+            val payload = playbackQueueJson(snapshot, songs)
 
             context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
                 .edit()
@@ -1290,122 +1251,21 @@ class ExoPlayerManager(private val context: Context) {
             .getBoolean(KEY_APP_SHUFFLE, _shuffleEnabled.value)
 
     private fun loadSavedQueue(): SavedQueue? {
-        val raw = context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
+        val raw = prefs
             .getString(KEY_QUEUE, null)
             ?: return null
 
-        return runCatching {
-            val payload = JSONObject(raw)
-            val songsArray = payload.optJSONArray("songs") ?: JSONArray()
-            val songs = (0 until songsArray.length())
-                .mapNotNull { songsArray.optJSONObject(it)?.toSongOrNull() }
-            val state = context.getSharedPreferences(PLAYBACK_PREFS, Context.MODE_PRIVATE)
-                .getString(KEY_STATE, null)
-                ?.let { runCatching { JSONObject(it) }.getOrNull() }
-            SavedQueue(
-                songs = songs,
-                index = state?.optInt("index", 0) ?: payload.optInt("index", 0),
-                positionMs = state?.optLong("positionMs", 0L) ?: payload.optLong("positionMs", 0L),
-                repeatMode = state?.optInt("repeatMode", Player.REPEAT_MODE_OFF)
-                    ?: payload.optInt("repeatMode", Player.REPEAT_MODE_OFF),
-                shuffle = state?.optBoolean("shuffle", false) ?: payload.optBoolean("shuffle", false),
-                speed = (state?.optDouble("speed", 1.0) ?: payload.optDouble("speed", 1.0)).toFloat(),
-                pitch = (state?.optDouble("pitch", 1.0) ?: payload.optDouble("pitch", 1.0)).toFloat()
-            )
-        }.getOrNull()
-    }
-
-    private fun Song.toJson(): JSONObject = JSONObject()
-        .put("id", id)
-        .put("title", title)
-        .put("artist", artist)
-        .put("album", album)
-        .put("albumId", albumId)
-        .put("duration", duration)
-        .put("path", path)
-        .put("fileName", fileName)
-        .put("fileSize", fileSize)
-        .put("mimeType", mimeType)
-        .put("dateAdded", dateAdded)
-        .put("dateModified", dateModified)
-        .put("trackNumber", trackNumber)
-        .put("discNumber", discNumber)
-        .put("albumArtist", albumArtist)
-        .put("genre", genre)
-        .put("year", year)
-        .put("composer", composer)
-        .put("lyricist", lyricist)
-        .put("coverUrl", coverUrl)
-        .put("onlineSource", onlineSource)
-        .put("onlineId", onlineId)
-
-    private fun JSONObject.toSongOrNull(): Song? {
-        val path = optString("path").takeIf { it.isNotBlank() } ?: return null
-        return Song(
-            id = optLong("id", path.hashCode().toLong()),
-            title = optString("title").ifBlank { optString("fileName").ifBlank { path.substringAfterLast('/') } },
-            artist = optString("artist").ifBlank { "Unknown" },
-            album = optString("album").ifBlank { "Music" },
-            albumId = optLong("albumId", 0L),
-            duration = optLong("duration", 0L),
-            path = path,
-            fileName = optString("fileName").ifBlank { path.substringAfterLast('/') },
-            fileSize = optLong("fileSize", 0L),
-            mimeType = optString("mimeType"),
-            dateAdded = optLong("dateAdded", 0L),
-            dateModified = optLong("dateModified", 0L),
-            trackNumber = optInt("trackNumber", 0),
-            discNumber = optInt("discNumber", 0),
-            albumArtist = optString("albumArtist"),
-            genre = optString("genre"),
-            year = optString("year"),
-            composer = optString("composer"),
-            lyricist = optString("lyricist"),
-            coverUrl = optString("coverUrl"),
-            onlineSource = optString("onlineSource"),
-            onlineId = optString("onlineId")
-        )
-    }
-
-    private data class SavedQueue(
-        val songs: List<Song>,
-        val index: Int,
-        val positionMs: Long,
-        val repeatMode: Int,
-        val shuffle: Boolean,
-        val speed: Float,
-        val pitch: Float
-    )
-
-    private data class PlaybackStateSnapshot(
-        val index: Int,
-        val positionMs: Long,
-        val repeatMode: Int,
-        val shuffle: Boolean,
-        val speed: Float,
-        val pitch: Float
-    ) {
-        fun toJson(): JSONObject = JSONObject()
-            .put("index", index)
-            .put("positionMs", positionMs)
-            .put("repeatMode", repeatMode)
-            .put("shuffle", shuffle)
-            .put("speed", speed)
-            .put("pitch", pitch)
+        return parseSavedQueue(raw, prefs.getString(KEY_STATE, null))
     }
 
     fun hasSavedQueue(): Boolean = loadSavedQueue()?.songs?.isNotEmpty() == true
-
-    private data class PendingPlaylist(
-        val songs: List<Song>,
-        val startIndex: Int
-    )
 
     private fun MediaItem.toSong(): Song {
         val metadata = mediaMetadata
         metadata.extras
             ?.getString(EXTRA_SONG_JSON)
-            ?.let { raw -> runCatching { JSONObject(raw).toSongOrNull() }.getOrNull() }
+            ?.let { raw -> runCatching { JSONObject(raw).toPlaybackQueueSongOrNull() }.getOrNull() }
             ?.let { return it }
 
         val path = localConfiguration?.uri?.toString().orEmpty()
