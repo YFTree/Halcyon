@@ -78,6 +78,9 @@ import com.ella.music.viewmodel.MetadataCategoryItem
 import com.ella.music.viewmodel.PlayerViewModel
 import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.AddToPlaylistSheet
+import com.ella.music.ui.components.CreatePlaylistAndAddSheet
+import com.ella.music.ui.components.rememberSongDeleteRequester
+import com.ella.music.ui.components.shareLocalSongs
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.EllaMiuixBottomSheet
@@ -118,28 +121,44 @@ fun MetadataCategoryScreen(
     onCategoryClick: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val requestDeleteSongs = rememberSongDeleteRequester(mainViewModel)
     val songs by mainViewModel.songs.collectAsState()
-    val items = remember(type, songs) { mainViewModel.getMetadataCategoryItems(type) }
+    val items by produceState(emptyList<MetadataCategoryItem>(), type, songs) {
+        value = withContext(Dispatchers.Default) { mainViewModel.getMetadataCategoryItems(type) }
+    }
     var sortExpanded by remember { mutableStateOf(false) }
     val sortIndexFlow = remember(type) { mainViewModel.settingsManager.metadataCategorySortIndex(type) }
     val sortIndex by sortIndexFlow.collectAsState(initial = 0)
     val availableSortModes = remember(type) { MetadataCategorySortMode.entries.filter { it.availableFor(type) } }
     val sortMode = availableSortModes.getOrElse(sortIndex) { MetadataCategorySortMode.Name }
     val sortedItems = remember(items, sortMode) { items.sortedForCategory(sortMode) }
+    val playlists by mainViewModel.playlists.collectAsState()
+    val pinnedCategoryKeys by mainViewModel.settingsManager
+        .pinnedKeysFlow("category:$type")
+        .collectAsState(initial = emptyList())
+    val pinnedOrderedItems = remember(sortedItems, pinnedCategoryKeys) {
+        if (pinnedCategoryKeys.isEmpty()) {
+            sortedItems
+        } else {
+            val pinnedSet = pinnedCategoryKeys.toSet()
+            val pinned = sortedItems
+                .filter { it.name in pinnedSet }
+                .sortedBy { pinnedCategoryKeys.indexOf(it.name) }
+            pinned + sortedItems.filterNot { it.name in pinnedSet }
+        }
+    }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var categoryMenuItem by remember { mutableStateOf<MetadataCategoryItem?>(null) }
-    val displayedItems = remember(sortedItems, searchQuery, type) {
+    var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var pendingDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    val displayedItems = remember(pinnedOrderedItems, searchQuery, type) {
         val query = searchQuery.trim()
         if (query.isBlank()) {
-            sortedItems
+            pinnedOrderedItems
         } else {
-            sortedItems.filter { it.matchesCategorySearch(query, type) }
-        }
-    }
-    val representativeSongsByName = remember(type, items, songs) {
-        items.associate { item ->
-            item.name to mainViewModel.getSongsForMetadataCategory(type, item.name).firstOrNull()
+            pinnedOrderedItems.filter { it.matchesCategorySearch(query, type) }
         }
     }
     val albumArtUrisByName = remember(items) {
@@ -314,7 +333,7 @@ fun MetadataCategoryScreen(
                             item = item,
                             sortMode = sortMode,
                             albumArtUri = albumArtUrisByName[item.name],
-                            representativeSong = representativeSongsByName[item.name],
+                            representativeSong = item.representativeSong,
                             loadCoverArt = if (type.prefersEmbeddedCategoryCardCover()) mainViewModel::getAlbumCoverArtBitmap else null,
                             onClick = { onCategoryClick(item.name) },
                             onLongClick = { categoryMenuItem = item }
@@ -348,6 +367,30 @@ fun MetadataCategoryScreen(
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                val isPinned = item.name in pinnedCategoryKeys
+                CategorySheetItem(
+                    stringResource(if (isPinned) R.string.common_unpin else R.string.common_pin_to_top)
+                ) {
+                    scope.launch {
+                        mainViewModel.settingsManager.setPinned("category:$type", item.name, !isPinned)
+                    }
+                    categoryMenuItem = null
+                }
+                CategorySheetItem(stringResource(R.string.common_share)) {
+                    val selectedSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
+                    shareLocalSongs(context, selectedSongs)
+                    categoryMenuItem = null
+                }
+                CategorySheetItem(stringResource(R.string.song_more_add_to_playlist)) {
+                    playlistPickerSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
+                    categoryMenuItem = null
+                }
+                CategorySheetItem(stringResource(R.string.common_add_to_queue)) {
+                    val selectedSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
+                    playerViewModel.addToPlaylist(selectedSongs)
+                    Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                    categoryMenuItem = null
+                }
                 CategorySheetItem(stringResource(R.string.song_more_play_next)) {
                     val selectedSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
                     playerViewModel.playNext(selectedSongs)
@@ -368,10 +411,65 @@ fun MetadataCategoryScreen(
                     ).show()
                     categoryMenuItem = null
                 }
+                if (type != "folder") {
+                    CategorySheetItem(stringResource(R.string.song_more_delete_permanently)) {
+                        pendingDeleteSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
+                        categoryMenuItem = null
+                    }
+                }
                 CategorySheetItem(stringResource(R.string.common_cancel)) {
                     categoryMenuItem = null
                 }
             }
         }
+    }
+
+    playlistPickerSongs?.let { songs ->
+        AddToPlaylistSheet(
+            playlists = playlists,
+            songCount = songs.size,
+            onDismiss = { playlistPickerSongs = null },
+            onCreatePlaylist = {
+                createPlaylistSongs = songs
+                playlistPickerSongs = null
+            },
+            onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
+                selectedPlaylists.forEach { playlist ->
+                    mainViewModel.addSongsToPlaylist(playlist.id, songs, appendToEnd)
+                }
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.player_added_to_playlists, selectedPlaylists.size),
+                    Toast.LENGTH_SHORT
+                ).show()
+                playlistPickerSongs = null
+            }
+        )
+    }
+
+    createPlaylistSongs?.let { songs ->
+        CreatePlaylistAndAddSheet(
+            onDismiss = { createPlaylistSongs = null },
+            onCreate = { name ->
+                mainViewModel.createPlaylist(name) { playlist ->
+                    if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songs)
+                }
+                createPlaylistSongs = null
+            }
+        )
+    }
+
+    if (pendingDeleteSongs.isNotEmpty()) {
+        ConfirmDangerDialog(
+            show = true,
+            title = stringResource(R.string.song_more_delete_song_title),
+            message = stringResource(R.string.library_delete_selected_message, pendingDeleteSongs.size),
+            confirmText = stringResource(R.string.song_more_delete_permanently),
+            onDismiss = { pendingDeleteSongs = emptyList() },
+            onConfirm = {
+                requestDeleteSongs(pendingDeleteSongs)
+                pendingDeleteSongs = emptyList()
+            }
+        )
     }
 }

@@ -83,7 +83,8 @@ internal fun buildMetadataCategoryItems(
                 coverAlbumIds = items
                     .mapNotNull { it.albumId.takeIf { albumId -> albumId > 0L } }
                     .distinct()
-                    .take(3)
+                    .take(3),
+                representativeSong = items.firstOrNull { it.albumId > 0L } ?: items.firstOrNull()
             )
         }
         .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })

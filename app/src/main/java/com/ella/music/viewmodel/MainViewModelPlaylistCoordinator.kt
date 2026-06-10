@@ -38,6 +38,12 @@ internal class MainViewModelPlaylistCoordinator(
         }
     }
 
+    fun renamePlaylist(id: String, newName: String) {
+        scope.launch {
+            playlistStore.renamePlaylist(id, newName)
+        }
+    }
+
     fun deletePlaylist(id: String) {
         scope.launch {
             playlistStore.deletePlaylist(id)

@@ -93,6 +93,9 @@
     <string name="common_all">모두</string>
     <string name="common_select_artist">아티스트 선택</string>
     <string name="common_add_to_queue">재생 대기열에 추가</string>
+    <string name="common_rename">이름 변경</string>
+    <string name="common_pin_to_top">상단 고정</string>
+    <string name="common_unpin">고정 해제</string>
     <string name="common_add_desktop_shortcut">데스크톱 바로가기 추가</string>
     <string name="common_exit_selection">선택 종료</string>
     <string name="common_multi_select">다중 선택</string>
@@ -596,6 +599,8 @@
     <string name="settings_backup_export_failed">백업 내보내기 실패</string>
     <string name="settings_backup_restore_success">백업이 복원되었습니다</string>
     <string name="settings_backup_restore_failed">백업 복원 실패</string>
+    <string name="settings_backup_restore_wrong_type">이것은 재생 기록 백업입니다. 재생 기록에서 복원하세요.</string>
+    <string name="settings_backup_restore_wrong_type_settings">이것은 설정 백업입니다. 설정에서 복원하세요.</string>
     <string name="settings_backup_webdav_section">WebDAV 클라우드 백업</string>
     <string name="settings_backup_webdav_url_label">WebDAV 서버 URL</string>
     <string name="settings_backup_webdav_url_summary">예를 들어 https://dav.example.com/remote.php/dav/files/user/</string>
@@ -718,6 +723,7 @@
     <string name="library_search_artist_summary">%1$d곡 · %2$d 참여 앨범</string>
     <string name="library_search_lyric_prefix">가사:</string>
     <string name="rating_filter_all">모든 평가</string>
+    <string name="rating_filter_unrated">평가 없음</string>
     <string name="rating_filter_star">%1$d점</string>
     <string name="favorite_filter">즐겨찾기</string>
     <string name="library_select_songs_first">먼저 곡을 선택하세요</string>

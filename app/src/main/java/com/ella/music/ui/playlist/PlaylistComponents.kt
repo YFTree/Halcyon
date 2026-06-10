@@ -104,6 +104,7 @@ internal fun PlaylistRow(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
+    onMore: (() -> Unit)? = null,
     trailingContent: (@Composable (() -> Unit))? = null
 ) {
     Card(
@@ -215,7 +216,14 @@ internal fun PlaylistRow(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
-            if (onDelete != null) {
+            if (onMore != null) {
+                IconButton(onClick = onMore) {
+                    com.ella.music.ui.player.MoreIcon(
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            } else if (onDelete != null) {
                 IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Delete,
@@ -258,9 +266,12 @@ private val FiveStarPlaylistIcon: ImageVector by lazy {
 @Composable
 internal fun CreatePlaylistDialog(
     onDismiss: () -> Unit,
-    onCreate: (String) -> Unit
+    onCreate: (String) -> Unit,
+    initialName: String = "",
+    title: String? = null,
+    confirmText: String? = null
 ) {
-    var name by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(initialName) }
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) {
@@ -270,7 +281,7 @@ internal fun CreatePlaylistDialog(
     }
     EllaMiuixBottomSheet(
         show = true,
-        title = stringResource(R.string.playlist_create_title),
+        title = title ?: stringResource(R.string.playlist_create_title),
         onDismissRequest = onDismiss
     ) {
         Column(
@@ -285,7 +296,7 @@ internal fun CreatePlaylistDialog(
             )
             EllaMiuixSheetActions(
                 cancelText = stringResource(R.string.common_cancel),
-                confirmText = stringResource(R.string.common_create),
+                confirmText = confirmText ?: stringResource(R.string.common_create),
                 onCancel = onDismiss,
                 onConfirm = { onCreate(name) }
             )

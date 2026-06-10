@@ -253,7 +253,11 @@ fun LibraryScreen(
         val favoriteKeys = favoriteSongKeys
         value = withContext(Dispatchers.IO) {
             songs.filter { song ->
-                val ratingMatched = ratingFilter.isEmpty() || mainViewModel.getSongRating(song) in ratingFilter
+                val ratingMatched = when {
+                    ratingFilter.isEmpty() -> true
+                    ratingFilter == setOf(0) -> mainViewModel.getSongRating(song) !in 1..5
+                    else -> mainViewModel.getSongRating(song) in ratingFilter
+                }
                 if (!ratingMatched) return@filter false
                 if (favoriteFilter && song.playlistIdentityKey() !in favoriteKeys) return@filter false
                 query.isBlank() || mainViewModel.songMatchesSearchSnapshot(song, query)

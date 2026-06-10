@@ -52,7 +52,13 @@ import com.ella.music.data.model.UserPlaylist
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.AlbumCard
 import com.ella.music.ui.components.AddToPlaylistSheet
+import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.CreatePlaylistAndAddSheet
+import com.ella.music.ui.components.EllaMiuixMenuItem
+import com.ella.music.ui.components.rememberSongDeleteRequester
+import com.ella.music.ui.components.requestPinnedEllaShortcut
+import com.ella.music.ui.components.shareLocalSongs
+import com.ella.music.ui.navigation.Screen
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
@@ -95,6 +101,10 @@ fun AlbumScreen(
     var selectedAlbumIds by remember { mutableStateOf(setOf<Long>()) }
     var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
     var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var albumMenuTarget by remember { mutableStateOf<Album?>(null) }
+    var pendingDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
+    val pinnedAlbumKeys by mainViewModel.settingsManager.pinnedKeysFlow("album").collectAsState(initial = emptyList())
+    val requestDeleteSongs = rememberSongDeleteRequester(mainViewModel)
     val sortIndex by mainViewModel.settingsManager.albumListSortIndex.collectAsState(initial = LibrarySortUiState.albumListSortIndex)
     val sortMode = AlbumSortMode.entries.getOrElse(sortIndex) { AlbumSortMode.Name }
     val gridColumns by mainViewModel.settingsManager.categoryGridColumns.collectAsState(initial = 2)
@@ -124,8 +134,8 @@ fun AlbumScreen(
             }
         }
     }
-    val sortedAlbums = remember(filteredAlbums, sortMode, albumDurations) {
-        when (sortMode) {
+    val sortedAlbums = remember(filteredAlbums, sortMode, albumDurations, pinnedAlbumKeys) {
+        val sorted = when (sortMode) {
             AlbumSortMode.Name -> filteredAlbums.sortedBy { it.name.musicSortKey() }
             AlbumSortMode.Artist -> filteredAlbums.sortedWith(
                 compareBy<Album> { it.albumArtist.isBlank() && it.artist.isBlank() }
@@ -136,6 +146,15 @@ fun AlbumScreen(
             AlbumSortMode.Duration -> filteredAlbums.sortedByDescending { albumDurations[it.id] ?: 0L }
             AlbumSortMode.YearAsc -> filteredAlbums.sortedWith(compareBy<Album> { it.yearInt <= 0 }.thenBy { it.yearInt }.thenBy { it.name.musicSortKey() })
             AlbumSortMode.YearDesc -> filteredAlbums.sortedWith(compareBy<Album> { it.yearInt <= 0 }.thenByDescending { it.yearInt }.thenBy { it.name.musicSortKey() })
+        }
+        if (pinnedAlbumKeys.isEmpty()) {
+            sorted
+        } else {
+            val pinnedSet = pinnedAlbumKeys.toSet()
+            val pinned = sorted
+                .filter { it.id.toString() in pinnedSet }
+                .sortedBy { pinnedAlbumKeys.indexOf(it.id.toString()) }
+            pinned + sorted.filterNot { it.id.toString() in pinnedSet }
         }
     }
 
@@ -375,8 +394,7 @@ fun AlbumScreen(
                                         toggleAlbumSelection(album)
                                         return@AlbumCard
                                     }
-                                    selectionMode = true
-                                    selectedAlbumIds = selectedAlbumIds + album.id
+                                    albumMenuTarget = album
                                 }
                             )
                         }
@@ -448,6 +466,101 @@ fun AlbumScreen(
                 }
                 createPlaylistSongs = null
                 finishSelectionMode()
+            }
+        )
+    }
+
+    albumMenuTarget?.let { album ->
+        val albumKey = album.id.toString()
+        val isPinned = albumKey in pinnedAlbumKeys
+        EllaMiuixBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = album.name,
+            onDismissRequest = { albumMenuTarget = null }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                EllaMiuixMenuItem(
+                    text = stringResource(if (isPinned) R.string.common_unpin else R.string.common_pin_to_top),
+                    onClick = {
+                        scope.launch { mainViewModel.settingsManager.setPinned("album", albumKey, !isPinned) }
+                        albumMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_share),
+                    onClick = {
+                        shareLocalSongs(context, mainViewModel.getSongsForAlbum(album.id))
+                        albumMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.song_more_add_to_playlist),
+                    onClick = {
+                        playlistPickerSongs = mainViewModel.getSongsForAlbum(album.id)
+                        albumMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_add_to_queue),
+                    onClick = {
+                        playerViewModel.addToPlaylist(mainViewModel.getSongsForAlbum(album.id))
+                        Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                        albumMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.song_more_play_next),
+                    onClick = {
+                        playerViewModel.playNext(mainViewModel.getSongsForAlbum(album.id))
+                        Toast.makeText(context, context.getString(R.string.song_more_added_to_play_next), Toast.LENGTH_SHORT).show()
+                        albumMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_add_desktop_shortcut),
+                    onClick = {
+                        val ok = requestPinnedEllaShortcut(
+                            context = context,
+                            id = "album_${album.id}",
+                            label = album.name,
+                            route = Screen.AlbumDetail.createRoute(album.id)
+                        )
+                        Toast.makeText(
+                            context,
+                            if (ok) context.getString(R.string.playlist_shortcut_requested, album.name) else context.getString(R.string.playlist_shortcut_unsupported),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        albumMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.song_more_delete_permanently),
+                    danger = true,
+                    onClick = {
+                        pendingDeleteSongs = mainViewModel.getSongsForAlbum(album.id)
+                        albumMenuTarget = null
+                    }
+                )
+            }
+        }
+    }
+
+    if (pendingDeleteSongs.isNotEmpty()) {
+        ConfirmDangerDialog(
+            show = true,
+            title = stringResource(R.string.song_more_delete_song_title),
+            message = stringResource(R.string.library_delete_selected_message, pendingDeleteSongs.size),
+            confirmText = stringResource(R.string.song_more_delete_permanently),
+            onDismiss = { pendingDeleteSongs = emptyList() },
+            onConfirm = {
+                requestDeleteSongs(pendingDeleteSongs)
+                pendingDeleteSongs = emptyList()
             }
         )
     }

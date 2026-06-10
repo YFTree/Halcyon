@@ -93,6 +93,9 @@
     <string name="common_all">Hepsi</string>
     <string name="common_select_artist">Sanatçı seç</string>
     <string name="common_add_to_queue">Kuyruğa ekle</string>
+    <string name="common_rename">Yeniden adlandır</string>
+    <string name="common_pin_to_top">Üste sabitle</string>
+    <string name="common_unpin">Sabitlemeyi kaldır</string>
     <string name="common_add_desktop_shortcut">Masaüstü kısayolu ekle</string>
     <string name="common_exit_selection">Seçimden çık</string>
     <string name="common_multi_select">Çoklu seçim</string>
@@ -594,6 +597,8 @@
     <string name="settings_backup_export_failed">Yedekleme dışa aktarımı başarısız oldu</string>
     <string name="settings_backup_restore_success">Yedekleme geri yüklendi</string>
     <string name="settings_backup_restore_failed">Yedekleme geri yüklemesi başarısız oldu</string>
+    <string name="settings_backup_restore_wrong_type">Bu bir dinleme geçmişi yedeğidir. Lütfen dinleme geçmişinden geri yükleyin.</string>
+    <string name="settings_backup_restore_wrong_type_settings">Bu bir ayar yedeğidir. Lütfen ayarlardan geri yükleyin.</string>
     <string name="settings_backup_webdav_section">WebDAV Bulut Yedekleme</string>
     <string name="settings_backup_webdav_url_label">WebDAV Sunucu URL</string>
     <string name="settings_backup_webdav_url_summary">örneğin https://dav.example.com/remote.php/dav/files/user/</string>
@@ -717,6 +722,7 @@
     <string name="library_search_artist_summary">%1$d şarkıları · %2$d\'nin katıldığı albümler</string>
     <string name="library_search_lyric_prefix">Şarkı sözleri: </string>
     <string name="rating_filter_all">Tüm derecelendirmeler</string>
+    <string name="rating_filter_unrated">Derecelendirilmemiş</string>
     <string name="rating_filter_star">%1$d yıldızları</string>
     <string name="favorite_filter">Favoriler</string>
     <string name="library_select_songs_first">Önce şarkıları seç</string>

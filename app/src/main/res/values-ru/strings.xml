@@ -93,6 +93,9 @@
     <string name="common_all">Все</string>
     <string name="common_select_artist">Выберите исполнителя</string>
     <string name="common_add_to_queue">Добавить в очередь</string>
+    <string name="common_rename">Переименовать</string>
+    <string name="common_pin_to_top">Закрепить</string>
+    <string name="common_unpin">Открепить</string>
     <string name="common_add_desktop_shortcut">Добавить ярлык на рабочий стол</string>
     <string name="common_exit_selection">Выход из выбора</string>
     <string name="common_multi_select">Множественный выбор</string>
@@ -594,6 +597,8 @@
     <string name="settings_backup_export_failed">Не удалось экспортировать резервную копию</string>
     <string name="settings_backup_restore_success">Резервная копия восстановлена</string>
     <string name="settings_backup_restore_failed">Восстановление резервной копии не удалось</string>
+    <string name="settings_backup_restore_wrong_type">Это резервная копия истории прослушивания. Восстановите её из раздела истории прослушивания.</string>
+    <string name="settings_backup_restore_wrong_type_settings">Это резервная копия настроек. Восстановите её из раздела настроек.</string>
     <string name="settings_backup_webdav_section">WebDAV Облачное резервное копирование</string>
     <string name="settings_backup_webdav_url_label">WebDAV Сервер URL</string>
     <string name="settings_backup_webdav_url_summary">например https://dav.example.com/remote.php/dav/files/user/</string>
@@ -717,6 +722,7 @@
     <string name="library_search_artist_summary">Песни %1$d · Альбомы с участием %2$d</string>
     <string name="library_search_lyric_prefix">Текст: </string>
     <string name="rating_filter_all">Все рейтинги</string>
+    <string name="rating_filter_unrated">Без оценки</string>
     <string name="rating_filter_star">%1$d звезды</string>
     <string name="favorite_filter">Избранное</string>
     <string name="library_select_songs_first">Сначала выберите песни</string>

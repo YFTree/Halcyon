@@ -22,7 +22,8 @@ data class MetadataCategoryItem(
     val albumCount: Int,
     val duration: Long,
     val dateModified: Long = 0L,
-    val coverAlbumIds: List<Long> = emptyList()
+    val coverAlbumIds: List<Long> = emptyList(),
+    val representativeSong: Song? = null
 )
 
 internal data class ArtistAccumulator(
@@ -41,8 +42,10 @@ internal fun Song.metadataCategoryNames(type: String): List<String> {
     }
 }
 
+private val YEAR_REGEX = Regex("""\d{4}""")
+
 internal fun String.extractYear(): String? {
-    return Regex("""\d{4}""").find(this)?.value
+    return YEAR_REGEX.find(this)?.value
 }
 
 internal fun Song.parentFolderPath(): String? {

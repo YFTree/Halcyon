@@ -67,6 +67,7 @@
     <string name="common_back">返回</string>
     <string name="common_cancel">取消</string>
     <string name="common_confirm">确定</string>
+    <string name="common_rename">重命名</string>
     <string name="common_custom">自定义</string>
     <string name="common_create">创建</string>
     <string name="common_close">关闭</string>
@@ -93,6 +94,8 @@
     <string name="common_all">全部</string>
     <string name="common_select_artist">选择歌手</string>
     <string name="common_add_to_queue">添加到队列</string>
+    <string name="common_pin_to_top">置顶</string>
+    <string name="common_unpin">取消置顶</string>
     <string name="common_add_desktop_shortcut">添加桌面快捷方式</string>
     <string name="common_exit_selection">退出多选</string>
     <string name="common_multi_select">多选</string>
@@ -720,6 +723,7 @@
     <string name="library_search_artist_summary">%1$d 首歌曲 · %2$d 张参与专辑</string>
     <string name="library_search_lyric_prefix">歌词：</string>
     <string name="rating_filter_all">全部星级</string>
+    <string name="rating_filter_unrated">未评分</string>
     <string name="rating_filter_star">%1$d 星</string>
     <string name="favorite_filter">喜欢</string>
     <string name="library_select_songs_first">请先选择歌曲</string>

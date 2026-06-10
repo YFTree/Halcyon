@@ -966,6 +966,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerManager.playNext(songs)
     }
 
+    /** Re-establish the media controller if the playback session was torn down in the background. */
+    fun ensurePlayerConnected() {
+        playerManager.ensureConnected()
+    }
+
     fun playQueueIndex(index: Int) {
         if (!lazyOnlineQueueController.playIndex(index)) playerManager.playQueueIndex(index)
     }

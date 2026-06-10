@@ -93,6 +93,9 @@
     <string name="common_all">Tất cả</string>
     <string name="common_select_artist">Chọn nghệ sĩ</string>
     <string name="common_add_to_queue">Thêm vào hàng đợi</string>
+    <string name="common_rename">Đổi tên</string>
+    <string name="common_pin_to_top">Ghim lên đầu</string>
+    <string name="common_unpin">Bỏ ghim</string>
     <string name="common_add_desktop_shortcut">Thêm lối tắt trên màn hình</string>
     <string name="common_exit_selection">Thoát khỏi lựa chọn</string>
     <string name="common_multi_select">Chọn nhiều lần</string>
@@ -596,6 +599,8 @@
     <string name="settings_backup_export_failed">Xuất bản sao lưu không thành công</string>
     <string name="settings_backup_restore_success">Đã khôi phục bản sao lưu</string>
     <string name="settings_backup_restore_failed">Khôi phục sao lưu không thành công</string>
+    <string name="settings_backup_restore_wrong_type">Đây là bản sao lưu lịch sử nghe. Vui lòng khôi phục từ lịch sử nghe.</string>
+    <string name="settings_backup_restore_wrong_type_settings">Đây là bản sao lưu cài đặt. Vui lòng khôi phục từ cài đặt.</string>
     <string name="settings_backup_webdav_section">Sao lưu đám mây WebDAV</string>
     <string name="settings_backup_webdav_url_label">URL máy chủ WebDAV</string>
     <string name="settings_backup_webdav_url_summary">ví dụ. https://dav.example.com/remote.php/dav/files/user/</string>
@@ -718,6 +723,7 @@
     <string name="library_search_artist_summary">Các bài hát của %1$d · Album tham gia của %2$d</string>
     <string name="library_search_lyric_prefix">Lời bài hát:</string>
     <string name="rating_filter_all">Tất cả xếp hạng</string>
+    <string name="rating_filter_unrated">Chưa đánh giá</string>
     <string name="rating_filter_star">sao %1$d</string>
     <string name="favorite_filter">Yêu thích</string>
     <string name="library_select_songs_first">Chọn bài hát đầu tiên</string>

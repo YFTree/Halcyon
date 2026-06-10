@@ -133,6 +133,21 @@ class ExoPlayerManager(private val context: Context) {
         mediaController = null
     }
 
+    /**
+     * Ensures the media controller is connected to the (possibly killed/recreated) playback
+     * service. When the app is backgrounded for a while — especially over Bluetooth — the
+     * system can tear down the session, leaving a stale, disconnected controller whose
+     * commands are silently dropped. Call this on app foreground and before issuing commands.
+     */
+    fun ensureConnected() {
+        val controller = mediaController
+        if (controller != null && controller.isConnected) return
+        if (controller != null) disconnect()
+        if (controllerFuture == null) connect()
+    }
+
+    private fun activeController(): MediaController? = mediaController?.takeIf { it.isConnected }
+
     suspend fun recreatePlaybackService() {
         val resumePlayback = _isPlaying.value
         savePlaybackQueue(force = true)
@@ -252,8 +267,12 @@ class ExoPlayerManager(private val context: Context) {
 
         val safeIndex = startIndex.coerceIn(songs.indices)
         val mediaItems = songs.map(::songToMediaItem)
-        val controller = mediaController
+        val controller = activeController()
         if (controller == null) {
+            // No live controller (first launch, or the session was torn down while backgrounded).
+            // Reconnect and queue the request so it is applied once the controller is back, and
+            // optimistically reflect the requested song in the UI right away.
+            ensureConnected()
             pendingPlaylist = PendingPlaylist(songs.toList(), safeIndex)
             _currentSong.value = songs.getOrNull(safeIndex)
             _duration.value = songs.getOrNull(safeIndex)?.duration ?: 0L

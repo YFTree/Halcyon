@@ -214,6 +214,7 @@ fun AppNavigation(
         composable(Screen.Artist.route) {
             ArtistListScreen(
                 mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
                 onArtistClick = { artistName ->
                     navController.navigate(Screen.ArtistDetail.createRoute(artistName))
@@ -321,6 +322,7 @@ fun AppNavigation(
         composable(Screen.Playlists.route) {
             PlaylistScreen(
                 mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
                 onBack = { navController.popBackStack() },
                 onPlaylistClick = { playlistId ->
                     navController.navigate(Screen.PlaylistDetail.createRoute(playlistId))

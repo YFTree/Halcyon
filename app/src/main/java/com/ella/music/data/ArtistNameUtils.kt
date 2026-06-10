@@ -17,7 +17,8 @@ object NameSplitConfigStore {
     var tagIgnoreCase: Boolean = false
 }
 
-private val defaultArtistSeparatorPatterns = listOf(
+// Symbol separators may sit directly against names ("A/B", "A,B").
+private val defaultArtistSymbolSeparators = listOf(
     "/",
     "&",
     "、",
@@ -26,15 +27,19 @@ private val defaultArtistSeparatorPatterns = listOf(
     ",",
     "，",
     "\\+",
-    "×",
-    " x ",
-    " X ",
-    "feat\\.?",
-    "ft\\.?",
-    "with"
+    "×"
 )
 
-private val defaultGenreSeparatorPatterns = listOf(
+// Word separators only count when surrounded by whitespace, so they never split
+// mid-word (e.g. "Smithwick" must not break on "with", "Defeat" not on "feat").
+private val defaultArtistWordSeparators = listOf(
+    "feat\\.?",
+    "ft\\.?",
+    "with",
+    "x"
+)
+
+private val defaultGenreSymbolSeparators = listOf(
     "/",
     "\\|",
     "、",
@@ -44,10 +49,18 @@ private val defaultGenreSeparatorPatterns = listOf(
     "，"
 )
 
+private val defaultGenreWordSeparators = emptyList<String>()
+
+// Compiled separator regexes are reused across calls; building them per call was a
+// hot spot when grouping the whole library (artist/genre/composer/lyricist screens).
+private val separatorRegexCache = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+private val protectedNameRegexCache = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+
 fun splitArtistNames(value: String): List<String> {
     return splitNames(
         value = value,
-        defaultSeparatorPatterns = defaultArtistSeparatorPatterns,
+        symbolSeparatorPatterns = defaultArtistSymbolSeparators,
+        wordSeparatorPatterns = defaultArtistWordSeparators,
         customSeparators = NameSplitConfigStore.artistCustomSeparators,
         protectedNames = NameSplitConfigStore.artistProtectedNames,
         unknownValues = setOf("<unknown>")
@@ -57,7 +70,8 @@ fun splitArtistNames(value: String): List<String> {
 fun splitGenreNames(value: String): List<String> {
     return splitNames(
         value = value,
-        defaultSeparatorPatterns = defaultGenreSeparatorPatterns,
+        symbolSeparatorPatterns = defaultGenreSymbolSeparators,
+        wordSeparatorPatterns = defaultGenreWordSeparators,
         customSeparators = NameSplitConfigStore.genreCustomSeparators,
         protectedNames = NameSplitConfigStore.genreProtectedNames,
         unknownValues = setOf("<unknown>")
@@ -90,7 +104,8 @@ fun parseNameSplitSetting(value: String): List<String> {
 
 private fun splitNames(
     value: String,
-    defaultSeparatorPatterns: List<String>,
+    symbolSeparatorPatterns: List<String>,
+    wordSeparatorPatterns: List<String>,
     customSeparators: List<String>,
     protectedNames: List<String>,
     unknownValues: Set<String>
@@ -108,21 +123,20 @@ private fun splitNames(
         .sortedByDescending { it.length }
         .forEachIndexed { index, name ->
             val token = "\uE000${index}\uE000"
-            val regex = Regex(Regex.escape(name), RegexOption.IGNORE_CASE)
+            val regex = protectedNameRegexCache.getOrPut(name) {
+                Regex(Regex.escape(name), RegexOption.IGNORE_CASE)
+            }
             if (regex.containsMatchIn(protectedText)) {
                 protectedMap[token] = name
                 protectedText = regex.replace(protectedText, token)
             }
         }
 
-    val separatorPattern = customSeparators
-        .map { Regex.escape(it) }
-        .filter { it.isNotBlank() }
-        .joinToString("|")
-    if (separatorPattern.isBlank()) return listOf(normalized)
+    val separatorRegex = separatorRegexFor(symbolSeparatorPatterns, wordSeparatorPatterns, customSeparators)
+        ?: return listOf(normalized)
 
     return protectedText
-        .split(Regex("""\s*(?:$separatorPattern)\s*""", RegexOption.IGNORE_CASE))
+        .split(separatorRegex)
         .map { raw ->
             protectedMap.entries.fold(raw.trim()) { current, (token, name) ->
                 current.replace(token, name)
@@ -132,4 +146,27 @@ private fun splitNames(
             item.isNotBlank() && item.lowercase() !in unknownValues
         }
         .distinctBy { it.tagIdentityKey() }
+}
+
+private fun separatorRegexFor(
+    symbolSeparatorPatterns: List<String>,
+    wordSeparatorPatterns: List<String>,
+    customSeparators: List<String>
+): Regex? {
+    val symbolParts = symbolSeparatorPatterns + customSeparators
+        .filter { it.isNotBlank() }
+        .map { Regex.escape(it) }
+    val alternatives = buildList {
+        if (symbolParts.isNotEmpty()) {
+            add("""\s*(?:${symbolParts.joinToString("|")})\s*""")
+        }
+        if (wordSeparatorPatterns.isNotEmpty()) {
+            add("""\s+(?:${wordSeparatorPatterns.joinToString("|")})\s+""")
+        }
+    }
+    if (alternatives.isEmpty()) return null
+    val pattern = alternatives.joinToString("|")
+    return separatorRegexCache.getOrPut(pattern) {
+        Regex(pattern, RegexOption.IGNORE_CASE)
+    }
 }

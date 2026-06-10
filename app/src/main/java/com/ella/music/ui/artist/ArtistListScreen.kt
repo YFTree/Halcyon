@@ -2,8 +2,10 @@ package com.ella.music.ui.artist
 
 import com.ella.music.ui.components.EllaMiuixBottomSheet
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
@@ -27,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
@@ -46,16 +49,24 @@ import com.ella.music.data.splitArtistNames
 import com.ella.music.data.tagIdentityKey
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.AddToPlaylistSheet
+import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.DoubleTapScrollOverlay
+import com.ella.music.ui.components.EllaMiuixMenuItem
+import com.ella.music.ui.components.rememberSongDeleteRequester
+import com.ella.music.ui.components.requestPinnedEllaShortcut
+import com.ella.music.ui.components.shareLocalSongs
+import com.ella.music.ui.navigation.Screen
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import com.ella.music.ui.components.EllaSmallTopAppBar
@@ -68,9 +79,17 @@ import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+private data class ArtistListAggregate(
+    val artists: List<Artist> = emptyList(),
+    val representativeSongsByArtist: Map<String, Song> = emptyMap(),
+    val artistDurations: Map<String, Long> = emptyMap(),
+    val releaseAlbumCounts: Map<String, Int> = emptyMap()
+)
+
 @Composable
 fun ArtistListScreen(
     mainViewModel: MainViewModel,
+    playerViewModel: com.ella.music.viewmodel.PlayerViewModel,
     onBack: () -> Unit,
     onArtistClick: (String) -> Unit
 ) {
@@ -85,9 +104,13 @@ fun ArtistListScreen(
     var selectedArtistKeys by remember { mutableStateOf(setOf<String>()) }
     var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
     var createPlaylistSongs by remember { mutableStateOf<List<Song>?>(null) }
+    var artistMenuTarget by remember { mutableStateOf<Artist?>(null) }
+    var pendingDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     val sortIndex by mainViewModel.settingsManager.artistListSortIndex.collectAsState(initial = LibrarySortUiState.artistListSortIndex)
     val showAlbumArtists by mainViewModel.settingsManager.showAlbumArtists.collectAsState(initial = false)
     val tagIgnoreCase by mainViewModel.settingsManager.tagIgnoreCase.collectAsState(initial = false)
+    val pinnedArtistKeys by mainViewModel.settingsManager.pinnedKeysFlow("artist").collectAsState(initial = emptyList())
+    val requestDeleteSongs = rememberSongDeleteRequester(mainViewModel)
     val sortMode = ArtistSortMode.entries.getOrElse(sortIndex) { ArtistSortMode.Name }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var scrollToTopRequest by remember { mutableStateOf(0) }
@@ -98,54 +121,73 @@ fun ArtistListScreen(
         listCoversEnabled = true
     }
 
-    val artists = remember(songs, albums, showAlbumArtists, tagIgnoreCase) { mainViewModel.getArtists(showAlbumArtists) }
-    val representativeSongsByArtist = remember(songs, showAlbumArtists, tagIgnoreCase) {
-        buildMap {
-            songs.forEach { song ->
-                val names = if (showAlbumArtists) {
-                    splitArtistNames(song.artist) + splitArtistNames(song.albumArtist)
-                } else {
-                    splitArtistNames(song.artist)
-                }
-                names.forEach { artistName ->
-                    putIfAbsent(artistName.tagIdentityKey(), song)
-                }
-            }
-        }
-    }
-    val artistDurations = remember(songs, tagIgnoreCase) {
-        buildMap {
-            songs.forEach { song ->
-                splitArtistNames(song.artist).forEach { artistName ->
-                    val key = artistName.tagIdentityKey()
-                    put(key, (get(key) ?: 0L) + song.duration)
+    val aggregate by produceState(
+        ArtistListAggregate(),
+        songs,
+        albums,
+        showAlbumArtists,
+        tagIgnoreCase
+    ) {
+        value = withContext(Dispatchers.Default) {
+            val artists = mainViewModel.getArtists(showAlbumArtists)
+            val representativeSongsByArtist = buildMap {
+                songs.forEach { song ->
+                    val names = if (showAlbumArtists) {
+                        splitArtistNames(song.artist) + splitArtistNames(song.albumArtist)
+                    } else {
+                        splitArtistNames(song.artist)
+                    }
+                    names.forEach { artistName ->
+                        putIfAbsent(artistName.tagIdentityKey(), song)
+                    }
                 }
             }
-        }
-    }
-    val releaseAlbumCounts = remember(albums, showAlbumArtists, tagIgnoreCase) {
-        buildMap {
-            if (!showAlbumArtists) return@buildMap
-            albums.forEach { album ->
-                splitArtistNames(album.albumArtist).forEach { artistName ->
-                    val key = artistName.tagIdentityKey()
-                    put(key, (get(key) ?: 0) + 1)
+            val artistDurations = buildMap {
+                songs.forEach { song ->
+                    splitArtistNames(song.artist).forEach { artistName ->
+                        val key = artistName.tagIdentityKey()
+                        put(key, (get(key) ?: 0L) + song.duration)
+                    }
                 }
             }
+            val releaseAlbumCounts = buildMap {
+                if (showAlbumArtists) {
+                    albums.forEach { album ->
+                        splitArtistNames(album.albumArtist).forEach { artistName ->
+                            val key = artistName.tagIdentityKey()
+                            put(key, (get(key) ?: 0) + 1)
+                        }
+                    }
+                }
+            }
+            ArtistListAggregate(artists, representativeSongsByArtist, artistDurations, releaseAlbumCounts)
         }
     }
-    val filteredArtists = remember(artists, searchQuery, sortMode, artistDurations, releaseAlbumCounts) {
+    val artists = aggregate.artists
+    val representativeSongsByArtist = aggregate.representativeSongsByArtist
+    val artistDurations = aggregate.artistDurations
+    val releaseAlbumCounts = aggregate.releaseAlbumCounts
+    val filteredArtists = remember(artists, searchQuery, sortMode, artistDurations, releaseAlbumCounts, pinnedArtistKeys) {
         val filtered = if (searchQuery.isBlank()) {
             artists
         } else {
             artists.filter { it.name.contains(searchQuery, ignoreCase = true) }
         }
-        when (sortMode) {
+        val sorted = when (sortMode) {
             ArtistSortMode.Name -> filtered.sortedBy { it.name.lowercase() }
             ArtistSortMode.SongCount -> filtered.sortedByDescending { it.songCount }
             ArtistSortMode.AlbumCount -> filtered.sortedByDescending { it.albumCount }
             ArtistSortMode.ReleaseAlbumCount -> filtered.sortedByDescending { releaseAlbumCounts[it.name.tagIdentityKey()] ?: 0 }
             ArtistSortMode.Duration -> filtered.sortedByDescending { artistDurations[it.name.tagIdentityKey()] ?: 0L }
+        }
+        if (pinnedArtistKeys.isEmpty()) {
+            sorted
+        } else {
+            val pinnedSet = pinnedArtistKeys.toSet()
+            val pinned = sorted
+                .filter { it.name.tagIdentityKey() in pinnedSet }
+                .sortedBy { pinnedArtistKeys.indexOf(it.name.tagIdentityKey()) }
+            pinned + sorted.filterNot { it.name.tagIdentityKey() in pinnedSet }
         }
     }
 
@@ -361,8 +403,7 @@ fun ArtistListScreen(
                                     toggleArtistSelection(artist)
                                     return@ArtistRow
                                 }
-                                selectionMode = true
-                                selectedArtistKeys = selectedArtistKeys + artistKey
+                                artistMenuTarget = artist
                             }
                         )
                     }
@@ -433,6 +474,101 @@ fun ArtistListScreen(
                 }
                 createPlaylistSongs = null
                 finishSelectionMode()
+            }
+        )
+    }
+
+    artistMenuTarget?.let { artist ->
+        val artistKey = artist.name.tagIdentityKey()
+        val isPinned = artistKey in pinnedArtistKeys
+        EllaMiuixBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = artist.name,
+            onDismissRequest = { artistMenuTarget = null }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                EllaMiuixMenuItem(
+                    text = stringResource(if (isPinned) R.string.common_unpin else R.string.common_pin_to_top),
+                    onClick = {
+                        scope.launch { mainViewModel.settingsManager.setPinned("artist", artistKey, !isPinned) }
+                        artistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_share),
+                    onClick = {
+                        shareLocalSongs(context, mainViewModel.getSongsForArtist(artist.name))
+                        artistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.song_more_add_to_playlist),
+                    onClick = {
+                        playlistPickerSongs = mainViewModel.getSongsForArtist(artist.name)
+                        artistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_add_to_queue),
+                    onClick = {
+                        playerViewModel.addToPlaylist(mainViewModel.getSongsForArtist(artist.name))
+                        Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                        artistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.song_more_play_next),
+                    onClick = {
+                        playerViewModel.playNext(mainViewModel.getSongsForArtist(artist.name))
+                        Toast.makeText(context, context.getString(R.string.song_more_added_to_play_next), Toast.LENGTH_SHORT).show()
+                        artistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_add_desktop_shortcut),
+                    onClick = {
+                        val ok = requestPinnedEllaShortcut(
+                            context = context,
+                            id = "artist_${artistKey}",
+                            label = artist.name,
+                            route = Screen.ArtistDetail.createRoute(artist.name)
+                        )
+                        Toast.makeText(
+                            context,
+                            if (ok) context.getString(R.string.playlist_shortcut_requested, artist.name) else context.getString(R.string.playlist_shortcut_unsupported),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        artistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.song_more_delete_permanently),
+                    danger = true,
+                    onClick = {
+                        pendingDeleteSongs = mainViewModel.getSongsForArtist(artist.name)
+                        artistMenuTarget = null
+                    }
+                )
+            }
+        }
+    }
+
+    if (pendingDeleteSongs.isNotEmpty()) {
+        ConfirmDangerDialog(
+            show = true,
+            title = stringResource(R.string.song_more_delete_song_title),
+            message = stringResource(R.string.library_delete_selected_message, pendingDeleteSongs.size),
+            confirmText = stringResource(R.string.song_more_delete_permanently),
+            onDismiss = { pendingDeleteSongs = emptyList() },
+            onConfirm = {
+                requestDeleteSongs(pendingDeleteSongs)
+                pendingDeleteSongs = emptyList()
             }
         )
     }

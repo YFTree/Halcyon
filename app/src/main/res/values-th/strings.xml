@@ -93,6 +93,9 @@
     <string name="common_all">ทั้งหมด</string>
     <string name="common_select_artist">เลือกศิลปิน</string>
     <string name="common_add_to_queue">เพิ่มในคิว</string>
+    <string name="common_rename">เปลี่ยนชื่อ</string>
+    <string name="common_pin_to_top">ปักหมุดไว้ด้านบน</string>
+    <string name="common_unpin">เลิกปักหมุด</string>
     <string name="common_add_desktop_shortcut">เพิ่มทางลัดบนเดสก์ท็อป</string>
     <string name="common_exit_selection">ออกจากโหมดเลือก</string>
     <string name="common_multi_select">เลือกหลายรายการ</string>
@@ -596,6 +599,8 @@
     <string name="settings_backup_export_failed">การส่งออกไฟล์สำรองล้มเหลว</string>
     <string name="settings_backup_restore_success">กู้คืนไฟล์สำรองแล้ว</string>
     <string name="settings_backup_restore_failed">การกู้คืนไฟล์สำรองล้มเหลว</string>
+    <string name="settings_backup_restore_wrong_type">นี่คือไฟล์สำรองประวัติการฟัง กรุณากู้คืนจากประวัติการฟัง</string>
+    <string name="settings_backup_restore_wrong_type_settings">นี่คือไฟล์สำรองการตั้งค่า กรุณากู้คืนจากการตั้งค่า</string>
     <string name="settings_backup_webdav_section">สำรองข้อมูลบนคลาวด์ WebDAV</string>
     <string name="settings_backup_webdav_url_label">URL เซิร์ฟเวอร์ WebDAV</string>
     <string name="settings_backup_webdav_url_summary">เช่น https://dav.example.com/remote.php/dav/files/user/</string>
@@ -718,6 +723,7 @@
     <string name="library_search_artist_summary">%1$d songs · %2$d participated albums</string>
     <string name="library_search_lyric_prefix">Lyrics: </string>
     <string name="rating_filter_all">All ratings</string>
+    <string name="rating_filter_unrated">ยังไม่ให้คะแนน</string>
     <string name="rating_filter_star">%1$d stars</string>
     <string name="favorite_filter">Favorites</string>
     <string name="library_select_songs_first">Select songs first</string>

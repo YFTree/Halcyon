@@ -93,6 +93,9 @@
     <string name="common_all">Tout</string>
     <string name="common_select_artist">Sélectionner un artiste</string>
     <string name="common_add_to_queue">Ajouter à la file</string>
+    <string name="common_rename">Renommer</string>
+    <string name="common_pin_to_top">Épingler en haut</string>
+    <string name="common_unpin">Détacher</string>
     <string name="common_add_desktop_shortcut">Ajouter un raccourci sur l’écran d’accueil</string>
     <string name="common_exit_selection">Quitter la sélection</string>
     <string name="common_multi_select">Sélection multiple</string>
@@ -596,6 +599,8 @@
     <string name="settings_backup_export_failed">Échec de l’export de la sauvegarde</string>
     <string name="settings_backup_restore_success">Sauvegarde restaurée</string>
     <string name="settings_backup_restore_failed">Échec de la restauration de la sauvegarde</string>
+    <string name="settings_backup_restore_wrong_type">Ceci est une sauvegarde de l\'historique d\'écoute. Veuillez la restaurer depuis l\'historique d\'écoute.</string>
+    <string name="settings_backup_restore_wrong_type_settings">Ceci est une sauvegarde des paramètres. Veuillez la restaurer depuis les paramètres.</string>
     <string name="settings_backup_webdav_section">Sauvegarde cloud WebDAV</string>
     <string name="settings_backup_webdav_url_label">URL du serveur WebDAV</string>
     <string name="settings_backup_webdav_url_summary">p. ex. https://dav.example.com/remote.php/dav/files/user/</string>
@@ -718,6 +723,7 @@
     <string name="library_search_artist_summary">%1$d titres · %2$d albums avec participation</string>
     <string name="library_search_lyric_prefix">Paroles : </string>
     <string name="rating_filter_all">Toutes les notes</string>
+    <string name="rating_filter_unrated">Non noté</string>
     <string name="rating_filter_star">%1$d étoiles</string>
     <string name="favorite_filter">Favoris</string>
     <string name="library_select_songs_first">Sélectionnez d’abord des titres</string>

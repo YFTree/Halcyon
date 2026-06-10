@@ -93,6 +93,9 @@
     <string name="common_all">Semua</string>
     <string name="common_select_artist">Pilih artis</string>
     <string name="common_add_to_queue">Tambah ke antrean</string>
+    <string name="common_rename">Ganti nama</string>
+    <string name="common_pin_to_top">Sematkan ke atas</string>
+    <string name="common_unpin">Lepas sematan</string>
     <string name="common_add_desktop_shortcut">Tambah pintasan desktop</string>
     <string name="common_exit_selection">Keluar dari pilihan</string>
     <string name="common_multi_select">Pilih banyak</string>
@@ -720,6 +723,7 @@
     <string name="library_search_artist_summary">%1$d lagu · %2$d album yang diikuti</string>
     <string name="library_search_lyric_prefix">Lirik: </string>
     <string name="rating_filter_all">Semua rating</string>
+    <string name="rating_filter_unrated">Belum dinilai</string>
     <string name="rating_filter_star">%1$d bintang</string>
     <string name="favorite_filter">Favorit</string>
     <string name="library_select_songs_first">Pilih lagu terlebih dahulu</string>

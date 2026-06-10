@@ -141,6 +141,19 @@ class PlaylistStore private constructor(context: Context) {
         }
     }
 
+    suspend fun renamePlaylist(id: String, newName: String) = withContext(Dispatchers.IO) {
+        val trimmed = newName.trim()
+        if (id == FAVORITES_PLAYLIST_ID || trimmed.isBlank()) return@withContext
+        synchronized(lock) {
+            val now = System.currentTimeMillis()
+            val next = playlists.value.map { playlist ->
+                if (playlist.id == id) playlist.copy(name = trimmed, updatedAt = now) else playlist
+            }
+            _playlists.value = next
+            saveLocked(next)
+        }
+    }
+
     suspend fun deletePlaylist(id: String) = withContext(Dispatchers.IO) {
         if (id == FAVORITES_PLAYLIST_ID) return@withContext
         synchronized(lock) {

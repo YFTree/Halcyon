@@ -1173,6 +1173,34 @@ class SettingsManager(private val context: Context) {
         }
     }
 
+    // Generic "pin to top" store, keyed by an arbitrary namespace (e.g. "artist",
+    // "album", "category:genre"). The ordered list keeps the most-recently pinned first.
+    fun pinnedKeysFlow(namespace: String): Flow<List<String>> =
+        context.dataStore.data.map { prefs ->
+            prefs[stringPreferencesKey("pinned_$namespace")]
+                ?.split("\n")
+                ?.map(String::trim)
+                ?.filter(String::isNotBlank)
+                ?: emptyList()
+        }
+
+    suspend fun setPinned(namespace: String, key: String, pinned: Boolean) {
+        val trimmed = key.trim()
+        if (trimmed.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val prefKey = stringPreferencesKey("pinned_$namespace")
+            val current = prefs[prefKey]
+                ?.split("\n")
+                ?.map(String::trim)
+                ?.filter(String::isNotBlank)
+                ?.toMutableList()
+                ?: mutableListOf()
+            current.remove(trimmed)
+            if (pinned) current.add(0, trimmed)
+            prefs[prefKey] = current.joinToString("\n")
+        }
+    }
+
     suspend fun setPlaylistDetailSongSortIndex(index: Int) {
         context.dataStore.edit { it[KEY_SORT_PLAYLIST_DETAIL_SONG] = index.coerceAtLeast(0) }
     }

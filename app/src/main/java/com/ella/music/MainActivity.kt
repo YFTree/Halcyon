@@ -483,6 +483,7 @@ fun EllaApp(
     DisposableEffect(lifecycleOwner, mainViewModel, playerViewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                playerViewModel.ensurePlayerConnected()
                 TagEditorEditTracker.consume()?.let { editedSong ->
                     mainViewModel.refreshSongAfterExternalEdit(editedSong) { updatedSong ->
                         playerViewModel.refreshCurrentSongAfterExternalEdit(updatedSong)

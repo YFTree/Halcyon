@@ -3,7 +3,6 @@ package com.ella.music.ui.player
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,7 +65,6 @@ internal fun PlayerSongMetaText(
     onAlbumClick: (() -> Unit)? = null
 ) {
     val artist = song?.artist.orEmpty()
-    val album = song?.album.orEmpty()
     fun clickableMetaModifier(enabled: Boolean, onClick: (() -> Unit)?): Modifier {
         return if (enabled && onClick != null) {
             Modifier
@@ -95,24 +93,7 @@ internal fun PlayerSongMetaText(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        if (annotation.isBlank() && album.isNotBlank()) {
-            Row(modifier = Modifier.fillMaxWidth()) {
-                PlayerMarqueeText(
-                    text = artist,
-                    fontSize = artistFontSize,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = artistAlpha),
-                    modifier = clickableMetaModifier(artist.isNotBlank(), onArtistClick).weight(1f)
-                )
-                PlayerMarqueeText(
-                    text = " · $album",
-                    fontSize = artistFontSize,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = artistAlpha),
-                    modifier = clickableMetaModifier(album.isNotBlank(), onAlbumClick).weight(1f)
-                )
-            }
-        } else {
+        if (annotation.isBlank()) {
             PlayerMarqueeText(
                 text = artist,
                 fontSize = artistFontSize,

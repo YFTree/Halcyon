@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
+import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -312,20 +314,30 @@ fun FolderScreen(
                         LibrarySortUiState.folderListFirstVisibleItemScrollOffset = offset
                     }
             }
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 160.dp)
-            ) {
-                items(
-                    items = folders,
-                    key = { it.path }
-                ) { folder ->
-                    FolderListRow(
-                        folder = folder,
-                        sortMode = folderSortMode,
-                        onClick = { onFolderClick(folder.path) },
-                        onLongClick = { folderToBlock = folder.path }
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 160.dp)
+                ) {
+                    items(
+                        items = folders,
+                        key = { it.path }
+                    ) { folder ->
+                        FolderListRow(
+                            folder = folder,
+                            sortMode = folderSortMode,
+                            onClick = { onFolderClick(folder.path) },
+                            onLongClick = { folderToBlock = folder.path }
+                        )
+                    }
+                }
+                if (folders.size > 30) {
+                    LazyListScrollIndicator(
+                        state = listState,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
                     )
                 }
             }

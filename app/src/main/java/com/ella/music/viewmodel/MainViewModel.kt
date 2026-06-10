@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -158,6 +159,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val currentSongs = songs.value
         if (currentSongs.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
+            // Defer the per-file tag warm-up so the cold-start library open and its
+            // cover decoding aren't starved by this disk I/O. Search still works before
+            // this completes: the snapshot is built lazily per song on demand.
+            delay(2000)
             repository.preloadLibrarySearchSnapshot(currentSongs)
         }
     }
@@ -323,6 +328,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun createPlaylist(name: String, onCreated: (UserPlaylist?) -> Unit = {}) {
         playlistCoordinator.createPlaylist(name, onCreated)
+    }
+
+    fun renamePlaylist(id: String, newName: String) {
+        playlistCoordinator.renamePlaylist(id, newName)
     }
 
     fun deletePlaylist(id: String) {

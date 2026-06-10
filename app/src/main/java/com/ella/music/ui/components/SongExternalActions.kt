@@ -71,6 +71,30 @@ fun shareLocalSong(context: Context, song: Song) {
     }
 }
 
+fun shareLocalSongs(context: Context, songs: List<Song>) {
+    val local = songs.filterNot { it.path.isHttpAudioSource() }
+    if (local.size <= 1) {
+        songs.firstOrNull()?.let { shareLocalSong(context, it) }
+        return
+    }
+    val uris = ArrayList<Uri>()
+    local.forEach { song -> runCatching { uris.add(song.localShareUri(context)) } }
+    if (uris.isEmpty()) {
+        songs.firstOrNull()?.let { shareLocalSong(context, it) }
+        return
+    }
+    val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+        type = "audio/*"
+        putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_song)))
+    }.onFailure {
+        Toast.makeText(context, context.getString(R.string.share_no_available_app), Toast.LENGTH_SHORT).show()
+    }
+}
+
 private fun Song.localShareUri(context: Context): Uri {
     mediaStoreUriByPath(context)?.let { return it }
     return runCatching {

@@ -6,11 +6,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -27,6 +31,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -38,8 +43,16 @@ import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.PlaylistExportFormat
 import com.ella.music.data.PlaylistImportMode
 import com.ella.music.ui.LibrarySortUiState
+import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.ConfirmDangerDialog
+import com.ella.music.ui.components.CreatePlaylistAndAddSheet
+import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.components.EllaMiuixMenuItem
+import com.ella.music.ui.components.LazyListScrollIndicator
+import com.ella.music.ui.components.requestPinnedEllaShortcut
+import com.ella.music.ui.components.shareLocalSongs
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.navigation.Screen
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
@@ -48,6 +61,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 @Composable
 fun PlaylistScreen(
     mainViewModel: MainViewModel,
+    playerViewModel: com.ella.music.viewmodel.PlayerViewModel,
     onBack: () -> Unit,
     onPlaylistClick: (String) -> Unit
 ) {
@@ -75,6 +89,13 @@ fun PlaylistScreen(
     var selectedPlaylistIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showExportAllFormatSheet by remember { mutableStateOf(false) }
     var pendingExportAllFormat by remember { mutableStateOf<PlaylistExportFormat?>(null) }
+    var playlistMenuTarget by remember { mutableStateOf<UserPlaylist?>(null) }
+    var playlistToRename by remember { mutableStateOf<UserPlaylist?>(null) }
+    var playlistPickerSongs by remember { mutableStateOf<List<com.ella.music.data.model.Song>?>(null) }
+    var createPlaylistSongs by remember { mutableStateOf<List<com.ella.music.data.model.Song>?>(null) }
+    var playlistToExport by remember { mutableStateOf<UserPlaylist?>(null) }
+    var showExportFormatSheet by remember { mutableStateOf(false) }
+    var pendingExportFormat by remember { mutableStateOf<PlaylistExportFormat?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val favorites = playlists.firstOrNull { it.id == FAVORITES_PLAYLIST_ID }
@@ -138,6 +159,40 @@ fun PlaylistScreen(
             )
         }
         mainViewModel.exportLocalPlaylists(storedCustomPlaylists, uri, format) { result ->
+            result
+                .onSuccess { exportResult ->
+                    Toast.makeText(
+                        context,
+                        context.getString(
+                            R.string.playlist_export_all_done,
+                            exportResult.exportedPlaylists,
+                            exportResult.exportedSongs
+                        ),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                .onFailure {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.playlist_export_failed, it.message.orEmpty()),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+        }
+    }
+    val exportPlaylistFolderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val format = pendingExportFormat
+        val playlist = playlistToExport
+        pendingExportFormat = null
+        playlistToExport = null
+        if (uri == null || format == null || playlist == null) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        }
+        mainViewModel.exportLocalPlaylists(listOf(playlist), uri, format) { result ->
             result
                 .onSuccess { exportResult ->
                     Toast.makeText(
@@ -297,6 +352,7 @@ fun PlaylistScreen(
             }
         )
 
+        Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -376,7 +432,7 @@ fun PlaylistScreen(
                                     selectedPlaylistIds = selectedPlaylistIds + playlist.id
                                 }
                             },
-                            onDelete = if (selectionMode) null else { { playlistPendingDelete = playlist } },
+                            onMore = if (selectionMode) null else { { playlistMenuTarget = playlist } },
                             trailingContent = if (reorderEnabled) {
                                 {
                                     PlaylistDragHandle(
@@ -392,6 +448,15 @@ fun PlaylistScreen(
             }
 
             item { Spacer(modifier = Modifier.height(150.dp)) }
+        }
+            if (displayedCustomPlaylists.size > 30) {
+                LazyListScrollIndicator(
+                    state = listState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                )
+            }
         }
     }
 
@@ -448,6 +513,170 @@ fun PlaylistScreen(
                 showExportAllFormatSheet = false
                 pendingExportAllFormat = format
                 exportAllFolderLauncher.launch(null)
+            }
+        )
+    }
+
+    playlistMenuTarget?.let { playlist ->
+        EllaMiuixBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = playlist.name,
+            onDismissRequest = { playlistMenuTarget = null }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_pin_to_top),
+                    onClick = {
+                        val orderedIds = (listOf(playlist.id) + storedCustomPlaylists.map { it.id }).distinct()
+                        scope.launch { mainViewModel.settingsManager.setPlaylistCustomOrder(orderedIds) }
+                        mainViewModel.reorderPlaylists(orderedIds)
+                        playlistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.playlist_export_title),
+                    onClick = {
+                        playlistToExport = playlist
+                        showExportFormatSheet = true
+                        playlistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_share),
+                    onClick = {
+                        shareLocalSongs(context, mainViewModel.playlistSongs(playlist))
+                        playlistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.song_more_add_to_playlist),
+                    onClick = {
+                        playlistPickerSongs = mainViewModel.playlistSongs(playlist)
+                        playlistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_add_to_queue),
+                    onClick = {
+                        playerViewModel.addToPlaylist(mainViewModel.playlistSongs(playlist))
+                        Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                        playlistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.song_more_play_next),
+                    onClick = {
+                        playerViewModel.playNext(mainViewModel.playlistSongs(playlist))
+                        Toast.makeText(context, context.getString(R.string.song_more_added_to_play_next), Toast.LENGTH_SHORT).show()
+                        playlistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_rename),
+                    onClick = {
+                        playlistToRename = playlist
+                        playlistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_add_desktop_shortcut),
+                    onClick = {
+                        val ok = requestPinnedEllaShortcut(
+                            context = context,
+                            id = "playlist_${playlist.id}",
+                            label = playlist.name,
+                            route = Screen.PlaylistDetail.createRoute(playlist.id)
+                        )
+                        Toast.makeText(
+                            context,
+                            if (ok) context.getString(R.string.playlist_shortcut_requested, playlist.name) else context.getString(R.string.playlist_shortcut_unsupported),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        playlistMenuTarget = null
+                    }
+                )
+                EllaMiuixMenuItem(
+                    text = stringResource(R.string.common_delete),
+                    danger = true,
+                    onClick = {
+                        playlistPendingDelete = playlist
+                        playlistMenuTarget = null
+                    }
+                )
+            }
+        }
+    }
+
+    playlistToRename?.let { playlist ->
+        CreatePlaylistDialog(
+            onDismiss = { playlistToRename = null },
+            onCreate = { newName ->
+                mainViewModel.renamePlaylist(playlist.id, newName)
+                playlistToRename = null
+            },
+            initialName = playlist.name,
+            title = stringResource(R.string.common_rename),
+            confirmText = stringResource(R.string.common_confirm)
+        )
+    }
+
+    playlistPickerSongs?.let { songsToAdd ->
+        EllaMiuixBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = stringResource(R.string.song_more_add_to_playlist),
+            onDismissRequest = { playlistPickerSongs = null }
+        ) {
+            AddToPlaylistSheet(
+                playlists = playlists.sortedWith(
+                    compareByDescending<UserPlaylist> { it.id == FAVORITES_PLAYLIST_ID }
+                        .thenByDescending { it.createdAt }
+                ),
+                songCount = songsToAdd.size,
+                onDismiss = { playlistPickerSongs = null },
+                onCreatePlaylist = {
+                    createPlaylistSongs = songsToAdd
+                    playlistPickerSongs = null
+                },
+                onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
+                    selectedPlaylists.forEach { target ->
+                        mainViewModel.addSongsToPlaylist(target.id, songsToAdd, appendToEnd)
+                    }
+                    Toast.makeText(context, context.getString(R.string.player_added_to_playlists, selectedPlaylists.size), Toast.LENGTH_SHORT).show()
+                    playlistPickerSongs = null
+                }
+            )
+        }
+    }
+
+    createPlaylistSongs?.let { songsToAdd ->
+        CreatePlaylistAndAddSheet(
+            onDismiss = { createPlaylistSongs = null },
+            onCreate = { playlistName ->
+                mainViewModel.createPlaylist(playlistName) { created ->
+                    if (created != null) mainViewModel.addSongsToPlaylist(created.id, songsToAdd)
+                }
+                createPlaylistSongs = null
+            }
+        )
+    }
+
+    if (showExportFormatSheet) {
+        ExportPlaylistFormatSheet(
+            onDismiss = {
+                showExportFormatSheet = false
+                playlistToExport = null
+            },
+            onFormatSelected = { format ->
+                showExportFormatSheet = false
+                pendingExportFormat = format
+                exportPlaylistFolderLauncher.launch(null)
             }
         )
     }

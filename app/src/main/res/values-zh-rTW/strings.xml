@@ -93,6 +93,9 @@
     <string name="common_all">全部</string>
     <string name="common_select_artist">選擇藝人</string>
     <string name="common_add_to_queue">加入播放佇列</string>
+    <string name="common_rename">重新命名</string>
+    <string name="common_pin_to_top">置頂</string>
+    <string name="common_unpin">取消置頂</string>
     <string name="common_add_desktop_shortcut">加入桌面捷徑</string>
     <string name="common_exit_selection">結束多選</string>
     <string name="common_multi_select">多選</string>
@@ -596,6 +599,8 @@
     <string name="settings_backup_export_failed">備份匯出失敗</string>
     <string name="settings_backup_restore_success">備份已還原</string>
     <string name="settings_backup_restore_failed">備份還原失敗</string>
+    <string name="settings_backup_restore_wrong_type">這是聽歌歷史備份，請從聽歌歷史還原</string>
+    <string name="settings_backup_restore_wrong_type_settings">這是設定備份，請從設定還原</string>
     <string name="settings_backup_webdav_section">WebDAV 雲端備份</string>
     <string name="settings_backup_webdav_url_label">WebDAV 伺服器位址</string>
     <string name="settings_backup_webdav_url_summary">例如 https://dav.example.com/remote.php/dav/files/user/</string>
@@ -718,6 +723,7 @@
     <string name="library_search_artist_summary">%1$d 首歌 · %2$d 張參與專輯</string>
     <string name="library_search_lyric_prefix">歌詞：</string>
     <string name="rating_filter_all">全部星級</string>
+    <string name="rating_filter_unrated">未評分</string>
     <string name="rating_filter_star">%1$d 星</string>
     <string name="favorite_filter">喜歡的歌曲</string>
     <string name="library_select_songs_first">請先選擇歌曲</string>

@@ -27,6 +27,7 @@ internal fun StarRatingFilterRow(
     onRatingsChange: (Set<Int>) -> Unit
 ) {
     val allSelected = selectedRatings.isEmpty()
+    val unratedOnly = selectedRatings == setOf(0)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -35,9 +36,13 @@ internal fun StarRatingFilterRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         StarRatingPill(
+            // Tri-state: lit = all songs; tap → dim = unrated only; tap again → all.
             text = stringResource(R.string.rating_filter_all),
             selected = allSelected,
-            onClick = { onRatingsChange(emptySet()) }
+            dim = unratedOnly,
+            onClick = {
+                onRatingsChange(if (selectedRatings.isEmpty()) setOf(0) else emptySet())
+            }
         )
         (1..5).forEach { rating ->
             StarRatingPill(
@@ -70,6 +75,7 @@ internal fun Set<Int>.normalizedRatingFilter(): Set<Int> {
 
 internal fun Set<Int>.summaryLabel(context: Context): String? {
     if (isEmpty()) return null
+    if (this == setOf(0)) return context.getString(R.string.rating_filter_unrated)
     return this
         .filter { it in 1..5 }
         .sorted()
@@ -83,16 +89,27 @@ internal fun Set<Int>.summaryLabel(context: Context): String? {
 private fun StarRatingPill(
     text: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    dim: Boolean = false
 ) {
+    val background = when {
+        selected -> MiuixTheme.colorScheme.primary
+        dim -> MiuixTheme.colorScheme.onSurface.copy(alpha = 0.16f)
+        else -> MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f)
+    }
+    val textColor = when {
+        selected -> MiuixTheme.colorScheme.onPrimary
+        dim -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+        else -> MiuixTheme.colorScheme.onSurface
+    }
     Text(
         text = text,
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
-        color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurface,
+        color = textColor,
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.82f))
+            .background(background)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp)
     )

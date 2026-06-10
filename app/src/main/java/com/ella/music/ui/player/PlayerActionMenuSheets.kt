@@ -105,31 +105,29 @@ private fun PlayerActionMenuSubtitle(
     val unknownArtist = stringResource(R.string.player_unknown_artist)
     val artist = song.artist.ifBlank { unknownArtist }
     val album = song.album.trim()
-    Row(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = artist,
             fontSize = 13.sp,
             lineHeight = 17.sp,
             fontWeight = FontWeight.Medium,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .weight(1f, fill = false)
                 .clip(RoundedCornerShape(6.dp))
                 .clickable(enabled = song.artist.isNotBlank(), onClick = onArtist)
         )
         if (album.isNotBlank()) {
             Text(
-                text = " · $album",
+                text = album,
                 fontSize = 13.sp,
                 lineHeight = 17.sp,
                 fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
-                    .weight(1f)
                     .clip(RoundedCornerShape(6.dp))
                     .clickable(onClick = onAlbum)
             )
