@@ -9,8 +9,10 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import com.ella.music.player.AudioEffectSettings
 import androidx.annotation.StringRes
 import com.ella.music.R
 import org.json.JSONObject
@@ -96,6 +98,13 @@ class SettingsManager(private val context: Context) {
         val KEY_PLAYER_IMMERSIVE_COVER = booleanPreferencesKey("player_immersive_cover")
         val KEY_PLAYER_DYNAMIC_FLOW_ENABLED = booleanPreferencesKey("player_dynamic_flow_enabled")
         val KEY_AUDIO_VISUALIZER_ENABLED = booleanPreferencesKey("audio_visualizer_enabled")
+        val KEY_EQ_ENABLED = booleanPreferencesKey("audio_eq_enabled")
+        val KEY_EQ_PRESET = intPreferencesKey("audio_eq_preset")
+        val KEY_EQ_BANDS = stringPreferencesKey("audio_eq_bands")
+        val KEY_BASS_BOOST_ENABLED = booleanPreferencesKey("audio_bass_boost_enabled")
+        val KEY_BASS_BOOST_STRENGTH = intPreferencesKey("audio_bass_boost_strength")
+        val KEY_VIRTUALIZER_ENABLED = booleanPreferencesKey("audio_virtualizer_enabled")
+        val KEY_VIRTUALIZER_STRENGTH = intPreferencesKey("audio_virtualizer_strength")
         val KEY_DYNAMIC_COVER_ENABLED = booleanPreferencesKey("dynamic_cover_enabled")
         val KEY_STARTUP_POSTER_ENABLED = booleanPreferencesKey("startup_poster_enabled")
         val KEY_STARTUP_POSTER_URI = stringPreferencesKey("startup_poster_uri")
@@ -416,6 +425,40 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_PLAYER_DYNAMIC_FLOW_ENABLED] ?: false }
     val audioVisualizerEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_AUDIO_VISUALIZER_ENABLED] ?: false }
+
+    val eqEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_EQ_ENABLED] ?: false }
+    val eqPreset: Flow<Int> =
+        context.dataStore.data.map { it[KEY_EQ_PRESET] ?: AudioEffectSettings.PRESET_CUSTOM }
+    val eqBandLevelsMb: Flow<List<Int>> =
+        context.dataStore.data.map { parseEqBands(it[KEY_EQ_BANDS]) }
+    val bassBoostEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_BASS_BOOST_ENABLED] ?: false }
+    val bassBoostStrength: Flow<Int> =
+        context.dataStore.data.map { it[KEY_BASS_BOOST_STRENGTH] ?: 0 }
+    val virtualizerEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_VIRTUALIZER_ENABLED] ?: false }
+    val virtualizerStrength: Flow<Int> =
+        context.dataStore.data.map { it[KEY_VIRTUALIZER_STRENGTH] ?: 0 }
+
+    /** Combined audio-effect snapshot consumed by PlaybackService's AudioEffectController. */
+    val audioEffectSettings: Flow<AudioEffectSettings> = combine(
+        eqEnabled,
+        eqPreset,
+        eqBandLevelsMb,
+        combine(bassBoostEnabled, bassBoostStrength) { enabled, strength -> enabled to strength },
+        combine(virtualizerEnabled, virtualizerStrength) { enabled, strength -> enabled to strength }
+    ) { enabled, preset, bands, bass, virt ->
+        AudioEffectSettings(
+            eqEnabled = enabled,
+            eqPreset = preset,
+            eqBandLevelsMb = bands,
+            bassBoostEnabled = bass.first,
+            bassBoostStrength = bass.second,
+            virtualizerEnabled = virt.first,
+            virtualizerStrength = virt.second
+        )
+    }
     val dynamicCoverEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_DYNAMIC_COVER_ENABLED] ?: false }
     val mcpServerEnabled: Flow<Boolean> =
@@ -830,6 +873,50 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setAudioVisualizerEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_AUDIO_VISUALIZER_ENABLED] = enabled }
+    }
+
+    suspend fun setEqEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_EQ_ENABLED] = enabled }
+    }
+
+    suspend fun setEqPreset(preset: Int) {
+        context.dataStore.edit { it[KEY_EQ_PRESET] = preset }
+    }
+
+    /** Persist preset selection and the concrete band levels it resolves to in one write. */
+    suspend fun setEqPresetWithBands(preset: Int, bandLevelsMb: List<Int>) {
+        context.dataStore.edit {
+            it[KEY_EQ_PRESET] = preset
+            it[KEY_EQ_BANDS] = bandLevelsMb.joinToString(",")
+        }
+    }
+
+    suspend fun setEqBandLevelsMb(bandLevelsMb: List<Int>) {
+        context.dataStore.edit {
+            it[KEY_EQ_BANDS] = bandLevelsMb.joinToString(",")
+            it[KEY_EQ_PRESET] = AudioEffectSettings.PRESET_CUSTOM
+        }
+    }
+
+    suspend fun setBassBoostEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_BASS_BOOST_ENABLED] = enabled }
+    }
+
+    suspend fun setBassBoostStrength(strength: Int) {
+        context.dataStore.edit { it[KEY_BASS_BOOST_STRENGTH] = strength.coerceIn(0, AudioEffectSettings.STRENGTH_MAX) }
+    }
+
+    suspend fun setVirtualizerEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_VIRTUALIZER_ENABLED] = enabled }
+    }
+
+    suspend fun setVirtualizerStrength(strength: Int) {
+        context.dataStore.edit { it[KEY_VIRTUALIZER_STRENGTH] = strength.coerceIn(0, AudioEffectSettings.STRENGTH_MAX) }
+    }
+
+    private fun parseEqBands(raw: String?): List<Int> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return raw.split(',').mapNotNull { it.trim().toIntOrNull() }
     }
 
     suspend fun setDynamicCoverEnabled(enabled: Boolean) {

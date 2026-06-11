@@ -80,6 +80,7 @@ class PlaybackService : MediaLibraryService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var bluetoothReceiver: BluetoothAutoPlayReceiver? = null
     private var openedAudioEffectSessionId = -1
+    private val audioEffectController = AudioEffectController()
     @Volatile
     private var previousButtonAction = SettingsManager.PREVIOUS_BUTTON_PREVIOUS
     @Volatile
@@ -157,6 +158,17 @@ class PlaybackService : MediaLibraryService() {
             .build()
         player.repeatMode = Player.REPEAT_MODE_ALL
         PlaybackAudioSession.update(player.audioSessionId)
+        audioEffectController.bind(player.audioSessionId)
+        serviceScope.launch {
+            PlaybackAudioSession.audioSessionId.collect { sessionId ->
+                if (sessionId > 0) audioEffectController.bind(sessionId)
+            }
+        }
+        serviceScope.launch {
+            settingsManager.audioEffectSettings.collect { settings ->
+                audioEffectController.apply(settings)
+            }
+        }
         player.addListener(object : Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
                 PlaybackAudioSession.update(audioSessionId)
@@ -165,6 +177,9 @@ class PlaybackService : MediaLibraryService() {
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) {
+                    // Retry attaching effects now that the audio track is live: some ROMs
+                    // (e.g. ColorOS/OxygenOS) reject Equalizer creation before playback starts.
+                    audioEffectController.bind(player.audioSessionId)
                     openAudioEffectSession(player.audioSessionId)
                 } else {
                     closeAudioEffectSession()
@@ -183,7 +198,11 @@ class PlaybackService : MediaLibraryService() {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_BUFFERING -> Log.d(TIMING_TAG, "player state BUFFERING mediaId=${player.currentMediaItem?.mediaId}")
-                    Player.STATE_READY -> Log.d(TIMING_TAG, "player state READY mediaId=${player.currentMediaItem?.mediaId}")
+                    Player.STATE_READY -> {
+                        Log.d(TIMING_TAG, "player state READY mediaId=${player.currentMediaItem?.mediaId}")
+                        // Audio track exists once READY; retry effect attach for ROMs that reject it earlier.
+                        audioEffectController.bind(player.audioSessionId)
+                    }
                     Player.STATE_ENDED -> Log.d(TIMING_TAG, "player state ENDED mediaId=${player.currentMediaItem?.mediaId}")
                 }
             }
@@ -249,6 +268,8 @@ class PlaybackService : MediaLibraryService() {
             runCatching { unregisterReceiver(it) }
             bluetoothReceiver = null
         }
+        audioEffectController.release()
+        AudioEffectState.publish(null)
         mediaSession?.run {
             closeAudioEffectSession()
             player.release()

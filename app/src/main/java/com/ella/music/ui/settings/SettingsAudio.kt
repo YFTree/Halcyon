@@ -34,13 +34,15 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun AudioSettingsScreen(
     onBack: () -> Unit,
-    playerViewModel: PlayerViewModel? = null
+    playerViewModel: PlayerViewModel? = null,
+    onNavigateToEqualizer: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -171,6 +173,16 @@ fun AudioSettingsScreen(
                 .padding(horizontal = 12.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+            SmallTitle(text = stringResource(R.string.equalizer_section_effects))
+
+            SettingsCardGroup {
+                ArrowPreference(
+                    title = stringResource(R.string.equalizer_screen_title),
+                    summary = stringResource(R.string.settings_audio_equalizer_summary),
+                    onClick = onNavigateToEqualizer
+                )
+            }
+
             SmallTitle(text = stringResource(R.string.settings_playback_section))
 
             SettingsCardGroup {

@@ -36,6 +36,7 @@ import com.ella.music.ui.playlist.PlaylistDetailScreen
 import com.ella.music.ui.playlist.PlaylistScreen
 import com.ella.music.ui.search.LibrarySearchScreen
 import com.ella.music.ui.settings.AudioSettingsScreen
+import com.ella.music.ui.settings.EqualizerScreen
 import com.ella.music.ui.settings.BackupSettingsScreen
 import com.ella.music.ui.settings.LyricFontScreen
 import com.ella.music.ui.settings.LogScreen
@@ -94,6 +95,7 @@ sealed class Screen(val route: String) {
     data object IntegrationSettings : Screen("integration_settings")
     data object LyricSettings : Screen("lyric_settings")
     data object AudioSettings : Screen("audio_settings")
+    data object Equalizer : Screen("equalizer")
     data object BackupSettings : Screen("backup_settings")
     data object LyricFont : Screen("lyric_font")
     data object Logs : Screen("logs")
@@ -429,8 +431,13 @@ fun AppNavigation(
         composable(Screen.AudioSettings.route) {
             AudioSettingsScreen(
                 onBack = { navController.popBackStack() },
-                playerViewModel = playerViewModel
+                playerViewModel = playerViewModel,
+                onNavigateToEqualizer = { navController.navigate(Screen.Equalizer.route) }
             )
+        }
+
+        composable(Screen.Equalizer.route) {
+            EqualizerScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Screen.BackupSettings.route) {
