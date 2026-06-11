@@ -257,6 +257,11 @@
     <string name="settings_bottom_dock_item_none">不显示</string>
     <string name="settings_theme_mode">主题模式</string>
     <string name="settings_theme_mode_summary">选择应用明暗外观</string>
+    <string name="settings_monet_color">动态取色</string>
+    <string name="settings_monet_color_summary">用 Monet 取色生成全局强调色</string>
+    <string name="settings_monet_off">关闭</string>
+    <string name="settings_monet_wallpaper">系统壁纸</string>
+    <string name="settings_monet_cover">歌曲封面</string>
     <string name="settings_category_grid_columns">分类网格列数</string>
     <string name="settings_category_grid_columns_summary">专辑、流派、年份等页面显示为 %1$d 列</string>
     <string name="settings_category_grid_columns_option">%1$d 列</string>

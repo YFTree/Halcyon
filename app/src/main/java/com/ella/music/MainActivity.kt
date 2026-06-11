@@ -57,6 +57,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -99,6 +100,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.AddToPlaylistSheet
@@ -121,7 +123,10 @@ import com.ella.music.ui.navigation.EXTRA_SHORTCUT_ACTION_NEW
 import com.ella.music.ui.navigation.SHORTCUT_ACTION_PLAY
 import com.ella.music.ui.navigation.SHORTCUT_ACTION_SHUFFLE_ALL
 import com.ella.music.ui.player.PlayerScreen
+import com.ella.music.ui.player.PlayerPalette
+import com.ella.music.ui.player.loadPaletteCoverBitmap
 import com.ella.music.ui.theme.EllaTheme
+import com.ella.music.ui.theme.MONET_COVER
 import com.ella.music.ui.theme.THEME_DARK
 import com.ella.music.ui.theme.THEME_FOLLOW_SYSTEM
 import com.ella.music.viewmodel.MainViewModel
@@ -187,6 +192,19 @@ class MainActivity : ComponentActivity() {
             )
             val appFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
             val appFontWeight by settingsManager.lyricFontWeight.collectAsState(initial = 800)
+            val monetMode by settingsManager.monetColorMode.collectAsState(initial = 0)
+            val monetSong by playerVm.currentSong.collectAsState()
+            // Seed color for cover-based Monet: extract a representative color from the current cover.
+            val coverSeed by produceState<ComposeColor?>(null, monetMode, monetSong?.id) {
+                val song = monetSong
+                value = if (monetMode == MONET_COVER && song != null) {
+                    withContext(Dispatchers.IO) {
+                        PlayerPalette.seedColor(loadPaletteCoverBitmap(this@MainActivity, song))
+                    }
+                } else {
+                    null
+                }
+            }
 
             val isDark = when (themeMode) {
                 THEME_DARK -> true
@@ -255,7 +273,9 @@ class MainActivity : ComponentActivity() {
             EllaTheme(
                 themeMode = themeMode,
                 appFontPath = appFontPath,
-                appFontWeight = appFontWeight
+                appFontWeight = appFontWeight,
+                monetMode = monetMode,
+                keyColor = coverSeed
             ) {
                 EllaApp(mainVm, playerVm, isDark)
             }

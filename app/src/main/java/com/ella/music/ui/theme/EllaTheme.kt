@@ -4,6 +4,7 @@ import android.graphics.Typeface
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -19,11 +20,18 @@ const val THEME_FOLLOW_SYSTEM = 0
 const val THEME_LIGHT = 1
 const val THEME_DARK = 2
 
+// Monet dynamic-color source.
+const val MONET_OFF = 0
+const val MONET_SYSTEM = 1   // system wallpaper colors (Android 12+)
+const val MONET_COVER = 2    // seed from the current song cover
+
 @Composable
 fun EllaTheme(
     themeMode: Int = THEME_FOLLOW_SYSTEM,
     appFontPath: String = "",
     appFontWeight: Int = 800,
+    monetMode: Int = MONET_OFF,
+    keyColor: Color? = null,
     content: @Composable () -> Unit
 ) {
     val colorSchemeMode = when (themeMode) {
@@ -31,9 +39,26 @@ fun EllaTheme(
         THEME_DARK -> ColorSchemeMode.Dark
         else -> ColorSchemeMode.System
     }
+    // Monet variant of the current light/dark choice.
+    val monetSchemeMode = when (themeMode) {
+        THEME_LIGHT -> ColorSchemeMode.MonetLight
+        THEME_DARK -> ColorSchemeMode.MonetDark
+        else -> ColorSchemeMode.MonetSystem
+    }
 
-    val controller = remember(colorSchemeMode) {
-        ThemeController(colorSchemeMode = colorSchemeMode)
+    val controller = remember(colorSchemeMode, monetSchemeMode, monetMode, keyColor) {
+        when (monetMode) {
+            // System wallpaper colors: keyColor = null -> platformDynamicColors.
+            MONET_SYSTEM -> ThemeController(colorSchemeMode = monetSchemeMode, keyColor = null)
+            // Cover-seeded scheme; until a cover seed is available, fall back to the default scheme
+            // so we don't briefly flash system/wallpaper colors.
+            MONET_COVER -> if (keyColor != null) {
+                ThemeController(colorSchemeMode = monetSchemeMode, keyColor = keyColor)
+            } else {
+                ThemeController(colorSchemeMode = colorSchemeMode)
+            }
+            else -> ThemeController(colorSchemeMode = colorSchemeMode)
+        }
     }
     val appFontFamily = remember {
         FontFamily(

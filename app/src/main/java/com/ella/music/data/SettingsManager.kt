@@ -50,6 +50,7 @@ class SettingsManager(private val context: Context) {
         val KEY_AUTO_SCAN_LOCAL_PLAYLISTS = booleanPreferencesKey("auto_scan_local_playlists")
         val KEY_GAPLESS = booleanPreferencesKey("gapless_playback")
         val KEY_THEME_MODE = intPreferencesKey("theme_mode")
+        val KEY_MONET_COLOR_MODE = intPreferencesKey("monet_color_mode")
         val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
         val KEY_BOTTOM_BAR_GLASS_EFFECT = stringPreferencesKey("bottom_bar_glass_effect")
         val KEY_BOTTOM_DOCK_ITEMS = stringPreferencesKey("bottom_dock_items")
@@ -330,6 +331,7 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_AUTO_SCAN_LOCAL_PLAYLISTS] ?: false }
     val gaplessPlayback: Flow<Boolean> = context.dataStore.data.map { it[KEY_GAPLESS] ?: true }
     val themeMode: Flow<Int> = context.dataStore.data.map { it[KEY_THEME_MODE] ?: 0 }
+    val monetColorMode: Flow<Int> = context.dataStore.data.map { it[KEY_MONET_COLOR_MODE] ?: 0 }
     val appLanguage: Flow<String> =
         context.dataStore.data.map { it[KEY_APP_LANGUAGE] ?: APP_LANGUAGE_SYSTEM }
     val bottomBarGlassEffect: Flow<BottomBarGlassEffect> = context.dataStore.data.map { preferences ->
@@ -638,6 +640,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setThemeMode(mode: Int) {
         context.dataStore.edit { it[KEY_THEME_MODE] = mode }
+    }
+
+    suspend fun setMonetColorMode(mode: Int) {
+        context.dataStore.edit { it[KEY_MONET_COLOR_MODE] = mode }
     }
 
     suspend fun setAppLanguage(languageTag: String) {

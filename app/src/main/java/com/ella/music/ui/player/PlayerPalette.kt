@@ -55,6 +55,9 @@ internal data class PlayerPalette(
             return fromCoverBackground(bitmap)
         }
 
+        /** A single representative, vibrancy-boosted color from the cover, for use as a Monet seed. */
+        fun seedColor(bitmap: Bitmap?): Color? = representativeAccent(bitmap)?.toPlayerAccent()
+
         fun fromCoverBackground(bitmap: Bitmap?): PlayerPalette {
             val representative = representativeAccent(bitmap) ?: return Default
             val accent = representative.toPlayerAccent()

@@ -57,6 +57,15 @@ internal fun SettingsAppearanceSection() {
     val selectedThemeMode = themeMode.coerceIn(themeLabels.indices)
     val themeEntries = remember(themeLabels) { themeLabels.map { DropdownItem(title = it) } }
 
+    val monetMode by settingsManager.monetColorMode.collectAsState(initial = 0)
+    val monetLabels = listOf(
+        stringResource(R.string.settings_monet_off),
+        stringResource(R.string.settings_monet_wallpaper),
+        stringResource(R.string.settings_monet_cover)
+    )
+    val selectedMonetMode = monetMode.coerceIn(monetLabels.indices)
+    val monetEntries = remember(monetLabels) { monetLabels.map { DropdownItem(title = it) } }
+
     val languageOptions = listOf(
         SettingsManager.APP_LANGUAGE_SYSTEM to stringResource(R.string.settings_language_system),
         SettingsManager.APP_LANGUAGE_ZH_CN to stringResource(R.string.settings_language_simplified_chinese),
@@ -193,6 +202,15 @@ internal fun SettingsAppearanceSection() {
                 selectedIndex = selectedThemeMode,
                 onSelectedIndexChange = { index ->
                     scope.launch { settingsManager.setThemeMode(index) }
+                }
+            )
+            WindowSpinnerPreference(
+                title = stringResource(R.string.settings_monet_color),
+                summary = stringResource(R.string.settings_monet_color_summary),
+                items = monetEntries,
+                selectedIndex = selectedMonetMode,
+                onSelectedIndexChange = { index ->
+                    scope.launch { settingsManager.setMonetColorMode(index) }
                 }
             )
             WindowSpinnerPreference(
