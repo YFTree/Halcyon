@@ -1,11 +1,8 @@
 package com.ella.music.ui.settings
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,18 +20,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -49,6 +41,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Slider
+import top.yukonga.miuix.kmp.basic.VerticalSlider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
@@ -170,13 +163,12 @@ fun EqualizerScreen(onBack: () -> Unit) {
                         EqBandColumn(
                             freqLabel = formatFreq(freqHz),
                             gainLabel = formatGainDb(levelMb),
-                            fraction = levelFraction(levelMb, caps.minLevelMb, caps.maxLevelMb),
-                            accent = accent,
-                            trackColor = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.25f),
-                            onFractionChange = { fraction ->
-                                val newLevel = fractionToLevel(fraction, caps.minLevelMb, caps.maxLevelMb)
+                            levelMb = levelMb,
+                            minMb = caps.minLevelMb,
+                            maxMb = caps.maxLevelMb,
+                            onLevelChange = { newLevel ->
                                 val updated = MutableList(caps.bandCount) { idx -> bandLevels.getOrElse(idx) { 0 } }
-                                updated[band] = newLevel
+                                updated[band] = newLevel.coerceIn(caps.minLevelMb, caps.maxLevelMb)
                                 scope.launch { settingsManager.setEqBandLevelsMb(updated) }
                             },
                             modifier = Modifier.weight(1f)
@@ -251,10 +243,10 @@ fun EqualizerScreen(onBack: () -> Unit) {
 private fun EqBandColumn(
     freqLabel: String,
     gainLabel: String,
-    fraction: Float,
-    accent: Color,
-    trackColor: Color,
-    onFractionChange: (Float) -> Unit,
+    levelMb: Int,
+    minMb: Int,
+    maxMb: Int,
+    onLevelChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -268,14 +260,12 @@ private fun EqBandColumn(
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
-        EqVerticalSlider(
-            fraction = fraction,
-            onFractionChange = onFractionChange,
-            accent = accent,
-            trackColor = trackColor,
-            modifier = Modifier
-                .width(32.dp)
-                .height(180.dp)
+        VerticalSlider(
+            value = levelMb.toFloat().coerceIn(minMb.toFloat(), maxMb.toFloat()),
+            onValueChange = { onLevelChange(it.roundToInt()) },
+            valueRange = minMb.toFloat()..maxMb.toFloat(),
+            width = 18.dp,
+            modifier = Modifier.height(180.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -284,58 +274,6 @@ private fun EqBandColumn(
             color = MiuixTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
-    }
-}
-
-@Composable
-private fun EqVerticalSlider(
-    fraction: Float,
-    onFractionChange: (Float) -> Unit,
-    accent: Color,
-    trackColor: Color,
-    modifier: Modifier = Modifier
-) {
-    var heightPx by remember { mutableFloatStateOf(0f) }
-    fun fractionAt(y: Float): Float {
-        if (heightPx <= 0f) return fraction
-        return (1f - (y / heightPx)).coerceIn(0f, 1f)
-    }
-    Box(
-        modifier = modifier
-            .onSizeChanged { heightPx = it.height.toFloat() }
-            .pointerInput(Unit) {
-                detectTapGestures { offset -> onFractionChange(fractionAt(offset.y)) }
-            }
-            .pointerInput(Unit) {
-                detectVerticalDragGestures { change, _ ->
-                    onFractionChange(fractionAt(change.position.y))
-                    change.consume()
-                }
-            }
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val cx = size.width / 2f
-            val trackWidth = 5.dp.toPx()
-            val thumbRadius = 9.dp.toPx()
-            val thumbY = (1f - fraction) * size.height
-            drawLine(
-                color = trackColor,
-                start = Offset(cx, thumbRadius),
-                end = Offset(cx, size.height - thumbRadius),
-                strokeWidth = trackWidth,
-                cap = StrokeCap.Round
-            )
-            // Bipolar fill from the centre (0 dB) towards the thumb.
-            val centerY = size.height / 2f
-            drawLine(
-                color = accent,
-                start = Offset(cx, centerY),
-                end = Offset(cx, thumbY),
-                strokeWidth = trackWidth,
-                cap = StrokeCap.Round
-            )
-            drawCircle(color = accent, radius = thumbRadius, center = Offset(cx, thumbY))
-        }
     }
 }
 
@@ -386,10 +324,3 @@ private fun formatGainDb(levelMb: Int): String {
     return "%.1f".format(db)
 }
 
-private fun levelFraction(levelMb: Int, minMb: Int, maxMb: Int): Float {
-    if (maxMb <= minMb) return 0.5f
-    return ((levelMb - minMb).toFloat() / (maxMb - minMb)).coerceIn(0f, 1f)
-}
-
-private fun fractionToLevel(fraction: Float, minMb: Int, maxMb: Int): Int =
-    (minMb + fraction.coerceIn(0f, 1f) * (maxMb - minMb)).roundToInt()
