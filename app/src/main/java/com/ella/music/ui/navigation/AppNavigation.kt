@@ -39,6 +39,7 @@ import com.ella.music.ui.settings.AudioSettingsScreen
 import com.ella.music.ui.settings.EqualizerScreen
 import com.ella.music.ui.settings.BackupSettingsScreen
 import com.ella.music.ui.settings.LyricFontScreen
+import com.ella.music.ui.settings.LyricPluginSourceSettingsScreen
 import com.ella.music.ui.settings.LogScreen
 import com.ella.music.ui.settings.SettingsDetailScreen
 import com.ella.music.ui.settings.SettingsDetailMode
@@ -94,6 +95,7 @@ sealed class Screen(val route: String) {
     data object LibrarySettings : Screen("library_settings")
     data object IntegrationSettings : Screen("integration_settings")
     data object LyricSettings : Screen("lyric_settings")
+    data object LyricPluginSources : Screen("lyric_plugin_sources")
     data object AudioSettings : Screen("audio_settings")
     data object Equalizer : Screen("equalizer")
     data object BackupSettings : Screen("backup_settings")
@@ -476,8 +478,15 @@ fun AppNavigation(
             SettingsDetailScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToLyricFont = { navController.navigate(Screen.LyricFont.route) },
+                onNavigateToLyricPluginSources = { navController.navigate(Screen.LyricPluginSources.route) },
                 playerViewModel = playerViewModel,
                 showOnlyLyrics = true
+            )
+        }
+
+        composable(Screen.LyricPluginSources.route) {
+            LyricPluginSourceSettingsScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

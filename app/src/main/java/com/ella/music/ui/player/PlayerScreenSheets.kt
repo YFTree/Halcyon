@@ -45,6 +45,8 @@ internal fun PlayerScreenSheetHost(
     onAiSheetSongChange: (Song?) -> Unit,
     deleteConfirmSong: Song?,
     onDeleteConfirmSongChange: (Song?) -> Unit,
+    lyricMatchSong: Song?,
+    onLyricMatchSongChange: (Song?) -> Unit,
     tagEditorSong: Song?,
     onTagEditorSongChange: (Song?) -> Unit,
     tagEditorKind: TagEditorOptionKind,
@@ -142,6 +144,23 @@ internal fun PlayerScreenSheetHost(
                 song = currentSong,
                 mainViewModel = mainViewModel,
                 onDismiss = { onAiSheetSongChange(null) }
+            )
+        }
+    }
+
+    lyricMatchSong?.let { currentSong ->
+        WindowBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = stringResource(R.string.player_match_online_lyrics),
+            onDismissRequest = { onLyricMatchSongChange(null) }
+        ) {
+            PluginLyricsMatchSheet(
+                song = currentSong,
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
+                onDismiss = { onLyricMatchSongChange(null) },
+                onWritePermissionRequired = onWritePermissionRequired
             )
         }
     }

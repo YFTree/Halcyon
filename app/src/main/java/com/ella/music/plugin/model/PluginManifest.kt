@@ -2,6 +2,10 @@ package com.ella.music.plugin.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 
 /** Lyrico-compatible plugin manifest (manifest.json). */
 @Serializable
@@ -41,9 +45,14 @@ data class PluginConfigField(
     val group: String = "",
     val type: PluginConfigFieldType = PluginConfigFieldType.TEXT,
     val required: Boolean = false,
-    val defaultValue: String = "",
+    val defaultValue: JsonElement = JsonPrimitive(""),
     val options: List<PluginConfigOption> = emptyList()
 )
+
+fun PluginConfigField.defaultValueString(): String =
+    (defaultValue as? JsonPrimitive)?.let { primitive ->
+        primitive.contentOrNull ?: primitive.booleanOrNull?.toString()
+    }.orEmpty()
 
 @Serializable
 enum class PluginConfigFieldType {

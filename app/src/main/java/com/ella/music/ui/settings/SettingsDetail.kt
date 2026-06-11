@@ -52,7 +52,8 @@ fun SettingsDetailScreen(
     playerViewModel: PlayerViewModel? = null,
     showOnlyLyrics: Boolean = false,
     mode: SettingsDetailMode = SettingsDetailMode.AppearanceHome,
-    onNavigateToScanFolders: (() -> Unit)? = null
+    onNavigateToScanFolders: (() -> Unit)? = null,
+    onNavigateToLyricPluginSources: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -182,7 +183,8 @@ fun SettingsDetailScreen(
                 }
                 SettingsDetailMode.Lyrics -> {
                     SettingsLyricsSection(
-                        playerViewModel = playerViewModel
+                        playerViewModel = playerViewModel,
+                        onNavigateToLyricPluginSources = onNavigateToLyricPluginSources
                     )
                     SettingsLyricShareSection()
                 }

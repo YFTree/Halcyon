@@ -49,6 +49,7 @@ internal fun PlayerActionMenu(
     onDeleteSong: () -> Unit,
     onEditMetadata: () -> Unit,
     onLyricTiming: () -> Unit,
+    onMatchOnlineLyrics: () -> Unit,
     onMatchDynamicCover: () -> Unit,
     onStopAfterCurrent: (Boolean) -> Unit,
     onTimer: (Int) -> Unit,
@@ -102,6 +103,7 @@ internal fun PlayerActionMenu(
                     }
                     PlayerActionMenuItem(stringResource(R.string.player_edit_metadata), onEditMetadata)
                     PlayerActionMenuItem(stringResource(R.string.player_lyric_timing), onLyricTiming)
+                    PlayerActionMenuItem(stringResource(R.string.player_match_online_lyrics), onMatchOnlineLyrics)
                     PlayerActionMenuItem(stringResource(R.string.player_lyric_offset), { page = PlayerActionSheetPage.LyricOffset })
                     if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
                         PlayerActionMenuItem(stringResource(R.string.player_download_lx_song), onDownload)

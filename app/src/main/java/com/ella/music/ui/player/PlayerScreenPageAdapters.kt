@@ -96,6 +96,7 @@ internal fun CoverPageContent(
     onAiSheetSongChange: (Song?) -> Unit,
     onTagEditorSongChange: (Song?) -> Unit,
     onTagEditorKindChange: (TagEditorOptionKind) -> Unit,
+    onLyricMatchSongChange: (Song?) -> Unit,
     onRequestDeleteSong: (Song) -> Unit,
     onNavigateToAlbum: (Long) -> Unit,
     onNavigateToArtist: (String) -> Unit,
@@ -317,6 +318,15 @@ internal fun CoverPageContent(
         },
         onLyricTiming = {
             openTagEditor(TagEditorOptionKind.LyricTiming)
+        },
+        onMatchOnlineLyrics = {
+            val current = song
+            if (current != null) {
+                onMenuExpandedChange(false)
+                onLyricMatchSongChange(current)
+            } else {
+                Toast.makeText(context, context.getString(R.string.player_no_song_playing), Toast.LENGTH_SHORT).show()
+            }
         },
         onStopAfterCurrent = {
             scope.launch { settingsManager.setSleepTimerStopAfterCurrent(it) }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import com.ella.music.player.AudioEffectSettings
+import com.ella.music.plugin.source.LyricoPluginManager
 import androidx.annotation.StringRes
 import com.ella.music.R
 import org.json.JSONObject
@@ -85,6 +86,7 @@ class SettingsManager(private val context: Context) {
         val KEY_PREVIOUS_BUTTON_ACTION = intPreferencesKey("previous_button_action")
         val KEY_LYRIC_SOURCE_MODE = intPreferencesKey("lyric_source_mode")
         val KEY_LYRIC_SOURCE_PRIORITY = stringPreferencesKey("lyric_source_priority")
+        val KEY_LYRICO_PLUGIN_ENABLED_IDS = stringPreferencesKey("lyrico_plugin_enabled_ids")
         val KEY_IGNORE_SPL_METADATA_LINES = booleanPreferencesKey("ignore_spl_metadata_lines")
         val KEY_LYRIC_OFFSET_OVERRIDES = stringPreferencesKey("lyric_offset_overrides")
         val KEY_LYRIC_PAGE_TRANSLATION = booleanPreferencesKey("lyric_page_translation")
@@ -392,6 +394,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map {
             normalizeLyricSourcePriority(it[KEY_LYRIC_SOURCE_PRIORITY] ?: DEFAULT_LYRIC_SOURCE_PRIORITY)
         }
+    val lyricoPluginEnabledIds: Flow<Set<String>> =
+        context.dataStore.data.map { LyricoPluginManager.normalizeEnabledIds(it[KEY_LYRICO_PLUGIN_ENABLED_IDS]) }
     val ignoreSplMetadataLines: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_IGNORE_SPL_METADATA_LINES] ?: false }
     val lyricOffsetOverrides: Flow<Map<String, Long>> =
@@ -811,6 +815,16 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setLyricSourcePriority(priority: String) {
         context.dataStore.edit { it[KEY_LYRIC_SOURCE_PRIORITY] = normalizeLyricSourcePriority(priority) }
+    }
+
+    suspend fun setLyricoPluginEnabled(id: String, enabled: Boolean) {
+        val pluginId = id.trim()
+        if (pluginId.isBlank()) return
+        context.dataStore.edit { prefs ->
+            val current = LyricoPluginManager.normalizeEnabledIds(prefs[KEY_LYRICO_PLUGIN_ENABLED_IDS]).toMutableSet()
+            if (enabled) current += pluginId else current -= pluginId
+            prefs[KEY_LYRICO_PLUGIN_ENABLED_IDS] = current.joinToString(",")
+        }
     }
 
     suspend fun setIgnoreSplMetadataLines(enabled: Boolean) {
