@@ -1,7 +1,10 @@
 package com.ella.music.data.repository
 
+import android.util.JsonReader
+import android.util.JsonToken
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
+import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -56,36 +59,125 @@ internal fun albumsToLibraryCacheJsonArray(albums: List<Album>): JSONArray {
     return array
 }
 
-internal fun JSONArray.toLibraryCacheSongList(): List<Song> =
-    List(length()) { index ->
-        val item = getJSONObject(index)
-        Song(
-            id = item.getLong("id"),
-            title = item.optString("title"),
-            artist = item.optString("artist"),
-            album = item.optString("album"),
-            albumId = item.optLong("albumId"),
-            duration = item.optLong("duration"),
-            path = item.optString("path"),
-            fileName = item.optString("fileName"),
-            fileSize = item.optLong("fileSize"),
-            mimeType = item.optString("mimeType"),
-            dateAdded = item.optLong("dateAdded"),
-            dateModified = item.optLong("dateModified"),
-            trackNumber = item.optInt("trackNumber"),
-            discNumber = item.optInt("discNumber"),
-            albumArtist = item.optString("albumArtist"),
-            genre = item.optString("genre"),
-            year = item.optString("year"),
-            composer = item.optString("composer"),
-            lyricist = item.optString("lyricist"),
-            coverUrl = item.optString("coverUrl"),
-            onlineSource = item.optString("onlineSource"),
-            onlineId = item.optString("onlineId"),
-            onlineLyrics = item.optString("onlineLyrics"),
-            onlineLyricTranslation = item.optString("onlineLyricTranslation")
-        )
+/**
+ * Stream the cached library straight off disk with [JsonReader] instead of reading the whole
+ * file into a String and building a JSONObject tree. For ~800+ songs the tree form produced a
+ * multi-MB string plus thousands of transient objects, contributing to the cold-start GC spike.
+ */
+internal fun readLibraryCacheSongs(file: File): List<Song> {
+    if (!file.exists()) return emptyList()
+    val songs = ArrayList<Song>()
+    file.bufferedReader().use { reader ->
+        JsonReader(reader).use { json ->
+            json.beginObject()
+            while (json.hasNext()) {
+                if (json.nextName() == "songs") {
+                    json.beginArray()
+                    while (json.hasNext()) {
+                        songs.add(json.readCacheSong())
+                    }
+                    json.endArray()
+                } else {
+                    json.skipValue()
+                }
+            }
+            json.endObject()
+        }
     }
+    return songs
+}
+
+private fun JsonReader.readCacheSong(): Song {
+    var id = 0L
+    var title = ""
+    var artist = ""
+    var album = ""
+    var albumId = 0L
+    var duration = 0L
+    var path = ""
+    var fileName = ""
+    var fileSize = 0L
+    var mimeType = ""
+    var dateAdded = 0L
+    var dateModified = 0L
+    var trackNumber = 0
+    var discNumber = 0
+    var albumArtist = ""
+    var genre = ""
+    var year = ""
+    var composer = ""
+    var lyricist = ""
+    var coverUrl = ""
+    var onlineSource = ""
+    var onlineId = ""
+    var onlineLyrics = ""
+    var onlineLyricTranslation = ""
+    beginObject()
+    while (hasNext()) {
+        when (nextName()) {
+            "id" -> id = nextLong()
+            "title" -> title = nextStringOrEmpty()
+            "artist" -> artist = nextStringOrEmpty()
+            "album" -> album = nextStringOrEmpty()
+            "albumId" -> albumId = nextLong()
+            "duration" -> duration = nextLong()
+            "path" -> path = nextStringOrEmpty()
+            "fileName" -> fileName = nextStringOrEmpty()
+            "fileSize" -> fileSize = nextLong()
+            "mimeType" -> mimeType = nextStringOrEmpty()
+            "dateAdded" -> dateAdded = nextLong()
+            "dateModified" -> dateModified = nextLong()
+            "trackNumber" -> trackNumber = nextInt()
+            "discNumber" -> discNumber = nextInt()
+            "albumArtist" -> albumArtist = nextStringOrEmpty()
+            "genre" -> genre = nextStringOrEmpty()
+            "year" -> year = nextStringOrEmpty()
+            "composer" -> composer = nextStringOrEmpty()
+            "lyricist" -> lyricist = nextStringOrEmpty()
+            "coverUrl" -> coverUrl = nextStringOrEmpty()
+            "onlineSource" -> onlineSource = nextStringOrEmpty()
+            "onlineId" -> onlineId = nextStringOrEmpty()
+            "onlineLyrics" -> onlineLyrics = nextStringOrEmpty()
+            "onlineLyricTranslation" -> onlineLyricTranslation = nextStringOrEmpty()
+            else -> skipValue()
+        }
+    }
+    endObject()
+    return Song(
+        id = id,
+        title = title,
+        artist = artist,
+        album = album,
+        albumId = albumId,
+        duration = duration,
+        path = path,
+        fileName = fileName,
+        fileSize = fileSize,
+        mimeType = mimeType,
+        dateAdded = dateAdded,
+        dateModified = dateModified,
+        trackNumber = trackNumber,
+        discNumber = discNumber,
+        albumArtist = albumArtist,
+        genre = genre,
+        year = year,
+        composer = composer,
+        lyricist = lyricist,
+        coverUrl = coverUrl,
+        onlineSource = onlineSource,
+        onlineId = onlineId,
+        onlineLyrics = onlineLyrics,
+        onlineLyricTranslation = onlineLyricTranslation
+    )
+}
+
+private fun JsonReader.nextStringOrEmpty(): String {
+    if (peek() == JsonToken.NULL) {
+        nextNull()
+        return ""
+    }
+    return nextString()
+}
 
 internal fun JSONArray.toLibraryCacheAlbumList(): List<Album> =
     List(length()) { index ->

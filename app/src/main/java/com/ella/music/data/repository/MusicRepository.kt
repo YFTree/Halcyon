@@ -392,8 +392,7 @@ class MusicRepository(private val context: Context) {
         if (!libraryCacheFile.exists()) return@withContext
 
         runCatching {
-            val root = JSONObject(libraryCacheFile.readText())
-            val songs = root.getJSONArray("songs").toLibraryCacheSongList()
+            val songs = readLibraryCacheSongs(libraryCacheFile)
             _songs.value = songs
             _albums.value = songs.toAlbums()
         }.onFailure {
@@ -404,7 +403,7 @@ class MusicRepository(private val context: Context) {
     private fun readCachedSongs(): List<Song> {
         if (!libraryCacheFile.exists()) return emptyList()
         return runCatching {
-            JSONObject(libraryCacheFile.readText()).getJSONArray("songs").toLibraryCacheSongList()
+            readLibraryCacheSongs(libraryCacheFile)
         }.getOrElse {
             Log.w("MusicRepo", "Failed to read music library cache for sync", it)
             emptyList()
