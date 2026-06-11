@@ -25,7 +25,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
@@ -64,6 +67,27 @@ internal fun CenteredPlayPauseGlyph(
         tint = tint,
         modifier = modifier
     )
+}
+
+@Composable
+internal fun QueueListIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val stroke = 3.dp.toPx()
+        val startX = size.width * 0.22f
+        val endX = size.width * 0.78f
+        listOf(0.30f, 0.50f, 0.70f).forEach { yFraction ->
+            drawLine(
+                color = color,
+                start = Offset(startX, size.height * yFraction),
+                end = Offset(endX, size.height * yFraction),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+        }
+    }
 }
 
 @Composable
