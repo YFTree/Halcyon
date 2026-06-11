@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -28,7 +29,10 @@ import com.ella.music.viewmodel.MainViewModel
 import com.lonx.audiotag.model.AudioTagKeys
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -200,10 +204,10 @@ internal fun SongMetadataEditorSheet(
                     label = stringResource(R.string.song_more_custom_tag_value),
                     modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = "✓",
-                    fontSize = 16.sp,
-                    color = MiuixTheme.colorScheme.primary,
+                Icon(
+                    imageVector = MiuixIcons.Basic.Check,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier
                         .padding(top = 14.dp)
                         .clip(RoundedCornerShape(4.dp))
@@ -216,6 +220,7 @@ internal fun SongMetadataEditorSheet(
                             }
                         }
                         .padding(4.dp)
+                        .size(18.dp)
                 )
             }
         }

@@ -45,6 +45,7 @@ import com.ella.music.ui.components.AppleStylePlayButton
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.PlayNextQuickButton
 import com.ella.music.ui.components.SafeCoverImage
+import com.ella.music.ui.components.SelectionCheck
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -237,15 +238,10 @@ private fun AlbumTrackRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                if (selected) Text(text = "✓", fontSize = 14.sp, color = Color.White)
-            }
+            SelectionCheck(
+                selected = selected,
+                checkColor = Color.White
+            )
             Spacer(modifier = Modifier.width(12.dp))
         }
         Text(

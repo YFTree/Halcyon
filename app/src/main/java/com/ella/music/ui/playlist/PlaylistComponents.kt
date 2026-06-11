@@ -50,6 +50,7 @@ import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixSheetActions
 import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.SafeCoverImage
+import com.ella.music.ui.components.SelectionCheck
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -131,20 +132,11 @@ internal fun PlaylistRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (selectionMode) {
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(RoundedCornerShape(11.dp))
-                        .background(
-                            if (selected) MiuixTheme.colorScheme.primary
-                            else MiuixTheme.colorScheme.surfaceContainer
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (selected) {
-                        Text(text = "✓", fontSize = 13.sp, color = Color.White)
-                    }
-                }
+                SelectionCheck(
+                    selected = selected,
+                    size = 22.dp,
+                    checkColor = Color.White
+                )
                 Spacer(modifier = Modifier.width(12.dp))
             }
             Box(

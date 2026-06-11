@@ -44,12 +44,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.TextFieldDefaults
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 import top.yukonga.miuix.kmp.window.WindowDialog
@@ -263,6 +268,37 @@ fun EllaMiuixChip(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+/**
+ * Shared selection indicator: a circular container that shows the miuix check icon when selected.
+ * Replaces the previously duplicated hand-rolled `Text("✓")` boxes.
+ */
+@Composable
+fun SelectionCheck(
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    size: Dp = 24.dp,
+    selectedColor: Color = MiuixTheme.colorScheme.primary,
+    unselectedColor: Color = MiuixTheme.colorScheme.surfaceContainer,
+    checkColor: Color = MiuixTheme.colorScheme.onPrimary
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(if (selected) selectedColor else unselectedColor),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Icon(
+                imageVector = MiuixIcons.Basic.Check,
+                contentDescription = null,
+                tint = checkColor,
+                modifier = Modifier.size(size * 0.66f)
+            )
+        }
     }
 }
 

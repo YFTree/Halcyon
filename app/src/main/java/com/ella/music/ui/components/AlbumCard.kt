@@ -97,20 +97,14 @@ fun AlbumCard(
                             else Color.Black.copy(alpha = 0.18f)
                         )
                 )
-                Box(
+                SelectionCheck(
+                    selected = selected,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .size(24.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (selected) MiuixTheme.colorScheme.primary
-                            else Color.White.copy(alpha = 0.28f)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (selected) Text(text = "✓", fontSize = 14.sp, color = Color.White)
-                }
+                        .padding(8.dp),
+                    unselectedColor = Color.White.copy(alpha = 0.28f),
+                    checkColor = Color.White
+                )
             }
         }
 

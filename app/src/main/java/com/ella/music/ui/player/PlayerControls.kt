@@ -36,6 +36,8 @@ import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.ListView
 
 @Composable
 internal fun LandscapeProgressRow(
@@ -275,8 +277,10 @@ internal fun PlayerTransportControls(
         }
         Box(contentAlignment = Alignment.Center) {
             PlayerTransportIconButton(onClick = onToggleQueue) {
-                QueueListIcon(
-                    color = Color.White.copy(alpha = 0.58f),
+                Icon(
+                    imageVector = MiuixIcons.Regular.ListView,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.58f),
                     modifier = Modifier.size(28.dp)
                 )
             }

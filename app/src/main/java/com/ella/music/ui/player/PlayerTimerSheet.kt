@@ -31,7 +31,10 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.model.formatPlaybackDuration
 import kotlinx.coroutines.delay
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -173,11 +176,11 @@ private fun StopAfterCurrentRow(
             contentAlignment = Alignment.Center
         ) {
             if (checked) {
-                Text(
-                    text = "✓",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MiuixTheme.colorScheme.onPrimary
+                Icon(
+                    imageVector = MiuixIcons.Basic.Check,
+                    contentDescription = null,
+                    tint = MiuixTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(15.dp)
                 )
             }
         }

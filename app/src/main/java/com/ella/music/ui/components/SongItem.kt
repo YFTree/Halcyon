@@ -99,24 +99,10 @@ fun SongItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (selected) MiuixTheme.colorScheme.primary
-                        else MiuixTheme.colorScheme.surfaceContainer
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (selected) {
-                    Text(
-                        text = "✓",
-                        fontSize = 14.sp,
-                        color = Color.White
-                    )
-                }
-            }
+            SelectionCheck(
+                selected = selected,
+                checkColor = Color.White
+            )
             Spacer(modifier = Modifier.width(12.dp))
         }
 

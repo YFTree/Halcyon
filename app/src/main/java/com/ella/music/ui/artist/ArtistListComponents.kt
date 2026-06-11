@@ -30,6 +30,7 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.SafeCoverImage
+import com.ella.music.ui.components.SelectionCheck
 import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.viewmodel.MainViewModel
 import top.yukonga.miuix.kmp.basic.Icon
@@ -86,15 +87,10 @@ internal fun ArtistRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (selectionMode) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .background(if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                if (selected) Text(text = "✓", fontSize = 14.sp, color = androidx.compose.ui.graphics.Color.White)
-            }
+            SelectionCheck(
+                selected = selected,
+                checkColor = androidx.compose.ui.graphics.Color.White
+            )
             Spacer(modifier = Modifier.size(12.dp))
         }
         Box(
