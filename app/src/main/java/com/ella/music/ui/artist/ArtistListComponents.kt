@@ -36,6 +36,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Music
+import top.yukonga.miuix.kmp.icon.extended.Pin
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal fun Artist.indexLetter(): String {
@@ -53,6 +54,7 @@ internal fun ArtistRow(
     selectionMode: Boolean,
     selected: Boolean,
     summary: String,
+    isPinned: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -124,14 +126,26 @@ internal fun ArtistRow(
         }
         Spacer(modifier = Modifier.size(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = artist.name.ifBlank { stringResource(R.string.player_unknown_artist) },
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MiuixTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = artist.name.ifBlank { stringResource(R.string.player_unknown_artist) },
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isPinned) {
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Pin,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
             Text(
                 text = summary,
                 fontSize = 12.sp,

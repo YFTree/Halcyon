@@ -41,6 +41,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Music
+import top.yukonga.miuix.kmp.icon.extended.Pin
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Locale
 
@@ -53,6 +54,7 @@ internal fun MetadataCategoryCard(
     albumArtUri: android.net.Uri?,
     representativeSong: Song? = null,
     loadCoverArt: ((Song) -> Bitmap?)? = null,
+    isPinned: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -71,6 +73,7 @@ internal fun MetadataCategoryCard(
                 item = item,
                 sortMode = sortMode,
                 coverModel = coverModel,
+                isPinned = isPinned,
                 onClick = onClick,
                 onLongClick = onLongClick
             )
@@ -81,6 +84,7 @@ internal fun MetadataCategoryCard(
                 item = item,
                 sortMode = sortMode,
                 coverModel = coverModel,
+                isPinned = isPinned,
                 onClick = onClick,
                 onLongClick = onLongClick
             )
@@ -163,16 +167,27 @@ internal fun MetadataCategoryCard(
                 ),
             verticalArrangement = if (isGenreCard) Arrangement.Center else Arrangement.SpaceBetween
         ) {
-            Text(
-                text = item.name,
-                fontSize = if (isGenreCard) 13.sp else 16.sp,
-                lineHeight = if (isGenreCard) 17.sp else 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.name,
+                    fontSize = if (isGenreCard) 13.sp else 16.sp,
+                    lineHeight = if (isGenreCard) 17.sp else 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isPinned) {
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Pin,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
             Text(
                 text = item.categorySortSummary(sortMode),
                 fontSize = if (isGenreCard) 10.sp else 12.sp,
@@ -192,6 +207,7 @@ private fun FolderCategoryRow(
     item: MetadataCategoryItem,
     sortMode: MetadataCategorySortMode,
     coverModel: Any?,
+    isPinned: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -229,15 +245,27 @@ private fun FolderCategoryRow(
             }
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.name.substringAfterLast('/').ifBlank { item.name.ifBlank { stringResource(R.string.folder_root) } },
-                fontSize = 17.sp,
-                lineHeight = 22.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MiuixTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.name.substringAfterLast('/').ifBlank { item.name.ifBlank { stringResource(R.string.folder_root) } },
+                    fontSize = 17.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isPinned) {
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Pin,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "${item.folderSortSummary(sortMode)} · ${item.name}",
@@ -258,6 +286,7 @@ private fun PersonCategoryRow(
     item: MetadataCategoryItem,
     sortMode: MetadataCategorySortMode,
     coverModel: Any?,
+    isPinned: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -301,14 +330,26 @@ private fun PersonCategoryRow(
         }
         Spacer(modifier = Modifier.size(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.name.ifBlank { stringResource(R.string.common_unknown) },
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MiuixTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.name.ifBlank { stringResource(R.string.common_unknown) },
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isPinned) {
+                    Spacer(modifier = Modifier.size(4.dp))
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Pin,
+                        contentDescription = null,
+                        tint = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
             Text(
                 text = item.personSortSummary(sortMode),
                 fontSize = 12.sp,

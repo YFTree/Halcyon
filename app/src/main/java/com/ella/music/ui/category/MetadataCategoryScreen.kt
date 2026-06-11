@@ -335,6 +335,7 @@ fun MetadataCategoryScreen(
                             albumArtUri = albumArtUrisByName[item.name],
                             representativeSong = item.representativeSong,
                             loadCoverArt = if (type.prefersEmbeddedCategoryCardCover()) mainViewModel::getAlbumCoverArtBitmap else null,
+                            isPinned = item.name in pinnedCategoryKeys,
                             onClick = { onCategoryClick(item.name) },
                             onLongClick = { categoryMenuItem = item }
                         )

@@ -386,6 +386,7 @@ fun AlbumScreen(
                                 summary = album.summaryForSort(context, sortMode, albumDurations[album.id] ?: 0L),
                                 selectionMode = selectionMode,
                                 selected = selected,
+                                isPinned = album.id.toString() in pinnedAlbumKeys,
                                 onClick = {
                                     if (selectionMode) toggleAlbumSelection(album) else onAlbumClick(album.id)
                                 },

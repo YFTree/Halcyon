@@ -382,6 +382,7 @@ fun ArtistListScreen(
                     items(filteredArtists, key = { it.name }) { artist ->
                         val artistKey = artist.name.tagIdentityKey()
                         val selected = artistKey in selectedArtistKeys
+                        val isPinned = artistKey in pinnedArtistKeys
                         ArtistRow(
                             artist = artist,
                             representativeSong = representativeSongsByArtist[artistKey],
@@ -395,6 +396,7 @@ fun ArtistListScreen(
                                 releaseAlbumCount = releaseAlbumCounts[artistKey] ?: 0,
                                 stringResolver = { resId, args -> context.getString(resId, *args) }
                             ),
+                            isPinned = isPinned,
                             onClick = {
                                 if (selectionMode) toggleArtistSelection(artist) else onArtistClick(artist.name)
                             },
