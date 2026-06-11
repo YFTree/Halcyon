@@ -8,6 +8,8 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.content.pm.PackageManager
 import android.net.Uri
+import com.ella.music.ui.home.MusicSortKeyCache
+import java.io.File
 import java.net.URLDecoder
 import android.os.Build
 import android.os.Bundle
@@ -173,10 +175,17 @@ class MainActivity : ComponentActivity() {
         super.attachBaseContext(newBase.withHalcyonLocale(language))
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Flush any newly computed A-Z sort keys so the next cold launch reuses them.
+        lifecycleScope.launch(Dispatchers.IO) { MusicSortKeyCache.persist() }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         applySavedAppLanguage()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        MusicSortKeyCache.configure(File(filesDir, "music_sort_keys.json"))
         currentSystemNightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
