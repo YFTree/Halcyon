@@ -107,6 +107,8 @@ fun ArtistListScreen(
     var artistMenuTarget by remember { mutableStateOf<Artist?>(null) }
     var pendingDeleteSongs by remember { mutableStateOf<List<Song>>(emptyList()) }
     val sortIndex by mainViewModel.settingsManager.artistListSortIndex.collectAsState(initial = LibrarySortUiState.artistListSortIndex)
+    val detailSongSortIndex by mainViewModel.settingsManager.artistDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.artistDetailSongSortIndex)
+    val detailSongSortMode = ArtistDetailSongSortMode.entries.getOrElse(detailSongSortIndex) { ArtistDetailSongSortMode.Title }
     val showAlbumArtists by mainViewModel.settingsManager.showAlbumArtists.collectAsState(initial = false)
     val tagIgnoreCase by mainViewModel.settingsManager.tagIgnoreCase.collectAsState(initial = false)
     val pinnedArtistKeys by mainViewModel.settingsManager.pinnedKeysFlow("artist").collectAsState(initial = emptyList())
@@ -512,14 +514,14 @@ fun ArtistListScreen(
                 EllaMiuixMenuItem(
                     text = stringResource(R.string.song_more_add_to_playlist),
                     onClick = {
-                        playlistPickerSongs = mainViewModel.getSongsForArtist(artist.name)
+                        playlistPickerSongs = mainViewModel.getSongsForArtist(artist.name).sortedForArtistDetail(detailSongSortMode)
                         artistMenuTarget = null
                     }
                 )
                 EllaMiuixMenuItem(
                     text = stringResource(R.string.common_add_to_queue),
                     onClick = {
-                        playerViewModel.addToPlaylist(mainViewModel.getSongsForArtist(artist.name))
+                        playerViewModel.addToPlaylist(mainViewModel.getSongsForArtist(artist.name).sortedForArtistDetail(detailSongSortMode))
                         Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
                         artistMenuTarget = null
                     }
@@ -527,7 +529,7 @@ fun ArtistListScreen(
                 EllaMiuixMenuItem(
                     text = stringResource(R.string.song_more_play_next),
                     onClick = {
-                        playerViewModel.playNext(mainViewModel.getSongsForArtist(artist.name))
+                        playerViewModel.playNext(mainViewModel.getSongsForArtist(artist.name).sortedForArtistDetail(detailSongSortMode))
                         Toast.makeText(context, context.getString(R.string.song_more_added_to_play_next), Toast.LENGTH_SHORT).show()
                         artistMenuTarget = null
                     }

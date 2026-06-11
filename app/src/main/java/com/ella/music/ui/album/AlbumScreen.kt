@@ -107,6 +107,8 @@ fun AlbumScreen(
     val requestDeleteSongs = rememberSongDeleteRequester(mainViewModel)
     val sortIndex by mainViewModel.settingsManager.albumListSortIndex.collectAsState(initial = LibrarySortUiState.albumListSortIndex)
     val sortMode = AlbumSortMode.entries.getOrElse(sortIndex) { AlbumSortMode.Name }
+    val detailSongSortIndex by mainViewModel.settingsManager.albumDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.albumDetailSongSortIndex)
+    val detailSongSortMode = AlbumDetailSongSortMode.entries.getOrElse(detailSongSortIndex) { AlbumDetailSongSortMode.Track }
     val gridColumns by mainViewModel.settingsManager.categoryGridColumns.collectAsState(initial = 2)
     val configuration = LocalConfiguration.current
     val safeGridColumns = if (configuration.smallestScreenWidthDp >= 600) {
@@ -503,14 +505,14 @@ fun AlbumScreen(
                 EllaMiuixMenuItem(
                     text = stringResource(R.string.song_more_add_to_playlist),
                     onClick = {
-                        playlistPickerSongs = mainViewModel.getSongsForAlbum(album.id)
+                        playlistPickerSongs = mainViewModel.getSongsForAlbum(album.id).sortedForAlbumDetail(detailSongSortMode)
                         albumMenuTarget = null
                     }
                 )
                 EllaMiuixMenuItem(
                     text = stringResource(R.string.common_add_to_queue),
                     onClick = {
-                        playerViewModel.addToPlaylist(mainViewModel.getSongsForAlbum(album.id))
+                        playerViewModel.addToPlaylist(mainViewModel.getSongsForAlbum(album.id).sortedForAlbumDetail(detailSongSortMode))
                         Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
                         albumMenuTarget = null
                     }
@@ -518,7 +520,7 @@ fun AlbumScreen(
                 EllaMiuixMenuItem(
                     text = stringResource(R.string.song_more_play_next),
                     onClick = {
-                        playerViewModel.playNext(mainViewModel.getSongsForAlbum(album.id))
+                        playerViewModel.playNext(mainViewModel.getSongsForAlbum(album.id).sortedForAlbumDetail(detailSongSortMode))
                         Toast.makeText(context, context.getString(R.string.song_more_added_to_play_next), Toast.LENGTH_SHORT).show()
                         albumMenuTarget = null
                     }

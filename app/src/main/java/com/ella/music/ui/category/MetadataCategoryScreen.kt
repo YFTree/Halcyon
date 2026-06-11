@@ -108,6 +108,7 @@ import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -383,19 +384,25 @@ fun MetadataCategoryScreen(
                     categoryMenuItem = null
                 }
                 CategorySheetItem(stringResource(R.string.song_more_add_to_playlist)) {
-                    playlistPickerSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
+                    scope.launch {
+                        playlistPickerSongs = mainViewModel.detailSortedSongsForMetadataCategory(type, item.name)
+                    }
                     categoryMenuItem = null
                 }
                 CategorySheetItem(stringResource(R.string.common_add_to_queue)) {
-                    val selectedSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
-                    playerViewModel.addToPlaylist(selectedSongs)
-                    Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                    scope.launch {
+                        val selectedSongs = mainViewModel.detailSortedSongsForMetadataCategory(type, item.name)
+                        playerViewModel.addToPlaylist(selectedSongs)
+                        Toast.makeText(context, context.getString(R.string.song_more_added_to_queue), Toast.LENGTH_SHORT).show()
+                    }
                     categoryMenuItem = null
                 }
                 CategorySheetItem(stringResource(R.string.song_more_play_next)) {
-                    val selectedSongs = mainViewModel.getSongsForMetadataCategory(type, item.name)
-                    playerViewModel.playNext(selectedSongs)
-                    Toast.makeText(context, context.getString(R.string.song_more_added_to_play_next), Toast.LENGTH_SHORT).show()
+                    scope.launch {
+                        val selectedSongs = mainViewModel.detailSortedSongsForMetadataCategory(type, item.name)
+                        playerViewModel.playNext(selectedSongs)
+                        Toast.makeText(context, context.getString(R.string.song_more_added_to_play_next), Toast.LENGTH_SHORT).show()
+                    }
                     categoryMenuItem = null
                 }
                 CategorySheetItem(stringResource(R.string.common_add_desktop_shortcut)) {
@@ -473,4 +480,24 @@ fun MetadataCategoryScreen(
             }
         )
     }
+}
+
+/**
+ * Gathers the songs for a metadata category and orders them using that category type's
+ * persisted DETAIL-page song-sort setting (matching MetadataCategoryDetailScreen).
+ */
+private suspend fun MainViewModel.detailSortedSongsForMetadataCategory(
+    type: String,
+    name: String
+): List<Song> {
+    val index = settingsManager.metadataCategoryDetailSongSortIndex(type).first()
+    val mode = MetadataDetailSongSortMode.entries.getOrElse(index) { MetadataDetailSongSortMode.AlbumTrack }
+        .let { resolved ->
+            if (type == "folder" && resolved == MetadataDetailSongSortMode.AlbumTrack) {
+                MetadataDetailSongSortMode.Title
+            } else {
+                resolved
+            }
+        }
+    return getSongsForMetadataCategory(type, name).sortedForMetadataDetail(mode)
 }
