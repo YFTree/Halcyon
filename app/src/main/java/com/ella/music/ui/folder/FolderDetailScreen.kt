@@ -510,7 +510,7 @@ fun FolderDetailScreen(
                 }
                 if (sortMode == FolderSongSortMode.Title && sortedSongs.size > 30) {
                     FastIndexBar(
-                        letters = sortedSongs.map { it.indexLetter() },
+                        letters = remember(sortedSongs) { sortedSongs.map { it.indexLetter() } },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()

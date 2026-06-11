@@ -422,7 +422,7 @@ fun ArtistListScreen(
 
                 if (sortMode == ArtistSortMode.Name && filteredArtists.size > 30) {
                     FastIndexBar(
-                        letters = filteredArtists.map { it.indexLetter() },
+                        letters = remember(filteredArtists) { filteredArtists.map { it.indexLetter() } },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()

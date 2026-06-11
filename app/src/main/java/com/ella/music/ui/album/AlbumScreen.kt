@@ -413,7 +413,7 @@ fun AlbumScreen(
 
                 if ((sortMode == AlbumSortMode.Name || sortMode == AlbumSortMode.Artist) && sortedAlbums.size > 30) {
                     FastIndexBar(
-                        letters = sortedAlbums.map { it.indexLetter(sortMode) },
+                        letters = remember(sortedAlbums, sortMode) { sortedAlbums.map { it.indexLetter(sortMode) } },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()

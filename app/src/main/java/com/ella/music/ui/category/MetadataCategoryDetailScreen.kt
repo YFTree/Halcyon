@@ -555,7 +555,7 @@ fun MetadataCategoryDetailScreen(
             if (selectedTab == MetadataDetailTab.Songs && sortedSongs.size > 30) {
                 if (sortMode == MetadataDetailSongSortMode.Title || sortMode == MetadataDetailSongSortMode.FileName) {
                     FastIndexBar(
-                        letters = sortedSongs.map { it.metadataDetailIndexLetter(sortMode) },
+                        letters = remember(sortedSongs, sortMode) { sortedSongs.map { it.metadataDetailIndexLetter(sortMode) } },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()

@@ -636,14 +636,28 @@ fun LibraryScreen(
                 if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
             }
 
-            val fastIndexTargets = remember(sortedSongs, sortKeysBySongId) {
-                sortedSongs
-                    .mapIndexed { index, song -> song.indexLetter(sortKeysBySongId[song.id]) to index }
-                    .distinctBy { it.first }
-                    .toMap()
+            // Compute the per-song index letter once and reuse it for both the bar labels and the
+            // scroll targets. Building this inline on every recomposition was O(n) main-thread work
+            // that scaled badly for large libraries (1k–10k+ songs).
+            val fastIndexLetters = remember(sortedSongs, sortKeysBySongId) {
+                sortedSongs.map { song -> song.indexLetter(sortKeysBySongId[song.id]) }
+            }
+            val fastIndexTargets = remember(fastIndexLetters) {
+                buildMap {
+                    fastIndexLetters.forEachIndexed { index, letter -> putIfAbsent(letter, index) }
+                }
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
+                val showFastIndexBar = sortMode == HomeSortMode.Title && sortedSongs.size > 30
+                val showScrollIndicator = sortedSongs.size > 30 && !showFastIndexBar
+                // Inset rows so the song "more" button clears the side index bar (matches Lyrico)
+                // and is no longer easy to mis-tap.
+                val listEndInset = when {
+                    showFastIndexBar -> 44.dp
+                    showScrollIndicator -> 16.dp
+                    else -> 0.dp
+                }
                 Column(modifier = Modifier.fillMaxSize()) {
                     if (selectionMode) {
                         SongSelectionActionRow(
@@ -675,7 +689,7 @@ fun LibraryScreen(
 
                     LazyColumn(
                         state = listState,
-                        contentPadding = PaddingValues(bottom = 160.dp)
+                        contentPadding = PaddingValues(end = listEndInset, bottom = 160.dp)
                     ) {
                         items(
                             items = sortedSongs,
@@ -719,9 +733,9 @@ fun LibraryScreen(
                     }
                 }
 
-                if (sortMode == HomeSortMode.Title && sortedSongs.size > 30) {
+                if (showFastIndexBar) {
                     FastIndexBar(
-                        letters = sortedSongs.map { it.indexLetter(sortKeysBySongId[it.id]) },
+                        letters = fastIndexLetters,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
@@ -736,7 +750,7 @@ fun LibraryScreen(
                             }
                         }
                     )
-                } else if (sortedSongs.size > 30) {
+                } else if (showScrollIndicator) {
                     LazyListScrollIndicator(
                         state = listState,
                         modifier = Modifier
