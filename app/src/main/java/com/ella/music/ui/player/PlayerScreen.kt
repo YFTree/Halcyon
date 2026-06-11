@@ -110,7 +110,6 @@ import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.player.PlaybackAudioSession
-import com.ella.music.ui.components.TagEditorOptionIds
 import com.ella.music.ui.components.shareLyricCard
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -144,16 +143,18 @@ fun PlayerScreen(
     onNavigateToArtist: (String) -> Unit = {},
     onNavigateToMetadataCategory: (String, String) -> Unit = { _, _ -> },
     onDismissProgressChange: (Float) -> Unit = {},
-    openToken: Int = 0
+    openToken: Int = 0,
+    playerVisible: Boolean = true
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val settingsManager = remember { SettingsManager.getInstance(context) }
-    val playerTapSeekEnabled by settingsManager.playerTapSeekEnabled.collectAsState(initial = true)
-    val playerShowTotalDuration by settingsManager.playerShowTotalDuration.collectAsState(initial = false)
-    val lyricSourceMode by settingsManager.lyricSourceMode.collectAsState(initial = SettingsManager.LYRIC_SOURCE_AUTO)
+    val playerSettings = rememberPlayerScreenSettings(settingsManager)
+    val playerTapSeekEnabled = playerSettings.playerTapSeekEnabled
+    val playerShowTotalDuration = playerSettings.playerShowTotalDuration
+    val lyricSourceMode = playerSettings.lyricSourceMode
     val lyricFontState = rememberPlayerLyricFontState(context, settingsManager)
     val lyricFontFamily = lyricFontState.fontFamily
     val effectiveLyricFontPath = lyricFontState.fontPath
@@ -173,18 +174,18 @@ fun PlayerScreen(
     val playbackSpeed by playerViewModel.playbackSpeed.collectAsState()
     val playbackPitch by playerViewModel.playbackPitch.collectAsState()
     val audioSessionId by PlaybackAudioSession.audioSessionId.collectAsState()
-    val audioVisualizerEnabled by settingsManager.audioVisualizerEnabled.collectAsState(initial = false)
-    val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
-    val immersiveAlbumCover by settingsManager.playerImmersiveCover.collectAsState(initial = true)
-    val playerBackgroundEnabled by settingsManager.playerBackgroundEnabled.collectAsState(initial = false)
-    val playerBackgroundUri by settingsManager.playerBackgroundUri.collectAsState(initial = "")
-    val hiResLogoEnabled by settingsManager.hiResLogoEnabled.collectAsState(initial = false)
-    val hiResLogoUri by settingsManager.hiResLogoUri.collectAsState(initial = "")
-    val lyricShareCustomInfo by settingsManager.lyricShareCustomInfo.collectAsState(initial = "")
-    val metadataEditorId by settingsManager.metadataEditorId.collectAsState(initial = TagEditorOptionIds.ASK_EACH_TIME)
-    val lyricTimingEditorId by settingsManager.lyricTimingEditorId.collectAsState(initial = TagEditorOptionIds.ASK_EACH_TIME)
-    val sleepTimerCustomMinutes by settingsManager.sleepTimerCustomMinutes.collectAsState(initial = 45)
-    val sleepTimerStopAfterCurrent by settingsManager.sleepTimerStopAfterCurrent.collectAsState(initial = false)
+    val audioVisualizerEnabled = playerSettings.audioVisualizerEnabled
+    val dynamicCoverEnabled = playerSettings.dynamicCoverEnabled
+    val immersiveAlbumCover = playerSettings.immersiveAlbumCover
+    val playerBackgroundEnabled = playerSettings.playerBackgroundEnabled
+    val playerBackgroundUri = playerSettings.playerBackgroundUri
+    val hiResLogoEnabled = playerSettings.hiResLogoEnabled
+    val hiResLogoUri = playerSettings.hiResLogoUri
+    val lyricShareCustomInfo = playerSettings.lyricShareCustomInfo
+    val metadataEditorId = playerSettings.metadataEditorId
+    val lyricTimingEditorId = playerSettings.lyricTimingEditorId
+    val sleepTimerCustomMinutes = playerSettings.sleepTimerCustomMinutes
+    val sleepTimerStopAfterCurrent = playerSettings.sleepTimerStopAfterCurrent
     val playlists by mainViewModel.playlists.collectAsState()
     val playlist by playerViewModel.playlist.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
@@ -195,8 +196,8 @@ fun PlayerScreen(
     val showLyrics by playerViewModel.showLyrics.collectAsState()
     val showLyricTranslation by playerViewModel.showLyricTranslation.collectAsState()
     val showLyricPronunciation by playerViewModel.showLyricPronunciation.collectAsState()
-    val lyricPageKeepScreenOn by settingsManager.lyricPageKeepScreenOn.collectAsState(initial = false)
-    val lyricPerspectiveEffect by settingsManager.lyricPerspectiveEffect.collectAsState(initial = false)
+    val lyricPageKeepScreenOn = playerSettings.lyricPageKeepScreenOn
+    val lyricPerspectiveEffect = playerSettings.lyricPerspectiveEffect
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val sleepTimerEndRealtimeMs by playerViewModel.sleepTimerEndRealtimeMs.collectAsState()
     val stopAfterCurrentEnabled by playerViewModel.stopAfterCurrentEnabled.collectAsState()
@@ -230,16 +231,18 @@ fun PlayerScreen(
             uiState.pendingWriteRetry = null
         }
     }
-    PlayerSystemBarsEffect(
-        context = context,
-        view = view,
-        trigger = landscapeState.expanded
-    )
-    PlayerLyricKeepScreenOnEffect(
-        view = view,
-        showLyrics = showLyrics,
-        keepScreenOn = lyricPageKeepScreenOn
-    )
+    if (playerVisible) {
+        PlayerSystemBarsEffect(
+            context = context,
+            view = view,
+            trigger = landscapeState.expanded
+        )
+        PlayerLyricKeepScreenOnEffect(
+            view = view,
+            showLyrics = showLyrics,
+            keepScreenOn = lyricPageKeepScreenOn
+        )
+    }
 
     val song = currentSong
     val isCurrentSongFavorite = song?.playlistIdentityKey()?.let { it in favoriteSongKeys } == true
@@ -311,6 +314,7 @@ fun PlayerScreen(
     PlayerDismissMotionHost(
         openToken = openToken,
         onDismissProgressChange = onDismissProgressChange,
+        backEnabled = playerVisible,
         onDismiss = {
             playerViewModel.setShowLyrics(false)
             onBack()
@@ -345,19 +349,11 @@ fun PlayerScreen(
                         )
                     )
             )
-            if (immersiveAlbumCover) {
-                ImmersiveCoverBackground(
-                    palette = palette,
-                    flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                ImmersiveCoverBackground(
-                    palette = palette,
-                    flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            ImmersiveCoverBackground(
+                palette = palette,
+                flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
+                modifier = Modifier.fillMaxSize()
+            )
 
             PlayerScreenPageHost(
                 immersiveAlbumCover = immersiveAlbumCover,

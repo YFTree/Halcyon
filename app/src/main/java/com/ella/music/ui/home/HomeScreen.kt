@@ -264,8 +264,13 @@ fun LibraryScreen(
             }
         }
     }
+    // initialValue must stay O(1): it is re-evaluated on every recomposition of this screen
+    // (it's a plain argument expression), even though produceState only uses it on first
+    // composition. Running the real sort here would re-sort all songs on the main thread on
+    // every recomposition. Wrap the filtered list unsorted as a cheap placeholder and let the
+    // background block below produce the actually sorted result.
     val sortedResult by produceState<HomeSortedSongs?>(
-        initialValue = filteredSongs.sortedForHomeMode(sortMode),
+        initialValue = HomeSortedSongs(filteredSongs, emptyMap()),
         filteredSongs,
         sortMode
     ) {

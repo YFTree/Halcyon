@@ -71,7 +71,7 @@ internal fun PlayerScreenPageHost(
             state = pagerState,
             modifier = modifier.fillMaxSize(),
             userScrollEnabled = userScrollEnabled,
-            beyondViewportPageCount = 1
+            beyondViewportPageCount = 0
         ) { page ->
             when (page) {
                 PLAYER_PAGE_COVER -> coverPage(

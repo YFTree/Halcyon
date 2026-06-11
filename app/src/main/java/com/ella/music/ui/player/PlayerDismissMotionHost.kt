@@ -40,6 +40,7 @@ internal fun PlayerDismissMotionHost(
     onDismissProgressChange: (Float) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    backEnabled: Boolean = true,
     overlayContent: @Composable () -> Unit = {},
     content: @Composable (dismissingPlayer: Boolean) -> Unit
 ) {
@@ -83,7 +84,7 @@ internal fun PlayerDismissMotionHost(
     DisposableEffect(Unit) {
         onDispose { onDismissProgressChange(0f) }
     }
-    BackHandler { dismissWithMotion() }
+    BackHandler(enabled = backEnabled) { dismissWithMotion() }
 
     Box(
         modifier = modifier

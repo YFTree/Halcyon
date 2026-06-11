@@ -18,14 +18,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -332,6 +332,24 @@ fun EllaApp(
     var showPlayerOverlay by remember { mutableStateOf(false) }
     var playerDismissProgress by remember { mutableFloatStateOf(0f) }
     var playerOverlayOpenToken by remember { mutableIntStateOf(0) }
+    // Keep the player surface resident in the composition tree once it has been opened, and
+    // drive open/close with a pure translationY slide instead of adding/removing the whole
+    // (very heavy) PlayerScreen each time. This removes the first-composition cost that used
+    // to land on the slide-in animation frames and caused a stutter on every open.
+    var playerEverShown by remember { mutableStateOf(false) }
+    val playerResident = showPlayerOverlay || playerEverShown
+    // 0f = fully open (on screen), 1f = fully closed (translated one screen-height down).
+    val playerOpenAnim = remember { Animatable(1f) }
+    LaunchedEffect(showPlayerOverlay) {
+        if (showPlayerOverlay) playerEverShown = true
+        playerOpenAnim.animateTo(
+            targetValue = if (showPlayerOverlay) 0f else 1f,
+            animationSpec = tween(
+                durationMillis = if (showPlayerOverlay) 320 else 260,
+                easing = if (showPlayerOverlay) FastOutSlowInEasing else LinearOutSlowInEasing
+            )
+        )
+    }
     val isPlayerVisible = showPlayerOverlay || currentRoute == Screen.Player.route
     val libraryCacheLoaded by mainViewModel.libraryCacheLoaded.collectAsState()
     val initialScanPromptHandled by settingsManager.initialScanPromptHandled.collectAsState(initial = true)
@@ -781,15 +799,18 @@ fun EllaApp(
                     modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
                 )
             }
-            AnimatedVisibility(
-                visible = showPlayerOverlay,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = ExitTransition.None,
-                modifier = Modifier.fillMaxSize()
-            ) {
+            if (playerResident) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationY = playerOpenAnim.value * size.height
+                        }
+                ) {
                 PlayerScreen(
                     mainViewModel = mainViewModel,
                     playerViewModel = playerViewModel,
+                    playerVisible = showPlayerOverlay,
                     onBack = {
                         playerViewModel.setShowLyrics(false)
                         showPlayerOverlay = false
@@ -818,6 +839,7 @@ fun EllaApp(
                     },
                     openToken = playerOverlayOpenToken
                 )
+                }
             }
 
             InitialScanPromptDialog(
