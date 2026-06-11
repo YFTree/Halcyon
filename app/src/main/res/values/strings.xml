@@ -305,7 +305,7 @@
     <string name="player_more_actions">更多操作</string>
     <string name="player_song_info">歌曲信息</string>
     <string name="player_lyrics_display">歌词显示</string>
-    <string name="player_landscape_lyrics">横屏歌词</string>
+    <string name="player_landscape_lyrics">横屏播放</string>
     <string name="player_edit_metadata">编辑元数据</string>
     <string name="player_lyric_timing">歌词打轴</string>
     <string name="player_lyric_offset">歌词偏移</string>

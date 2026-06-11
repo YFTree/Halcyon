@@ -2,6 +2,7 @@ package com.ella.music.ui.player
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,23 +16,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ella.music.R
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.SmoothLyricView
+import top.yukonga.miuix.kmp.basic.Icon
 
 @Composable
 internal fun LandscapeCoverPlayerPage(
@@ -83,6 +90,7 @@ internal fun LandscapeCoverPlayerPage(
     onClearQueue: () -> Unit,
     onLineClick: () -> Unit,
     onArtist: () -> Unit,
+    onDismiss: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val bluetoothDeviceName = rememberBluetoothOutputName()
@@ -105,42 +113,42 @@ internal fun LandscapeCoverPlayerPage(
                 .padding(horizontal = 32.dp, vertical = 22.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(0.62f),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight(0.82f)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (dynamicCoverSource != null) {
-                        DynamicCoverVideo(
-                            source = dynamicCoverSource,
-                            isPlaying = isPlaying,
-                            onPlaybackError = { onDynamicCoverFailed(dynamicCoverSource.failureKey) },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        AlbumArtView(
-                            song = song,
-                            embeddedCover = embeddedCover,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.width(28.dp))
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(1.38f),
+                    .weight(0.33f),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (dynamicCoverSource != null) {
+                            DynamicCoverVideo(
+                                source = dynamicCoverSource,
+                                isPlaying = isPlaying,
+                                onPlaybackError = { onDynamicCoverFailed(dynamicCoverSource.failureKey) },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            AlbumArtView(
+                                song = song,
+                                embeddedCover = embeddedCover,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -148,8 +156,8 @@ internal fun LandscapeCoverPlayerPage(
                     PlayerSongMetaText(
                         song = song,
                         annotation = annotation,
-                        titleFontSize = 24.sp,
-                        artistFontSize = 14.sp,
+                        titleFontSize = 20.sp,
+                        artistFontSize = 12.sp,
                         artistAlpha = 0.56f,
                         onArtistClick = onArtist,
                         modifier = Modifier.weight(1f)
@@ -161,7 +169,45 @@ internal fun LandscapeCoverPlayerPage(
                     )
                     PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
+                PlayerProgressBlock(
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    audioInfo = audioInfo,
+                    bluetoothDeviceName = bluetoothDeviceName,
+                    palette = palette,
+                    allowTapSeek = false,
+                    showTotalDuration = showTotalDuration,
+                    onSeek = onSeek
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                PlayerTransportControls(
+                    isPlaying = isPlaying,
+                    shuffleEnabled = shuffleEnabled,
+                    repeatMode = repeatMode,
+                    palette = palette,
+                    queueExpanded = queueExpanded,
+                    playlist = playlist,
+                    currentSongId = song?.id,
+                    onCyclePlaybackMode = onCyclePlaybackMode,
+                    onPrevious = onPrevious,
+                    onPlayPause = onPlayPause,
+                    onNext = onNext,
+                    onToggleQueue = onToggleQueue,
+                    onDismissQueue = onDismissQueue,
+                    onQueueSongClick = onQueueSongClick,
+                    onRemoveQueueSong = onRemoveQueueSong,
+                    onMoveQueueSong = onMoveQueueSong,
+                    onAddQueueToPlaylist = onAddQueueToPlaylist,
+                    onClearQueue = onClearQueue
+                )
+            }
+            Spacer(modifier = Modifier.width(28.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(0.67f)
+            ) {
                 SmoothLyricView(
                     songId = song?.id ?: 0L,
                     songTitle = song?.title.orEmpty(),
@@ -183,38 +229,7 @@ internal fun LandscapeCoverPlayerPage(
                     onLineLongClick = onLyricLineLongClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                )
-                PlayerProgressBlock(
-                    currentPosition = currentPosition,
-                    duration = duration,
-                    audioInfo = audioInfo,
-                    bluetoothDeviceName = bluetoothDeviceName,
-                    palette = palette,
-                    allowTapSeek = false,
-                    showTotalDuration = showTotalDuration,
-                    onSeek = onSeek
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                PlayerTransportControls(
-                    isPlaying = isPlaying,
-                    shuffleEnabled = shuffleEnabled,
-                    repeatMode = repeatMode,
-                    palette = palette,
-                    queueExpanded = queueExpanded,
-                    playlist = playlist,
-                    currentSongId = song?.id,
-                    onCyclePlaybackMode = onCyclePlaybackMode,
-                    onPrevious = onPrevious,
-                    onPlayPause = onPlayPause,
-                    onNext = onNext,
-                    onToggleQueue = onToggleQueue,
-                    onDismissQueue = onDismissQueue,
-                    onQueueSongClick = onQueueSongClick,
-                    onRemoveQueueSong = onRemoveQueueSong,
-                    onMoveQueueSong = onMoveQueueSong,
-                    onAddQueueToPlaylist = onAddQueueToPlaylist,
-                    onClearQueue = onClearQueue
+                        .fillMaxHeight()
                 )
             }
         }

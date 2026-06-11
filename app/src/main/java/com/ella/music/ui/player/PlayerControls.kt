@@ -96,12 +96,9 @@ internal fun LandscapeTransportControls(
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        PlayerTransportIconButton(onClick = onCyclePlaybackMode) {
-            PlaybackModeIcon(shuffleEnabled = shuffleEnabled, repeatMode = repeatMode, accent = palette.accent)
-        }
         PlayerTransportIconButton(onClick = onPrevious) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_skip_previous),

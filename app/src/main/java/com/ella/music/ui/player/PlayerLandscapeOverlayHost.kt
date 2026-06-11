@@ -68,94 +68,58 @@ internal fun PlayerLandscapeOverlayHost(
 
     ForceLandscapePlayerBars(onDismiss = onDismiss)
 
-    if (coverMode) {
-        val landscapeDynamicCoverSource = if (dynamicCoverEnabled) {
-            song
-                ?.dynamicCoverSource(context)
-                ?.takeUnless { it.failureKey == dynamicCoverFailedPath }
-        } else {
-            null
-        }
-        LandscapeCoverPlaybackOverlay(
-            song = song,
-            embeddedCover = embeddedCover,
-            annotation = annotation,
-            dynamicCoverSource = landscapeDynamicCoverSource,
-            isPlaying = isPlaying,
-            currentPosition = currentPosition,
-            duration = duration,
-            shuffleEnabled = shuffleEnabled,
-            repeatMode = repeatMode,
-            audioInfo = audioInfo,
-            palette = palette,
-            lyrics = lyrics,
-            currentLyricIndex = currentLyricIndex,
-            showTranslation = showTranslation,
-            showPronunciation = showPronunciation,
-            fontFamily = fontFamily,
-            fontPath = fontPath,
-            fontWeight = fontWeight,
-            fontScale = fontScale,
-            queueExpanded = queueExpanded,
-            playlist = playlist,
-            audioSessionId = audioSessionId,
-            visualizerEnabled = visualizerEnabled,
-            flowEffectMode = flowEffectMode,
-            onDynamicCoverFailed = onDynamicCoverFailed,
-            isFavorite = isFavorite,
-            onToggleFavorite = onToggleFavorite,
-            onToggleQueue = onToggleQueue,
-            onDismissQueue = onDismissQueue,
-            onShowLyrics = onShowLyrics,
-            onLyricLineClick = onLyricLineClick,
-            onLyricLineLongClick = onLyricLineLongClick,
-            onSeek = onSeekProgress,
-            onCyclePlaybackMode = onCyclePlaybackMode,
-            onPrevious = onPrevious,
-            onPlayPause = onPlayPause,
-            onNext = onNext,
-            onQueueSongClick = onQueueSongClick,
-            onRemoveQueueSong = onRemoveQueueSong,
-            onMoveQueueSong = onMoveQueueSong,
-            onAddQueueToPlaylist = onAddQueueToPlaylist,
-            onClearQueue = onClearQueue,
-            onArtist = onArtist,
-            onDismiss = onDismiss,
-            modifier = Modifier.fillMaxSize()
-        )
+    val landscapeDynamicCoverSource = if (dynamicCoverEnabled) {
+        song
+            ?.dynamicCoverSource(context)
+            ?.takeUnless { it.failureKey == dynamicCoverFailedPath }
     } else {
-        LandscapeLyricsOverlay(
-            song = song,
-            embeddedCover = embeddedCover,
-            annotation = annotation,
-            lyrics = lyrics,
-            currentLyricIndex = currentLyricIndex,
-            currentPosition = currentPosition,
-            duration = duration,
-            shuffleEnabled = shuffleEnabled,
-            repeatMode = repeatMode,
-            showTranslation = showTranslation,
-            showPronunciation = showPronunciation,
-            fontFamily = fontFamily,
-            fontPath = fontPath,
-            fontWeight = fontWeight,
-            fontScale = fontScale,
-            showTotalDuration = showTotalDuration,
-            palette = palette,
-            flowEffectMode = flowEffectMode,
-            isPlaying = isPlaying,
-            audioSessionId = audioSessionId,
-            visualizerEnabled = visualizerEnabled,
-            onLineClick = onLyricLineClick,
-            onLineLongClick = onLyricLineLongClick,
-            onSeek = onSeekProgress,
-            onCyclePlaybackMode = onCyclePlaybackMode,
-            onPrevious = onPrevious,
-            onPlayPause = onPlayPause,
-            onNext = onNext,
-            onShowCoverPlayer = onShowCoverPlayer,
-            onDismiss = onDismiss,
-            modifier = Modifier.fillMaxSize()
-        )
+        null
     }
+    LandscapeCoverPlaybackOverlay(
+        song = song,
+        embeddedCover = embeddedCover,
+        annotation = annotation,
+        dynamicCoverSource = landscapeDynamicCoverSource,
+        isPlaying = isPlaying,
+        currentPosition = currentPosition,
+        duration = duration,
+        shuffleEnabled = shuffleEnabled,
+        repeatMode = repeatMode,
+        audioInfo = audioInfo,
+        palette = palette,
+        lyrics = lyrics,
+        currentLyricIndex = currentLyricIndex,
+        showTranslation = showTranslation,
+        showPronunciation = showPronunciation,
+        fontFamily = fontFamily,
+        fontPath = fontPath,
+        fontWeight = fontWeight,
+        fontScale = fontScale,
+        queueExpanded = queueExpanded,
+        playlist = playlist,
+        audioSessionId = audioSessionId,
+        visualizerEnabled = visualizerEnabled,
+        flowEffectMode = flowEffectMode,
+        onDynamicCoverFailed = onDynamicCoverFailed,
+        isFavorite = isFavorite,
+        onToggleFavorite = onToggleFavorite,
+        onToggleQueue = onToggleQueue,
+        onDismissQueue = onDismissQueue,
+        onShowLyrics = onShowLyrics,
+        onLyricLineClick = onLyricLineClick,
+        onLyricLineLongClick = onLyricLineLongClick,
+        onSeek = onSeekProgress,
+        onCyclePlaybackMode = onCyclePlaybackMode,
+        onPrevious = onPrevious,
+        onPlayPause = onPlayPause,
+        onNext = onNext,
+        onQueueSongClick = onQueueSongClick,
+        onRemoveQueueSong = onRemoveQueueSong,
+        onMoveQueueSong = onMoveQueueSong,
+        onAddQueueToPlaylist = onAddQueueToPlaylist,
+        onClearQueue = onClearQueue,
+        onArtist = onArtist,
+        onDismiss = onDismiss,
+        modifier = Modifier.fillMaxSize()
+    )
 }

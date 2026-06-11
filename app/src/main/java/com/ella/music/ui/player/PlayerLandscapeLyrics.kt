@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -83,79 +84,86 @@ internal fun LandscapeLyricsOverlay(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 34.dp, end = 78.dp, top = 22.dp, bottom = 28.dp),
+                .padding(start = 34.dp, end = 48.dp, top = 22.dp, bottom = 28.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(0.56f)
-                    .widthIn(max = 360.dp),
-                contentAlignment = Alignment.Center
+                    .weight(0.33f)
+                    .widthIn(max = 400.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                AlbumArtView(
-                    song = song,
-                    embeddedCover = embeddedCover,
+                Box(
                     modifier = Modifier
-                        .fillMaxHeight(0.72f)
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(16.dp))
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AlbumArtView(
+                        song = song,
+                        embeddedCover = embeddedCover,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(16.dp))
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                LandscapeSongTitle(
+                    song = song,
+                    annotation = annotation,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LandscapeProgressRow(
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    palette = palette,
+                    allowTapSeek = false,
+                    showTotalDuration = showTotalDuration,
+                    onSeek = onSeek
+                )
+                LandscapeTransportControls(
+                    isPlaying = isPlaying,
+                    shuffleEnabled = shuffleEnabled,
+                    repeatMode = repeatMode,
+                    palette = palette,
+                    onCyclePlaybackMode = onCyclePlaybackMode,
+                    onPrevious = onPrevious,
+                    onPlayPause = onPlayPause,
+                    onNext = onNext
                 )
             }
             Spacer(modifier = Modifier.width(34.dp))
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(1.44f)
+                    .weight(0.67f)
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    LandscapeSongTitle(
-                        song = song,
-                        annotation = annotation,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    SmoothLyricView(
-                        songId = song?.id ?: 0L,
-                        songTitle = song?.title.orEmpty(),
-                        songArtist = song?.artist.orEmpty(),
-                        lyrics = lyrics,
-                        currentIndex = currentLyricIndex,
-                        currentPositionMs = currentPosition,
-                        isPlaying = isPlaying,
-                        showTranslation = showTranslation,
-                        showPronunciation = showPronunciation,
-                        fontScale = fontScale,
-                        fontPath = fontPath,
-                        fontWeight = fontWeight,
-                        primaryTextSizeSp = 30f,
-                        secondaryTextSizeSp = 15f,
-                        anchorOffsetRatio = -0.06f,
-                        topContentPadding = 12.dp,
-                        onLineClick = onLineClick,
-                        onLineLongClick = onLineLongClick,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                    )
-                    LandscapeProgressRow(
-                        currentPosition = currentPosition,
-                        duration = duration,
-                        palette = palette,
-                        allowTapSeek = false,
-                        showTotalDuration = showTotalDuration,
-                        onSeek = onSeek
-                    )
-                    LandscapeTransportControls(
-                        isPlaying = isPlaying,
-                        shuffleEnabled = shuffleEnabled,
-                        repeatMode = repeatMode,
-                        palette = palette,
-                        onCyclePlaybackMode = onCyclePlaybackMode,
-                        onPrevious = onPrevious,
-                        onPlayPause = onPlayPause,
-                        onNext = onNext
-                    )
-                }
+                SmoothLyricView(
+                    songId = song?.id ?: 0L,
+                    songTitle = song?.title.orEmpty(),
+                    songArtist = song?.artist.orEmpty(),
+                    lyrics = lyrics,
+                    currentIndex = currentLyricIndex,
+                    currentPositionMs = currentPosition,
+                    isPlaying = isPlaying,
+                    showTranslation = showTranslation,
+                    showPronunciation = showPronunciation,
+                    fontScale = fontScale,
+                    fontPath = fontPath,
+                    fontWeight = fontWeight,
+                    primaryTextSizeSp = 30f,
+                    secondaryTextSizeSp = 15f,
+                    anchorOffsetRatio = -0.06f,
+                    topContentPadding = 12.dp,
+                    onLineClick = onLineClick,
+                    onLineLongClick = onLineLongClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                )
             }
         }
         Box(

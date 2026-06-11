@@ -228,7 +228,7 @@ internal fun CoverPageContent(
         },
         onLandscape = {
             onMenuExpandedChange(false)
-            onLandscapeCoverModeChange(false)
+            onLandscapeCoverModeChange(true)
             onLandscapeExpandedChange(true)
         },
         onSongInfo = {

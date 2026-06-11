@@ -1,6 +1,7 @@
 package com.ella.music.ui.player
 
 import android.graphics.Bitmap
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +33,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,10 +42,7 @@ import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import kotlin.math.abs
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Music
 
 @Composable
 internal fun LandscapeCoverPlaybackOverlay(
@@ -143,10 +143,29 @@ internal fun LandscapeCoverPlaybackOverlay(
                 .padding(vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Text(
+                text = song?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.app_name),
+                color = Color.White.copy(alpha = 0.96f),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 96.dp)
+            )
+            Text(
+                text = song?.artist?.takeIf { it.isNotBlank() } ?: stringResource(R.string.player_unknown_artist),
+                color = Color.White.copy(alpha = 0.52f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 96.dp, vertical = 2.dp)
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f)
+                    .padding(top = 18.dp),
                 contentAlignment = Alignment.Center
             ) {
                 LandscapeCoverStack(
@@ -160,42 +179,51 @@ internal fun LandscapeCoverPlaybackOverlay(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = song?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.app_name),
-                color = Color.White.copy(alpha = 0.96f),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 34.dp)
-            )
-            Text(
-                text = song?.artist?.takeIf { it.isNotBlank() } ?: stringResource(R.string.player_unknown_artist),
-                color = Color.White.copy(alpha = 0.52f),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 34.dp, vertical = 2.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 58.dp)
+                    .padding(horizontal = 34.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Crossfade(targetState = currentLyricIndex, label = "coverOverlayLyric") { lineIndex ->
+                    val line = lyrics.getOrNull(lineIndex)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = line?.text?.trim().orEmpty(),
+                            color = Color.White.copy(alpha = 0.92f),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = fontFamily,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        val secondary = line?.translation?.trim()
+                            ?.takeIf { showTranslation && it.isNotEmpty() }
+                        if (secondary != null) {
+                            Text(
+                                text = secondary,
+                                color = Color.White.copy(alpha = 0.55f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = fontFamily,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(10.dp))
-        }
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 26.dp, end = 92.dp)
-                .size(56.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onShowLyrics),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Regular.Music,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.92f),
-                modifier = Modifier.size(26.dp)
-            )
         }
         Box(
             modifier = Modifier
