@@ -90,6 +90,8 @@ import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -432,21 +434,44 @@ fun ArtistScreen(
             )
         }
 
-        IconButton(
-            onClick = { sortExpanded = !sortExpanded },
-            enabled = !selectionMode,
-            modifier = Modifier
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(end = 8.dp, top = 8.dp)
-                .size(48.dp)
-                .align(Alignment.TopEnd)
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Regular.Sort,
-                contentDescription = stringResource(R.string.common_sort),
-                tint = if (selectionMode) Color.White.copy(alpha = 0.36f) else Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+        if (!selectionMode) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(end = 8.dp, top = 8.dp)
+                    .size(48.dp)
+                    .align(Alignment.TopEnd)
+            ) {
+                val sortItems = if (selectedArtistTab == ArtistTab.Songs) {
+                    ArtistDetailSongSortMode.entries.map { mode ->
+                        SortDropdownItem(
+                            text = stringResource(mode.labelRes),
+                            selected = sortMode == mode,
+                            onClick = {
+                                LibrarySortUiState.artistDetailSongSortIndex = mode.ordinal
+                                scope.launch { mainViewModel.settingsManager.setArtistDetailSongSortIndex(mode.ordinal) }
+                                scrollToTopRequest++
+                            }
+                        )
+                    }
+                } else {
+                    ArtistDetailAlbumSortMode.entries.map { mode ->
+                        SortDropdownItem(
+                            text = stringResource(mode.labelRes),
+                            selected = albumSortMode == mode,
+                            onClick = {
+                                albumSortMode = mode
+                                scrollToTopRequest++
+                            }
+                        )
+                    }
+                }
+                SortDropdownMenu(
+                    items = sortItems,
+                    tint = Color.White
+                )
+            }
         }
 
         DoubleTapScrollOverlay(

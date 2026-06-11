@@ -74,6 +74,8 @@ import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.viewmodel.MainViewModel
@@ -408,21 +410,29 @@ fun AlbumDetailScreen(
             )
         }
 
-        IconButton(
-            onClick = { sortExpanded = !sortExpanded },
-            enabled = !selectionMode,
-            modifier = Modifier
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(end = 8.dp, top = 8.dp)
-                .size(48.dp)
-                .align(Alignment.TopEnd)
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Regular.Sort,
-                contentDescription = stringResource(R.string.common_sort),
-                tint = if (selectionMode) MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.38f) else MiuixTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp)
-            )
+        if (!selectionMode) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(end = 8.dp, top = 8.dp)
+                    .size(48.dp)
+                    .align(Alignment.TopEnd)
+            ) {
+                SortDropdownMenu(
+                    items = AlbumDetailSongSortMode.entries.map { mode ->
+                        SortDropdownItem(
+                            text = stringResource(mode.labelRes),
+                            selected = sortMode == mode,
+                            onClick = {
+                                LibrarySortUiState.albumDetailSongSortIndex = mode.ordinal
+                                scope.launch { mainViewModel.settingsManager.setAlbumDetailSongSortIndex(mode.ordinal) }
+                                scrollToTopRequest++
+                            }
+                        )
+                    }
+                )
+            }
         }
 
         DoubleTapScrollOverlay(

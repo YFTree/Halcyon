@@ -2,6 +2,7 @@ package com.ella.music.ui.theme
 
 import android.graphics.Typeface
 import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
@@ -32,18 +33,20 @@ fun EllaTheme(
     appFontWeight: Int = 800,
     monetMode: Int = MONET_OFF,
     keyColor: Color? = null,
+    systemDarkOverride: Boolean? = null,
     content: @Composable () -> Unit
 ) {
+    val systemDark = systemDarkOverride ?: isSystemInDarkTheme()
     val colorSchemeMode = when (themeMode) {
         THEME_LIGHT -> ColorSchemeMode.Light
         THEME_DARK -> ColorSchemeMode.Dark
-        else -> ColorSchemeMode.System
+        else -> if (systemDark) ColorSchemeMode.Dark else ColorSchemeMode.Light
     }
     // Monet variant of the current light/dark choice.
     val monetSchemeMode = when (themeMode) {
         THEME_LIGHT -> ColorSchemeMode.MonetLight
         THEME_DARK -> ColorSchemeMode.MonetDark
-        else -> ColorSchemeMode.MonetSystem
+        else -> if (systemDark) ColorSchemeMode.MonetDark else ColorSchemeMode.MonetLight
     }
 
     val controller = remember(colorSchemeMode, monetSchemeMode, monetMode, keyColor) {

@@ -25,6 +25,8 @@ import com.ella.music.R
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.EllaSmallTopAppBar
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
 import top.yukonga.miuix.kmp.basic.FloatingActionButton
 import top.yukonga.miuix.kmp.basic.Icon
@@ -46,10 +48,10 @@ internal fun PlaylistDetailTopBar(
     selectionMode: Boolean,
     showRemoveSelected: Boolean,
     showExport: Boolean,
+    sortItems: List<SortDropdownItem>,
     onNavigationClick: () -> Unit,
     onAddSelectedClick: () -> Unit,
     onRemoveSelectedClick: () -> Unit,
-    onSortClick: () -> Unit,
     onSearchClick: () -> Unit,
     onExportClick: () -> Unit
 ) {
@@ -86,14 +88,7 @@ internal fun PlaylistDetailTopBar(
                     }
                 }
             } else {
-                IconButton(onClick = onSortClick) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Sort,
-                        contentDescription = stringResource(R.string.common_sort),
-                        tint = MiuixTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                SortDropdownMenu(items = sortItems)
                 IconButton(onClick = onSearchClick) {
                     Icon(
                         imageVector = MiuixIcons.Basic.Search,

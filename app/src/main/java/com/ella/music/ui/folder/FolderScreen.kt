@@ -49,6 +49,8 @@ import com.ella.music.ui.LibrarySortUiState
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.LazyListScrollIndicator
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -129,14 +131,19 @@ fun FolderScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Sort,
-                            contentDescription = stringResource(R.string.common_sort),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    SortDropdownMenu(
+                        items = FolderListSortMode.entries.map { mode ->
+                            SortDropdownItem(
+                                text = stringResource(mode.labelRes),
+                                selected = folderSortMode == mode,
+                                onClick = {
+                                    LibrarySortUiState.folderListSortIndex = mode.ordinal
+                                    scope.launch { mainViewModel.settingsManager.setFolderListSortIndex(mode.ordinal) }
+                                    scrollToTopRequest++
+                                }
+                            )
+                        }
+                    )
                     IconButton(onClick = {
                         searchExpanded = !searchExpanded
                         if (!searchExpanded) searchQuery = ""

@@ -3,6 +3,8 @@ package com.ella.music.ui.home
 import android.icu.text.Transliterator
 import com.ella.music.R
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.toFastIndexSection
+import com.ella.music.ui.components.toFastIndexSortableKey
 import java.util.Locale
 
 internal enum class HomeSortMode(val labelRes: Int) {
@@ -49,17 +51,16 @@ private fun Song.releaseYearOrNull(): Int? =
     Regex("""\d{4}""").find(year)?.value?.toIntOrNull()
 
 internal fun Song.indexLetter(sortKey: String? = null): String {
-    val first = (sortKey ?: title.musicSortKey()).firstOrNull()?.uppercaseChar()
-    return if (first != null && first in 'A'..'Z') first.toString() else "#"
+    return (sortKey ?: title.musicSortKey()).toFastIndexSection()
 }
 
 private fun String.musicSortKey(): String {
     val text = trim()
     if (text.isBlank()) return ""
-    if (text.isAsciiSortable()) return text.lowercase(Locale.ROOT)
+    if (text.isAsciiSortable()) return text.toFastIndexSortableKey()
     MusicSortKeyCache[text]?.let { return it }
     val latin = runCatching { MusicSortTransliterator.value.transliterate(text) }.getOrDefault(text)
-    return latin.lowercase(Locale.ROOT).also { MusicSortKeyCache[text] = it }
+    return latin.toFastIndexSortableKey().also { MusicSortKeyCache[text] = it }
 }
 
 private inline fun List<Song>.sortedByMusicKey(crossinline selector: (Song) -> String): HomeSortedSongs {

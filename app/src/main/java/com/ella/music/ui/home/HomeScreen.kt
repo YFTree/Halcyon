@@ -96,6 +96,8 @@ import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SongSelectionActionRow
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.TagEditorOption
 import com.ella.music.ui.components.TagEditorOptionKind
 import com.ella.music.ui.components.buildTagEditorOptions
@@ -477,14 +479,19 @@ fun LibraryScreen(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
-                        IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                            Icon(
-                                imageVector = MiuixIcons.Regular.Sort,
-                                contentDescription = stringResource(R.string.common_sort),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        SortDropdownMenu(
+                            items = HomeSortMode.entries.map { mode ->
+                                SortDropdownItem(
+                                    text = stringResource(mode.labelRes),
+                                    selected = sortMode == mode,
+                                    onClick = {
+                                        LibrarySortUiState.librarySongSortIndex = mode.ordinal
+                                        scope.launch { settingsManager.setLibrarySongSortIndex(mode.ordinal) }
+                                        scrollToTopRequest++
+                                    }
+                                )
+                            }
+                        )
                     }
                 }
             )

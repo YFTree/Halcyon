@@ -110,6 +110,7 @@ import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.player.PlaybackAudioSession
+import com.ella.music.ui.components.TagEditorOptionKind
 import com.ella.music.ui.components.shareLyricCard
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -431,6 +432,8 @@ fun PlayerScreen(
                         onSongInfoExpandedChange = { uiState.songInfoExpanded = it },
                         onRatingSheetSongChange = { uiState.ratingSheetSong = it },
                         onAiSheetSongChange = { uiState.aiSheetSong = it },
+                        onTagEditorSongChange = { uiState.tagEditorSong = it },
+                        onTagEditorKindChange = { uiState.tagEditorKind = it },
                         onRequestDeleteSong = ::requestDeleteSong,
                         onNavigateToAlbum = onNavigateToAlbum,
                         onNavigateToArtist = onNavigateToArtist,
@@ -587,6 +590,14 @@ fun PlayerScreen(
                 onAiSheetSongChange = { uiState.aiSheetSong = it },
                 deleteConfirmSong = uiState.deleteConfirmSong,
                 onDeleteConfirmSongChange = { uiState.deleteConfirmSong = it },
+                tagEditorSong = uiState.tagEditorSong,
+                onTagEditorSongChange = { uiState.tagEditorSong = it },
+                tagEditorKind = uiState.tagEditorKind,
+                onTagEditorKindChange = { uiState.tagEditorKind = it },
+                metadataEditorId = metadataEditorId,
+                lyricTimingEditorId = lyricTimingEditorId,
+                metadataEditorSong = uiState.metadataEditorSong,
+                onMetadataEditorSongChange = { uiState.metadataEditorSong = it },
                 onWritePermissionRequired = { error, retry ->
                     uiState.pendingWriteRetry = retry
                     deletePermissionLauncher.launch(

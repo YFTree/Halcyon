@@ -1,6 +1,7 @@
 package com.ella.music.data
 
 import android.content.Context
+import android.net.Uri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -16,6 +17,7 @@ import com.ella.music.player.AudioEffectSettings
 import androidx.annotation.StringRes
 import com.ella.music.R
 import org.json.JSONObject
+import java.io.File
 import java.util.Locale
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "ella_settings")
@@ -1559,7 +1561,36 @@ class SettingsManager(private val context: Context) {
             setString(KEY_BOTTOM_DOCK_ITEMS)
             setString(KEY_LYRIC_OFFSET_OVERRIDES)
             setString(KEY_PLAYLIST_CUSTOM_ORDER)
+
+            fun clearMissingCustomImage(
+                enabledKey: Preferences.Key<Boolean>,
+                uriKey: Preferences.Key<String>
+            ) {
+                val uriString = prefs[uriKey].orEmpty()
+                if (uriString.isNotBlank() && !isRestoredCustomImageAvailable(uriString)) {
+                    prefs[enabledKey] = false
+                    prefs.remove(uriKey)
+                }
+            }
+
+            clearMissingCustomImage(KEY_STARTUP_POSTER_ENABLED, KEY_STARTUP_POSTER_URI)
+            clearMissingCustomImage(KEY_APP_WALLPAPER_ENABLED, KEY_APP_WALLPAPER_URI)
+            clearMissingCustomImage(KEY_PLAYER_BACKGROUND_ENABLED, KEY_PLAYER_BACKGROUND_URI)
+            clearMissingCustomImage(KEY_HI_RES_LOGO_ENABLED, KEY_HI_RES_LOGO_URI)
         }
+    }
+
+    private fun isRestoredCustomImageAvailable(uriString: String): Boolean {
+        val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return false
+        if (uri.scheme != "file") return false
+        val path = uri.path ?: return false
+        val file = File(path)
+        val customImageDir = File(context.filesDir, "custom_images")
+        return runCatching {
+            val target = file.canonicalFile
+            val dir = customImageDir.canonicalFile
+            target.path.startsWith(dir.path) && target.isFile && target.canRead() && target.length() > 0L
+        }.getOrDefault(false)
     }
 
     suspend fun setScanExcludeFolders(folders: String) {

@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -160,6 +161,7 @@ class MainActivity : ComponentActivity() {
 
     private var mainViewModel: MainViewModel? = null
     private var appliedLanguageTag: String? = null
+    private var currentSystemNightMode by mutableIntStateOf(Configuration.UI_MODE_NIGHT_UNDEFINED)
     var latestIntent: Intent? = null
         private set
     var onNewIntentCallback: ((Intent) -> Unit)? = null
@@ -175,6 +177,7 @@ class MainActivity : ComponentActivity() {
         applySavedAppLanguage()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        currentSystemNightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
@@ -206,9 +209,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            val systemDark = when (currentSystemNightMode) {
+                Configuration.UI_MODE_NIGHT_YES -> true
+                Configuration.UI_MODE_NIGHT_NO -> false
+                else -> isSystemInDarkTheme()
+            }
             val isDark = when (themeMode) {
                 THEME_DARK -> true
-                THEME_FOLLOW_SYSTEM -> isSystemInDarkTheme()
+                THEME_FOLLOW_SYSTEM -> systemDark
                 else -> false
             }
 
@@ -275,11 +283,17 @@ class MainActivity : ComponentActivity() {
                 appFontPath = appFontPath,
                 appFontWeight = appFontWeight,
                 monetMode = monetMode,
-                keyColor = coverSeed
+                keyColor = coverSeed,
+                systemDarkOverride = systemDark
             ) {
                 EllaApp(mainVm, playerVm, isDark)
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        currentSystemNightMode = newConfig.uiMode and Configuration.UI_MODE_NIGHT_MASK
     }
 
     private fun checkAndRequestPermissions(): Boolean {

@@ -49,6 +49,7 @@ import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixMenuItem
 import com.ella.music.ui.components.LazyListScrollIndicator
+import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.requestPinnedEllaShortcut
 import com.ella.music.ui.components.shareLocalSongs
 import com.ella.music.ui.components.ellaPageBackground
@@ -309,12 +310,21 @@ fun PlaylistScreen(
         PlaylistScreenTopBar(
             selectionMode = selectionMode,
             selectedCount = selectedPlaylistIds.size,
+            sortItems = PlaylistSortMode.entries.map { mode ->
+                SortDropdownItem(
+                    text = stringResource(mode.labelRes),
+                    selected = playlistSortMode == mode,
+                    onClick = {
+                        scope.launch { mainViewModel.settingsManager.setPlaylistListSortIndex(mode.ordinal) }
+                        scope.launch { listState.animateScrollToItem(0) }
+                    }
+                )
+            },
             onBackClick = { if (selectionMode) finishSelectionMode() else onBack() },
             onDeleteSelectedClick = {
                 val targets = storedCustomPlaylists.filter { it.id in selectedPlaylistIds }
                 if (targets.isNotEmpty()) playlistsPendingDelete = targets
             },
-            onSortClick = { sortExpanded = !sortExpanded },
             onSearchClick = {
                 searchExpanded = !searchExpanded
                 if (!searchExpanded) searchQuery = ""

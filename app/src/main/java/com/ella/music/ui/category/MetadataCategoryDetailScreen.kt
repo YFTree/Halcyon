@@ -99,6 +99,8 @@ import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.ArtworkUsage
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.ui.components.requestPinnedEllaShortcut
@@ -350,14 +352,32 @@ fun MetadataCategoryDetailScreen(
                                 )
                             }
                         }
-                        IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                            Icon(
-                                imageVector = MiuixIcons.Regular.Sort,
-                                contentDescription = stringResource(R.string.common_sort),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
+                        val sortItems = if (selectedTab == MetadataDetailTab.Albums) {
+                            MetadataDetailAlbumSortMode.entries.map { mode ->
+                                SortDropdownItem(
+                                    text = mode.label(),
+                                    selected = albumSortMode == mode,
+                                    onClick = {
+                                        scope.launch { mainViewModel.settingsManager.setMetadataCategoryDetailAlbumSortIndex(type, mode.ordinal) }
+                                        scope.launch { listState.animateScrollToItem(0) }
+                                    }
+                                )
+                            }
+                        } else {
+                            MetadataDetailSongSortMode.entries
+                                .filterNot { type == "folder" && it == MetadataDetailSongSortMode.AlbumTrack }
+                                .map { mode ->
+                                    SortDropdownItem(
+                                        text = mode.label(),
+                                        selected = sortMode == mode,
+                                        onClick = {
+                                            scope.launch { mainViewModel.settingsManager.setMetadataCategoryDetailSongSortIndex(type, mode.ordinal) }
+                                            scope.launch { listState.animateScrollToItem(0) }
+                                        }
+                                    )
+                                }
                         }
+                        SortDropdownMenu(items = sortItems)
                     }
                 }
             )

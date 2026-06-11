@@ -87,11 +87,34 @@ fun AddToPlaylistSheet(
             modifier = Modifier.fillMaxWidth()
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            AddPlaylistChip(
-                text = stringResource(R.string.common_sort) + ": " + stringResource(sortMode.labelRes),
-                onClick = { sortMode = sortMode.next() },
-                modifier = Modifier.weight(1f)
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                SortDropdownMenuContent(
+                    items = AddPlaylistSortMode.entries.map { mode ->
+                        SortDropdownItem(
+                            text = stringResource(mode.labelRes),
+                            selected = sortMode == mode,
+                            onClick = { sortMode = mode }
+                        )
+                    }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f))
+                            .padding(horizontal = 10.dp, vertical = 9.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.common_sort) + ": " + stringResource(sortMode.labelRes),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
             AddPlaylistChip(
                 text = if (appendToEnd) stringResource(R.string.song_more_add_position_end) else stringResource(R.string.song_more_add_position_start),
                 onClick = { appendToEnd = !appendToEnd },

@@ -6,7 +6,12 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun SongSheetColumn(content: @Composable ColumnScope.() -> Unit) {
-    EllaMiuixSheetColumn(verticalPadding = 8.dp, spacing = 2.dp, content = content)
+    EllaMiuixSheetColumn(
+        verticalPadding = 8.dp,
+        spacing = 2.dp,
+        showHandle = false,
+        content = content
+    )
 }
 
 @Composable

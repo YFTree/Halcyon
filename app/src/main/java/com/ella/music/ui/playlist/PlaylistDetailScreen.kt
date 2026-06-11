@@ -48,6 +48,7 @@ import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -240,6 +241,16 @@ fun PlaylistDetailScreen(
                 selectionMode = selectionMode,
                 showRemoveSelected = !isFiveStarPlaylist,
                 showExport = playlist != null && !isFiveStarPlaylist,
+                sortItems = PlaylistSongSortMode.entries.map { mode ->
+                    SortDropdownItem(
+                        text = stringResource(mode.labelRes),
+                        selected = sortMode == mode,
+                        onClick = {
+                            scope.launch { mainViewModel.settingsManager.setPlaylistDetailSongSortIndex(mode.ordinal) }
+                            scope.launch { listState.animateScrollToItem(0) }
+                        }
+                    )
+                },
                 onNavigationClick = {
                     if (selectionMode) finishSelectionMode() else onBack()
                 },
@@ -255,7 +266,6 @@ fun PlaylistDetailScreen(
                     val selected = selectedDisplayedSongs()
                     if (selected.isNotEmpty()) removeSelectedPlaylistSongs = selected
                 },
-                onSortClick = { sortExpanded = !sortExpanded },
                 onSearchClick = {
                     searchExpanded = !searchExpanded
                     if (!searchExpanded) searchQuery = ""
@@ -325,7 +335,16 @@ fun PlaylistDetailScreen(
                                 if (openPlayerOnPlay) onNavigateToPlayer()
                             }
                         },
-                        onSort = { sortExpanded = !sortExpanded }
+                        sortItems = PlaylistSongSortMode.entries.map { mode ->
+                            SortDropdownItem(
+                                text = stringResource(mode.labelRes),
+                                selected = sortMode == mode,
+                                onClick = {
+                                    scope.launch { mainViewModel.settingsManager.setPlaylistDetailSongSortIndex(mode.ordinal) }
+                                    scope.launch { listState.animateScrollToItem(0) }
+                                }
+                            )
+                        }
                     )
                 }
 

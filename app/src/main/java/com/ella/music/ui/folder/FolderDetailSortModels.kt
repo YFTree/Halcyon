@@ -3,6 +3,8 @@ package com.ella.music.ui.folder
 import android.icu.text.Transliterator
 import com.ella.music.R
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.toFastIndexSection
+import com.ella.music.ui.components.toFastIndexSortableKey
 import java.util.Locale
 
 internal enum class FolderSongSortMode(val labelRes: Int) {
@@ -38,14 +40,13 @@ internal fun Song.releaseYearOrNull(): Int? =
     Regex("""\d{4}""").find(year)?.value?.toIntOrNull()
 
 internal fun Song.indexLetter(): String {
-    val first = title.musicSortKey().firstOrNull()?.uppercaseChar()
-    return if (first != null && first in 'A'..'Z') first.toString() else "#"
+    return title.musicSortKey().toFastIndexSection()
 }
 
 internal fun String.musicSortKey(): String {
     val text = trim()
     if (text.isBlank()) return ""
-    if (text.isAsciiSortable()) return text.lowercase(Locale.ROOT)
+    if (text.isAsciiSortable()) return text.toFastIndexSortableKey()
 
     FolderSortKeyCache[text]?.let { return it }
 
@@ -53,7 +54,7 @@ internal fun String.musicSortKey(): String {
         FolderSortTransliterator.value.transliterate(text)
     }.getOrDefault(text)
 
-    return latin.lowercase(Locale.ROOT).also {
+    return latin.toFastIndexSortableKey().also {
         FolderSortKeyCache[text] = it
     }
 }

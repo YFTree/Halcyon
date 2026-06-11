@@ -29,6 +29,8 @@ import com.ella.music.R
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.EllaSmallTopAppBar
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -48,9 +50,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun PlaylistScreenTopBar(
     selectionMode: Boolean,
     selectedCount: Int,
+    sortItems: List<SortDropdownItem>,
     onBackClick: () -> Unit,
     onDeleteSelectedClick: () -> Unit,
-    onSortClick: () -> Unit,
     onSearchClick: () -> Unit,
     onImportClick: () -> Unit,
     onExportAllClick: () -> Unit,
@@ -84,11 +86,7 @@ internal fun PlaylistScreenTopBar(
                         )
                     }
                 } else {
-                    PlaylistTopBarIcon(
-                        icon = MiuixIcons.Regular.Sort,
-                        contentDescription = stringResource(R.string.common_sort),
-                        onClick = onSortClick
-                    )
+                    SortDropdownMenu(items = sortItems)
                     PlaylistTopBarIcon(
                         icon = MiuixIcons.Basic.Search,
                         contentDescription = stringResource(R.string.common_search),

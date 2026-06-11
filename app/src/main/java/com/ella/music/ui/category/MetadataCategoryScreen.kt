@@ -90,6 +90,8 @@ import com.ella.music.ui.components.LazyGridScrollIndicator
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.requestPinnedEllaShortcut
 import com.ella.music.ui.navigation.Screen
@@ -230,14 +232,18 @@ fun MetadataCategoryScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Sort,
-                            contentDescription = stringResource(R.string.common_sort),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    SortDropdownMenu(
+                        items = availableSortModes.map { mode ->
+                            SortDropdownItem(
+                                text = mode.displayLabel(type),
+                                selected = sortMode == mode,
+                                onClick = {
+                                    scope.launch { mainViewModel.settingsManager.setMetadataCategorySortIndex(type, availableSortModes.indexOf(mode)) }
+                                    scope.launch { gridState.scrollToItem(0) }
+                                }
+                            )
+                        }
+                    )
                     IconButton(onClick = {
                         searchExpanded = !searchExpanded
                         if (!searchExpanded) searchQuery = ""

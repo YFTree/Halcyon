@@ -13,14 +13,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ella.music.R
 import com.ella.music.data.model.Song
-import com.ella.music.ui.components.TagEditorOptionKind
-import com.ella.music.ui.components.buildTagEditorOptions
-import com.ella.music.ui.components.launchTagEditorOption
 
 @Composable
 internal fun PlayerActionMenu(
@@ -51,6 +47,8 @@ internal fun PlayerActionMenu(
     onSpectrum: () -> Unit,
     onOpenEqualizer: () -> Unit,
     onDeleteSong: () -> Unit,
+    onEditMetadata: () -> Unit,
+    onLyricTiming: () -> Unit,
     onMatchDynamicCover: () -> Unit,
     onStopAfterCurrent: (Boolean) -> Unit,
     onTimer: (Int) -> Unit,
@@ -64,34 +62,6 @@ internal fun PlayerActionMenu(
     modifier: Modifier = Modifier
 ) {
     var page by remember(initialPage) { mutableStateOf(initialPage) }
-    val context = LocalContext.current
-    val metadataOptions = remember(song?.id, song?.path, song?.mimeType) {
-        song?.let { buildTagEditorOptions(context, it) }
-            .orEmpty()
-            .filter { it.kind == TagEditorOptionKind.Metadata }
-    }
-    val lyricTimingOptions = remember(song?.id, song?.path, song?.mimeType) {
-        song?.let { buildTagEditorOptions(context, it) }
-            .orEmpty()
-            .filter { it.kind == TagEditorOptionKind.LyricTiming }
-    }
-
-    fun openEditorPage(kind: TagEditorOptionKind, preferredId: String) {
-        val options = if (kind == TagEditorOptionKind.Metadata) metadataOptions else lyricTimingOptions
-        val preferredOption = preferredId
-            .takeIf { it.isNotBlank() }
-            ?.let { id -> options.firstOrNull { it.id == id } }
-        if (preferredOption != null) {
-            launchTagEditorOption(context, preferredOption)
-            onClose()
-        } else {
-            page = if (kind == TagEditorOptionKind.Metadata) {
-                PlayerActionSheetPage.MetadataEditor
-            } else {
-                PlayerActionSheetPage.LyricTimingEditor
-            }
-        }
-    }
 
     Column(
         modifier = modifier
@@ -130,8 +100,8 @@ internal fun PlayerActionMenu(
                     if (visualizerAvailable) {
                         PlayerActionMenuItem(stringResource(R.string.player_visualizer_settings), { page = PlayerActionSheetPage.Visualizer })
                     }
-                    PlayerActionMenuItem(stringResource(R.string.player_edit_metadata), { openEditorPage(TagEditorOptionKind.Metadata, metadataEditorId) })
-                    PlayerActionMenuItem(stringResource(R.string.player_lyric_timing), { openEditorPage(TagEditorOptionKind.LyricTiming, lyricTimingEditorId) })
+                    PlayerActionMenuItem(stringResource(R.string.player_edit_metadata), onEditMetadata)
+                    PlayerActionMenuItem(stringResource(R.string.player_lyric_timing), onLyricTiming)
                     PlayerActionMenuItem(stringResource(R.string.player_lyric_offset), { page = PlayerActionSheetPage.LyricOffset })
                     if (song?.onlineSource == "kw" && song.path.startsWith("http")) {
                         PlayerActionMenuItem(stringResource(R.string.player_download_lx_song), onDownload)
@@ -177,24 +147,6 @@ internal fun PlayerActionMenu(
                     onEnabledChange = onVisualizerEnabled
                 )
             }
-            PlayerActionSheetPage.MetadataEditor -> {
-                TagEditorSheetContent(
-                    song = song,
-                    title = stringResource(R.string.player_choose_metadata_editor),
-                    kind = TagEditorOptionKind.Metadata,
-                    onBack = { page = PlayerActionSheetPage.Main },
-                    onClose = onClose
-                )
-            }
-            PlayerActionSheetPage.LyricTimingEditor -> {
-                TagEditorSheetContent(
-                    song = song,
-                    title = stringResource(R.string.player_choose_lyric_timing_editor),
-                    kind = TagEditorOptionKind.LyricTiming,
-                    onBack = { page = PlayerActionSheetPage.Main },
-                    onClose = onClose
-                )
-            }
         }
     }
 }
@@ -204,7 +156,5 @@ internal enum class PlayerActionSheetPage {
     Timer,
     Speed,
     LyricOffset,
-    Visualizer,
-    MetadataEditor,
-    LyricTimingEditor
+    Visualizer
 }

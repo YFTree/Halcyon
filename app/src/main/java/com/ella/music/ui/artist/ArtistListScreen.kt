@@ -60,6 +60,8 @@ import com.ella.music.ui.navigation.Screen
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.LazyListScrollIndicator
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -268,14 +270,19 @@ fun ArtistListScreen(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
-                        IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                            Icon(
-                                imageVector = MiuixIcons.Regular.Sort,
-                                contentDescription = stringResource(R.string.common_sort),
-                                tint = MiuixTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
+                        SortDropdownMenu(
+                            items = ArtistSortMode.entries.map { mode ->
+                                SortDropdownItem(
+                                    text = stringResource(mode.labelRes),
+                                    selected = sortMode == mode,
+                                    onClick = {
+                                        LibrarySortUiState.artistListSortIndex = mode.ordinal
+                                        scope.launch { mainViewModel.settingsManager.setArtistListSortIndex(mode.ordinal) }
+                                        scrollToTopRequest++
+                                    }
+                                )
+                            }
+                        )
                         IconButton(onClick = { searchExpanded = !searchExpanded }) {
                             Icon(
                                 imageVector = MiuixIcons.Basic.Search,

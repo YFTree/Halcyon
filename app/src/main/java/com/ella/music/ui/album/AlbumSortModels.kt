@@ -4,6 +4,8 @@ import android.icu.text.Transliterator
 import com.ella.music.R
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.formatPlaybackDuration
+import com.ella.music.ui.components.toFastIndexSection
+import com.ella.music.ui.components.toFastIndexSortableKey
 import java.util.Locale
 
 internal enum class AlbumSortMode(val labelRes: Int) {
@@ -42,14 +44,13 @@ private fun Long.formatAlbumDuration(): String {
 
 internal fun Album.indexLetter(sortMode: AlbumSortMode): String {
     val source = if (sortMode == AlbumSortMode.Artist) albumArtist.ifBlank { artist } else name
-    val first = source.musicSortKey().firstOrNull()?.uppercaseChar()
-    return if (first != null && first in 'A'..'Z') first.toString() else "#"
+    return source.musicSortKey().toFastIndexSection()
 }
 
 internal fun String.musicSortKey(): String {
     val text = trim()
     if (text.isBlank()) return ""
-    if (text.isAsciiSortable()) return text.lowercase(Locale.ROOT)
+    if (text.isAsciiSortable()) return text.toFastIndexSortableKey()
 
     AlbumSortKeyCache[text]?.let { return it }
 
@@ -57,7 +58,7 @@ internal fun String.musicSortKey(): String {
         AlbumSortTransliterator.value.transliterate(text)
     }.getOrDefault(text)
 
-    return latin.lowercase(Locale.ROOT).also {
+    return latin.toFastIndexSortableKey().also {
         AlbumSortKeyCache[text] = it
     }
 }

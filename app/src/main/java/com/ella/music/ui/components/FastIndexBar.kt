@@ -1,6 +1,7 @@
 package com.ella.music.ui.components
 
 import android.os.SystemClock
+import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -13,10 +14,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -32,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +46,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -51,11 +56,20 @@ fun FastIndexBar(
     onLetterClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val view = LocalView.current
     val indexLetters = remember(letters) { letters.toFastIndexLetters() }
     var heightPx by remember { mutableStateOf(1) }
     var contentHeightPx by remember { mutableStateOf(1) }
     var lastSelectedLetter by remember { mutableStateOf<String?>(null) }
     var lastDispatchTimeMs by remember { mutableStateOf(0L) }
+    val barAlpha by animateFloatAsState(
+        targetValue = if (lastSelectedLetter != null) 0.18f else 0f,
+        label = "fastIndexBarBackgroundAlpha"
+    )
+    val bubbleAlpha by animateFloatAsState(
+        targetValue = if (lastSelectedLetter != null) 1f else 0f,
+        label = "fastIndexBubbleAlpha"
+    )
 
     fun selectAt(y: Float, force: Boolean = false) {
         if (indexLetters.isEmpty()) return
@@ -71,11 +85,14 @@ fun FastIndexBar(
             lastSelectedLetter = letter
             lastDispatchTimeMs = now
             onLetterClick(letter)
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
+            .width(42.dp)
+            .fillMaxHeight()
             .onSizeChanged { heightPx = it.height.coerceAtLeast(1) }
             .pointerInput(indexLetters, heightPx, contentHeightPx) {
                 awaitEachGesture {
@@ -95,23 +112,69 @@ fun FastIndexBar(
             },
         contentAlignment = Alignment.Center
     ) {
+        val cellSize = if (indexLetters.isEmpty()) {
+            10.dp
+        } else {
+            (maxHeight / indexLetters.size.toFloat()).coerceAtMost(20.dp).coerceAtLeast(10.dp)
+        }
+        val barHeight = cellSize * indexLetters.size.toFloat()
+        val cellFontSize = when {
+            cellSize < 15.dp -> 6.sp
+            cellSize < 20.dp -> 9.sp
+            else -> 10.sp
+        }
         Column(
-            modifier = Modifier.onSizeChanged { contentHeightPx = it.height.coerceAtLeast(1) },
+            modifier = Modifier
+                .width(cellSize)
+                .height(barHeight)
+                .clip(RoundedCornerShape(999.dp))
+                .background(MiuixTheme.colorScheme.primary.copy(alpha = barAlpha))
+                .onSizeChanged { contentHeightPx = it.height.coerceAtLeast(1) },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             indexLetters.forEach { letter ->
-                Text(
-                    text = letter,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.primary,
+                val selected = letter == lastSelectedLetter
+                Box(
                     modifier = Modifier
+                        .size(cellSize)
                         .clickable {
                             lastSelectedLetter = letter
                             lastDispatchTimeMs = SystemClock.uptimeMillis()
                             onLetterClick(letter)
+                            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = letter,
+                        fontSize = cellFontSize,
+                        lineHeight = cellFontSize,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (selected) {
+                            MiuixTheme.colorScheme.primary
+                        } else {
+                            MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.72f)
                         }
-                        .padding(horizontal = 8.dp, vertical = 1.dp)
+                    )
+                }
+            }
+        }
+        if (bubbleAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .offset(x = (-38).dp)
+                    .size(50.dp)
+                    .alpha(bubbleAlpha)
+                    .clip(CircleShape)
+                    .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.92f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = lastSelectedLetter.orEmpty(),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MiuixTheme.colorScheme.onPrimary
                 )
             }
         }
@@ -119,7 +182,43 @@ fun FastIndexBar(
 }
 
 fun List<String>.toFastIndexLetters(): List<String> =
-    distinct().sortedWith(compareBy<String> { if (it == "#") "ZZZ" else it })
+    map { it.trim().ifBlank { "#" } }
+        .distinct()
+        .sortedWith(
+            compareBy<String> { letter ->
+                val first = letter.firstOrNull()
+                when {
+                    first?.isDigit() == true -> 0
+                    first?.isLetter() == true -> 1
+                    else -> 2
+                }
+            }.thenBy { if (it == "#") "ZZZ" else it.uppercase() }
+        )
+
+fun String.toFastIndexSection(): String {
+    val value = trim().removeFastIndexSortPrefix()
+    val first = value.firstOrNull()?.uppercaseChar()
+    return when {
+        first == null -> "#"
+        first.isDigit() -> "0"
+        first in 'A'..'Z' -> first.toString()
+        else -> "#"
+    }
+}
+
+fun String.toFastIndexSortableKey(): String {
+    val value = trim()
+    if (value.isBlank()) return "2_"
+    val first = value.first()
+    return when {
+        first.isDigit() -> "0_$value"
+        first.isLetter() && first.code < 128 -> "1_${value.uppercase(Locale.ROOT)}"
+        else -> "2_$value"
+    }
+}
+
+private fun String.removeFastIndexSortPrefix(): String =
+    if (length >= 2 && this[1] == '_' && this[0] in '0'..'2') drop(2) else this
 
 @Composable
 fun LazyListScrollIndicator(

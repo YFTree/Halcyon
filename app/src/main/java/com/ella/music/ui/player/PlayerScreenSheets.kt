@@ -17,6 +17,8 @@ import com.ella.music.ui.components.ArtistPickerSheet
 import com.ella.music.ui.components.LyricSharePicker
 import com.ella.music.ui.components.SongAiInterpretationSheet
 import com.ella.music.ui.components.SongInfoSheet
+import com.ella.music.ui.components.SongMoreTagActionSheets
+import com.ella.music.ui.components.TagEditorOptionKind
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -43,6 +45,14 @@ internal fun PlayerScreenSheetHost(
     onAiSheetSongChange: (Song?) -> Unit,
     deleteConfirmSong: Song?,
     onDeleteConfirmSongChange: (Song?) -> Unit,
+    tagEditorSong: Song?,
+    onTagEditorSongChange: (Song?) -> Unit,
+    tagEditorKind: TagEditorOptionKind,
+    onTagEditorKindChange: (TagEditorOptionKind) -> Unit,
+    metadataEditorId: String,
+    lyricTimingEditorId: String,
+    metadataEditorSong: Song?,
+    onMetadataEditorSongChange: (Song?) -> Unit,
     onWritePermissionRequired: (WritePermissionRequiredException, suspend () -> Unit) -> Unit,
     playlistPickerSong: Song?,
     onPlaylistPickerSongChange: (Song?) -> Unit,
@@ -102,6 +112,22 @@ internal fun PlayerScreenSheetHost(
         onRatingSheetSongChange = onRatingSheetSongChange,
         deleteConfirmSong = deleteConfirmSong,
         onDeleteConfirmSongChange = onDeleteConfirmSongChange,
+        onWritePermissionRequired = onWritePermissionRequired
+    )
+
+    SongMoreTagActionSheets(
+        context = context,
+        scope = scope,
+        mainViewModel = mainViewModel,
+        tagEditorSong = tagEditorSong,
+        onTagEditorSongChange = onTagEditorSongChange,
+        tagEditorKind = tagEditorKind,
+        metadataEditorId = metadataEditorId,
+        lyricTimingEditorId = lyricTimingEditorId,
+        editTagTitle = stringResource(R.string.song_more_edit_tags_title),
+        lyricTimingTitle = stringResource(R.string.song_more_lyric_timing),
+        metadataEditorSong = metadataEditorSong,
+        onMetadataEditorSongChange = onMetadataEditorSongChange,
         onWritePermissionRequired = onWritePermissionRequired
     )
 

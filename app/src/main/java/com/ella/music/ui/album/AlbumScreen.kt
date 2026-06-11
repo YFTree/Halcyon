@@ -63,6 +63,8 @@ import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.LazyGridScrollIndicator
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -235,14 +237,19 @@ fun AlbumScreen(
                             modifier = Modifier.size(24.dp)
                         )
                     }
-                    IconButton(onClick = { sortExpanded = !sortExpanded }) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Sort,
-                            contentDescription = stringResource(R.string.common_sort),
-                            tint = MiuixTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    SortDropdownMenu(
+                        items = AlbumSortMode.entries.map { mode ->
+                            SortDropdownItem(
+                                text = stringResource(mode.labelRes),
+                                selected = sortMode == mode,
+                                onClick = {
+                                    LibrarySortUiState.albumListSortIndex = mode.ordinal
+                                    scope.launch { mainViewModel.settingsManager.setAlbumListSortIndex(mode.ordinal) }
+                                    scrollToTopRequest++
+                                }
+                            )
+                        }
+                    )
                     IconButton(onClick = { searchExpanded = !searchExpanded }) {
                         Icon(
                             imageVector = MiuixIcons.Basic.Search,

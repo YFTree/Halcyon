@@ -24,8 +24,6 @@ import com.ella.music.data.neteaseArtistUrl
 import com.ella.music.data.neteaseSongUrl
 import com.ella.music.data.repository.MusicRepository
 import com.ella.music.ui.components.TagEditorOptionKind
-import com.ella.music.ui.components.buildTagEditorOptions
-import com.ella.music.ui.components.launchTagEditorOption
 import com.ella.music.ui.components.openSongSpectrumWithAspectPro
 import com.ella.music.ui.components.shareLocalSong
 import com.ella.music.viewmodel.MainViewModel
@@ -96,6 +94,8 @@ internal fun CoverPageContent(
     onSongInfoExpandedChange: (Boolean) -> Unit,
     onRatingSheetSongChange: (Song?) -> Unit,
     onAiSheetSongChange: (Song?) -> Unit,
+    onTagEditorSongChange: (Song?) -> Unit,
+    onTagEditorKindChange: (TagEditorOptionKind) -> Unit,
     onRequestDeleteSong: (Song) -> Unit,
     onNavigateToAlbum: (Long) -> Unit,
     onNavigateToArtist: (String) -> Unit,
@@ -105,6 +105,27 @@ internal fun CoverPageContent(
     modifier: Modifier = Modifier
 ) {
     var actionMenuInitialPage by remember { mutableStateOf(PlayerActionSheetPage.Main) }
+    fun openTagEditor(kind: TagEditorOptionKind) {
+        val current = song
+        when {
+            current == null -> {
+                Toast.makeText(context, context.getString(R.string.player_no_song_playing), Toast.LENGTH_SHORT).show()
+            }
+            current.path.startsWith("http://", ignoreCase = true) ||
+                current.path.startsWith("https://", ignoreCase = true) -> {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.player_external_editor_not_supported_for_remote),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            else -> {
+                onTagEditorKindChange(kind)
+                onTagEditorSongChange(current)
+                onMenuExpandedChange(false)
+            }
+        }
+    }
     CoverPlayerPage(
         context = context,
         mainViewModel = mainViewModel,
@@ -289,20 +310,13 @@ internal fun CoverPageContent(
             onMenuExpandedChange(true)
         },
         onOpenMetadataEditor = {
-            val metadataOptions = song
-                ?.let { buildTagEditorOptions(context, it) }
-                .orEmpty()
-                .filter { it.kind == TagEditorOptionKind.Metadata }
-            val preferredOption = metadataEditorId
-                .takeIf { it.isNotBlank() }
-                ?.let { id -> metadataOptions.firstOrNull { it.id == id } }
-            if (preferredOption != null) {
-                launchTagEditorOption(context, preferredOption)
-                onMenuExpandedChange(false)
-            } else {
-                actionMenuInitialPage = PlayerActionSheetPage.MetadataEditor
-                onMenuExpandedChange(true)
-            }
+            openTagEditor(TagEditorOptionKind.Metadata)
+        },
+        onEditMetadata = {
+            openTagEditor(TagEditorOptionKind.Metadata)
+        },
+        onLyricTiming = {
+            openTagEditor(TagEditorOptionKind.LyricTiming)
         },
         onStopAfterCurrent = {
             scope.launch { settingsManager.setSleepTimerStopAfterCurrent(it) }

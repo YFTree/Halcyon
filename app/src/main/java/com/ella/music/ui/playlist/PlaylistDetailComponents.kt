@@ -30,6 +30,8 @@ import com.ella.music.R
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SafeCoverImage
+import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.SortDropdownMenuContent
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -133,7 +135,7 @@ internal fun PlaylistPlayAllBar(
     songCount: Int,
     sortLabel: String,
     onPlayAll: () -> Unit,
-    onSort: () -> Unit
+    sortItems: List<SortDropdownItem>
 ) {
     Row(
         modifier = Modifier
@@ -171,17 +173,18 @@ internal fun PlaylistPlayAllBar(
             modifier = Modifier.padding(start = 4.dp)
         )
         Spacer(modifier = Modifier.weight(1f))
-        Text(
-            text = sortLabel,
-            fontSize = 12.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .clickable(onClick = onSort)
-                .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.70f))
-                .padding(horizontal = 10.dp, vertical = 7.dp)
-        )
+        SortDropdownMenuContent(items = sortItems) {
+            Text(
+                text = sortLabel,
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.70f))
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+            )
+        }
     }
 }

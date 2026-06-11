@@ -25,13 +25,13 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.webdav.WebDavItem
 import com.ella.music.ui.components.FolderOutlineIcon
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
+import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -159,7 +159,13 @@ internal fun WebDavBrowserCard(
                     )
                 }
                 if (canGoParent) {
-                    Button(onClick = onGoParent) { Text(stringResource(R.string.folder_parent)) }
+                    IconButton(onClick = onGoParent) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Back,
+                            contentDescription = stringResource(R.string.folder_parent),
+                            tint = MiuixTheme.colorScheme.onSurface
+                        )
+                    }
                 }
                 IconButton(onClick = onRefresh) {
                     Icon(

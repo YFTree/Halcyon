@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.TagEditorOptionKind
 
 internal class PlayerScreenUiState(
     menuExpanded: Boolean = false,
@@ -22,6 +23,9 @@ internal class PlayerScreenUiState(
     ratingSheetSong: Song? = null,
     aiSheetSong: Song? = null,
     deleteConfirmSong: Song? = null,
+    tagEditorSong: Song? = null,
+    tagEditorKind: TagEditorOptionKind = TagEditorOptionKind.Metadata,
+    metadataEditorSong: Song? = null,
     dynamicCoverFailedPath: String? = null
 ) {
     var menuExpanded by mutableStateOf(menuExpanded)
@@ -36,6 +40,9 @@ internal class PlayerScreenUiState(
     var ratingSheetSong by mutableStateOf(ratingSheetSong)
     var aiSheetSong by mutableStateOf(aiSheetSong)
     var deleteConfirmSong by mutableStateOf(deleteConfirmSong)
+    var tagEditorSong by mutableStateOf(tagEditorSong)
+    var tagEditorKind by mutableStateOf(tagEditorKind)
+    var metadataEditorSong by mutableStateOf(metadataEditorSong)
     var pendingWriteRetry by mutableStateOf<(suspend () -> Unit)?>(null)
     var dynamicCoverFailedPath by mutableStateOf(dynamicCoverFailedPath)
 }
