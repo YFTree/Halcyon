@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">外掛匯入失敗</string>
     <string name="settings_lyric_plugin_import_later">右上角可匯入 Lyrico 外掛 zip；匯入後會出現在這裡並參與單曲歌詞比對。</string>
     <string name="settings_lyric_plugin_source_imported">已匯入</string>
+    <string name="settings_hide_system_bars">隱藏狀態列和導覽列</string>
+    <string name="settings_hide_system_bars_summary">進入全螢幕沉浸，隱藏系統狀態列與導覽列，適合車機等場景</string>
+    <string name="lyric_match_format_enhanced_lrc">逐字 ELRC</string>
+    <string name="lyric_match_format_plain_lrc">逐行 LRC</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">逐字 LRC</string>
+    <string name="lyric_match_include_romanization">取得羅馬音</string>
+    <string name="lyric_match_include_translation">取得翻譯</string>
+    <string name="lyric_match_render_format">歌詞格式</string>
+    <string name="lyric_match_ttml_write_choice">這是 TTML 歌詞，請選擇寫入的標籤。</string>
+    <string name="lyric_match_write_lyrics_tag">寫入一般 LYRICS 標籤</string>
+    <string name="lyric_match_write_ttml_tag">寫入 TTMLLYRIC 標籤</string>
+    <string name="settings_lyric_plugin_config">外掛設定</string>
 </resources>

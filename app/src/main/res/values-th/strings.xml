@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">นำเข้าปลั๊กอินไม่สำเร็จ</string>
     <string name="settings_lyric_plugin_import_later">ใช้ปุ่มมุมขวาบนเพื่อนำเข้าไฟล์ zip ปลั๊กอิน Lyrico แหล่งที่นำเข้าจะปรากฏที่นี่และใช้จับคู่เนื้อเพลง</string>
     <string name="settings_lyric_plugin_source_imported">นำเข้าแล้ว</string>
+    <string name="settings_hide_system_bars">ซ่อนแถบสถานะและแถบนำทาง</string>
+    <string name="settings_hide_system_bars_summary">โหมดเต็มจอ — ซ่อนแถบสถานะและแถบนำทางของระบบ เหมาะกับจอในรถยนต์</string>
+    <string name="lyric_match_format_enhanced_lrc">ELRC แบบทีละคำ</string>
+    <string name="lyric_match_format_plain_lrc">LRC แบบทีละบรรทัด</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">LRC แบบทีละคำ</string>
+    <string name="lyric_match_include_romanization">ดึงคำอ่านโรมัน</string>
+    <string name="lyric_match_include_translation">ดึงคำแปล</string>
+    <string name="lyric_match_render_format">รูปแบบเนื้อเพลง</string>
+    <string name="lyric_match_ttml_write_choice">นี่คือเนื้อเพลง TTML โปรดเลือกแท็กที่จะเขียน</string>
+    <string name="lyric_match_write_lyrics_tag">เขียนแท็ก LYRICS ปกติ</string>
+    <string name="lyric_match_write_ttml_tag">เขียนแท็ก TTMLLYRIC</string>
+    <string name="settings_lyric_plugin_config">ตั้งค่าปลั๊กอิน</string>
 </resources>

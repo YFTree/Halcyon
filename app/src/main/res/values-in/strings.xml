@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">Impor plugin gagal</string>
     <string name="settings_lyric_plugin_import_later">Gunakan tombol kanan atas untuk mengimpor zip plugin Lyrico; sumber yang diimpor muncul di sini dan ikut mencocokkan lirik.</string>
     <string name="settings_lyric_plugin_source_imported">Diimpor</string>
+    <string name="settings_hide_system_bars">Sembunyikan bilah status &amp; navigasi</string>
+    <string name="settings_hide_system_bars_summary">Layar penuh imersif — menyembunyikan bilah status dan navigasi sistem, cocok untuk layar mobil</string>
+    <string name="lyric_match_format_enhanced_lrc">ELRC per kata</string>
+    <string name="lyric_match_format_plain_lrc">LRC per baris</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">LRC per kata</string>
+    <string name="lyric_match_include_romanization">Ambil romanisasi</string>
+    <string name="lyric_match_include_translation">Ambil terjemahan</string>
+    <string name="lyric_match_render_format">Format lirik</string>
+    <string name="lyric_match_ttml_write_choice">Ini lirik TTML. Pilih tag yang akan ditulis.</string>
+    <string name="lyric_match_write_lyrics_tag">Tulis tag LYRICS biasa</string>
+    <string name="lyric_match_write_ttml_tag">Tulis tag TTMLLYRIC</string>
+    <string name="settings_lyric_plugin_config">Pengaturan plugin</string>
 </resources>

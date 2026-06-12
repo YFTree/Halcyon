@@ -88,6 +88,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -205,6 +207,7 @@ class MainActivity : ComponentActivity() {
             val appFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
             val appFontWeight by settingsManager.lyricFontWeight.collectAsState(initial = 800)
             val monetMode by settingsManager.monetColorMode.collectAsState(initial = 0)
+            val hideSystemBars by settingsManager.hideSystemBars.collectAsState(initial = false)
             val monetSong by playerVm.currentSong.collectAsState()
             // Seed color for cover-based Monet: extract a representative color from the current cover.
             val coverSeed by produceState<ComposeColor?>(null, monetMode, monetSong?.id) {
@@ -260,6 +263,18 @@ class MainActivity : ComponentActivity() {
                 val window = (view.context as ComponentActivity).window
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !isDark
                 WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !isDark
+            }
+
+            LaunchedEffect(hideSystemBars) {
+                val window = (view.context as ComponentActivity).window
+                val controller = WindowCompat.getInsetsController(window, view)
+                if (hideSystemBars) {
+                    controller.systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    controller.hide(WindowInsetsCompat.Type.systemBars())
+                } else {
+                    controller.show(WindowInsetsCompat.Type.systemBars())
+                }
             }
 
             LaunchedEffect(Unit) {

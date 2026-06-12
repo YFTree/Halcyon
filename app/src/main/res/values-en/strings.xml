@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">Plugin import failed</string>
     <string name="settings_lyric_plugin_import_later">Use the top-right button to import a Lyrico plugin zip; imported sources appear here and join per-song lyric matching.</string>
     <string name="settings_lyric_plugin_source_imported">Imported</string>
+    <string name="settings_hide_system_bars">Hide status &amp; navigation bars</string>
+    <string name="settings_hide_system_bars_summary">Full-screen immersive — hides the system status and navigation bars, ideal for car displays</string>
+    <string name="lyric_match_format_enhanced_lrc">Word-by-word ELRC</string>
+    <string name="lyric_match_format_plain_lrc">Line LRC</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">Word-by-word LRC</string>
+    <string name="lyric_match_include_romanization">Fetch romanization</string>
+    <string name="lyric_match_include_translation">Fetch translation</string>
+    <string name="lyric_match_render_format">Lyric format</string>
+    <string name="lyric_match_ttml_write_choice">These are TTML lyrics. Choose which tag to write.</string>
+    <string name="lyric_match_write_lyrics_tag">Write plain LYRICS tag</string>
+    <string name="lyric_match_write_ttml_tag">Write TTMLLYRIC tag</string>
+    <string name="settings_lyric_plugin_config">Plugin settings</string>
 </resources>

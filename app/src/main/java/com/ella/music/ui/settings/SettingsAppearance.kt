@@ -30,6 +30,7 @@ internal fun SettingsAppearanceSection() {
     val bottomDockItems by settingsManager.bottomDockItems.collectAsState(
         initial = SettingsManager.DEFAULT_BOTTOM_DOCK_ITEMS.split(',')
     )
+    val hideSystemBars by settingsManager.hideSystemBars.collectAsState(initial = false)
     val startupPosterEnabled by settingsManager.startupPosterEnabled.collectAsState(initial = false)
     val startupPosterUri by settingsManager.startupPosterUri.collectAsState(initial = "")
     val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
@@ -256,6 +257,14 @@ internal fun SettingsAppearanceSection() {
                     }
                 )
             }
+            SwitchPreference(
+                title = stringResource(R.string.settings_hide_system_bars),
+                summary = stringResource(R.string.settings_hide_system_bars_summary),
+                checked = hideSystemBars,
+                onCheckedChange = {
+                    scope.launch { settingsManager.setHideSystemBars(it) }
+                }
+            )
             SwitchPreference(
                 title = stringResource(R.string.settings_startup_poster),
                 summary = stringResource(R.string.settings_startup_poster_summary),

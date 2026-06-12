@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">プラグインのインポートに失敗しました</string>
     <string name="settings_lyric_plugin_import_later">右上のボタンから Lyrico プラグインの zip をインポートできます。インポートしたソースはここに表示され、歌詞照合に使われます。</string>
     <string name="settings_lyric_plugin_source_imported">インポート済み</string>
+    <string name="settings_hide_system_bars">ステータスバーとナビゲーションバーを非表示</string>
+    <string name="settings_hide_system_bars_summary">全画面の没入表示。システムのステータスバーとナビゲーションバーを隠します。車載ディスプレイなどに最適</string>
+    <string name="lyric_match_format_enhanced_lrc">文字単位 ELRC</string>
+    <string name="lyric_match_format_plain_lrc">行単位 LRC</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">文字単位 LRC</string>
+    <string name="lyric_match_include_romanization">ローマ字を取得</string>
+    <string name="lyric_match_include_translation">翻訳を取得</string>
+    <string name="lyric_match_render_format">歌詞フォーマット</string>
+    <string name="lyric_match_ttml_write_choice">これは TTML 歌詞です。書き込むタグを選択してください。</string>
+    <string name="lyric_match_write_lyrics_tag">通常の LYRICS タグに書き込む</string>
+    <string name="lyric_match_write_ttml_tag">TTMLLYRIC タグに書き込む</string>
+    <string name="settings_lyric_plugin_config">プラグイン設定</string>
 </resources>

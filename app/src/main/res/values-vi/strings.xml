@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">Nhập plugin thất bại</string>
     <string name="settings_lyric_plugin_import_later">Dùng nút trên cùng bên phải để nhập tệp zip plugin Lyrico; nguồn đã nhập sẽ hiện ở đây và tham gia khớp lời.</string>
     <string name="settings_lyric_plugin_source_imported">Đã nhập</string>
+    <string name="settings_hide_system_bars">Ẩn thanh trạng thái và thanh điều hướng</string>
+    <string name="settings_hide_system_bars_summary">Toàn màn hình đắm chìm — ẩn thanh trạng thái và điều hướng hệ thống, phù hợp cho màn hình ô tô</string>
+    <string name="lyric_match_format_enhanced_lrc">ELRC theo từng chữ</string>
+    <string name="lyric_match_format_plain_lrc">LRC theo dòng</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">LRC theo từng chữ</string>
+    <string name="lyric_match_include_romanization">Lấy phiên âm La-tinh</string>
+    <string name="lyric_match_include_translation">Lấy bản dịch</string>
+    <string name="lyric_match_render_format">Định dạng lời bài hát</string>
+    <string name="lyric_match_ttml_write_choice">Đây là lời TTML. Hãy chọn thẻ để ghi.</string>
+    <string name="lyric_match_write_lyrics_tag">Ghi thẻ LYRICS thường</string>
+    <string name="lyric_match_write_ttml_tag">Ghi thẻ TTMLLYRIC</string>
+    <string name="settings_lyric_plugin_config">Cài đặt plugin</string>
 </resources>

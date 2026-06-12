@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">Plugin-Import fehlgeschlagen</string>
     <string name="settings_lyric_plugin_import_later">Über die Schaltfläche oben rechts ein Lyrico-Plugin-Zip importieren; importierte Quellen erscheinen hier und werden für das Songtext-Matching genutzt.</string>
     <string name="settings_lyric_plugin_source_imported">Importiert</string>
+    <string name="settings_hide_system_bars">Status- und Navigationsleiste ausblenden</string>
+    <string name="settings_hide_system_bars_summary">Vollbild-Immersiv – blendet System-Status- und Navigationsleiste aus, ideal für Autodisplays</string>
+    <string name="lyric_match_format_enhanced_lrc">Wort-für-Wort-ELRC</string>
+    <string name="lyric_match_format_plain_lrc">Zeilen-LRC</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">Wort-für-Wort-LRC</string>
+    <string name="lyric_match_include_romanization">Romanisierung abrufen</string>
+    <string name="lyric_match_include_translation">Übersetzung abrufen</string>
+    <string name="lyric_match_render_format">Liedtextformat</string>
+    <string name="lyric_match_ttml_write_choice">Dies sind TTML-Texte. Wählen Sie das zu schreibende Tag.</string>
+    <string name="lyric_match_write_lyrics_tag">Einfaches LYRICS-Tag schreiben</string>
+    <string name="lyric_match_write_ttml_tag">TTMLLYRIC-Tag schreiben</string>
+    <string name="settings_lyric_plugin_config">Plug-in-Einstellungen</string>
 </resources>

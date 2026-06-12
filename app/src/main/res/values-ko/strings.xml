@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">플러그인 가져오기 실패</string>
     <string name="settings_lyric_plugin_import_later">오른쪽 위 버튼으로 Lyrico 플러그인 zip을 가져올 수 있습니다. 가져온 소스는 여기에 표시되며 가사 매칭에 사용됩니다.</string>
     <string name="settings_lyric_plugin_source_imported">가져옴</string>
+    <string name="settings_hide_system_bars">상태 표시줄 및 탐색 모음 숨기기</string>
+    <string name="settings_hide_system_bars_summary">전체 화면 몰입 모드 — 시스템 상태 표시줄과 탐색 모음을 숨깁니다. 차량용 디스플레이에 적합</string>
+    <string name="lyric_match_format_enhanced_lrc">글자별 ELRC</string>
+    <string name="lyric_match_format_plain_lrc">줄별 LRC</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">글자별 LRC</string>
+    <string name="lyric_match_include_romanization">로마자 가져오기</string>
+    <string name="lyric_match_include_translation">번역 가져오기</string>
+    <string name="lyric_match_render_format">가사 형식</string>
+    <string name="lyric_match_ttml_write_choice">TTML 가사입니다. 기록할 태그를 선택하세요.</string>
+    <string name="lyric_match_write_lyrics_tag">일반 LYRICS 태그 기록</string>
+    <string name="lyric_match_write_ttml_tag">TTMLLYRIC 태그 기록</string>
+    <string name="settings_lyric_plugin_config">플러그인 설정</string>
 </resources>

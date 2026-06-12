@@ -1378,4 +1378,17 @@
     <string name="settings_lyric_plugin_import_failed">Échec de l\'import du plugin</string>
     <string name="settings_lyric_plugin_import_later">Utilisez le bouton en haut à droite pour importer un zip de plugin Lyrico ; les sources importées apparaissent ici et participent au matching des paroles.</string>
     <string name="settings_lyric_plugin_source_imported">Importé</string>
+    <string name="settings_hide_system_bars">Masquer les barres d’état et de navigation</string>
+    <string name="settings_hide_system_bars_summary">Plein écran immersif — masque les barres système, idéal pour les écrans de voiture</string>
+    <string name="lyric_match_format_enhanced_lrc">ELRC mot à mot</string>
+    <string name="lyric_match_format_plain_lrc">LRC par ligne</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_format_word_lrc">LRC mot à mot</string>
+    <string name="lyric_match_include_romanization">Récupérer la romanisation</string>
+    <string name="lyric_match_include_translation">Récupérer la traduction</string>
+    <string name="lyric_match_render_format">Format des paroles</string>
+    <string name="lyric_match_ttml_write_choice">Ce sont des paroles TTML. Choisissez la balise à écrire.</string>
+    <string name="lyric_match_write_lyrics_tag">Écrire la balise LYRICS simple</string>
+    <string name="lyric_match_write_ttml_tag">Écrire la balise TTMLLYRIC</string>
+    <string name="settings_lyric_plugin_config">Paramètres des plug-ins</string>
 </resources>
