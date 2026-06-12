@@ -12,11 +12,11 @@ data class AudioQualitySummary(
 )
 
 /**
- * Compact Dolby mark built from the left/right half black-circle glyphs, mimicking the
+ * Compact Dolby mark built from the right/left half black-circle glyphs (◗◖), mimicking the
  * facing "double-D" Dolby logo. Used as the list tag and as the player-badge prefix for
  * Dolby (AC3 / E-AC-3) streams.
  */
-const val DOLBY_MARK = "◖◗"
+const val DOLBY_MARK = "◗◖"
 
 fun audioQualitySummary(info: AudioInfo): AudioQualitySummary {
     val normalizedFormat = normalizedAudioFormat(info.format)
