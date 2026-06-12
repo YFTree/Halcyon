@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +40,7 @@ import com.ella.music.plugin.source.PluginLyricsRenderOptions
 import com.ella.music.plugin.source.PluginSearchHit
 import com.ella.music.plugin.source.defaultRenderFormat
 import com.ella.music.plugin.source.toEmbeddedLyricsText
+import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -75,6 +78,7 @@ internal fun PluginLyricsMatchSheet(
     var includeTranslation by remember { mutableStateOf(true) }
     var includeRomanization by remember { mutableStateOf(true) }
     var fetchingLyrics by remember { mutableStateOf(false) }
+    var showPreviewSheet by remember { mutableStateOf(false) }
     val lyricsOptions = remember(renderFormat, includeTranslation, includeRomanization) {
         PluginLyricsRenderOptions(
             format = renderFormat,
@@ -186,7 +190,11 @@ internal fun PluginLyricsMatchSheet(
                                     includeRomanization = includeRomanization
                                 )
                             ).orEmpty()
-                            if (previewText.isBlank()) message = context.getString(R.string.lyric_match_fetch_failed)
+                            if (previewText.isBlank()) {
+                                message = context.getString(R.string.lyric_match_fetch_failed)
+                            } else {
+                                showPreviewSheet = true
+                            }
                             fetchingLyrics = false
                         }
                     }
@@ -197,8 +205,20 @@ internal fun PluginLyricsMatchSheet(
         if (fetchingLyrics) {
             Text(text = stringResource(R.string.lyric_match_fetching), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
-        if (lyricsText.isNotBlank()) {
-            Spacer(modifier = Modifier.height(10.dp))
+    }
+
+    EllaMiuixBottomSheet(
+        show = showPreviewSheet,
+        title = selectedHit?.song?.title?.takeIf { it.isNotBlank() }
+            ?: stringResource(R.string.lyric_match_preview),
+        onDismissRequest = { showPreviewSheet = false },
+        enableNestedScroll = false
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 12.dp)
+        ) {
             LyricsRenderControls(
                 selectedFormat = renderFormat,
                 onFormatChange = { renderFormat = it },
@@ -214,12 +234,14 @@ internal fun PluginLyricsMatchSheet(
                 color = MiuixTheme.colorScheme.onSurface
             )
             Text(
-                text = lyricsText.lines().take(8).joinToString("\n"),
+                text = lyricsText.ifBlank { stringResource(R.string.lyric_match_fetch_failed) },
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 fontSize = 12.sp,
-                maxLines = 8,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(vertical = 8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp, max = 280.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 8.dp)
             )
             if (isTtmlLyrics) {
                 Text(
@@ -232,6 +254,7 @@ internal fun PluginLyricsMatchSheet(
                     onClick = {
                         writeLyrics(AudioTagInfo(customTags = mapOf("TTMLLYRIC" to listOf(lyricsText))))
                     },
+                    enabled = lyricsText.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = stringResource(R.string.lyric_match_write_ttml_tag))
@@ -239,6 +262,7 @@ internal fun PluginLyricsMatchSheet(
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { writeLyrics(AudioTagInfo(lyrics = lyricsText)) },
+                    enabled = lyricsText.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = stringResource(R.string.lyric_match_write_lyrics_tag))
@@ -246,6 +270,7 @@ internal fun PluginLyricsMatchSheet(
             } else {
                 Button(
                     onClick = { writeLyrics(AudioTagInfo(lyrics = lyricsText)) },
+                    enabled = lyricsText.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = stringResource(R.string.lyric_match_write_embedded))

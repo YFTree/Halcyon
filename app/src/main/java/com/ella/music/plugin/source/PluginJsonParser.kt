@@ -112,17 +112,35 @@ fun PluginLyricsResult.toEmbeddedLyricsText(
     options: PluginLyricsRenderOptions = PluginLyricsRenderOptions()
 ): String {
     val format = effectiveRenderFormat(options.format)
-    directRawFor(format, options)?.let { return it.trim() }
+    directRawFor(format, options)?.let { raw ->
+        return if (format == PluginLyricsRenderFormat.TTML) raw.trim() else raw.stripLrcMetadataTags()
+    }
     val lines = toLyricLines()
     if (lines.isEmpty()) return ""
-    return when (format) {
+    val rendered = when (format) {
         PluginLyricsRenderFormat.TTML -> lines.renderTtml(tags, options)
         PluginLyricsRenderFormat.WORD_LRC -> lines.renderWordLrc(tags, options)
         PluginLyricsRenderFormat.ENHANCED_LRC -> lines.renderEnhancedLrc(tags, options)
         PluginLyricsRenderFormat.PLAIN_LRC,
         PluginLyricsRenderFormat.AUTO -> lines.renderPlainLrc(tags, options)
     }.trim()
+    return if (format == PluginLyricsRenderFormat.TTML) rendered else rendered.stripLrcMetadataTags()
 }
+
+/**
+ * Matches a full-line LRC ID/metadata tag such as `[ti:..]`, `[ar:..]`, `[al:..]`,
+ * `[by:..]`, `[offset:0]`, `[length:..]`, `[language:..]`. The key starts with a
+ * letter, which distinguishes these from timestamp tags like `[00:12.34]` (digit start),
+ * so timed lyric/translation/romanization lines are preserved.
+ */
+private val LRC_METADATA_TAG = Regex("""^\[[A-Za-z][A-Za-z0-9 _\-]*:[^\]]*]$""")
+
+/** Drops meaningless LRC metadata header lines so they are not written into a song's lyrics. */
+private fun String.stripLrcMetadataTags(): String =
+    lineSequence()
+        .filterNot { LRC_METADATA_TAG.matches(it.trim()) }
+        .joinToString("\n")
+        .trim()
 
 fun PluginLyricsResult.defaultRenderFormat(): PluginLyricsRenderFormat =
     effectiveRenderFormat(PluginLyricsRenderFormat.AUTO)
@@ -186,7 +204,6 @@ private fun List<LyricLine>.renderPlainLrc(
     tags: Map<String, String>,
     options: PluginLyricsRenderOptions
 ): String = buildString {
-    appendLrcTags(tags)
     sortedBy { it.timeMs }.forEach { line ->
         val text = line.text.trim()
         if (text.isBlank()) return@forEach
@@ -199,7 +216,6 @@ private fun List<LyricLine>.renderEnhancedLrc(
     tags: Map<String, String>,
     options: PluginLyricsRenderOptions
 ): String = buildString {
-    appendLrcTags(tags)
     sortedBy { it.timeMs }.forEach { line ->
         val text = line.text.trim()
         if (text.isBlank()) return@forEach
@@ -224,7 +240,6 @@ private fun List<LyricLine>.renderWordLrc(
     tags: Map<String, String>,
     options: PluginLyricsRenderOptions
 ): String = buildString {
-    appendLrcTags(tags)
     sortedBy { it.timeMs }.forEach { line ->
         val text = line.text.trim()
         if (text.isBlank()) return@forEach
@@ -287,16 +302,6 @@ private fun List<LyricLine>.renderTtml(
     appendLine("    </div>")
     appendLine("  </body>")
     append("</tt>")
-}
-
-private fun StringBuilder.appendLrcTags(tags: Map<String, String>) {
-    (tags["title"] ?: tags["ti"])?.takeIf { it.isNotBlank() }?.let { appendLine("[ti:$it]") }
-    (tags["artist"] ?: tags["ar"])?.takeIf { it.isNotBlank() }?.let { appendLine("[ar:$it]") }
-    (tags["album"] ?: tags["al"])?.takeIf { it.isNotBlank() }?.let { appendLine("[al:$it]") }
-    tags.filterKeys { it !in setOf("title", "artist", "album", "ti", "ar", "al") }
-        .forEach { (key, value) ->
-            if (key.isNotBlank() && value.isNotBlank()) appendLine("[$key:$value]")
-        }
 }
 
 private fun StringBuilder.appendCompanions(line: LyricLine, options: PluginLyricsRenderOptions) {
