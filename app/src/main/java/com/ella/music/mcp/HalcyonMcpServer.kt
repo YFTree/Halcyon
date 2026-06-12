@@ -11,6 +11,8 @@ import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -66,7 +68,7 @@ class HalcyonMcpServer(
             if (query.isBlank()) return@addTool ok("query is required")
             val songs = searchLibrary(query)
             if (songs.isEmpty()) return@addTool ok("No songs found for: $query")
-            playerManager.playSong(songs.first())
+            onMain { playerManager.playSong(songs.first()) }
             ok("Now playing: ${songs.first().title} — ${songs.first().artist}")
         }
 
@@ -113,7 +115,7 @@ class HalcyonMcpServer(
             description = "Skip to the next song in the queue",
             inputSchema = schema()
         ) { _ ->
-            playerManager.skipToNext()
+            onMain { playerManager.skipToNext() }
             ok("Skipped to next song")
         }
 
@@ -122,7 +124,7 @@ class HalcyonMcpServer(
             description = "Skip to the previous song in the queue",
             inputSchema = schema()
         ) { _ ->
-            playerManager.skipToPrevious()
+            onMain { playerManager.skipToPrevious() }
             ok("Skipped to previous song")
         }
 
@@ -131,7 +133,7 @@ class HalcyonMcpServer(
             description = "Toggle between play and pause",
             inputSchema = schema()
         ) { _ ->
-            playerManager.togglePlayPause()
+            onMain { playerManager.togglePlayPause() }
             ok("Playback ${if (playerManager.isPlaying.value) "playing" else "paused"}")
         }
 
@@ -140,7 +142,7 @@ class HalcyonMcpServer(
             description = "Cycle playback mode (normal → shuffle → repeat)",
             inputSchema = schema()
         ) { _ ->
-            playerManager.cyclePlaybackMode()
+            onMain { playerManager.cyclePlaybackMode() }
             ok("Playback mode cycled")
         }
 
@@ -151,7 +153,7 @@ class HalcyonMcpServer(
         ) { request ->
             val pos = request.arguments?.get("position_ms")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
                 ?: return@addTool ok("position_ms is required")
-            playerManager.seekTo(pos)
+            onMain { playerManager.seekTo(pos) }
             ok("Seeked to ${pos}ms")
         }
 
@@ -236,6 +238,13 @@ class HalcyonMcpServer(
 }
 
 // ── Helpers ──
+
+/**
+ * Run [block] on the main thread. The Media3 [androidx.media3.session.MediaController]
+ * may only be touched from the thread it was built on (the app's main looper); MCP
+ * tool handlers run on Ktor worker threads, so every player mutation must hop here.
+ */
+private suspend fun <T> onMain(block: () -> T): T = withContext(Dispatchers.Main) { block() }
 
 private fun ok(text: String) = CallToolResult(content = listOf(TextContent(text = text)))
 
