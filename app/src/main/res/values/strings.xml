@@ -1375,6 +1375,13 @@
     <string name="lyric_match_no_sources">请先在设置中启用歌词匹配在线源</string>
     <string name="lyric_match_no_results">没有找到匹配结果</string>
     <string name="lyric_match_fetching">正在获取歌词…</string>
+    <string name="lyric_match_render_format">歌词格式</string>
+    <string name="lyric_match_format_word_lrc">逐字 LRC</string>
+    <string name="lyric_match_format_enhanced_lrc">逐字 ELRC</string>
+    <string name="lyric_match_format_plain_lrc">逐行 LRC</string>
+    <string name="lyric_match_format_ttml">TTML</string>
+    <string name="lyric_match_include_translation">获取翻译</string>
+    <string name="lyric_match_include_romanization">获取罗马音</string>
     <string name="lyric_match_preview">歌词预览</string>
     <string name="lyric_match_write_embedded">写入内嵌歌词</string>
     <string name="lyric_match_ttml_write_choice">这是 TTML 歌词，请选择写入的标签。</string>

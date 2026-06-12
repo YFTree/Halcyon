@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -48,6 +49,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixDialog
 import com.ella.music.ui.components.EllaMiuixDialogActions
 import com.ella.music.ui.components.EllaMiuixTextField
@@ -73,7 +75,7 @@ fun LyricPluginSourceSettingsScreen(
     val enabledIds by settingsManager.lyricoPluginEnabledIds.collectAsState(initial = emptySet())
     var reloadToken by remember { mutableIntStateOf(0) }
     var pendingDelete by remember { mutableStateOf<LyricoPluginSource?>(null) }
-    var expandedPluginId by remember { mutableStateOf<String?>(null) }
+    var configTarget by remember { mutableStateOf<LyricoPluginSource?>(null) }
     val sources by produceState(initialValue = emptyList<LyricoPluginSource>(), context, reloadToken) {
         value = pluginManager.availableSources()
     }
@@ -182,9 +184,7 @@ fun LyricPluginSourceSettingsScreen(
                                     }
                                     if (manifest.configFields.isNotEmpty()) {
                                         IconButton(
-                                            onClick = {
-                                                expandedPluginId = if (expandedPluginId == manifest.id) null else manifest.id
-                                            }
+                                            onClick = { configTarget = source }
                                         ) {
                                             Icon(
                                                 imageVector = MiuixIcons.Regular.Settings,
@@ -205,13 +205,6 @@ fun LyricPluginSourceSettingsScreen(
                                     }
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Switch(checked = checked, onCheckedChange = onToggle)
-                                }
-                                if (expandedPluginId == manifest.id) {
-                                    PluginConfigEditor(
-                                        source = source,
-                                        pluginManager = pluginManager,
-                                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
-                                    )
                                 }
                             }
                         }
@@ -249,6 +242,29 @@ fun LyricPluginSourceSettingsScreen(
                 }
             }
         )
+    }
+
+    configTarget?.let { target ->
+        EllaMiuixBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = target.manifest.name,
+            onDismissRequest = { configTarget = null }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 620.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 12.dp)
+            ) {
+                PluginConfigEditor(
+                    source = target,
+                    pluginManager = pluginManager,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 }
 

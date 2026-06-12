@@ -1,5 +1,8 @@
 package com.ella.music.plugin.source
 
+import com.ella.music.data.model.LyricLine
+import com.ella.music.data.model.LyricWord
+import com.ella.music.data.parser.LrcParser
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -91,36 +94,230 @@ class PluginJsonParser(
     }
 }
 
-fun PluginLyricsResult.toEmbeddedLyricsText(): String = when (payloadType) {
-    PluginLyricsPayloadType.RAW_TTML -> rawTtml
-    PluginLyricsPayloadType.RAW_ENHANCED_LRC -> rawEnhancedLrc
-    PluginLyricsPayloadType.RAW_VERBATIM_LRC -> rawVerbatimLrc
-    PluginLyricsPayloadType.RAW_MULTI_PERSON_ENHANCED_LRC -> rawMultiPersonEnhancedLrc
-    PluginLyricsPayloadType.RAW_PLAIN_LRC -> rawPlainLrc
-    PluginLyricsPayloadType.STRUCTURED -> buildStructuredLrc()
-}.trim()
+enum class PluginLyricsRenderFormat {
+    AUTO,
+    WORD_LRC,
+    ENHANCED_LRC,
+    PLAIN_LRC,
+    TTML
+}
 
-private fun PluginLyricsResult.buildStructuredLrc(): String = buildString {
-    tags["title"]?.takeIf { it.isNotBlank() }?.let { appendLine("[ti:$it]") }
-    tags["artist"]?.takeIf { it.isNotBlank() }?.let { appendLine("[ar:$it]") }
-    original.sortedBy { it.start }.forEach { line ->
+data class PluginLyricsRenderOptions(
+    val format: PluginLyricsRenderFormat = PluginLyricsRenderFormat.AUTO,
+    val includeTranslation: Boolean = true,
+    val includeRomanization: Boolean = true
+)
+
+fun PluginLyricsResult.toEmbeddedLyricsText(
+    options: PluginLyricsRenderOptions = PluginLyricsRenderOptions()
+): String {
+    val format = effectiveRenderFormat(options.format)
+    directRawFor(format, options)?.let { return it.trim() }
+    val lines = toLyricLines()
+    if (lines.isEmpty()) return ""
+    return when (format) {
+        PluginLyricsRenderFormat.TTML -> lines.renderTtml(tags, options)
+        PluginLyricsRenderFormat.WORD_LRC -> lines.renderWordLrc(tags, options)
+        PluginLyricsRenderFormat.ENHANCED_LRC -> lines.renderEnhancedLrc(tags, options)
+        PluginLyricsRenderFormat.PLAIN_LRC,
+        PluginLyricsRenderFormat.AUTO -> lines.renderPlainLrc(tags, options)
+    }.trim()
+}
+
+fun PluginLyricsResult.defaultRenderFormat(): PluginLyricsRenderFormat =
+    effectiveRenderFormat(PluginLyricsRenderFormat.AUTO)
+
+private fun PluginLyricsResult.effectiveRenderFormat(requested: PluginLyricsRenderFormat): PluginLyricsRenderFormat {
+    if (requested != PluginLyricsRenderFormat.AUTO) return requested
+    return when {
+        rawTtml.isNotBlank() -> PluginLyricsRenderFormat.TTML
+        rawEnhancedLrc.isNotBlank() || rawMultiPersonEnhancedLrc.isNotBlank() -> PluginLyricsRenderFormat.ENHANCED_LRC
+        rawVerbatimLrc.isNotBlank() -> PluginLyricsRenderFormat.WORD_LRC
+        original.any { it.words.size > 1 } -> PluginLyricsRenderFormat.ENHANCED_LRC
+        else -> PluginLyricsRenderFormat.PLAIN_LRC
+    }
+}
+
+private fun PluginLyricsResult.directRawFor(
+    format: PluginLyricsRenderFormat,
+    options: PluginLyricsRenderOptions
+): String? {
+    if (!options.includeTranslation || !options.includeRomanization) return null
+    return when (format) {
+        PluginLyricsRenderFormat.TTML -> rawTtml.takeIf { it.isNotBlank() }
+        PluginLyricsRenderFormat.ENHANCED_LRC -> rawEnhancedLrc
+            .ifBlank { rawMultiPersonEnhancedLrc }
+            .takeIf { it.isNotBlank() }
+        PluginLyricsRenderFormat.WORD_LRC -> rawVerbatimLrc.takeIf { it.isNotBlank() }
+        PluginLyricsRenderFormat.PLAIN_LRC -> rawPlainLrc.takeIf { it.isNotBlank() }
+        PluginLyricsRenderFormat.AUTO -> null
+    }
+}
+
+private fun PluginLyricsResult.toLyricLines(): List<LyricLine> {
+    if (payloadType != PluginLyricsPayloadType.STRUCTURED) {
+        val raw = rawTtml
+            .ifBlank { rawEnhancedLrc }
+            .ifBlank { rawMultiPersonEnhancedLrc }
+            .ifBlank { rawVerbatimLrc }
+            .ifBlank { rawPlainLrc }
+        return raw.takeIf { it.isNotBlank() }
+            ?.let { LrcParser.parse(it).lyrics }
+            .orEmpty()
+    }
+    return original.sortedBy { it.start }.mapNotNull { line ->
+        val text = line.text
+        if (text.isBlank()) return@mapNotNull null
+        val translation = translated.nearestLine(line.start)?.text?.trim()?.takeIf { it.isNotBlank() }
+        val roman = romanization.nearestLine(line.start)
+        LyricLine(
+            timeMs = line.start,
+            text = text,
+            words = line.words.map { LyricWord(it.text, it.start, it.end) },
+            translation = translation,
+            pronunciation = roman?.text?.trim()?.takeIf { it.isNotBlank() },
+            pronunciationWords = roman?.words.orEmpty().map { LyricWord(it.text, it.start, it.end) },
+            endMs = line.end
+        )
+    }
+}
+
+private fun List<LyricLine>.renderPlainLrc(
+    tags: Map<String, String>,
+    options: PluginLyricsRenderOptions
+): String = buildString {
+    appendLrcTags(tags)
+    sortedBy { it.timeMs }.forEach { line ->
         val text = line.text.trim()
         if (text.isBlank()) return@forEach
-        appendLine("${line.start.lrcTimestamp()}$text")
-        translated?.nearestText(line.start)?.let { appendLine(it) }
-        romanization?.nearestText(line.start)?.let { appendLine(it) }
+        appendLine("${line.timeMs.lrcTimestamp()}$text")
+        appendCompanions(line, options)
+    }
+}
+
+private fun List<LyricLine>.renderEnhancedLrc(
+    tags: Map<String, String>,
+    options: PluginLyricsRenderOptions
+): String = buildString {
+    appendLrcTags(tags)
+    sortedBy { it.timeMs }.forEach { line ->
+        val text = line.text.trim()
+        if (text.isBlank()) return@forEach
+        val words = line.words.takeIf { it.size > 1 }
+        if (words == null) {
+            appendLine("${line.timeMs.lrcTimestamp()}$text")
+        } else {
+            append(line.timeMs.lrcTimestamp())
+            words.forEach { word ->
+                append(word.startMs.enhancedTimestamp())
+                append(word.text)
+            }
+            val end = line.endMs ?: words.lastOrNull()?.endMs
+            if (end != null) append(end.enhancedTimestamp())
+            appendLine()
+        }
+        appendCompanions(line, options)
+    }
+}
+
+private fun List<LyricLine>.renderWordLrc(
+    tags: Map<String, String>,
+    options: PluginLyricsRenderOptions
+): String = buildString {
+    appendLrcTags(tags)
+    sortedBy { it.timeMs }.forEach { line ->
+        val text = line.text.trim()
+        if (text.isBlank()) return@forEach
+        val words = line.words.takeIf { it.size > 1 }
+        if (words == null) {
+            appendLine("${line.timeMs.lrcTimestamp()}$text")
+        } else {
+            words.forEach { word ->
+                append(word.startMs.lrcTimestamp())
+                append(word.text)
+            }
+            val end = line.endMs ?: words.lastOrNull()?.endMs
+            if (end != null) append(end.lrcTimestamp())
+            appendLine()
+        }
+        appendCompanions(line, options)
+    }
+}
+
+private fun List<LyricLine>.renderTtml(
+    tags: Map<String, String>,
+    options: PluginLyricsRenderOptions
+): String = buildString {
+    appendLine("""<?xml version="1.0" encoding="utf-8"?>""")
+    appendLine("""<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:itunes="http://music.apple.com/lyric-ttml-internal">""")
+    if (tags.isNotEmpty()) {
+        appendLine("  <head>")
+        appendLine("    <metadata>")
+        tags["ti"]?.takeIf { it.isNotBlank() }?.let { appendLine("""      <amll:meta xmlns:amll="http://www.example.com/ns/amll" key="musicName" value="${it.escapeXml()}"/>""") }
+        tags["ar"]?.takeIf { it.isNotBlank() }?.let { appendLine("""      <amll:meta xmlns:amll="http://www.example.com/ns/amll" key="artists" value="${it.escapeXml()}"/>""") }
+        tags["al"]?.takeIf { it.isNotBlank() }?.let { appendLine("""      <amll:meta xmlns:amll="http://www.example.com/ns/amll" key="album" value="${it.escapeXml()}"/>""") }
+        appendLine("    </metadata>")
+        appendLine("  </head>")
+    }
+    appendLine("  <body>")
+    appendLine("    <div>")
+    sortedBy { it.timeMs }.forEachIndexed { index, line ->
+        val text = line.text.trim()
+        if (text.isBlank()) return@forEachIndexed
+        val end = line.endMs ?: line.words.lastOrNull()?.endMs ?: (line.timeMs + 2_000L)
+        append("""      <p begin="${line.timeMs.ttmlTimestamp()}" end="${end.ttmlTimestamp()}" itunes:key="L$index">""")
+        val words = line.words.takeIf { it.size > 1 }
+        if (words == null) {
+            append(text.escapeXml())
+        } else {
+            words.forEach { word ->
+                append("""<span begin="${word.startMs.ttmlTimestamp()}" end="${word.endMs.ttmlTimestamp()}">${word.text.escapeXml()}</span>""")
+            }
+        }
+        if (options.includeRomanization) {
+            val roman = line.pronunciation?.takeIf { it.isNotBlank() }
+            if (roman != null) append("""<span ttm:role="x-romanization">${roman.escapeXml()}</span>""")
+        }
+        if (options.includeTranslation) {
+            val translation = line.translation?.takeIf { it.isNotBlank() }
+            if (translation != null) append("""<span ttm:role="x-translation">${translation.escapeXml()}</span>""")
+        }
+        appendLine("</p>")
+    }
+    appendLine("    </div>")
+    appendLine("  </body>")
+    append("</tt>")
+}
+
+private fun StringBuilder.appendLrcTags(tags: Map<String, String>) {
+    (tags["title"] ?: tags["ti"])?.takeIf { it.isNotBlank() }?.let { appendLine("[ti:$it]") }
+    (tags["artist"] ?: tags["ar"])?.takeIf { it.isNotBlank() }?.let { appendLine("[ar:$it]") }
+    (tags["album"] ?: tags["al"])?.takeIf { it.isNotBlank() }?.let { appendLine("[al:$it]") }
+    tags.filterKeys { it !in setOf("title", "artist", "album", "ti", "ar", "al") }
+        .forEach { (key, value) ->
+            if (key.isNotBlank() && value.isNotBlank()) appendLine("[$key:$value]")
+        }
+}
+
+private fun StringBuilder.appendCompanions(line: LyricLine, options: PluginLyricsRenderOptions) {
+    if (options.includeRomanization) {
+        line.pronunciation?.trim()?.takeIf { it.isNotBlank() }?.let { roman ->
+            appendLine("${line.timeMs.lrcTimestamp()}$roman")
+        }
+    }
+    if (options.includeTranslation) {
+        line.translation?.trim()?.takeIf { it.isNotBlank() }?.let { translation ->
+            appendLine("${line.timeMs.lrcTimestamp()}$translation")
+        }
     }
 }
 
 fun PluginSongSearchResult.toPluginSongRequest(): PluginSongRequest =
     PluginSongRequest(id, title, artist, album, duration, pluginId, pluginId, fields, internal)
 
-private fun List<PluginLyricsLine>.nearestText(start: Long): String? =
-    minByOrNull { kotlin.math.abs(it.start - start) }
+private fun List<PluginLyricsLine>?.nearestLine(start: Long): PluginLyricsLine? =
+    this?.minByOrNull { kotlin.math.abs(it.start - start) }
         ?.takeIf { kotlin.math.abs(it.start - start) <= 1500L }
-        ?.text
-        ?.trim()
-        ?.takeIf { it.isNotBlank() }
 
 private fun Long.lrcTimestamp(): String {
     val minutes = this / 60000
@@ -128,6 +325,23 @@ private fun Long.lrcTimestamp(): String {
     val centis = (this % 1000) / 10
     return "[%02d:%02d.%02d]".format(minutes, seconds, centis)
 }
+
+private fun Long.enhancedTimestamp(): String = lrcTimestamp().replace('[', '<').replace(']', '>')
+
+private fun Long.ttmlTimestamp(): String {
+    val hours = this / 3_600_000
+    val minutes = (this % 3_600_000) / 60_000
+    val seconds = (this % 60_000) / 1000
+    val millis = this % 1000
+    return "%02d:%02d:%02d.%03d".format(hours, minutes, seconds, millis)
+}
+
+private fun String.escapeXml(): String =
+    replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
 
 private fun String.toPayloadType(): PluginLyricsPayloadType? = when (trim()) {
     "structured", "STRUCTURED" -> PluginLyricsPayloadType.STRUCTURED

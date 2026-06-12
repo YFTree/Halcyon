@@ -334,7 +334,7 @@ internal object EllaLyricsParser {
                     .firstOrNull { it.hasRole("x-bg") }
                     ?.parseTtmlBackground(end, translations[key])
                 val linePronunciation = p.childrenElements()
-                    .firstOrNull { it.hasRole("x-roman") }
+                    .firstOrNull { it.hasAnyRole("x-roman", "x-romanization") }
                     ?.textContent
                     ?.cleanLyricText()
                 val transliteration = transliterations[key]
@@ -506,7 +506,7 @@ internal object EllaLyricsParser {
                 Node.TEXT_NODE -> builder.append(node.nodeValue.orEmpty().withoutFormattingWhitespace())
                 Node.ELEMENT_NODE -> {
                     val child = node as? Element ?: return@forEach
-                    if (child.hasRole("x-translation") || child.hasRole("x-bg") || child.hasRole("x-roman")) {
+                    if (child.hasRole("x-translation") || child.hasRole("x-bg") || child.hasAnyRole("x-roman", "x-romanization")) {
                         return@forEach
                     }
                     when (child.rubyMode()) {
@@ -1000,6 +1000,9 @@ internal object EllaLyricsParser {
 
     private fun Element.hasRole(role: String): Boolean =
         attr("role") == role || attr("ttm:role") == role
+
+    private fun Element.hasAnyRole(vararg roles: String): Boolean =
+        roles.any { hasRole(it) }
 
     private fun Element.rubyMode(): String =
         attr("tts:ruby").ifBlank { attr("ruby") }

@@ -1,6 +1,7 @@
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.android.build.api.artifact.SingleArtifact
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -8,6 +9,8 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.kotlinSerialization)
 }
+
+    val appVersionName = "1.1.96"
 
 android {
     namespace = "com.ella.music"
@@ -31,7 +34,7 @@ android {
         minSdk = 29
         targetSdk = 37
         versionCode = 26
-        versionName = "1.1.96"
+        versionName = appVersionName
 
         val buildTime = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
@@ -72,7 +75,7 @@ android {
             if (!hasReleaseSigning) {
                 throw GradleException(
                     "Release signing is not configured. Put release.jks in app/ or project root, " +
-                        "or set RELEASE_STORE_FILE/RELEASE_STORE_PASSWORD/RELEASE_KEY_ALIAS/RELEASE_KEY_PASSWORD."
+                    "or set RELEASE_STORE_FILE/RELEASE_STORE_PASSWORD/RELEASE_KEY_ALIAS/RELEASE_KEY_PASSWORD."
                 )
             }
             signingConfig = signingConfigs.getByName("release")
@@ -102,6 +105,51 @@ android {
             useLegacyPackaging = true
         }
     }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        val variantName = variant.name
+        val variantNameCapitalized = variantName.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString()
+        }
+
+        val apkDirProvider = variant.artifacts.get(SingleArtifact.APK)
+        val outputDirProvider = layout.buildDirectory.dir("outputs/renamed-apk/$variantName")
+
+        val renameTask = tasks.register("copy${variantNameCapitalized}RenamedApks") {
+            inputs.dir(apkDirProvider)
+            outputs.dir(outputDirProvider)
+
+            doLast {
+                val apkDir = apkDirProvider.get().asFile
+                val outputDir = outputDirProvider.get().asFile
+                outputDir.mkdirs()
+
+                val knownAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+
+                apkDir.walkTopDown()
+                    .filter { it.isFile && it.extension.equals("apk", ignoreCase = true) }
+                    .forEach { apk ->
+                        val lowerName = apk.name.lowercase(Locale.US)
+                        val abi = knownAbis.firstOrNull { lowerName.contains(it.lowercase(Locale.US)) }
+                            ?: "universal"
+
+                        val target = outputDir.resolve(
+                            "Halcyon-$appVersionName-$abi-$variantName.APK"
+                        )
+
+                        apk.copyTo(target, overwrite = true)
+                        logger.lifecycle("Renamed APK copied to: ${target.absolutePath}")
+                    }
+            }
+        }
+
+        tasks.matching { it.name == "assemble$variantNameCapitalized" }
+            .configureEach {
+                finalizedBy(renameTask)
+            }
+        }
 }
 
 dependencies {

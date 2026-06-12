@@ -33,14 +33,20 @@ import com.ella.music.data.metadata.AudioTagInfo
 import com.ella.music.data.model.Song
 import com.ella.music.plugin.source.LyricoPluginManager
 import com.ella.music.plugin.source.PluginLyricsResult
+import com.ella.music.plugin.source.PluginLyricsRenderFormat
+import com.ella.music.plugin.source.PluginLyricsRenderOptions
 import com.ella.music.plugin.source.PluginSearchHit
+import com.ella.music.plugin.source.defaultRenderFormat
 import com.ella.music.plugin.source.toEmbeddedLyricsText
 import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -65,8 +71,21 @@ internal fun PluginLyricsMatchSheet(
     var results by remember { mutableStateOf<List<PluginSearchHit>>(emptyList()) }
     var selectedHit by remember { mutableStateOf<PluginSearchHit?>(null) }
     var lyricsResult by remember { mutableStateOf<PluginLyricsResult?>(null) }
-    var lyricsText by remember { mutableStateOf("") }
+    var renderFormat by remember { mutableStateOf(PluginLyricsRenderFormat.PLAIN_LRC) }
+    var includeTranslation by remember { mutableStateOf(true) }
+    var includeRomanization by remember { mutableStateOf(true) }
     var fetchingLyrics by remember { mutableStateOf(false) }
+    val lyricsOptions = remember(renderFormat, includeTranslation, includeRomanization) {
+        PluginLyricsRenderOptions(
+            format = renderFormat,
+            includeTranslation = includeTranslation,
+            includeRomanization = includeRomanization
+        )
+    }
+    val lyricsText = remember(lyricsResult, lyricsOptions) {
+        lyricsResult?.toEmbeddedLyricsText(lyricsOptions).orEmpty()
+    }
+    val isTtmlLyrics = renderFormat == PluginLyricsRenderFormat.TTML && lyricsText.trimStart().startsWith("<")
 
     fun writeLyrics(tags: AudioTagInfo) {
         if (song.path.startsWith("http://", true) || song.path.startsWith("https://", true)) {
@@ -105,7 +124,6 @@ internal fun PluginLyricsMatchSheet(
             message = null
             selectedHit = null
             lyricsResult = null
-            lyricsText = ""
             results = manager.searchSongs(query.ifBlank { song.title })
             if (results.isEmpty()) message = context.getString(R.string.lyric_match_no_results)
             loading = false
@@ -157,9 +175,18 @@ internal fun PluginLyricsMatchSheet(
                         fetchingLyrics = true
                         message = null
                         scope.launch {
-                            lyricsResult = manager.getLyrics(hit)
-                            lyricsText = lyricsResult?.toEmbeddedLyricsText().orEmpty()
-                            if (lyricsText.isBlank()) message = context.getString(R.string.lyric_match_fetch_failed)
+                            val result = manager.getLyrics(hit)
+                            val defaultFormat = result?.defaultRenderFormat() ?: PluginLyricsRenderFormat.PLAIN_LRC
+                            lyricsResult = result
+                            renderFormat = defaultFormat
+                            val previewText = result?.toEmbeddedLyricsText(
+                                PluginLyricsRenderOptions(
+                                    format = defaultFormat,
+                                    includeTranslation = includeTranslation,
+                                    includeRomanization = includeRomanization
+                                )
+                            ).orEmpty()
+                            if (previewText.isBlank()) message = context.getString(R.string.lyric_match_fetch_failed)
                             fetchingLyrics = false
                         }
                     }
@@ -172,6 +199,15 @@ internal fun PluginLyricsMatchSheet(
         }
         if (lyricsText.isNotBlank()) {
             Spacer(modifier = Modifier.height(10.dp))
+            LyricsRenderControls(
+                selectedFormat = renderFormat,
+                onFormatChange = { renderFormat = it },
+                includeTranslation = includeTranslation,
+                onIncludeTranslationChange = { includeTranslation = it },
+                includeRomanization = includeRomanization,
+                onIncludeRomanizationChange = { includeRomanization = it }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.lyric_match_preview),
                 fontWeight = FontWeight.Bold,
@@ -185,7 +221,7 @@ internal fun PluginLyricsMatchSheet(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
-            if (lyricsResult?.rawTtml?.isNotBlank() == true) {
+            if (isTtmlLyrics) {
                 Text(
                     text = stringResource(R.string.lyric_match_ttml_write_choice),
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -216,6 +252,70 @@ internal fun PluginLyricsMatchSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LyricsRenderControls(
+    selectedFormat: PluginLyricsRenderFormat,
+    onFormatChange: (PluginLyricsRenderFormat) -> Unit,
+    includeTranslation: Boolean,
+    onIncludeTranslationChange: (Boolean) -> Unit,
+    includeRomanization: Boolean,
+    onIncludeRomanizationChange: (Boolean) -> Unit
+) {
+    val formats = listOf(
+        PluginLyricsRenderFormat.ENHANCED_LRC,
+        PluginLyricsRenderFormat.WORD_LRC,
+        PluginLyricsRenderFormat.PLAIN_LRC,
+        PluginLyricsRenderFormat.TTML
+    )
+    val labels = listOf(
+        stringResource(R.string.lyric_match_format_enhanced_lrc),
+        stringResource(R.string.lyric_match_format_word_lrc),
+        stringResource(R.string.lyric_match_format_plain_lrc),
+        stringResource(R.string.lyric_match_format_ttml)
+    )
+    val selectedIndex = formats.indexOf(selectedFormat).takeIf { it >= 0 } ?: 0
+    WindowSpinnerPreference(
+        title = stringResource(R.string.lyric_match_render_format),
+        summary = labels[selectedIndex],
+        items = labels.map { DropdownItem(title = it) },
+        selectedIndex = selectedIndex,
+        onSelectedIndexChange = { index ->
+            formats.getOrNull(index)?.let(onFormatChange)
+        }
+    )
+    LyricsOptionSwitchRow(
+        title = stringResource(R.string.lyric_match_include_translation),
+        checked = includeTranslation,
+        onCheckedChange = onIncludeTranslationChange
+    )
+    LyricsOptionSwitchRow(
+        title = stringResource(R.string.lyric_match_include_romanization),
+        checked = includeRomanization,
+        onCheckedChange = onIncludeRomanizationChange
+    )
+}
+
+@Composable
+private fun LyricsOptionSwitchRow(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            color = MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
