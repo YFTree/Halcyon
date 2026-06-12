@@ -660,7 +660,7 @@ fun LibraryScreen(
                 // Inset rows so the song "more" button clears the side index bar (matches Lyrico)
                 // and is no longer easy to mis-tap.
                 val listEndInset = when {
-                    showFastIndexBar -> 44.dp
+                    showFastIndexBar -> 36.dp
                     showScrollIndicator -> 16.dp
                     else -> 0.dp
                 }

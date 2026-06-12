@@ -165,7 +165,9 @@ internal fun MetadataCategoryCard(
                     },
                     bottom = 12.dp
                 ),
-            verticalArrangement = if (isGenreCard) Arrangement.Center else Arrangement.SpaceBetween
+            // Small-cover cards (genre/year) keep the title and count on adjacent lines instead of
+            // spreading them apart, so there is no empty gap between e.g. the year and song count.
+            verticalArrangement = if (useSmallCover) Arrangement.Center else Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

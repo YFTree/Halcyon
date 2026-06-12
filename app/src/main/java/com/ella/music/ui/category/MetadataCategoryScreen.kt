@@ -86,6 +86,7 @@ import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixSheetActions
 import com.ella.music.ui.components.EllaMiuixTextField
+import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.LazyGridScrollIndicator
 import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SongItem
@@ -316,11 +317,27 @@ fun MetadataCategoryScreen(
                 )
             }
         } else {
+            // A-Z index bar for the single-column person categories (composer/lyricist) when
+            // sorted by name, mirroring the artists list.
+            val showCategoryIndexBar = (type == "composer" || type == "lyricist") &&
+                sortMode == MetadataCategorySortMode.Name &&
+                displayedItems.size > 30
+            val categoryIndexLetters = remember(displayedItems, showCategoryIndexBar) {
+                if (showCategoryIndexBar) displayedItems.map { it.categoryIndexLetter() } else emptyList()
+            }
+            val categoryIndexTargets = remember(categoryIndexLetters) {
+                buildMap {
+                    categoryIndexLetters.forEachIndexed { index, letter -> putIfAbsent(letter, index) }
+                }
+            }
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(safeGridColumns),
                     state = gridState,
-                    contentPadding = PaddingValues(bottom = 120.dp)
+                    contentPadding = PaddingValues(
+                        end = if (showCategoryIndexBar) 36.dp else 0.dp,
+                        bottom = 120.dp
+                    )
                 ) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
@@ -347,7 +364,22 @@ fun MetadataCategoryScreen(
                         )
                     }
                 }
-                if (displayedItems.size > 30) {
+                if (showCategoryIndexBar) {
+                    FastIndexBar(
+                        letters = categoryIndexLetters,
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .fillMaxHeight()
+                            .padding(end = 2.dp),
+                        onLetterClick = { letter ->
+                            val index = categoryIndexTargets[letter]
+                            if (index != null) {
+                                // +1 to skip the count-summary header item.
+                                scope.launch { gridState.scrollToItem(index + 1) }
+                            }
+                        }
+                    )
+                } else if (displayedItems.size > 30) {
                     LazyGridScrollIndicator(
                         state = gridState,
                         modifier = Modifier

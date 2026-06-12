@@ -152,6 +152,9 @@ internal fun List<com.ella.music.data.model.Song>.sortedForMetadataDetail(
     }
 }
 
+internal fun MetadataCategoryItem.categoryIndexLetter(): String =
+    name.musicSortKey().toFastIndexSection()
+
 internal fun Song.metadataDetailIndexLetter(mode: MetadataDetailSongSortMode): String {
     val sortText = when (mode) {
         MetadataDetailSongSortMode.FileName -> fileName.ifBlank { path.substringAfterLast('/') }

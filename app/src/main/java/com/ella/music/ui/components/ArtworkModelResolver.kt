@@ -35,7 +35,10 @@ fun rememberSongArtworkState(
         loadCoverArt != null &&
         when (usage) {
             ArtworkUsage.ListThumbnail -> true
-            ArtworkUsage.ArtistImage -> true
+            // Cards in fast-scrolling grids: only load the embedded bitmap when there is no
+            // album-art URI. Otherwise we'd show the (Coil-cached) URI first and then async-swap
+            // to the embedded bitmap as each recycled cell resolves, which flickers on fast scroll.
+            ArtworkUsage.ArtistImage -> albumArtUri == null
             ArtworkUsage.MiniPlayer -> albumArtUri == null || preferEmbedded
         }
     val initialModel = when {
