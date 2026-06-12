@@ -5,20 +5,36 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.player.DesktopLyricService
+import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ColorPicker
+import top.yukonga.miuix.kmp.basic.ColorSpace
 import top.yukonga.miuix.kmp.basic.DropdownItem
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
@@ -59,6 +75,7 @@ internal fun SettingsDesktopLyricControls(
     }
     val selectedDesktopLyricColorIndex =
         desktopLyricColorPresets.indexOfFirst { it.second == desktopLyricTextColor }.takeIf { it >= 0 } ?: 0
+    var showColorPickerSheet by remember { mutableStateOf(false) }
     val statusLyricPositionLeft = stringResource(R.string.settings_status_position_left)
     val statusLyricPositionCenter = stringResource(R.string.settings_status_position_center)
     val statusLyricPositionRight = stringResource(R.string.settings_status_position_right)
@@ -272,4 +289,46 @@ internal fun SettingsDesktopLyricControls(
             }
         }
     )
+
+    ArrowPreference(
+        title = stringResource(R.string.common_custom),
+        summary = String.format("#%06X", 0xFFFFFF and desktopLyricTextColor),
+        enabled = desktopLyricEnabled,
+        onClick = { showColorPickerSheet = true }
+    )
+
+    EllaMiuixBottomSheet(
+        show = showColorPickerSheet,
+        title = stringResource(R.string.settings_desktop_lyric_color),
+        onDismissRequest = { showColorPickerSheet = false }
+    ) {
+        var pickerColor by remember(showColorPickerSheet) {
+            mutableStateOf(Color(desktopLyricTextColor))
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            ColorPicker(
+                color = pickerColor,
+                onColorChanged = { pickerColor = it },
+                colorSpace = ColorSpace.HSV,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    showColorPickerSheet = false
+                    scope.launch {
+                        settingsManager.setDesktopLyricTextColor(pickerColor.toArgb())
+                        applyDesktopLyricSettings()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = stringResource(R.string.common_confirm))
+            }
+        }
+    }
 }
