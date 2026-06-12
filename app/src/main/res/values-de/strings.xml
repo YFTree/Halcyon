@@ -1357,4 +1357,25 @@
     <string name="settings_monet_cover">Albumcover</string>
     <string name="settings_monet_off">Aus</string>
     <string name="settings_monet_wallpaper">System-Hintergrund</string>
+    <string name="player_match_online_lyrics">Songtexte online suchen</string>
+    <string name="lyric_match_query_label">Suchbegriff</string>
+    <string name="lyric_match_search">Suchen</string>
+    <string name="lyric_match_searching">Suche läuft…</string>
+    <string name="lyric_match_fetching">Songtext wird geladen…</string>
+    <string name="lyric_match_preview">Songtext-Vorschau</string>
+    <string name="lyric_match_no_results">Keine Treffer gefunden</string>
+    <string name="lyric_match_no_sources">Aktiviere zuerst eine Online-Songtextquelle in den Einstellungen</string>
+    <string name="lyric_match_remote_not_supported">Songtexte für Online-Titel können noch nicht geschrieben werden</string>
+    <string name="lyric_match_fetch_failed">Songtext konnte nicht geladen werden</string>
+    <string name="lyric_match_write_embedded">Eingebetteten Songtext schreiben</string>
+    <string name="lyric_match_write_success">Songtext gespeichert</string>
+    <string name="lyric_match_write_failed">Songtext konnte nicht geschrieben werden: %1$s</string>
+    <string name="settings_lyric_plugin_sources">Online-Songtextquellen</string>
+    <string name="settings_lyric_plugin_sources_summary">Lyrico-Plugin-Quellen für das Songtext-Matching lokaler Titel verwalten</string>
+    <string name="settings_lyric_plugin_sources_empty">Noch keine Songtext-Plugins importiert</string>
+    <string name="settings_lyric_plugin_import">Plugin importieren</string>
+    <string name="settings_lyric_plugin_import_success">%1$s importiert</string>
+    <string name="settings_lyric_plugin_import_failed">Plugin-Import fehlgeschlagen</string>
+    <string name="settings_lyric_plugin_import_later">Über die Schaltfläche oben rechts ein Lyrico-Plugin-Zip importieren; importierte Quellen erscheinen hier und werden für das Songtext-Matching genutzt.</string>
+    <string name="settings_lyric_plugin_source_imported">Importiert</string>
 </resources>

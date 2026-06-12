@@ -1357,4 +1357,25 @@
     <string name="settings_monet_cover">Song cover</string>
     <string name="settings_monet_off">Off</string>
     <string name="settings_monet_wallpaper">System wallpaper</string>
+    <string name="player_match_online_lyrics">Match lyrics online</string>
+    <string name="lyric_match_query_label">Search keyword</string>
+    <string name="lyric_match_search">Search</string>
+    <string name="lyric_match_searching">Searching…</string>
+    <string name="lyric_match_fetching">Fetching lyrics…</string>
+    <string name="lyric_match_preview">Lyrics preview</string>
+    <string name="lyric_match_no_results">No matches found</string>
+    <string name="lyric_match_no_sources">Enable an online lyric source in settings first</string>
+    <string name="lyric_match_remote_not_supported">Writing lyrics to online songs is not supported yet</string>
+    <string name="lyric_match_fetch_failed">Failed to fetch lyrics</string>
+    <string name="lyric_match_write_embedded">Write embedded lyrics</string>
+    <string name="lyric_match_write_success">Lyrics saved</string>
+    <string name="lyric_match_write_failed">Failed to write lyrics: %1$s</string>
+    <string name="settings_lyric_plugin_sources">Online lyric sources</string>
+    <string name="settings_lyric_plugin_sources_summary">Manage Lyrico plugin sources used to match lyrics for local songs</string>
+    <string name="settings_lyric_plugin_sources_empty">No lyric source plugins imported yet</string>
+    <string name="settings_lyric_plugin_import">Import plugin</string>
+    <string name="settings_lyric_plugin_import_success">Imported %1$s</string>
+    <string name="settings_lyric_plugin_import_failed">Plugin import failed</string>
+    <string name="settings_lyric_plugin_import_later">Use the top-right button to import a Lyrico plugin zip; imported sources appear here and join per-song lyric matching.</string>
+    <string name="settings_lyric_plugin_source_imported">Imported</string>
 </resources>

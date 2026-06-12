@@ -173,14 +173,6 @@ fun ArtistScreen(
     val sortedReleaseAlbums = remember(releaseAlbums, albumSortMode, albumDurations) {
         releaseAlbums.sortedForArtistAlbumDetail(albumSortMode, albumDurations)
     }
-    val albumArtUrisBySongId = remember(sortedArtistSongs) {
-        sortedArtistSongs.associate { song -> song.id to mainViewModel.getAlbumArtUri(song.albumId) }
-    }
-    val albumArtUrisByAlbumId = remember(sortedParticipatedAlbums, sortedReleaseAlbums) {
-        (sortedParticipatedAlbums + sortedReleaseAlbums)
-            .distinctBy { it.id }
-            .associate { album -> album.id to mainViewModel.getAlbumArtUri(album.artAlbumId) }
-    }
     val hasComposerCategory = remember(songs, artistName) {
         mainViewModel.hasMetadataCategory("composer", artistName)
     }
@@ -199,11 +191,16 @@ fun ArtistScreen(
     }
     val selectedArtistTab = selectedTabTarget.takeIf { it in tabs } ?: ArtistTab.Songs
     val listState = rememberLazyListState()
-    val currentSongItemIndex = remember(sortedArtistSongs, currentSong?.id, selectedArtistTab) {
+    val sortedArtistSongIndexById = remember(sortedArtistSongs) {
+        buildMap {
+            sortedArtistSongs.forEachIndexed { index, song -> put(song.id, index) }
+        }
+    }
+    val currentSongItemIndex = remember(sortedArtistSongIndexById, currentSong?.id, selectedArtistTab) {
         if (selectedArtistTab != ArtistTab.Songs || selectionMode) {
             -1
         } else {
-            sortedArtistSongs.indexOfFirst { it.id == currentSong?.id }
+            (currentSong?.id?.let { sortedArtistSongIndexById[it] } ?: -1)
                 .takeIf { it >= 0 }
                 ?.plus(3)
                 ?: -1
@@ -304,10 +301,15 @@ fun ArtistScreen(
 
                     itemsIndexed(sortedArtistSongs) { index, song ->
                         val selected = song.id in selectedIds
+                        val albumArtUri = remember(song.albumId) {
+                            song.albumId
+                                .takeIf { it > 0L }
+                                ?.let(mainViewModel::getAlbumArtUri)
+                        }
                         SongItem(
                             song = song,
                             isCurrent = currentSong?.id == song.id,
-                            albumArtUri = albumArtUrisBySongId[song.id],
+                            albumArtUri = albumArtUri,
                             loadCoverArt = mainViewModel::getCoverArtBitmap,
                             loadAudioInfo = mainViewModel::getAudioInfo,
                             isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
@@ -346,10 +348,15 @@ fun ArtistScreen(
                         items = sortedParticipatedAlbums,
                         key = { it.id }
                     ) { album ->
+                        val albumArtUri = remember(album.artAlbumId) {
+                            album.artAlbumId
+                                .takeIf { it > 0L }
+                                ?.let(mainViewModel::getAlbumArtUri)
+                        }
                         ArtistAlbumRow(
                             album = album,
                             duration = albumDurations[album.id] ?: 0L,
-                            albumArtUri = albumArtUrisByAlbumId[album.id],
+                            albumArtUri = albumArtUri,
                             onClick = { onAlbumClick(album.id) }
                         )
                     }
@@ -368,10 +375,15 @@ fun ArtistScreen(
                         items = sortedReleaseAlbums,
                         key = { it.id }
                     ) { album ->
+                        val albumArtUri = remember(album.artAlbumId) {
+                            album.artAlbumId
+                                .takeIf { it > 0L }
+                                ?.let(mainViewModel::getAlbumArtUri)
+                        }
                         ArtistAlbumRow(
                             album = album,
                             duration = albumDurations[album.id] ?: 0L,
-                            albumArtUri = albumArtUrisByAlbumId[album.id],
+                            albumArtUri = albumArtUri,
                             onClick = { onAlbumClick(album.id) }
                         )
                     }

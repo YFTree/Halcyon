@@ -6,23 +6,9 @@ import com.ella.music.data.model.albumIdentityId
 
 object LibraryAlbumAggregator {
     fun toAlbums(songs: List<Song>): List<Album> {
-        return songs
-            .groupBy { it.albumIdentityId() }
-            .map { (albumIdentityId, albumSongs) ->
-                val first = albumSongs.first()
-                val albumOwner = first.albumArtist
-                    .takeIf(LibraryNormalizer::isUsableTagText)
-                    ?: ""
-                Album(
-                    id = albumIdentityId,
-                    name = first.album.takeIf(LibraryNormalizer::isUsableTagText) ?: "Unknown Album",
-                    artist = albumOwner,
-                    songCount = albumSongs.size,
-                    year = albumSongs.mapNotNull { s -> s.year.takeIf { it.isNotBlank() } }.minByOrNull { it } ?: "",
-                    artAlbumId = first.albumId,
-                    albumArtist = first.albumArtist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty()
-                )
-            }
+        return songs.toAlbumAccumulators()
+            .values
+            .map { it.toAlbum(unknownAlbumName = "Unknown Album", preferAlbumArtist = true) }
             .sortedWith(
                 compareBy<Album> { it.name.lowercase() }
                     .thenBy { it.artist.lowercase() }
@@ -31,15 +17,20 @@ object LibraryAlbumAggregator {
     }
 
     fun durationsByAlbumIdentity(songs: List<Song>): Map<Long, Long> {
-        return songs
-            .groupBy { it.albumIdentityId() }
-            .mapValues { (_, albumSongs) -> albumSongs.sumOf { it.duration } }
+        val durations = HashMap<Long, Long>()
+        songs.forEach { song ->
+            val albumId = song.albumIdentityId()
+            durations[albumId] = (durations[albumId] ?: 0L) + song.duration
+        }
+        return durations
     }
 
     fun representativeSongsByAlbumIdentity(songs: List<Song>): Map<Long, Song?> {
-        return songs
-            .groupBy { it.albumIdentityId() }
-            .mapValues { (_, albumSongs) -> albumSongs.firstOrNull() }
+        val representatives = HashMap<Long, Song?>()
+        songs.forEach { song ->
+            representatives.putIfAbsent(song.albumIdentityId(), song)
+        }
+        return representatives
     }
 
     fun toAlbumsForSongs(
@@ -48,19 +39,53 @@ object LibraryAlbumAggregator {
         unknownAlbumName: String = "Unknown Album"
     ): List<Album> {
         val albumById = libraryAlbums.associateBy { it.id }
-        return songs
-            .groupBy { it.albumIdentityId() }
-            .map { (albumId, albumSongs) ->
-                val first = albumSongs.first()
-                albumById[albumId] ?: Album(
-                    id = albumId,
-                    name = first.album.takeIf(LibraryNormalizer::isUsableTagText) ?: unknownAlbumName,
-                    artist = first.artist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty(),
-                    songCount = albumSongs.size,
-                    year = albumSongs.mapNotNull { s -> s.year.takeIf { it.isNotBlank() } }.minByOrNull { it } ?: "",
-                    artAlbumId = first.albumId,
-                    albumArtist = first.albumArtist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty()
+        return songs.toAlbumAccumulators()
+            .map { (albumId, accumulator) ->
+                albumById[albumId] ?: accumulator.toAlbum(
+                    unknownAlbumName = unknownAlbumName,
+                    preferAlbumArtist = false
                 )
             }
+    }
+
+    private fun List<Song>.toAlbumAccumulators(): LinkedHashMap<Long, AlbumAccumulator> {
+        val albums = LinkedHashMap<Long, AlbumAccumulator>()
+        forEach { song ->
+            val albumId = song.albumIdentityId()
+            val accumulator = albums.getOrPut(albumId) { AlbumAccumulator(albumId, song) }
+            accumulator.add(song)
+        }
+        return albums
+    }
+
+    private class AlbumAccumulator(
+        private val albumId: Long,
+        private val first: Song
+    ) {
+        private var count = 0
+        private var minYear = ""
+
+        fun add(song: Song) {
+            count++
+            val year = song.year.takeIf { it.isNotBlank() } ?: return
+            if (minYear.isBlank() || year < minYear) minYear = year
+        }
+
+        fun toAlbum(unknownAlbumName: String, preferAlbumArtist: Boolean): Album {
+            val artist = if (preferAlbumArtist) {
+                first.albumArtist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty()
+            } else {
+                first.artist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty()
+            }
+            return Album(
+                id = albumId,
+                name = first.album.takeIf(LibraryNormalizer::isUsableTagText) ?: unknownAlbumName,
+                artist = artist,
+                songCount = count,
+                year = minYear,
+                artAlbumId = first.albumId,
+                albumArtist = first.albumArtist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty()
+            )
+        }
     }
 }

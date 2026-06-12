@@ -17,7 +17,7 @@ class CustomPluginStore(
 ) {
     private val rootDir: File = File(context.filesDir, "lyrico_plugins")
 
-    suspend fun loadPlugins(): List<BuiltInPluginSource> = withContext(Dispatchers.IO) {
+    suspend fun loadPlugins(): List<LyricoPluginSource> = withContext(Dispatchers.IO) {
         rootDir.listFiles { file -> file.isDirectory }
             .orEmpty()
             .sortedBy { it.name }
@@ -53,18 +53,17 @@ class CustomPluginStore(
         }
     }
 
-    private fun loadPlugin(dir: File): BuiltInPluginSource {
+    private fun loadPlugin(dir: File): LyricoPluginSource {
         val manifest = json.decodeFromString<PluginManifest>(File(dir, "manifest.json").readText())
         if (PluginCapability.SEARCH_SONGS !in manifest.capabilities ||
             PluginCapability.GET_LYRICS !in manifest.capabilities
         ) {
             error("Unsupported plugin capabilities")
         }
-        return BuiltInPluginSource(
+        return LyricoPluginSource(
             manifest = manifest,
             assetDir = dir.absolutePath,
-            script = buildScript(dir, manifest),
-            origin = PluginSourceOrigin.IMPORTED
+            script = buildScript(dir, manifest)
         )
     }
 

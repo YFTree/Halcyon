@@ -143,10 +143,11 @@ fun MetadataCategoryScreen(
         if (pinnedCategoryKeys.isEmpty()) {
             sortedItems
         } else {
-            val pinnedSet = pinnedCategoryKeys.toSet()
+            val pinnedRank = pinnedCategoryKeys.withIndex().associate { it.value to it.index }
+            val pinnedSet = pinnedRank.keys
             val pinned = sortedItems
                 .filter { it.name in pinnedSet }
-                .sortedBy { pinnedCategoryKeys.indexOf(it.name) }
+                .sortedBy { pinnedRank[it.name] ?: Int.MAX_VALUE }
             pinned + sortedItems.filterNot { it.name in pinnedSet }
         }
     }
@@ -162,11 +163,6 @@ fun MetadataCategoryScreen(
             pinnedOrderedItems
         } else {
             pinnedOrderedItems.filter { it.matchesCategorySearch(query, type) }
-        }
-    }
-    val albumArtUrisByName = remember(items) {
-        items.associate { item ->
-            item.name to item.coverAlbumIds.firstOrNull()?.let(mainViewModel::getAlbumArtUri)
         }
     }
     val gridColumns by mainViewModel.settingsManager.categoryGridColumns.collectAsState(initial = 2)
@@ -335,11 +331,14 @@ fun MetadataCategoryScreen(
                         )
                     }
                     items(displayedItems, key = { it.name }) { item ->
+                        val albumArtUri = remember(item.coverAlbumIds) {
+                            item.coverAlbumIds.firstOrNull()?.let(mainViewModel::getAlbumArtUri)
+                        }
                         MetadataCategoryCard(
                             type = type,
                             item = item,
                             sortMode = sortMode,
-                            albumArtUri = albumArtUrisByName[item.name],
+                            albumArtUri = albumArtUri,
                             representativeSong = item.representativeSong,
                             loadCoverArt = if (type.prefersEmbeddedCategoryCardCover()) mainViewModel::getAlbumCoverArtBitmap else null,
                             isPinned = item.name in pinnedCategoryKeys,

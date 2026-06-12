@@ -1357,4 +1357,25 @@
     <string name="settings_monet_cover">ปกเพลง</string>
     <string name="settings_monet_off">ปิด</string>
     <string name="settings_monet_wallpaper">วอลล์เปเปอร์ระบบ</string>
+    <string name="player_match_online_lyrics">จับคู่เนื้อเพลงออนไลน์</string>
+    <string name="lyric_match_query_label">คำค้นหา</string>
+    <string name="lyric_match_search">ค้นหา</string>
+    <string name="lyric_match_searching">กำลังค้นหา…</string>
+    <string name="lyric_match_fetching">กำลังดึงเนื้อเพลง…</string>
+    <string name="lyric_match_preview">ตัวอย่างเนื้อเพลง</string>
+    <string name="lyric_match_no_results">ไม่พบผลลัพธ์ที่ตรงกัน</string>
+    <string name="lyric_match_no_sources">กรุณาเปิดใช้แหล่งเนื้อเพลงออนไลน์ในการตั้งค่าก่อน</string>
+    <string name="lyric_match_remote_not_supported">ยังไม่รองรับการเขียนเนื้อเพลงสำหรับเพลงออนไลน์</string>
+    <string name="lyric_match_fetch_failed">ดึงเนื้อเพลงไม่สำเร็จ</string>
+    <string name="lyric_match_write_embedded">เขียนเนื้อเพลงแบบฝัง</string>
+    <string name="lyric_match_write_success">บันทึกเนื้อเพลงแล้ว</string>
+    <string name="lyric_match_write_failed">เขียนเนื้อเพลงไม่สำเร็จ: %1$s</string>
+    <string name="settings_lyric_plugin_sources">แหล่งเนื้อเพลงออนไลน์</string>
+    <string name="settings_lyric_plugin_sources_summary">จัดการแหล่งปลั๊กอิน Lyrico สำหรับจับคู่เนื้อเพลงของเพลงในเครื่อง</string>
+    <string name="settings_lyric_plugin_sources_empty">ยังไม่ได้นำเข้าปลั๊กอินแหล่งเนื้อเพลง</string>
+    <string name="settings_lyric_plugin_import">นำเข้าปลั๊กอิน</string>
+    <string name="settings_lyric_plugin_import_success">นำเข้า %1$s แล้ว</string>
+    <string name="settings_lyric_plugin_import_failed">นำเข้าปลั๊กอินไม่สำเร็จ</string>
+    <string name="settings_lyric_plugin_import_later">ใช้ปุ่มมุมขวาบนเพื่อนำเข้าไฟล์ zip ปลั๊กอิน Lyrico แหล่งที่นำเข้าจะปรากฏที่นี่และใช้จับคู่เนื้อเพลง</string>
+    <string name="settings_lyric_plugin_source_imported">นำเข้าแล้ว</string>
 </resources>

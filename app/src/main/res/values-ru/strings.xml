@@ -1344,4 +1344,25 @@
     <string name="settings_monet_cover">Обложка</string>
     <string name="settings_monet_off">Выкл.</string>
     <string name="settings_monet_wallpaper">Системные обои</string>
+    <string name="player_match_online_lyrics">Подбор текста онлайн</string>
+    <string name="lyric_match_query_label">Ключевое слово</string>
+    <string name="lyric_match_search">Поиск</string>
+    <string name="lyric_match_searching">Поиск…</string>
+    <string name="lyric_match_fetching">Получение текста…</string>
+    <string name="lyric_match_preview">Предпросмотр текста</string>
+    <string name="lyric_match_no_results">Совпадений не найдено</string>
+    <string name="lyric_match_no_sources">Сначала включите онлайн-источник текстов в настройках</string>
+    <string name="lyric_match_remote_not_supported">Запись текста для онлайн-треков пока не поддерживается</string>
+    <string name="lyric_match_fetch_failed">Не удалось получить текст</string>
+    <string name="lyric_match_write_embedded">Записать встроенный текст</string>
+    <string name="lyric_match_write_success">Текст сохранён</string>
+    <string name="lyric_match_write_failed">Не удалось записать текст: %1$s</string>
+    <string name="settings_lyric_plugin_sources">Онлайн-источники текстов</string>
+    <string name="settings_lyric_plugin_sources_summary">Управление источниками плагинов Lyrico для подбора текста локальных треков</string>
+    <string name="settings_lyric_plugin_sources_empty">Плагины источников текста ещё не импортированы</string>
+    <string name="settings_lyric_plugin_import">Импорт плагина</string>
+    <string name="settings_lyric_plugin_import_success">%1$s импортирован</string>
+    <string name="settings_lyric_plugin_import_failed">Не удалось импортировать плагин</string>
+    <string name="settings_lyric_plugin_import_later">Кнопкой вверху справа импортируйте zip плагина Lyrico; импортированные источники появятся здесь и будут использоваться для подбора текста.</string>
+    <string name="settings_lyric_plugin_source_imported">Импортирован</string>
 </resources>

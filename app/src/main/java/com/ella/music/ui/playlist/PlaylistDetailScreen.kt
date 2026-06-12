@@ -52,9 +52,7 @@ import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -129,11 +127,7 @@ fun PlaylistDetailScreen(
         value = if (query.isBlank()) {
             baseSongs
         } else {
-            withContext(Dispatchers.IO) {
-                baseSongs.filter { song ->
-                    mainViewModel.songMatchesSearchSnapshot(song, query)
-                }
-            }
+            mainViewModel.filterSongsBySearchSnapshot(baseSongs, query)
         }
     }
     val songListHeaderCount = 2
@@ -180,8 +174,13 @@ fun PlaylistDetailScreen(
             sortExpanded -> sortExpanded = false
         }
     }
-    val currentSongItemIndex = remember(displayedSongs, currentSong?.playlistIdentityKey()) {
-        displayedSongs.indexOfFirst { it.playlistIdentityKey() == currentSong?.playlistIdentityKey() }
+    val displayedSongIndexByKey = remember(displayedSongs) {
+        buildMap {
+            displayedSongs.forEachIndexed { index, song -> put(song.playlistIdentityKey(), index) }
+        }
+    }
+    val currentSongItemIndex = remember(displayedSongIndexByKey, currentSong?.playlistIdentityKey()) {
+        (currentSong?.playlistIdentityKey()?.let { displayedSongIndexByKey[it] } ?: -1)
             .takeIf { it >= 0 }
             ?.plus(2)
             ?: -1
@@ -369,10 +368,15 @@ fun PlaylistDetailScreen(
                                 )
                             }
                         )
+                        val albumArtUri = remember(song.albumId) {
+                            song.albumId
+                                .takeIf { it > 0L }
+                                ?.let(mainViewModel::getAlbumArtUri)
+                        }
                         SongItem(
                             song = song,
                             isCurrent = currentSong?.playlistIdentityKey() == song.playlistIdentityKey(),
-                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                            albumArtUri = albumArtUri,
                             loadCoverArt = mainViewModel::getCoverArtBitmap,
                             loadAudioInfo = mainViewModel::getAudioInfo,
                             selectionMode = selectionMode,

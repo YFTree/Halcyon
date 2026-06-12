@@ -41,10 +41,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.model.Album
 import com.ella.music.data.model.Artist
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
+import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.tagIdentityKey
 import com.ella.music.ui.LibrarySortUiState
@@ -87,6 +89,87 @@ private data class ArtistListAggregate(
     val artistDurations: Map<String, Long> = emptyMap(),
     val releaseAlbumCounts: Map<String, Int> = emptyMap()
 )
+
+private class ArtistListAccumulator(
+    val name: String
+) {
+    var songCount: Int = 0
+    var duration: Long = 0L
+    val albumIds: MutableSet<Long> = linkedSetOf()
+    var representativeSong: Song? = null
+}
+
+private fun buildArtistListAggregate(
+    songs: List<Song>,
+    albums: List<Album>,
+    includeAlbumArtists: Boolean
+): ArtistListAggregate {
+    val artistsByKey = linkedMapOf<String, ArtistListAccumulator>()
+    val releaseAlbumCounts = mutableMapOf<String, Int>()
+
+    fun accumulatorFor(rawName: String): ArtistListAccumulator {
+        val key = rawName.tagIdentityKey()
+        return artistsByKey.getOrPut(key) { ArtistListAccumulator(rawName) }
+    }
+
+    songs.forEach { song ->
+        val albumIdentityId = song.albumIdentityId()
+        splitArtistNames(song.artist).forEach { artistName ->
+            val accumulator = accumulatorFor(artistName)
+            accumulator.songCount += 1
+            accumulator.duration += song.duration
+            accumulator.albumIds += albumIdentityId
+            if (accumulator.representativeSong == null) {
+                accumulator.representativeSong = song
+            }
+        }
+        if (includeAlbumArtists) {
+            splitArtistNames(song.albumArtist).forEach { artistName ->
+                val accumulator = accumulatorFor(artistName)
+                accumulator.albumIds += albumIdentityId
+                if (accumulator.representativeSong == null) {
+                    accumulator.representativeSong = song
+                }
+            }
+        }
+    }
+
+    if (includeAlbumArtists) {
+        albums.forEach { album ->
+            splitArtistNames(album.albumArtist).forEach { artistName ->
+                val key = artistName.tagIdentityKey()
+                val accumulator = accumulatorFor(artistName)
+                if (album.id > 0L) {
+                    accumulator.albumIds += album.id
+                }
+                releaseAlbumCounts[key] = (releaseAlbumCounts[key] ?: 0) + 1
+            }
+        }
+    }
+
+    val artists = artistsByKey.values
+        .map { accumulator ->
+            Artist(
+                name = accumulator.name,
+                songCount = accumulator.songCount,
+                albumCount = accumulator.albumIds.size
+            )
+        }
+        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+    val representativeSongsByArtist = artistsByKey.mapNotNull { (key, accumulator) ->
+        accumulator.representativeSong?.let { key to it }
+    }.toMap()
+    val artistDurations = artistsByKey.mapNotNull { (key, accumulator) ->
+        accumulator.duration.takeIf { it > 0L }?.let { key to it }
+    }.toMap()
+
+    return ArtistListAggregate(
+        artists = artists,
+        representativeSongsByArtist = representativeSongsByArtist,
+        artistDurations = artistDurations,
+        releaseAlbumCounts = releaseAlbumCounts
+    )
+}
 
 @Composable
 fun ArtistListScreen(
@@ -133,38 +216,11 @@ fun ArtistListScreen(
         tagIgnoreCase
     ) {
         value = withContext(Dispatchers.Default) {
-            val artists = mainViewModel.getArtists(showAlbumArtists)
-            val representativeSongsByArtist = buildMap {
-                songs.forEach { song ->
-                    val names = if (showAlbumArtists) {
-                        splitArtistNames(song.artist) + splitArtistNames(song.albumArtist)
-                    } else {
-                        splitArtistNames(song.artist)
-                    }
-                    names.forEach { artistName ->
-                        putIfAbsent(artistName.tagIdentityKey(), song)
-                    }
-                }
-            }
-            val artistDurations = buildMap {
-                songs.forEach { song ->
-                    splitArtistNames(song.artist).forEach { artistName ->
-                        val key = artistName.tagIdentityKey()
-                        put(key, (get(key) ?: 0L) + song.duration)
-                    }
-                }
-            }
-            val releaseAlbumCounts = buildMap {
-                if (showAlbumArtists) {
-                    albums.forEach { album ->
-                        splitArtistNames(album.albumArtist).forEach { artistName ->
-                            val key = artistName.tagIdentityKey()
-                            put(key, (get(key) ?: 0) + 1)
-                        }
-                    }
-                }
-            }
-            ArtistListAggregate(artists, representativeSongsByArtist, artistDurations, releaseAlbumCounts)
+            buildArtistListAggregate(
+                songs = songs,
+                albums = albums,
+                includeAlbumArtists = showAlbumArtists
+            )
         }
     }
     val artists = aggregate.artists
@@ -187,10 +243,11 @@ fun ArtistListScreen(
         if (pinnedArtistKeys.isEmpty()) {
             sorted
         } else {
-            val pinnedSet = pinnedArtistKeys.toSet()
+            val pinnedRank = pinnedArtistKeys.withIndex().associate { it.value to it.index }
+            val pinnedSet = pinnedRank.keys
             val pinned = sorted
                 .filter { it.name.tagIdentityKey() in pinnedSet }
-                .sortedBy { pinnedArtistKeys.indexOf(it.name.tagIdentityKey()) }
+                .sortedBy { pinnedRank[it.name.tagIdentityKey()] ?: Int.MAX_VALUE }
             pinned + sorted.filterNot { it.name.tagIdentityKey() in pinnedSet }
         }
     }
@@ -368,11 +425,13 @@ fun ArtistListScreen(
                         LibrarySortUiState.artistListFirstVisibleItemScrollOffset = offset
                     }
             }
-            val fastIndexTargets = remember(filteredArtists) {
-                filteredArtists
-                    .mapIndexed { index, artist -> artist.indexLetter() to index + 1 }
-                    .distinctBy { it.first }
-                    .toMap()
+            val fastIndexLetters = remember(filteredArtists) {
+                filteredArtists.map { it.indexLetter() }
+            }
+            val fastIndexTargets = remember(fastIndexLetters) {
+                buildMap {
+                    fastIndexLetters.forEachIndexed { index, letter -> putIfAbsent(letter, index + 1) }
+                }
             }
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
@@ -422,7 +481,7 @@ fun ArtistListScreen(
 
                 if (sortMode == ArtistSortMode.Name && filteredArtists.size > 30) {
                     FastIndexBar(
-                        letters = remember(filteredArtists) { filteredArtists.map { it.indexLetter() } },
+                        letters = fastIndexLetters,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()

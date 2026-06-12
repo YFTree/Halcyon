@@ -1357,4 +1357,25 @@
     <string name="settings_monet_cover">歌曲封面</string>
     <string name="settings_monet_off">關閉</string>
     <string name="settings_monet_wallpaper">系統桌布</string>
+    <string name="player_match_online_lyrics">線上比對歌詞</string>
+    <string name="lyric_match_query_label">搜尋關鍵字</string>
+    <string name="lyric_match_search">搜尋</string>
+    <string name="lyric_match_searching">搜尋中…</string>
+    <string name="lyric_match_fetching">正在取得歌詞…</string>
+    <string name="lyric_match_preview">歌詞預覽</string>
+    <string name="lyric_match_no_results">找不到比對結果</string>
+    <string name="lyric_match_no_sources">請先在設定中啟用歌詞比對線上來源</string>
+    <string name="lyric_match_remote_not_supported">線上歌曲暫不支援寫入歌詞</string>
+    <string name="lyric_match_fetch_failed">取得歌詞失敗</string>
+    <string name="lyric_match_write_embedded">寫入內嵌歌詞</string>
+    <string name="lyric_match_write_success">歌詞已寫入</string>
+    <string name="lyric_match_write_failed">歌詞寫入失敗：%1$s</string>
+    <string name="settings_lyric_plugin_sources">歌詞比對線上來源管理</string>
+    <string name="settings_lyric_plugin_sources_summary">管理用於本機歌曲單曲比對歌詞的 Lyrico 外掛來源</string>
+    <string name="settings_lyric_plugin_sources_empty">尚未匯入歌詞來源外掛</string>
+    <string name="settings_lyric_plugin_import">匯入外掛</string>
+    <string name="settings_lyric_plugin_import_success">已匯入 %1$s</string>
+    <string name="settings_lyric_plugin_import_failed">外掛匯入失敗</string>
+    <string name="settings_lyric_plugin_import_later">右上角可匯入 Lyrico 外掛 zip；匯入後會出現在這裡並參與單曲歌詞比對。</string>
+    <string name="settings_lyric_plugin_source_imported">已匯入</string>
 </resources>

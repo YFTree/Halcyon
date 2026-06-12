@@ -1357,4 +1357,25 @@
     <string name="settings_monet_cover">アルバムアート</string>
     <string name="settings_monet_off">オフ</string>
     <string name="settings_monet_wallpaper">システムの壁紙</string>
+    <string name="player_match_online_lyrics">歌詞をオンラインで照合</string>
+    <string name="lyric_match_query_label">検索キーワード</string>
+    <string name="lyric_match_search">検索</string>
+    <string name="lyric_match_searching">検索中…</string>
+    <string name="lyric_match_fetching">歌詞を取得中…</string>
+    <string name="lyric_match_preview">歌詞プレビュー</string>
+    <string name="lyric_match_no_results">一致する結果が見つかりません</string>
+    <string name="lyric_match_no_sources">先に設定でオンライン歌詞ソースを有効にしてください</string>
+    <string name="lyric_match_remote_not_supported">オンライン楽曲への歌詞書き込みはまだ対応していません</string>
+    <string name="lyric_match_fetch_failed">歌詞の取得に失敗しました</string>
+    <string name="lyric_match_write_embedded">埋め込み歌詞を書き込む</string>
+    <string name="lyric_match_write_success">歌詞を書き込みました</string>
+    <string name="lyric_match_write_failed">歌詞の書き込みに失敗しました：%1$s</string>
+    <string name="settings_lyric_plugin_sources">オンライン歌詞ソース</string>
+    <string name="settings_lyric_plugin_sources_summary">ローカル楽曲の歌詞照合に使う Lyrico プラグインソースを管理</string>
+    <string name="settings_lyric_plugin_sources_empty">歌詞ソースプラグインがまだインポートされていません</string>
+    <string name="settings_lyric_plugin_import">プラグインをインポート</string>
+    <string name="settings_lyric_plugin_import_success">%1$s をインポートしました</string>
+    <string name="settings_lyric_plugin_import_failed">プラグインのインポートに失敗しました</string>
+    <string name="settings_lyric_plugin_import_later">右上のボタンから Lyrico プラグインの zip をインポートできます。インポートしたソースはここに表示され、歌詞照合に使われます。</string>
+    <string name="settings_lyric_plugin_source_imported">インポート済み</string>
 </resources>

@@ -98,11 +98,14 @@ fun HomeScreen(
             .distinctBy { it.tagIdentityKey() }
             .size
     }
-    val folderCount = remember(songs) { mainViewModel.getMetadataCategoryItems("folder").size }
-    val genreCount = remember(songs) { mainViewModel.getMetadataCategoryItems("genre").size }
-    val yearCount = remember(songs) { mainViewModel.getMetadataCategoryItems("year").size }
-    val composerCount = remember(songs) { mainViewModel.getMetadataCategoryItems("composer").size }
-    val lyricistCount = remember(songs) { mainViewModel.getMetadataCategoryItems("lyricist").size }
+    val metadataCategoryCounts = remember(songs) {
+        mainViewModel.getMetadataCategoryCounts(listOf("folder", "genre", "year", "composer", "lyricist"))
+    }
+    val folderCount = metadataCategoryCounts["folder"] ?: 0
+    val genreCount = metadataCategoryCounts["genre"] ?: 0
+    val yearCount = metadataCategoryCounts["year"] ?: 0
+    val composerCount = metadataCategoryCounts["composer"] ?: 0
+    val lyricistCount = metadataCategoryCounts["lyricist"] ?: 0
     val songsById = remember(songs) { songs.associateBy { it.id } }
     val recentSongs = remember(history, songsById) {
         history

@@ -1361,12 +1361,11 @@
     <!-- Lyrico plugin lyric matching -->
     <string name="settings_lyric_plugin_sources">歌词匹配在线源管理</string>
     <string name="settings_lyric_plugin_sources_summary">管理用于本地歌曲单曲匹配歌词的 Lyrico 插件源</string>
-    <string name="settings_lyric_plugin_sources_empty">未找到内置歌词源插件</string>
+    <string name="settings_lyric_plugin_sources_empty">还没有导入歌词源插件</string>
     <string name="settings_lyric_plugin_import_later">右上角可导入 Lyrico 插件 zip；导入后会出现在这里并参与单曲歌词匹配。</string>
     <string name="settings_lyric_plugin_import">导入插件</string>
     <string name="settings_lyric_plugin_import_success">已导入 %1$s</string>
     <string name="settings_lyric_plugin_import_failed">插件导入失败</string>
-    <string name="settings_lyric_plugin_source_builtin">内置</string>
     <string name="settings_lyric_plugin_source_imported">已导入</string>
     <string name="player_match_online_lyrics">在线匹配歌词</string>
     <string name="lyric_match_query_label">搜索关键词</string>

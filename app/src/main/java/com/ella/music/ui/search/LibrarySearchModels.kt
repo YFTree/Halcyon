@@ -78,10 +78,19 @@ internal fun Album.matchesLibrarySearch(query: String): Boolean =
         albumArtist.contains(query, ignoreCase = true)
 
 internal fun List<Song>.duplicateTitleAlbumSongs(): List<Song> =
-    groupBy { "${it.title.trim().lowercase()}|${it.album.trim().lowercase()}" }
-        .values
-        .filter { it.size > 1 }
-        .flatten()
+    buildList {
+        val firstByKey = HashMap<String, Song>()
+        val duplicatesByKey = LinkedHashMap<String, MutableList<Song>>()
+        this@duplicateTitleAlbumSongs.forEach { song ->
+            val key = "${song.title.trim().lowercase()}|${song.album.trim().lowercase()}"
+            val first = firstByKey.putIfAbsent(key, song)
+            if (first != null) {
+                val duplicates = duplicatesByKey.getOrPut(key) { mutableListOf(first) }
+                duplicates += song
+            }
+        }
+        duplicatesByKey.values.forEach(::addAll)
+    }
         .sortedWith(compareBy<Song> { it.album.lowercase() }.thenBy { it.title.lowercase() }.thenBy { it.artist.lowercase() })
 
 internal fun loadSearchHistory(context: Context): List<String> =

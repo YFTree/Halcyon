@@ -1357,4 +1357,25 @@
     <string name="settings_monet_cover">Ảnh bìa bài hát</string>
     <string name="settings_monet_off">Tắt</string>
     <string name="settings_monet_wallpaper">Hình nền hệ thống</string>
+    <string name="player_match_online_lyrics">Khớp lời bài hát trực tuyến</string>
+    <string name="lyric_match_query_label">Từ khóa tìm kiếm</string>
+    <string name="lyric_match_search">Tìm kiếm</string>
+    <string name="lyric_match_searching">Đang tìm…</string>
+    <string name="lyric_match_fetching">Đang lấy lời…</string>
+    <string name="lyric_match_preview">Xem trước lời</string>
+    <string name="lyric_match_no_results">Không tìm thấy kết quả khớp</string>
+    <string name="lyric_match_no_sources">Hãy bật một nguồn lời trực tuyến trong cài đặt trước</string>
+    <string name="lyric_match_remote_not_supported">Chưa hỗ trợ ghi lời cho bài hát trực tuyến</string>
+    <string name="lyric_match_fetch_failed">Lấy lời thất bại</string>
+    <string name="lyric_match_write_embedded">Ghi lời nhúng</string>
+    <string name="lyric_match_write_success">Đã lưu lời</string>
+    <string name="lyric_match_write_failed">Ghi lời thất bại: %1$s</string>
+    <string name="settings_lyric_plugin_sources">Nguồn lời trực tuyến</string>
+    <string name="settings_lyric_plugin_sources_summary">Quản lý nguồn plugin Lyrico dùng để khớp lời cho bài hát cục bộ</string>
+    <string name="settings_lyric_plugin_sources_empty">Chưa nhập plugin nguồn lời nào</string>
+    <string name="settings_lyric_plugin_import">Nhập plugin</string>
+    <string name="settings_lyric_plugin_import_success">Đã nhập %1$s</string>
+    <string name="settings_lyric_plugin_import_failed">Nhập plugin thất bại</string>
+    <string name="settings_lyric_plugin_import_later">Dùng nút trên cùng bên phải để nhập tệp zip plugin Lyrico; nguồn đã nhập sẽ hiện ở đây và tham gia khớp lời.</string>
+    <string name="settings_lyric_plugin_source_imported">Đã nhập</string>
 </resources>

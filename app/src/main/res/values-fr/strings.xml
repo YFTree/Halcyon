@@ -1357,4 +1357,25 @@
     <string name="settings_monet_cover">Pochette</string>
     <string name="settings_monet_off">Désactivé</string>
     <string name="settings_monet_wallpaper">Fond d\'écran système</string>
+    <string name="player_match_online_lyrics">Rechercher les paroles en ligne</string>
+    <string name="lyric_match_query_label">Mot-clé de recherche</string>
+    <string name="lyric_match_search">Rechercher</string>
+    <string name="lyric_match_searching">Recherche…</string>
+    <string name="lyric_match_fetching">Récupération des paroles…</string>
+    <string name="lyric_match_preview">Aperçu des paroles</string>
+    <string name="lyric_match_no_results">Aucun résultat trouvé</string>
+    <string name="lyric_match_no_sources">Activez d\'abord une source de paroles en ligne dans les paramètres</string>
+    <string name="lyric_match_remote_not_supported">L\'écriture des paroles pour les titres en ligne n\'est pas encore prise en charge</string>
+    <string name="lyric_match_fetch_failed">Échec de récupération des paroles</string>
+    <string name="lyric_match_write_embedded">Écrire les paroles intégrées</string>
+    <string name="lyric_match_write_success">Paroles enregistrées</string>
+    <string name="lyric_match_write_failed">Échec de l\'écriture des paroles : %1$s</string>
+    <string name="settings_lyric_plugin_sources">Sources de paroles en ligne</string>
+    <string name="settings_lyric_plugin_sources_summary">Gérer les sources de plugins Lyrico utilisées pour les paroles des titres locaux</string>
+    <string name="settings_lyric_plugin_sources_empty">Aucun plugin de source de paroles importé</string>
+    <string name="settings_lyric_plugin_import">Importer un plugin</string>
+    <string name="settings_lyric_plugin_import_success">%1$s importé</string>
+    <string name="settings_lyric_plugin_import_failed">Échec de l\'import du plugin</string>
+    <string name="settings_lyric_plugin_import_later">Utilisez le bouton en haut à droite pour importer un zip de plugin Lyrico ; les sources importées apparaissent ici et participent au matching des paroles.</string>
+    <string name="settings_lyric_plugin_source_imported">Importé</string>
 </resources>

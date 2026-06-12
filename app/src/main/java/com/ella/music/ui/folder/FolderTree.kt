@@ -21,39 +21,64 @@ internal fun Song.folderPath(): String {
 }
 
 internal fun List<Song>.commonFolderRoot(): String {
-    val folders = map { it.folderPath() }.distinct()
-    if (folders.isEmpty()) return "/"
-    if (folders.size == 1) return folders.first().parentFolderPath()
-
-    val commonSegments = folders
-        .map { it.trim('/').split('/').filter(String::isNotBlank) }
-        .reduce { common, next ->
-            common.zip(next)
+    if (isEmpty()) return "/"
+    var firstFolder: String? = null
+    var allSameFolder = true
+    var commonSegments: List<String>? = null
+    forEach { song ->
+        val folder = song.folderPath()
+        val first = firstFolder
+        if (first == null) {
+            firstFolder = folder
+            commonSegments = folder.pathSegments()
+        } else {
+            if (!folder.equals(first, ignoreCase = true)) allSameFolder = false
+            val currentCommon = commonSegments.orEmpty()
+            val next = folder.pathSegments()
+            commonSegments = currentCommon.zip(next)
                 .takeWhile { (left, right) -> left.equals(right, ignoreCase = true) }
                 .map { it.first }
         }
-    return commonSegments.toFolderPath().ifBlank { "/" }
+    }
+    if (allSameFolder) return firstFolder.orEmpty().parentFolderPath()
+    return commonSegments.orEmpty().toFolderPath().ifBlank { "/" }
 }
 
 internal fun List<Song>.childFoldersOf(context: Context, parentPath: String): List<FolderTreeEntry> {
     val normalizedParent = parentPath.normalizeFolderPath()
     val rootName = context.getString(R.string.folder_root)
-    return asSequence()
-        .mapNotNull { song ->
-            val childPath = song.folderPath().immediateChildOf(normalizedParent) ?: return@mapNotNull null
-            childPath to song
-        }
-        .groupBy({ it.first }, { it.second })
-        .map { (path, songs) ->
-            FolderTreeEntry(
-                path = path,
-                name = path.folderDisplayName(rootName),
-                songCount = songs.size,
-                albumCount = songs.map { it.albumIdentityId() }.distinct().size,
-                duration = songs.sumOf { it.duration },
-                dateModified = songs.maxOfOrNull { it.dateModified } ?: 0L
-            )
-        }
+    val folders = LinkedHashMap<String, FolderAccumulator>()
+    forEach { song ->
+        val childPath = song.folderPath().immediateChildOf(normalizedParent) ?: return@forEach
+        folders.getOrPut(childPath) { FolderAccumulator(childPath) }.add(song)
+    }
+    return folders.values.map { it.toEntry(rootName) }
+}
+
+private class FolderAccumulator(
+    private val path: String
+) {
+    private var songCount = 0
+    private var duration = 0L
+    private var dateModified = 0L
+    private val albumIds = HashSet<Long>()
+
+    fun add(song: Song) {
+        songCount++
+        duration += song.duration
+        if (song.dateModified > dateModified) dateModified = song.dateModified
+        albumIds += song.albumIdentityId()
+    }
+
+    fun toEntry(rootName: String): FolderTreeEntry =
+        FolderTreeEntry(
+            path = path,
+            name = path.folderDisplayName(rootName),
+            songCount = songCount,
+            albumCount = albumIds.size,
+            duration = duration,
+            dateModified = dateModified
+        )
 }
 
 internal fun List<Song>.directSongsInFolder(folderPath: String): List<Song> {
@@ -106,3 +131,6 @@ private fun String.immediateChildOf(parentPath: String): String? {
 
 private fun List<String>.toFolderPath(): String =
     if (isEmpty()) "/" else joinToString(prefix = "/", separator = "/")
+
+private fun String.pathSegments(): List<String> =
+    trim('/').split('/').filter(String::isNotBlank)

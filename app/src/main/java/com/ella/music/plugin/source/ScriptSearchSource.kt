@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 
 class ScriptSearchSource(
-    private val source: BuiltInPluginSource
+    private val source: LyricoPluginSource
 ) : AutoCloseable {
     val id: String = source.manifest.id
     val name: String = source.manifest.name

@@ -128,6 +128,11 @@ fun AlbumDetailScreen(
     val album = albums.find { it.id == albumId }
     val albumSongs = mainViewModel.getSongsForAlbum(albumId)
     val sortedAlbumSongs = remember(albumSongs, sortMode) { albumSongs.sortedForAlbumDetail(sortMode) }
+    val sortedAlbumSongIndexById = remember(sortedAlbumSongs) {
+        buildMap {
+            sortedAlbumSongs.forEachIndexed { index, song -> put(song.id, index) }
+        }
+    }
     val albumDuration = remember(albumSongs) { albumSongs.sumOf { it.duration } }
     val useDiscSections = sortMode == AlbumDetailSongSortMode.Track && sortedAlbumSongs.any { it.discNumber > 0 }
     val discGroups = remember(sortedAlbumSongs, sortMode) {
@@ -204,7 +209,7 @@ fun AlbumDetailScreen(
 
     val currentSongItemIndex = remember(sortedAlbumSongs, discGroups, useDiscSections, currentSong?.id, selectionMode) {
         if (selectionMode) return@remember -1
-        val songIndex = sortedAlbumSongs.indexOfFirst { it.id == currentSong?.id }
+        val songIndex = currentSong?.id?.let { sortedAlbumSongIndexById[it] } ?: -1
         if (songIndex < 0) {
             -1
         } else {
@@ -293,7 +298,7 @@ fun AlbumDetailScreen(
                         items = group.songs,
                         key = { song -> song.id }
                     ) { song ->
-                        val index = sortedAlbumSongs.indexOfFirst { it.id == song.id }
+                        val index = sortedAlbumSongIndexById[song.id] ?: -1
                         AlbumSongRow(
                             song = song,
                             index = index,

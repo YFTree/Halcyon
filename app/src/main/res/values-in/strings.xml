@@ -1357,4 +1357,25 @@
     <string name="settings_monet_cover">Sampul lagu</string>
     <string name="settings_monet_off">Nonaktif</string>
     <string name="settings_monet_wallpaper">Wallpaper sistem</string>
+    <string name="player_match_online_lyrics">Cocokkan lirik online</string>
+    <string name="lyric_match_query_label">Kata kunci pencarian</string>
+    <string name="lyric_match_search">Cari</string>
+    <string name="lyric_match_searching">Mencari…</string>
+    <string name="lyric_match_fetching">Mengambil lirik…</string>
+    <string name="lyric_match_preview">Pratinjau lirik</string>
+    <string name="lyric_match_no_results">Tidak ada hasil yang cocok</string>
+    <string name="lyric_match_no_sources">Aktifkan dulu sumber lirik online di pengaturan</string>
+    <string name="lyric_match_remote_not_supported">Menulis lirik untuk lagu online belum didukung</string>
+    <string name="lyric_match_fetch_failed">Gagal mengambil lirik</string>
+    <string name="lyric_match_write_embedded">Tulis lirik tertanam</string>
+    <string name="lyric_match_write_success">Lirik disimpan</string>
+    <string name="lyric_match_write_failed">Gagal menulis lirik: %1$s</string>
+    <string name="settings_lyric_plugin_sources">Sumber lirik online</string>
+    <string name="settings_lyric_plugin_sources_summary">Kelola sumber plugin Lyrico untuk mencocokkan lirik lagu lokal</string>
+    <string name="settings_lyric_plugin_sources_empty">Belum ada plugin sumber lirik yang diimpor</string>
+    <string name="settings_lyric_plugin_import">Impor plugin</string>
+    <string name="settings_lyric_plugin_import_success">%1$s diimpor</string>
+    <string name="settings_lyric_plugin_import_failed">Impor plugin gagal</string>
+    <string name="settings_lyric_plugin_import_later">Gunakan tombol kanan atas untuk mengimpor zip plugin Lyrico; sumber yang diimpor muncul di sini dan ikut mencocokkan lirik.</string>
+    <string name="settings_lyric_plugin_source_imported">Diimpor</string>
 </resources>

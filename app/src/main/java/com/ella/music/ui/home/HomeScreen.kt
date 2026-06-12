@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -242,18 +243,24 @@ fun LibraryScreen(
         listCoversEnabled = true
     }
 
+    val activeFavoriteSongKeys = if (favoriteFilter) favoriteSongKeys else emptySet()
+    val activeRatingRevision = if (ratingFilter.isEmpty()) 0 else ratingRevision
     val filteredSongs by produceState(
         initialValue = songs,
         songs,
         searchQuery,
         ratingFilter,
         favoriteFilter,
-        favoriteSongKeys,
-        ratingRevision
+        activeFavoriteSongKeys,
+        activeRatingRevision
     ) {
         val query = searchQuery.trim()
-        val favoriteKeys = favoriteSongKeys
-        value = withContext(Dispatchers.IO) {
+        val favoriteKeys = activeFavoriteSongKeys
+        if (query.isBlank() && ratingFilter.isEmpty() && !favoriteFilter) {
+            value = songs
+            return@produceState
+        }
+        val base = withContext(Dispatchers.IO) {
             songs.filter { song ->
                 val ratingMatched = when {
                     ratingFilter.isEmpty() -> true
@@ -262,9 +269,10 @@ fun LibraryScreen(
                 }
                 if (!ratingMatched) return@filter false
                 if (favoriteFilter && song.playlistIdentityKey() !in favoriteKeys) return@filter false
-                query.isBlank() || mainViewModel.songMatchesSearchSnapshot(song, query)
+                true
             }
         }
+        value = if (query.isBlank()) base else mainViewModel.filterSongsBySearchSnapshot(base, query)
     }
     // initialValue must stay O(1): it is re-evaluated on every recomposition of this screen
     // (it's a plain argument expression), even though produceState only uses it on first
@@ -276,13 +284,18 @@ fun LibraryScreen(
         filteredSongs,
         sortMode
     ) {
-        value = withContext(Dispatchers.Default) { filteredSongs.sortedForHomeMode(sortMode) }
+        value = withContext(Dispatchers.Default) { filteredSongs.cachedSortedForHomeMode(sortMode) }
     }
     val sortedSongs = sortedResult?.songs.orEmpty()
     val sortKeysBySongId = sortedResult?.sortKeysBySongId.orEmpty()
     val visibleSongIds = remember(sortedSongs) { sortedSongs.map { it.id }.toSet() }
+    val sortedSongIndexById = remember(sortedSongs) {
+        buildMap {
+            sortedSongs.forEachIndexed { index, song -> put(song.id, index) }
+        }
+    }
     val selectedVisibleCount = remember(selectedIds, visibleSongIds) { selectedIds.count { it in visibleSongIds } }
-    val rangeSelectionAvailable = remember(sortedSongs, selectedIds, rangeAnchorId, rangeTargetId) {
+    val rangeSelectionAvailable = remember(sortedSongIndexById, selectedIds, rangeAnchorId, rangeTargetId) {
         val anchor = rangeAnchorId
         val target = rangeTargetId
         if (anchor == null || target == null || anchor == target) {
@@ -290,15 +303,8 @@ fun LibraryScreen(
         } else {
             anchor in selectedIds &&
                 target in selectedIds &&
-                sortedSongs.indexOfFirst { it.id == anchor } >= 0 &&
-                sortedSongs.indexOfFirst { it.id == target } >= 0
-        }
-    }
-    val albumArtUrisBySongId = remember(sortedSongs, listCoversEnabled) {
-        if (!listCoversEnabled) {
-            emptyMap()
-        } else {
-            sortedSongs.associate { song -> song.id to mainViewModel.getAlbumArtUri(song.albumId) }
+                anchor in sortedSongIndexById &&
+                target in sortedSongIndexById
         }
     }
     fun finishSelectionMode() {
@@ -333,8 +339,8 @@ fun LibraryScreen(
     fun applyRangeSelection() {
         val anchor = rangeAnchorId ?: return
         val target = rangeTargetId ?: return
-        val anchorIndex = sortedSongs.indexOfFirst { it.id == anchor }
-        val targetIndex = sortedSongs.indexOfFirst { it.id == target }
+        val anchorIndex = sortedSongIndexById[anchor] ?: -1
+        val targetIndex = sortedSongIndexById[target] ?: -1
         if (anchorIndex < 0 || targetIndex < 0 || anchorIndex == targetIndex) return
         val bounds = if (anchorIndex < targetIndex) anchorIndex..targetIndex else targetIndex..anchorIndex
         selectedIds = selectedIds + bounds.map { sortedSongs[it].id }
@@ -614,8 +620,8 @@ fun LibraryScreen(
             val listState = rememberLazyListState()
             var fastScrollJob by remember { mutableStateOf<Job?>(null) }
             var handledLocateRequest by remember { mutableStateOf(locateCurrentSongRequest) }
-            val currentSongIndex = remember(sortedSongs, currentSong?.id) {
-                sortedSongs.indexOfFirst { it.id == currentSong?.id }
+            val currentSongIndex = remember(sortedSongIndexById, currentSong?.id) {
+                currentSong?.id?.let { sortedSongIndexById[it] } ?: -1
             }
             val showLocateCurrentSongButton by remember(currentSongIndex, selectionMode) {
                 derivedStateOf {
@@ -691,16 +697,21 @@ fun LibraryScreen(
                         state = listState,
                         contentPadding = PaddingValues(end = listEndInset, bottom = 160.dp)
                     ) {
-                        items(
+                        itemsIndexed(
                             items = sortedSongs,
-                            key = { it.id }
-                        ) { song ->
+                            key = { _, song -> song.id }
+                        ) { index, song ->
                             val selected = song.id in selectedIds
+                            val albumArtUri = remember(listCoversEnabled, song.albumId) {
+                                song.albumId
+                                    .takeIf { listCoversEnabled && it > 0L }
+                                    ?.let(mainViewModel::getAlbumArtUri)
+                            }
 
                             SongItem(
                                 song = song,
                                 isCurrent = currentSong?.id == song.id,
-                                albumArtUri = albumArtUrisBySongId[song.id],
+                                albumArtUri = albumArtUri,
                                 loadCoverArt = mainViewModel::getCoverArtBitmap,
                                 loadAudioInfo = mainViewModel::getAudioInfo,
                                 isFavorite = song.playlistIdentityKey() in favoriteSongKeys,
@@ -719,7 +730,7 @@ fun LibraryScreen(
                                     if (selectionMode) {
                                         toggleSongSelection(song.id)
                                     } else {
-                                        playerViewModel.setPlaylist(sortedSongs, sortedSongs.indexOf(song))
+                                        playerViewModel.setPlaylist(sortedSongs, index)
                                         if (openPlayerOnPlay) onNavigateToPlayer()
                                     }
                                 },

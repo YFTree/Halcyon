@@ -63,31 +63,87 @@ internal fun buildMetadataCategoryItems(
     songs: List<Song>,
     type: String
 ): List<MetadataCategoryItem> {
-    val groups = linkedMapOf<String, MutableList<Song>>()
-    val displayNames = linkedMapOf<String, String>()
+    val groups = linkedMapOf<String, MetadataCategoryAccumulator>()
     songs.forEach { song ->
         song.metadataCategoryNames(type).forEach { name ->
             val key = name.tagIdentityKey()
-            displayNames.putIfAbsent(key, name)
-            groups.getOrPut(key) { mutableListOf() } += song
+            groups.getOrPut(key) { MetadataCategoryAccumulator(name) }.add(song)
         }
     }
-    return groups
-        .map { (key, items) ->
+    return groups.values
+        .map { item ->
             MetadataCategoryItem(
-                name = displayNames[key] ?: key,
-                songCount = items.size,
-                albumCount = items.map { it.albumIdentityId() }.distinct().size,
-                duration = items.sumOf { it.duration },
-                dateModified = items.maxOfOrNull { it.dateModified } ?: 0L,
-                coverAlbumIds = items
-                    .mapNotNull { it.albumId.takeIf { albumId -> albumId > 0L } }
-                    .distinct()
-                    .take(3),
-                representativeSong = items.firstOrNull { it.albumId > 0L } ?: items.firstOrNull()
+                name = item.name,
+                songCount = item.songCount,
+                albumCount = item.albumIds.size,
+                duration = item.duration,
+                dateModified = item.dateModified,
+                coverAlbumIds = item.coverAlbumIds,
+                representativeSong = item.representativeSongWithCover ?: item.firstSong
             )
         }
         .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+}
+
+private class MetadataCategoryAccumulator(
+    val name: String
+) {
+    var songCount: Int = 0
+        private set
+    var duration: Long = 0L
+        private set
+    var dateModified: Long = 0L
+        private set
+    val albumIds: MutableSet<Long> = linkedSetOf()
+    private val coverAlbumIdSet = linkedSetOf<Long>()
+    val coverAlbumIds: List<Long>
+        get() = coverAlbumIdSet.toList()
+    var firstSong: Song? = null
+        private set
+    var representativeSongWithCover: Song? = null
+        private set
+
+    fun add(song: Song) {
+        songCount += 1
+        duration += song.duration
+        if (song.dateModified > dateModified) dateModified = song.dateModified
+        albumIds += song.albumIdentityId()
+        if (song.albumId > 0L && coverAlbumIdSet.size < 3) {
+            coverAlbumIdSet += song.albumId
+        }
+        if (firstSong == null) firstSong = song
+        if (representativeSongWithCover == null && song.albumId > 0L) {
+            representativeSongWithCover = song
+        }
+    }
+}
+
+internal fun countMetadataCategories(
+    songs: List<Song>,
+    type: String
+): Int {
+    val keys = HashSet<String>()
+    songs.forEach { song ->
+        song.metadataCategoryNames(type).forEach { name ->
+            keys += name.tagIdentityKey()
+        }
+    }
+    return keys.size
+}
+
+internal fun countMetadataCategories(
+    songs: List<Song>,
+    types: Collection<String>
+): Map<String, Int> {
+    val keySets = types.associateWith { HashSet<String>() }
+    songs.forEach { song ->
+        keySets.forEach { (type, keys) ->
+            song.metadataCategoryNames(type).forEach { name ->
+                keys += name.tagIdentityKey()
+            }
+        }
+    }
+    return keySets.mapValues { (_, keys) -> keys.size }
 }
 
 internal fun filterSongsForMetadataCategory(

@@ -32,6 +32,9 @@ internal fun List<Song>.sortedForHomeMode(sortMode: HomeSortMode): HomeSortedSon
         HomeSortMode.DateModifiedAsc -> HomeSortedSongs(sortedBy { it.dateModified }, emptyMap())
     }
 
+internal fun List<Song>.cachedSortedForHomeMode(sortMode: HomeSortMode): HomeSortedSongs =
+    HomeSortResultCache.getOrPut(this, sortMode) { sortedForHomeMode(sortMode) }
+
 private fun List<Song>.sortedByReleaseDate(ascending: Boolean): List<Song> {
     val comparator = if (ascending) {
         compareBy<Song> { it.releaseYearOrNull() == null }
@@ -92,6 +95,55 @@ private data class SongSortEntry(
     val song: Song,
     val sortKey: String,
     val fallback: String
+)
+
+private object HomeSortResultCache {
+    private const val MaxSize = 8
+    private val lock = Any()
+    private val values = object : LinkedHashMap<HomeSortCacheKey, HomeSortedSongs>(MaxSize, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<HomeSortCacheKey, HomeSortedSongs>?): Boolean {
+            return size > MaxSize
+        }
+    }
+
+    fun getOrPut(songs: List<Song>, sortMode: HomeSortMode, builder: () -> HomeSortedSongs): HomeSortedSongs {
+        val key = songs.cacheKey(sortMode)
+        synchronized(lock) {
+            values[key]?.let { return it }
+        }
+        val sorted = builder()
+        synchronized(lock) {
+            values[key] = sorted
+        }
+        return sorted
+    }
+
+    private fun List<Song>.cacheKey(sortMode: HomeSortMode): HomeSortCacheKey {
+        var hash = 1125899906842597L
+        forEach { song ->
+            hash = hash.mix(song.hashCode().toLong())
+                .mix(song.id)
+                .mix(song.dateAdded)
+                .mix(song.dateModified)
+                .mix(song.fileSize)
+                .mix(song.title.hashCode().toLong())
+                .mix(song.fileName.hashCode().toLong())
+                .mix(song.album.hashCode().toLong())
+                .mix(song.year.hashCode().toLong())
+                .mix(song.discNumber.toLong())
+                .mix(song.trackNumber.toLong())
+        }
+        return HomeSortCacheKey(sortMode, size, hash)
+    }
+
+    private fun Long.mix(value: Long): Long =
+        (this xor value).let { mixed -> mixed * 1099511628211L }
+}
+
+private data class HomeSortCacheKey(
+    val sortMode: HomeSortMode,
+    val size: Int,
+    val fingerprint: Long
 )
 
 private fun String.isAsciiSortable(): Boolean {

@@ -191,13 +191,6 @@ fun MetadataCategoryDetailScreen(
             emptyList()
         }
     }
-    val albumArtUrisByAlbumId = remember(sortedAlbums, shouldBuildAlbumTabContent) {
-        if (shouldBuildAlbumTabContent) {
-            sortedAlbums.associate { album -> album.id to mainViewModel.getAlbumArtUri(album.artAlbumId) }
-        } else {
-            emptyMap()
-        }
-    }
     val hasSameNameArtist = remember(type, name, librarySongs) {
         (type == "composer" || type == "lyricist") && mainViewModel.getSongsForArtist(name).isNotEmpty()
     }
@@ -249,18 +242,25 @@ fun MetadataCategoryDetailScreen(
             }
         }
     }
-    val currentSongItemIndex = remember(sortedSongs, currentSong?.id, selectedTab, selectionMode) {
+    val sortedSongIndexById = remember(sortedSongs) {
+        buildMap {
+            sortedSongs.forEachIndexed { index, song -> put(song.id, index) }
+        }
+    }
+    val currentSongItemIndex = remember(sortedSongIndexById, currentSong?.id, selectedTab, selectionMode) {
         if (selectedTab != MetadataDetailTab.Songs || selectionMode) return@remember -1
-        sortedSongs.indexOfFirst { it.id == currentSong?.id }
+        (currentSong?.id?.let { sortedSongIndexById[it] } ?: -1)
             .takeIf { it >= 0 }
             ?.plus(1)
             ?: -1
     }
-    val fastIndexTargets = remember(sortedSongs, sortMode) {
-        sortedSongs
-            .mapIndexed { index, song -> song.metadataDetailIndexLetter(sortMode) to (index + 1) }
-            .distinctBy { it.first }
-            .toMap()
+    val fastIndexLetters = remember(sortedSongs, sortMode) {
+        sortedSongs.map { it.metadataDetailIndexLetter(sortMode) }
+    }
+    val fastIndexTargets = remember(fastIndexLetters) {
+        buildMap {
+            fastIndexLetters.forEachIndexed { index, letter -> putIfAbsent(letter, index + 1) }
+        }
     }
     BackHandler(enabled = selectionMode || sortExpanded) {
         when {
@@ -511,20 +511,30 @@ fun MetadataCategoryDetailScreen(
                 }
                 if (selectedTab == MetadataDetailTab.Albums) {
                     items(sortedAlbums, key = { it.id }) { album ->
+                        val albumArtUri = remember(shouldBuildAlbumTabContent, album.artAlbumId) {
+                            album.artAlbumId
+                                .takeIf { shouldBuildAlbumTabContent && it > 0L }
+                                ?.let(mainViewModel::getAlbumArtUri)
+                        }
                         MetadataAlbumRow(
                             album = album,
                             duration = albumDurations[album.id] ?: 0L,
-                            albumArtUri = albumArtUrisByAlbumId[album.id],
+                            albumArtUri = albumArtUri,
                             onClick = { onAlbumClick(album.id) }
                         )
                     }
                 } else {
                     itemsIndexed(sortedSongs, key = { _, song -> song.id }) { index, song ->
                         val selected = song.id in selectedIds
+                        val albumArtUri = remember(song.albumId) {
+                            song.albumId
+                                .takeIf { it > 0L }
+                                ?.let(mainViewModel::getAlbumArtUri)
+                        }
                         SongItem(
                             song = song,
                             isCurrent = currentSong?.id == song.id,
-                            albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                            albumArtUri = albumArtUri,
                             loadCoverArt = mainViewModel::getCoverArtBitmap,
                             loadAudioInfo = mainViewModel::getAudioInfo,
                             showPlayNextInLists = showPlayNextInLists,
@@ -555,7 +565,7 @@ fun MetadataCategoryDetailScreen(
             if (selectedTab == MetadataDetailTab.Songs && sortedSongs.size > 30) {
                 if (sortMode == MetadataDetailSongSortMode.Title || sortMode == MetadataDetailSongSortMode.FileName) {
                     FastIndexBar(
-                        letters = remember(sortedSongs, sortMode) { sortedSongs.map { it.metadataDetailIndexLetter(sortMode) } },
+                        letters = fastIndexLetters,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()

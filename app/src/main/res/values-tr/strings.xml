@@ -1344,4 +1344,25 @@
     <string name="settings_monet_cover">Şarkı kapağı</string>
     <string name="settings_monet_off">Kapalı</string>
     <string name="settings_monet_wallpaper">Sistem duvar kağıdı</string>
+    <string name="player_match_online_lyrics">Sözleri çevrimiçi eşleştir</string>
+    <string name="lyric_match_query_label">Arama anahtarı</string>
+    <string name="lyric_match_search">Ara</string>
+    <string name="lyric_match_searching">Aranıyor…</string>
+    <string name="lyric_match_fetching">Sözler alınıyor…</string>
+    <string name="lyric_match_preview">Söz önizleme</string>
+    <string name="lyric_match_no_results">Eşleşme bulunamadı</string>
+    <string name="lyric_match_no_sources">Önce ayarlardan bir çevrimiçi söz kaynağı etkinleştirin</string>
+    <string name="lyric_match_remote_not_supported">Çevrimiçi parçalara söz yazma henüz desteklenmiyor</string>
+    <string name="lyric_match_fetch_failed">Sözler alınamadı</string>
+    <string name="lyric_match_write_embedded">Gömülü sözleri yaz</string>
+    <string name="lyric_match_write_success">Sözler kaydedildi</string>
+    <string name="lyric_match_write_failed">Sözler yazılamadı: %1$s</string>
+    <string name="settings_lyric_plugin_sources">Çevrimiçi söz kaynakları</string>
+    <string name="settings_lyric_plugin_sources_summary">Yerel parçaların sözlerini eşleştirmek için kullanılan Lyrico eklenti kaynaklarını yönet</string>
+    <string name="settings_lyric_plugin_sources_empty">Henüz söz kaynağı eklentisi içe aktarılmadı</string>
+    <string name="settings_lyric_plugin_import">Eklenti içe aktar</string>
+    <string name="settings_lyric_plugin_import_success">%1$s içe aktarıldı</string>
+    <string name="settings_lyric_plugin_import_failed">Eklenti içe aktarma başarısız</string>
+    <string name="settings_lyric_plugin_import_later">Sağ üstteki düğmeyle bir Lyrico eklenti zip\'i içe aktarın; içe aktarılan kaynaklar burada görünür ve söz eşleştirmede kullanılır.</string>
+    <string name="settings_lyric_plugin_source_imported">İçe aktarıldı</string>
 </resources>

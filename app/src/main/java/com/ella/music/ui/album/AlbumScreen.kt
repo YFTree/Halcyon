@@ -154,10 +154,11 @@ fun AlbumScreen(
         if (pinnedAlbumKeys.isEmpty()) {
             sorted
         } else {
-            val pinnedSet = pinnedAlbumKeys.toSet()
+            val pinnedRank = pinnedAlbumKeys.withIndex().associate { it.value to it.index }
+            val pinnedSet = pinnedRank.keys
             val pinned = sorted
                 .filter { it.id.toString() in pinnedSet }
-                .sortedBy { pinnedAlbumKeys.indexOf(it.id.toString()) }
+                .sortedBy { pinnedRank[it.id.toString()] ?: Int.MAX_VALUE }
             pinned + sorted.filterNot { it.id.toString() in pinnedSet }
         }
     }
@@ -350,11 +351,13 @@ fun AlbumScreen(
                         LibrarySortUiState.albumListFirstVisibleItemScrollOffset = offset
                     }
             }
-            val fastIndexTargets = remember(sortedAlbums, sortMode) {
-                sortedAlbums
-                    .mapIndexed { index, album -> album.indexLetter(sortMode) to index }
-                    .distinctBy { it.first }
-                    .toMap()
+            val fastIndexLetters = remember(sortedAlbums, sortMode) {
+                sortedAlbums.map { it.indexLetter(sortMode) }
+            }
+            val fastIndexTargets = remember(fastIndexLetters) {
+                buildMap {
+                    fastIndexLetters.forEachIndexed { index, letter -> putIfAbsent(letter, index) }
+                }
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -413,7 +416,7 @@ fun AlbumScreen(
 
                 if ((sortMode == AlbumSortMode.Name || sortMode == AlbumSortMode.Artist) && sortedAlbums.size > 30) {
                     FastIndexBar(
-                        letters = remember(sortedAlbums, sortMode) { sortedAlbums.map { it.indexLetter(sortMode) } },
+                        letters = fastIndexLetters,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()

@@ -209,6 +209,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return buildMetadataCategoryItems(songs.value, type)
     }
 
+    fun getMetadataCategoryCount(type: String): Int {
+        return countMetadataCategories(songs.value, type)
+    }
+
+    fun getMetadataCategoryCounts(types: Collection<String>): Map<String, Int> {
+        return countMetadataCategories(songs.value, types)
+    }
+
     fun getSongsForMetadataCategory(type: String, name: String): List<Song> {
         return filterSongsForMetadataCategory(songs.value, type, name)
     }
@@ -309,6 +317,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun songMatchesSearchSnapshot(song: Song, query: String): Boolean =
         repository.songMatchesSearchSnapshot(song, query)
+
+    suspend fun filterSongsBySearchSnapshot(songs: List<Song>, query: String): List<Song> =
+        repository.filterSongsBySearchSnapshot(songs, query)
 
     fun clearLibrarySnapshotCache() {
         viewModelScope.launch {

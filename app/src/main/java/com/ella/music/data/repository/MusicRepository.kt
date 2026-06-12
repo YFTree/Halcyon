@@ -150,6 +150,8 @@ class MusicRepository(private val context: Context) {
     private val searchTextCache = ConcurrentHashMap<String, String>()
     @Volatile
     private var searchSnapshotLoaded = false
+    @Volatile
+    private var searchSnapshotDirty = false
     private val remoteAudioCacheDir = File(context.cacheDir, "webdav_audio")
     private val remoteMetadataHeaderCacheDir = File(context.cacheDir, "webdav_metadata_headers")
 
@@ -697,13 +699,30 @@ class MusicRepository(private val context: Context) {
         getSongSearchText(song).contains(normalizedQuery)
     }
 
+    suspend fun filterSongsBySearchSnapshot(songs: List<Song>, query: String): List<Song> = withContext(Dispatchers.IO) {
+        val normalizedQuery = query.trim().lowercase()
+        if (normalizedQuery.isBlank()) return@withContext songs
+        ensureSearchSnapshotLoaded()
+        var changed = false
+        val matches = songs.filter { song ->
+            val key = song.searchSnapshotKey()
+            val text = searchTextCache[key] ?: buildSongSearchText(song).also {
+                searchTextCache[key] = it
+                changed = true
+            }
+            text.contains(normalizedQuery)
+        }
+        if (changed) searchSnapshotDirty = true
+        matches
+    }
+
     suspend fun getSongSearchText(song: Song): String = withContext(Dispatchers.IO) {
         ensureSearchSnapshotLoaded()
         val key = song.searchSnapshotKey()
         searchTextCache[key]?.let { return@withContext it }
         val text = buildSongSearchText(song)
         searchTextCache[key] = text
-        saveSearchSnapshot()
+        searchSnapshotDirty = true
         text
     }
 
@@ -718,7 +737,12 @@ class MusicRepository(private val context: Context) {
                 changed = true
             }
         }
-        if (changed) saveSearchSnapshot()
+        if (changed) {
+            searchSnapshotDirty = true
+        }
+        if (searchSnapshotDirty) {
+            saveSearchSnapshot()
+        }
     }
 
     private fun buildSongSearchText(song: Song): String =
@@ -729,6 +753,7 @@ class MusicRepository(private val context: Context) {
     suspend fun clearLibrarySnapshotCache() = withContext(Dispatchers.IO) {
         searchTextCache.clear()
         searchSnapshotLoaded = true
+        searchSnapshotDirty = false
         if (librarySearchSnapshotFile.exists()) librarySearchSnapshotFile.delete()
     }
 
@@ -1675,10 +1700,12 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun saveSearchSnapshot() {
+        if (!searchSnapshotDirty) return
         runCatching {
             val root = JSONObject()
             searchTextCache.forEach { (key, value) -> root.put(key, value) }
             librarySearchSnapshotFile.writeText(root.toString())
+            searchSnapshotDirty = false
         }.onFailure {
             Log.w("MusicRepo", "Failed to save library search snapshot", it)
         }

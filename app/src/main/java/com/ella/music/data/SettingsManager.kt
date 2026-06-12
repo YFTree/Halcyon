@@ -1567,6 +1567,7 @@ class SettingsManager(private val context: Context) {
             setString(KEY_SHORTCUT_LIBRARY_LABEL)
             setString(KEY_SHORTCUT_PLAYLISTS_LABEL)
             setString(KEY_SHORTCUT_FOLDER_LABEL)
+            setString(KEY_LYRICO_PLUGIN_ENABLED_IDS)
             setString(KEY_SCAN_INCLUDE_FOLDERS)
             setString(KEY_SCAN_EXCLUDE_FOLDERS)
             setString(KEY_USB_FOLDER_URIS)

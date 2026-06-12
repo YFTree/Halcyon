@@ -37,9 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
-import com.ella.music.plugin.source.BuiltInPluginSource
 import com.ella.music.plugin.source.LyricoPluginManager
-import com.ella.music.plugin.source.PluginSourceOrigin
+import com.ella.music.plugin.source.LyricoPluginSource
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -52,7 +51,6 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Download
-import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -65,8 +63,8 @@ fun LyricPluginSourceSettingsScreen(
     val pluginManager = remember(context) { LyricoPluginManager(context, settingsManager) }
     val enabledIds by settingsManager.lyricoPluginEnabledIds.collectAsState(initial = emptySet())
     var reloadToken by remember { mutableIntStateOf(0) }
-    var pendingDelete by remember { mutableStateOf<BuiltInPluginSource?>(null) }
-    val sources by produceState(initialValue = emptyList<BuiltInPluginSource>(), context, reloadToken) {
+    var pendingDelete by remember { mutableStateOf<LyricoPluginSource?>(null) }
+    val sources by produceState(initialValue = emptyList<LyricoPluginSource>(), context, reloadToken) {
         value = pluginManager.availableSources()
     }
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
@@ -140,13 +138,7 @@ fun LyricPluginSourceSettingsScreen(
                         sources.forEach { source ->
                             val manifest = source.manifest
                             val summary = buildString {
-                                append(
-                                    if (source.origin == PluginSourceOrigin.IMPORTED) {
-                                        context.getString(R.string.settings_lyric_plugin_source_imported)
-                                    } else {
-                                        context.getString(R.string.settings_lyric_plugin_source_builtin)
-                                    }
-                                )
+                                append(context.getString(R.string.settings_lyric_plugin_source_imported))
                                 append(" · ")
                                 append(manifest.description.ifBlank { manifest.id })
                                 if (manifest.versionName.isNotBlank()) append(" · v${manifest.versionName}")
@@ -155,42 +147,33 @@ fun LyricPluginSourceSettingsScreen(
                             val onToggle: (Boolean) -> Unit = { enabled ->
                                 scope.launch { settingsManager.setLyricoPluginEnabled(manifest.id, enabled) }
                             }
-                            if (source.origin == PluginSourceOrigin.IMPORTED) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = manifest.name,
-                                            color = MiuixTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = summary,
-                                            fontSize = 12.sp,
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                        )
-                                    }
-                                    IconButton(onClick = { pendingDelete = source }) {
-                                        Icon(
-                                            imageVector = MiuixIcons.Regular.Delete,
-                                            contentDescription = stringResource(R.string.common_delete),
-                                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                            modifier = Modifier.size(22.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Switch(checked = checked, onCheckedChange = onToggle)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = manifest.name,
+                                        color = MiuixTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = summary,
+                                        fontSize = 12.sp,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                    )
                                 }
-                            } else {
-                                SwitchPreference(
-                                    title = manifest.name,
-                                    summary = summary,
-                                    checked = checked,
-                                    onCheckedChange = onToggle
-                                )
+                                IconButton(onClick = { pendingDelete = source }) {
+                                    Icon(
+                                        imageVector = MiuixIcons.Regular.Delete,
+                                        contentDescription = stringResource(R.string.common_delete),
+                                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Switch(checked = checked, onCheckedChange = onToggle)
                             }
                         }
                     }

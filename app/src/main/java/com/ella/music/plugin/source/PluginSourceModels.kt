@@ -1,6 +1,7 @@
 package com.ella.music.plugin.source
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 @Serializable
 data class PluginSearchSongsRequest(
@@ -81,14 +82,14 @@ enum class PluginLyricsPayloadType {
     RAW_MULTI_PERSON_ENHANCED_LRC
 }
 
-data class BuiltInPluginSource(
+data class LyricoPluginSource(
     val manifest: com.ella.music.plugin.model.PluginManifest,
     val assetDir: String,
-    val script: String,
-    val origin: PluginSourceOrigin = PluginSourceOrigin.BUILTIN
+    val script: String
 )
 
-enum class PluginSourceOrigin {
-    BUILTIN,
-    IMPORTED
+val pluginJson: Json = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+    explicitNulls = false
 }

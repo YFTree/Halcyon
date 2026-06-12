@@ -96,7 +96,7 @@ fun FolderScreen(
     var scrollToTopRequest by remember { mutableStateOf(0) }
 
     val rootFolderPath = remember(songs) { songs.commonFolderRoot() }
-    val rootSongs = remember(songs, rootFolderPath) { songs.recursiveSongsInFolder(rootFolderPath) }
+    val rootSongs = songs
     val rootChildFolders = remember(songs, rootFolderPath) { songs.childFoldersOf(context, rootFolderPath) }
 
     BackHandler(enabled = sortExpanded || searchExpanded || folderToBlock != null) {

@@ -147,8 +147,8 @@ fun FolderDetailScreen(
     val directSongs = remember(songs, normalizedFolderPath) {
         songs.directSongsInFolder(normalizedFolderPath)
     }
-    val recursiveSongs = remember(songs, normalizedFolderPath) {
-        songs.recursiveSongsInFolder(normalizedFolderPath)
+    val recursiveSongs = remember(songs, normalizedFolderPath, searchQuery) {
+        if (searchQuery.isBlank()) emptyList() else songs.recursiveSongsInFolder(normalizedFolderPath)
     }
     val filteredSongs = remember(directSongs, recursiveSongs, searchQuery) {
         val sourceSongs = if (searchQuery.isBlank()) directSongs else recursiveSongs
@@ -434,19 +434,26 @@ fun FolderDetailScreen(
             LaunchedEffect(scrollToTopRequest) {
                 if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
             }
-            val currentSongItemIndex = remember(sortedSongs, childFolders, searchQuery, currentSong?.id, selectionMode) {
+            val sortedSongIndexById = remember(sortedSongs) {
+                buildMap {
+                    sortedSongs.forEachIndexed { index, song -> put(song.id, index) }
+                }
+            }
+            val currentSongItemIndex = remember(sortedSongIndexById, childFolders, searchQuery, currentSong?.id, selectionMode) {
                 if (selectionMode) return@remember -1
-                sortedSongs.indexOfFirst { it.id == currentSong?.id }
+                (currentSong?.id?.let { sortedSongIndexById[it] } ?: -1)
                     .takeIf { it >= 0 }
                     ?.plus(if (searchQuery.isBlank()) childFolders.size else 0)
                     ?: -1
             }
-            val fastIndexTargets = remember(sortedSongs, childFolders, searchQuery) {
+            val fastIndexLetters = remember(sortedSongs) {
+                sortedSongs.map { it.indexLetter() }
+            }
+            val fastIndexTargets = remember(fastIndexLetters, childFolders, searchQuery) {
                 val offset = if (searchQuery.isBlank()) childFolders.size else 0
-                sortedSongs
-                    .mapIndexed { index, song -> song.indexLetter() to (index + offset) }
-                    .distinctBy { it.first }
-                    .toMap()
+                buildMap {
+                    fastIndexLetters.forEachIndexed { index, letter -> putIfAbsent(letter, index + offset) }
+                }
             }
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
@@ -479,10 +486,15 @@ fun FolderDetailScreen(
                             key = { _, song -> song.id }
                         ) { index, song ->
                             val selected = song.id in selectedIds
+                            val albumArtUri = remember(song.albumId) {
+                                song.albumId
+                                    .takeIf { it > 0L }
+                                    ?.let(mainViewModel::getAlbumArtUri)
+                            }
                             SongItem(
                                 song = song,
                                 isCurrent = currentSong?.id == song.id,
-                                albumArtUri = mainViewModel.getAlbumArtUri(song.albumId),
+                                albumArtUri = albumArtUri,
                                 loadCoverArt = mainViewModel::getCoverArtBitmap,
                                 loadAudioInfo = mainViewModel::getAudioInfo,
                                 showPlayNextInLists = showPlayNextInLists,
@@ -510,7 +522,7 @@ fun FolderDetailScreen(
                 }
                 if (sortMode == FolderSongSortMode.Title && sortedSongs.size > 30) {
                     FastIndexBar(
-                        letters = remember(sortedSongs) { sortedSongs.map { it.indexLetter() } },
+                        letters = fastIndexLetters,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
                             .fillMaxHeight()
