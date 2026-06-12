@@ -65,7 +65,11 @@ class McpServerService : Service() {
                 val mcpServer = HalcyonMcpServer(playerManager, repository)
 
                 serverJob = embeddedServer(CIO, host = "0.0.0.0", port = PORT) {
-                    mcpStreamableHttp(path = "/mcp") { mcpServer.server }
+                    // DNS-rebinding protection defaults to allowing only localhost hosts, which
+                    // rejects the documented LAN usage (http://<device-ip>:8384/mcp) with a 403
+                    // "Invalid Host". This server binds 0.0.0.0 by explicit user opt-in and is
+                    // reached by device IP from another LAN device, so disable the localhost guard.
+                    mcpStreamableHttp(path = "/mcp", enableDnsRebindingProtection = false) { mcpServer.server }
                 }.start(wait = true)
 
                 Log.i(TAG, "MCP server started on port $PORT")
