@@ -123,7 +123,7 @@ internal fun LandscapeCoverPlayerPage(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentAlignment = Alignment.TopCenter
+                    contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier

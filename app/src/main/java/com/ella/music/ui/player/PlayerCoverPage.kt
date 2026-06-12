@@ -289,6 +289,7 @@ internal fun CoverPlayerPage(
                                 titleFontSize = 22.sp,
                                 artistFontSize = 14.sp,
                                 artistAlpha = 0.54f,
+                                showArtistWithAnnotation = true,
                                 onArtistClick = onArtist,
                                 modifier = Modifier
                                     .weight(1f)
@@ -424,6 +425,7 @@ internal fun CoverPlayerPage(
                                 titleFontSize = 23.sp,
                                 artistFontSize = 14.sp,
                                 artistAlpha = 0.62f,
+                                showArtistWithAnnotation = true,
                                 onArtistClick = onArtist,
                                 modifier = Modifier.weight(1f)
                             )
