@@ -2,9 +2,10 @@ package com.ella.music.ui.player
 
 import android.graphics.Bitmap
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -21,13 +22,13 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -41,7 +42,7 @@ import com.ella.music.R
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
-import kotlin.math.abs
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Text
 
 @Composable
@@ -81,6 +82,7 @@ internal fun LandscapeCoverPlaybackOverlay(
     onSeek: (Float) -> Unit,
     onCyclePlaybackMode: () -> Unit,
     onPrevious: () -> Unit,
+    onSwipePrevious: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onQueueSongClick: (Int) -> Unit,
@@ -100,27 +102,26 @@ internal fun LandscapeCoverPlaybackOverlay(
             .ifEmpty { listOfNotNull(song?.let { 0 to it }) }
     }
     val swipeThresholdPx = with(LocalDensity.current) { 92.dp.toPx() }
-    var swipeDragX by remember { mutableFloatStateOf(0f) }
+    val swipeScope = rememberCoroutineScope()
+    val dragOffset = remember { Animatable(0f) }
 
     Box(
         modifier = modifier
             .background(palette.middle)
-            .pointerInput(onPrevious, onNext) {
-                detectDragGestures(
-                    onDragStart = { swipeDragX = 0f },
-                    onDragCancel = { swipeDragX = 0f },
+            .pointerInput(onSwipePrevious, onNext) {
+                detectHorizontalDragGestures(
+                    onDragCancel = { swipeScope.launch { dragOffset.animateTo(0f) } },
                     onDragEnd = {
+                        val travel = dragOffset.value
+                        swipeScope.launch { dragOffset.animateTo(0f) }
                         when {
-                            swipeDragX > swipeThresholdPx -> onPrevious()
-                            swipeDragX < -swipeThresholdPx -> onNext()
+                            travel > swipeThresholdPx -> onSwipePrevious()
+                            travel < -swipeThresholdPx -> onNext()
                         }
-                        swipeDragX = 0f
                     },
-                    onDrag = { change, dragAmount ->
-                        if (abs(dragAmount.x) > abs(dragAmount.y)) {
-                            swipeDragX += dragAmount.x
-                            change.consume()
-                        }
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        swipeScope.launch { dragOffset.snapTo(dragOffset.value + dragAmount) }
                     }
                 )
             }
@@ -165,7 +166,10 @@ internal fun LandscapeCoverPlaybackOverlay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(top = 18.dp),
+                    .padding(top = 18.dp)
+                    // Follow the finger (damped) so swiping the cover wall feels direct; the
+                    // offset springs back to 0 on release while the song change re-centers.
+                    .graphicsLayer { translationX = dragOffset.value * 0.5f },
                 contentAlignment = Alignment.Center
             ) {
                 LandscapeCoverStack(

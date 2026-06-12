@@ -544,6 +544,7 @@ fun PlayerScreen(
                 },
                 onCyclePlaybackMode = { playerViewModel.cyclePlaybackMode() },
                 onPrevious = { playerViewModel.skipToPrevious() },
+                onSwipePrevious = { playerViewModel.skipToPreviousTrack() },
                 onPlayPause = { playerViewModel.togglePlayPause() },
                 onNext = { playerViewModel.skipToNext() },
                 onQueueSongClick = { index ->

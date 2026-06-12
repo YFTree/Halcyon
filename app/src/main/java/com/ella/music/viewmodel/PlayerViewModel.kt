@@ -879,6 +879,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (!lazyOnlineQueueController.playOffset(-1)) playerManager.skipToPrevious()
     }
 
+    /**
+     * Always move to the previous track, ignoring the "previous button replays current song"
+     * preference. Used by the landscape cover-wall swipe, where the gesture unambiguously means
+     * "go to that cover" rather than "restart this one".
+     */
+    fun skipToPreviousTrack() {
+        manualSeekAfterPreviousButton = false
+        if (!lazyOnlineQueueController.playOffset(-1)) playerManager.skipToPrevious()
+    }
+
     private fun shouldReplayCurrentFromPreviousButton(): Boolean {
         if (manualSeekAfterPreviousButton) {
             manualSeekAfterPreviousButton = false
