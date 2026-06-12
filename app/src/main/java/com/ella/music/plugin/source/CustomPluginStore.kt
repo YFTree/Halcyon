@@ -29,25 +29,23 @@ class CustomPluginStore(
         dir.isDirectory && dir.deleteRecursively()
     }
 
-    suspend fun importPluginZip(uri: Uri): PluginManifest = withContext(Dispatchers.IO) {
+    suspend fun importPluginZip(uri: Uri): List<PluginManifest> = withContext(Dispatchers.IO) {
         rootDir.mkdirs()
         val tempDir = File(context.cacheDir, "lyrico_plugin_import_${System.currentTimeMillis()}")
         tempDir.deleteRecursively()
         tempDir.mkdirs()
         try {
             unzip(uri, tempDir)
-            val pluginDir = normalizeSingleRoot(tempDir)
-            val manifest = json.decodeFromString<PluginManifest>(File(pluginDir, "manifest.json").readText())
-            require(PluginCapability.SEARCH_SONGS in manifest.capabilities &&
-                PluginCapability.GET_LYRICS in manifest.capabilities
-            ) { "Unsupported plugin capabilities" }
-            require(manifest.entry.isNotBlank()) { "Missing plugin entry" }
-            require(File(pluginDir, manifest.entry).isFile) { "Missing plugin entry file" }
-
-            val targetDir = File(rootDir, manifest.id.safeFileName())
-            targetDir.deleteRecursively()
-            copyDirectory(pluginDir, targetDir)
-            manifest
+            val imported = findPluginRoots(tempDir)
+                .map { pluginDir ->
+                    val manifest = readAndValidateManifest(pluginDir)
+                    val targetDir = File(rootDir, manifest.id.safeFileName())
+                    targetDir.deleteRecursively()
+                    copyDirectory(pluginDir, targetDir)
+                    manifest
+                }
+            require(imported.isNotEmpty()) { "Plugin manifest.json not found" }
+            imported
         } finally {
             tempDir.deleteRecursively()
         }
@@ -131,12 +129,22 @@ class CustomPluginStore(
         }
     }
 
-    private fun normalizeSingleRoot(tempDir: File): File {
-        val manifestAtRoot = File(tempDir, "manifest.json")
-        if (manifestAtRoot.isFile) return tempDir
-        val dirs = tempDir.listFiles { file -> file.isDirectory }.orEmpty()
-        return dirs.singleOrNull { File(it, "manifest.json").isFile }
-            ?: error("Plugin manifest.json not found")
+    private fun findPluginRoots(tempDir: File): List<File> {
+        return tempDir.walkTopDown()
+            .filter { file -> file.isFile && file.name.equals("manifest.json", ignoreCase = true) }
+            .mapNotNull { it.parentFile }
+            .distinctBy { it.canonicalPath }
+            .toList()
+    }
+
+    private fun readAndValidateManifest(pluginDir: File): PluginManifest {
+        val manifest = json.decodeFromString<PluginManifest>(File(pluginDir, "manifest.json").readText())
+        require(PluginCapability.SEARCH_SONGS in manifest.capabilities &&
+            PluginCapability.GET_LYRICS in manifest.capabilities
+        ) { "Unsupported plugin capabilities" }
+        require(manifest.entry.isNotBlank()) { "Missing plugin entry" }
+        require(File(pluginDir, manifest.entry).isFile) { "Missing plugin entry file" }
+        return manifest
     }
 
     private fun copyDirectory(from: File, to: File) {

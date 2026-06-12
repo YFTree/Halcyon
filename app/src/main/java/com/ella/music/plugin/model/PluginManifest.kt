@@ -46,7 +46,8 @@ data class PluginConfigField(
     val type: PluginConfigFieldType = PluginConfigFieldType.TEXT,
     val required: Boolean = false,
     val defaultValue: JsonElement = JsonPrimitive(""),
-    val options: List<PluginConfigOption> = emptyList()
+    val options: List<PluginConfigOption> = emptyList(),
+    val dependency: PluginConfigDependency? = null
 )
 
 fun PluginConfigField.defaultValueString(): String =
@@ -83,4 +84,15 @@ data class PluginConfigOption(
     val value: String,
     val label: String,
     val summary: String = ""
+)
+
+@Serializable
+data class PluginConfigDependency(
+    val match: PluginConfigDependencyMatch? = null
+)
+
+@Serializable
+data class PluginConfigDependencyMatch(
+    val key: String,
+    val value: String
 )

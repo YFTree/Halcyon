@@ -306,21 +306,26 @@ internal object EllaLyricsParser {
                 isNamespaceAware = false
                 isIgnoringComments = true
                 isCoalescing = true
+                trySetFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+                trySetFeature("http://xml.org/sax/features/external-general-entities", false)
+                trySetFeature("http://xml.org/sax/features/external-parameter-entities", false)
             }.newDocumentBuilder().parse(InputSource(StringReader(content.preformatTtml())))
 
+            val metadata = parseTtmlMetadata(document.documentElement)
             val agentInfo = parseAgentInfo(document.documentElement)
-            val translations = parseTimedTextMap(document.documentElement, "translation")
+            val translations = parseTimedTextMap(document.documentElement, "translations", "translation")
             val transliterations = parseTransliterations(document.documentElement)
-            val paragraphs = document.getElementsByTagName("p")
+            val paragraphs = document.documentElement.allElements()
+                .filter { it.localTagName() == "p" }
 
-            val lines = (0 until paragraphs.length).mapNotNull { index ->
-                val p = paragraphs.item(index) as? Element ?: return@mapNotNull null
+            val lines = paragraphs.mapNotNull { p ->
                 val start = p.attr("begin").parseTtmlTime() ?: return@mapNotNull null
                 val end = p.attr("end").parseTtmlTime()
                 val key = p.attr("itunes:key").ifBlank { p.attr("key") }
                 val agent = p.attr("ttm:agent").ifBlank { p.attr("agent") }
                 val words = mutableListOf<LyricWord>()
-                val text = collectTtmlMainText(p, words, end).cleanLyricText()
+                val rubyPronunciationWords = mutableListOf<LyricWord>()
+                val text = collectTtmlMainText(p, words, end, rubyPronunciationWords).cleanLyricText()
                 val inlineTranslation = p.childrenElements()
                     .firstOrNull { it.hasRole("x-translation") && !it.hasRole("x-bg") }
                     ?.textContent
@@ -333,11 +338,14 @@ internal object EllaLyricsParser {
                     ?.textContent
                     ?.cleanLyricText()
                 val transliteration = transliterations[key]
-                val pronunciationWords = transliteration?.words
-                    ?.alignPronunciationWords(words, text)
-                    .orEmpty()
+                val pronunciationWords = when {
+                    transliteration?.words?.isNotEmpty() == true -> transliteration.words.alignPronunciationWords(words, text)
+                    rubyPronunciationWords.isNotEmpty() -> rubyPronunciationWords
+                    else -> emptyList()
+                }
                 val pronunciation = linePronunciation
                     ?: transliteration?.text?.takeUsefulText()
+                    ?: rubyPronunciationWords.joinLyricText().takeIf { it.isNotBlank() }
                     ?: pronunciationWords.joinLyricText().takeIf { it.isNotBlank() }
 
                 if (text.isBlank() && bg == null) return@mapNotNull null
@@ -361,14 +369,55 @@ internal object EllaLyricsParser {
                 )
             }
 
-            LrcParser.LrcResult(lyrics = lines.sortedBy { it.timeMs })
+            LrcParser.LrcResult(
+                lyrics = lines.sortedBy { it.timeMs },
+                title = metadata.title,
+                artist = metadata.artist,
+                album = metadata.album
+            )
         }.getOrNull()?.takeIf { it.lyrics.isNotEmpty() }
+    }
+
+    private data class TtmlMetadata(
+        val title: String? = null,
+        val artist: String? = null,
+        val album: String? = null
+    )
+
+    private fun parseTtmlMetadata(root: Element): TtmlMetadata {
+        var title: String? = null
+        var artist: String? = null
+        var album: String? = null
+
+        root.allElements().forEach { element ->
+            when (element.localTagName()) {
+                "title" -> if (title == null) title = element.textContent.takeUsefulText()
+                "meta" -> {
+                    val key = element.attr("key").trim()
+                    val value = element.attr("value")
+                        .ifBlank { element.textContent.orEmpty() }
+                        .takeUsefulText()
+                        ?: return@forEach
+                    when (key) {
+                        "musicName" -> title = title ?: value
+                        "artists" -> artist = artist ?: value
+                        "album" -> album = album ?: value
+                    }
+                }
+            }
+        }
+
+        return TtmlMetadata(title = title, artist = artist, album = album)
     }
 
     private data class TtmlAgentInfo(
         val alignment: String,
         val name: String?
     )
+
+    private fun DocumentBuilderFactory.trySetFeature(name: String, value: Boolean) {
+        runCatching { setFeature(name, value) }
+    }
 
     private fun parseAgentInfo(root: Element): Map<String, TtmlAgentInfo> {
         val agents = root.allElements()
@@ -386,16 +435,24 @@ internal object EllaLyricsParser {
         }.toMap()
     }
 
-    private fun parseTimedTextMap(root: Element, tag: String): Map<String, String> {
+    private fun parseTimedTextMap(root: Element, containerTag: String, itemTag: String): Map<String, String> {
         val result = mutableMapOf<String, String>()
         root.allElements()
-            .filter { it.localTagName() == tag }
+            .filter { it.localTagName() == containerTag }
+            .flatMap { it.childrenElements() }
+            .filter { it.localTagName() == itemTag }
             .flatMap { it.childrenElements() }
             .filter { it.localTagName() == "text" }
+            .plus(
+                root.allElements()
+                    .filter { it.localTagName() == itemTag }
+                    .flatMap { it.childrenElements() }
+                    .filter { it.localTagName() == "text" }
+            )
             .forEach { text ->
                 val key = text.attr("for").ifBlank { return@forEach }
                 val value = text.textContent.cleanLyricText()
-                if (value.isNotBlank()) result[key] = value
+                if (value.isNotBlank()) result.putIfAbsent(key, value)
             }
         return result
     }
@@ -437,7 +494,12 @@ internal object EllaLyricsParser {
         return result
     }
 
-    private fun collectTtmlMainText(element: Element, words: MutableList<LyricWord>, fallbackEnd: Long?): String {
+    private fun collectTtmlMainText(
+        element: Element,
+        words: MutableList<LyricWord>,
+        fallbackEnd: Long?,
+        pronunciationWords: MutableList<LyricWord> = mutableListOf()
+    ): String {
         val builder = StringBuilder()
         element.childNodes.toNodeList().forEach { node ->
             when (node.nodeType) {
@@ -447,9 +509,26 @@ internal object EllaLyricsParser {
                     if (child.hasRole("x-translation") || child.hasRole("x-bg") || child.hasRole("x-roman")) {
                         return@forEach
                     }
-                    val nested = collectTtmlMainText(child, words, fallbackEnd)
+                    when (child.rubyMode()) {
+                        "container" -> {
+                            val ruby = child.parseRubyTtml(fallbackEnd)
+                            if (ruby.text.isNotBlank()) {
+                                builder.append(ruby.text)
+                                words += ruby.words
+                                pronunciationWords += ruby.pronunciationWords
+                            }
+                            return@forEach
+                        }
+                        "textContainer", "text" -> {
+                            pronunciationWords += child.collectRubyPronunciationWords(fallbackEnd)
+                            return@forEach
+                        }
+                    }
+                    val wordCountBefore = words.size
+                    val nested = collectTtmlMainText(child, words, fallbackEnd, pronunciationWords)
+                    val nestedAddedTimedWords = words.size > wordCountBefore
                     val begin = child.attr("begin").parseTtmlTime()
-                    if (begin != null && nested.isNotBlank()) {
+                    if (begin != null && nested.isNotBlank() && !nestedAddedTimedWords) {
                         words += LyricWord(
                             text = nested,
                             startMs = begin,
@@ -463,6 +542,73 @@ internal object EllaLyricsParser {
             }
         }
         return builder.toString()
+    }
+
+    private data class TtmlRuby(
+        val text: String,
+        val words: List<LyricWord>,
+        val pronunciationWords: List<LyricWord>
+    )
+
+    private fun Element.parseRubyTtml(fallbackEnd: Long?): TtmlRuby {
+        val pronunciationWords = collectRubyPronunciationWords(fallbackEnd)
+        val baseText = childrenElements()
+            .filter { it.rubyMode() == "base" }
+            .joinToString("") { it.textContent.orEmpty() }
+            .cleanLyricText()
+            .ifBlank {
+                childNodes.toNodeList()
+                    .mapNotNull { node ->
+                        when (node.nodeType) {
+                            Node.TEXT_NODE -> node.nodeValue.orEmpty().withoutFormattingWhitespace()
+                            Node.ELEMENT_NODE -> {
+                                val child = node as? Element ?: return@mapNotNull null
+                                child.takeUnless { it.rubyMode() in setOf("textContainer", "text") }
+                                    ?.textContent
+                                    .orEmpty()
+                            }
+                            else -> null
+                        }
+                    }
+                    .joinToString("")
+                    .cleanLyricText()
+            }
+        if (baseText.isBlank()) return TtmlRuby("", emptyList(), pronunciationWords)
+
+        val begin = attr("begin").parseTtmlTime() ?: pronunciationWords.minOfOrNull { it.startMs }
+        val end = attr("end").parseTtmlTime()
+            ?: pronunciationWords.maxOfOrNull { it.endMs }
+            ?: fallbackEnd
+            ?: begin?.plus(estimateDuration(baseText))
+        val words = if (begin != null && end != null) {
+            listOf(LyricWord(baseText, begin, end))
+        } else {
+            emptyList()
+        }
+        return TtmlRuby(baseText, words, pronunciationWords)
+    }
+
+    private fun Element.collectRubyPronunciationWords(fallbackEnd: Long?): List<LyricWord> {
+        val result = mutableListOf<LyricWord>()
+        fun visit(element: Element) {
+            val mode = element.rubyMode()
+            if (mode == "text") {
+                val value = element.textContent.cleanLyricText()
+                val begin = element.attr("begin").parseTtmlTime()
+                if (value.isNotBlank() && begin != null) {
+                    result += LyricWord(
+                        text = value,
+                        startMs = begin,
+                        endMs = element.attr("end").parseTtmlTime()
+                            ?: fallbackEnd
+                            ?: begin + estimateDuration(value)
+                    )
+                }
+            }
+            element.childrenElements().forEach(::visit)
+        }
+        visit(this)
+        return result
     }
 
     private fun Element.parseTtmlBackground(fallbackEnd: Long?, fallbackTranslation: String?): TtmlBackground {
@@ -854,6 +1000,9 @@ internal object EllaLyricsParser {
 
     private fun Element.hasRole(role: String): Boolean =
         attr("role") == role || attr("ttm:role") == role
+
+    private fun Element.rubyMode(): String =
+        attr("tts:ruby").ifBlank { attr("ruby") }
 
     private fun Element.localTagName(): String = tagName.substringAfter(':')
 

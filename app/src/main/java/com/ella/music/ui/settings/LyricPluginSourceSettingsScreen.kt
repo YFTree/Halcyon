@@ -33,17 +33,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
+import com.ella.music.plugin.model.PluginConfigField
+import com.ella.music.plugin.model.PluginConfigFieldType
+import com.ella.music.plugin.model.defaultValueString
 import com.ella.music.plugin.source.LyricoPluginManager
 import com.ella.music.plugin.source.LyricoPluginSource
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import com.ella.music.ui.components.EllaMiuixDialog
 import com.ella.music.ui.components.EllaMiuixDialogActions
+import com.ella.music.ui.components.EllaMiuixTextField
 import com.ella.music.ui.components.EllaSmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
@@ -51,6 +58,8 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Download
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -64,6 +73,7 @@ fun LyricPluginSourceSettingsScreen(
     val enabledIds by settingsManager.lyricoPluginEnabledIds.collectAsState(initial = emptySet())
     var reloadToken by remember { mutableIntStateOf(0) }
     var pendingDelete by remember { mutableStateOf<LyricoPluginSource?>(null) }
+    var expandedPluginId by remember { mutableStateOf<String?>(null) }
     val sources by produceState(initialValue = emptyList<LyricoPluginSource>(), context, reloadToken) {
         value = pluginManager.availableSources()
     }
@@ -73,12 +83,17 @@ fun LyricPluginSourceSettingsScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             runCatching { pluginManager.importPluginZip(uri) }
-                .onSuccess { manifest ->
-                    settingsManager.setLyricoPluginEnabled(manifest.id, true)
+                .onSuccess { manifests ->
+                    manifests.forEach { manifest ->
+                        settingsManager.setLyricoPluginEnabled(manifest.id, true)
+                    }
                     reloadToken++
                     Toast.makeText(
                         context,
-                        context.getString(R.string.settings_lyric_plugin_import_success, manifest.name),
+                        context.getString(
+                            R.string.settings_lyric_plugin_import_success,
+                            manifests.joinToString("、") { it.name }
+                        ),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -147,33 +162,57 @@ fun LyricPluginSourceSettingsScreen(
                             val onToggle: (Boolean) -> Unit = { enabled ->
                                 scope.launch { settingsManager.setLyricoPluginEnabled(manifest.id, enabled) }
                             }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = manifest.name,
-                                        color = MiuixTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = summary,
-                                        fontSize = 12.sp,
-                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            Column {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = manifest.name,
+                                            color = MiuixTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = summary,
+                                            fontSize = 12.sp,
+                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                        )
+                                    }
+                                    if (manifest.configFields.isNotEmpty()) {
+                                        IconButton(
+                                            onClick = {
+                                                expandedPluginId = if (expandedPluginId == manifest.id) null else manifest.id
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = MiuixIcons.Regular.Settings,
+                                                contentDescription = stringResource(R.string.settings_lyric_plugin_config),
+                                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                    }
+                                    IconButton(onClick = { pendingDelete = source }) {
+                                        Icon(
+                                            imageVector = MiuixIcons.Regular.Delete,
+                                            contentDescription = stringResource(R.string.common_delete),
+                                            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Switch(checked = checked, onCheckedChange = onToggle)
+                                }
+                                if (expandedPluginId == manifest.id) {
+                                    PluginConfigEditor(
+                                        source = source,
+                                        pluginManager = pluginManager,
+                                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
                                     )
                                 }
-                                IconButton(onClick = { pendingDelete = source }) {
-                                    Icon(
-                                        imageVector = MiuixIcons.Regular.Delete,
-                                        contentDescription = stringResource(R.string.common_delete),
-                                        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Switch(checked = checked, onCheckedChange = onToggle)
                             }
                         }
                     }
@@ -212,6 +251,153 @@ fun LyricPluginSourceSettingsScreen(
         )
     }
 }
+
+@Composable
+private fun PluginConfigEditor(
+    source: LyricoPluginSource,
+    pluginManager: LyricoPluginManager,
+    modifier: Modifier = Modifier
+) {
+    var values by remember(source.manifest.id, source.manifest.versionCode) {
+        mutableStateOf(pluginManager.pluginConfig(source))
+    }
+
+    fun update(field: PluginConfigField, value: String) {
+        values = values + (field.key to value)
+        pluginManager.setPluginConfigValue(source.manifest.id, field.key, value)
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        source.manifest.configFields
+            .filter { field -> field.isDependencySatisfied(values) }
+            .forEach { field ->
+                when (field.type) {
+                    PluginConfigFieldType.MARKDOWN -> PluginConfigMarkdown(field)
+                    PluginConfigFieldType.DROPDOWN -> PluginConfigDropdown(
+                        field = field,
+                        value = values[field.key].orEmpty(),
+                        onValueChange = { update(field, it) }
+                    )
+                    PluginConfigFieldType.SWITCH -> PluginConfigSwitch(
+                        field = field,
+                        value = values[field.key].orEmpty(),
+                        onValueChange = { update(field, it) }
+                    )
+                    PluginConfigFieldType.PASSWORD,
+                    PluginConfigFieldType.TEXT,
+                    PluginConfigFieldType.NUMBER,
+                    PluginConfigFieldType.TEXTAREA -> PluginConfigTextField(
+                        field = field,
+                        value = values[field.key].orEmpty(),
+                        onValueChange = { update(field, it) }
+                    )
+                }
+            }
+    }
+}
+
+@Composable
+private fun PluginConfigMarkdown(field: PluginConfigField) {
+    val text = field.defaultValueStringForDisplay()
+    if (text.isBlank()) return
+    Text(
+        text = text,
+        fontSize = 12.sp,
+        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        modifier = Modifier.padding(vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun PluginConfigDropdown(
+    field: PluginConfigField,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    if (field.options.isEmpty()) return
+    val selectedIndex = field.options.indexOfFirst { it.value == value }.takeIf { it >= 0 } ?: 0
+    WindowSpinnerPreference(
+        title = field.title,
+        summary = field.summary ?: field.options.getOrNull(selectedIndex)?.summary.orEmpty(),
+        items = field.options.map { option ->
+            DropdownItem(
+                title = option.label.ifBlank { option.value }
+            )
+        },
+        selectedIndex = selectedIndex,
+        onSelectedIndexChange = { index ->
+            field.options.getOrNull(index)?.value?.let(onValueChange)
+        }
+    )
+}
+
+@Composable
+private fun PluginConfigSwitch(
+    field: PluginConfigField,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = field.title, color = MiuixTheme.colorScheme.onSurface)
+            field.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+                Text(
+                    text = summary,
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+        Switch(
+            checked = value.equals("true", ignoreCase = true),
+            onCheckedChange = { onValueChange(it.toString()) }
+        )
+    }
+}
+
+@Composable
+private fun PluginConfigTextField(
+    field: PluginConfigField,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+        field.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+            Text(
+                text = summary,
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+        }
+        EllaMiuixTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = field.title,
+            singleLine = field.type != PluginConfigFieldType.TEXTAREA,
+            visualTransformation = if (field.type == PluginConfigFieldType.PASSWORD) {
+                PasswordVisualTransformation()
+            } else {
+                VisualTransformation.None
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+private fun PluginConfigField.isDependencySatisfied(values: Map<String, String>): Boolean {
+    val match = dependency?.match ?: return true
+    return values[match.key] == match.value
+}
+
+private fun PluginConfigField.defaultValueStringForDisplay(): String =
+    defaultValueString()
 
 private val PLUGIN_ZIP_MIME_TYPES = arrayOf(
     "application/zip",

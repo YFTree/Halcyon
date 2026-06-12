@@ -13,12 +13,24 @@ class LyricoPluginManager(
 ) {
     private val appContext = context.applicationContext
     private val customStore = CustomPluginStore(appContext)
+    private val configStore = PluginConfigStore(appContext)
 
     suspend fun availableSources(): List<LyricoPluginSource> = customStore.loadPlugins()
 
     suspend fun importPluginZip(uri: Uri) = customStore.importPluginZip(uri)
 
-    suspend fun deletePlugin(id: String): Boolean = customStore.deletePlugin(id)
+    suspend fun deletePlugin(id: String): Boolean {
+        val deleted = customStore.deletePlugin(id)
+        if (deleted) configStore.deleteConfig(id)
+        return deleted
+    }
+
+    fun pluginConfig(source: LyricoPluginSource): Map<String, String> =
+        configStore.loadConfig(source.manifest)
+
+    fun setPluginConfigValue(pluginId: String, key: String, value: String) {
+        configStore.setValue(pluginId, key, value)
+    }
 
     suspend fun enabledSources(): List<LyricoPluginSource> {
         val sources = availableSources()
@@ -28,7 +40,7 @@ class LyricoPluginManager(
 
     suspend fun searchSongs(keyword: String, pageSizePerSource: Int = 8): List<PluginSearchHit> = withContext(Dispatchers.IO) {
         enabledSources().flatMap { source ->
-            ScriptSearchSource(source).use { runtime ->
+            ScriptSearchSource(source, configStore.loadConfig(source.manifest)).use { runtime ->
                 runtime.searchSongs(keyword, pageSize = pageSizePerSource).map { result ->
                     PluginSearchHit(source.manifest.id, source.manifest.name, result)
                 }
@@ -38,7 +50,7 @@ class LyricoPluginManager(
 
     suspend fun getLyrics(hit: PluginSearchHit): PluginLyricsResult? = withContext(Dispatchers.IO) {
         val source = availableSources().firstOrNull { it.manifest.id == hit.sourceId } ?: return@withContext null
-        ScriptSearchSource(source).use { runtime -> runtime.getLyrics(hit.song) }
+        ScriptSearchSource(source, configStore.loadConfig(source.manifest)).use { runtime -> runtime.getLyrics(hit.song) }
     }
 
     companion object {

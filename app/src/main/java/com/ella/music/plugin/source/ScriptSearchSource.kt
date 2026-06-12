@@ -12,12 +12,15 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 
 class ScriptSearchSource(
-    private val source: LyricoPluginSource
+    private val source: LyricoPluginSource,
+    configOverrides: Map<String, String> = emptyMap()
 ) : AutoCloseable {
     val id: String = source.manifest.id
     val name: String = source.manifest.name
     private val capabilities = source.manifest.capabilities.ifEmpty { setOf(PluginCapability.SEARCH_SONGS) }
-    private val config = source.manifest.configFields.associate { it.key to it.defaultValueString() }
+    private val config = source.manifest.configFields
+        .associate { it.key to it.defaultValueString() }
+        .plus(configOverrides)
     private val parser = PluginJsonParser(pluginJson)
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(null, runnable, "Halcyon-LyricoPlugin-$id", 4L * 1024L * 1024L)

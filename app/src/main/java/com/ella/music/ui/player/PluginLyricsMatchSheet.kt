@@ -68,6 +68,33 @@ internal fun PluginLyricsMatchSheet(
     var lyricsText by remember { mutableStateOf("") }
     var fetchingLyrics by remember { mutableStateOf(false) }
 
+    fun writeLyrics(tags: AudioTagInfo) {
+        if (song.path.startsWith("http://", true) || song.path.startsWith("https://", true)) {
+            Toast.makeText(context, R.string.lyric_match_remote_not_supported, Toast.LENGTH_SHORT).show()
+            return
+        }
+        suspend fun write() {
+            val result = mainViewModel.writeSongMetadata(song, tags)
+            val error = result.exceptionOrNull()
+            if (error is WritePermissionRequiredException) {
+                onWritePermissionRequired(error) { write() }
+                return
+            }
+            if (result.isSuccess) {
+                playerViewModel.refreshCurrentSongAfterExternalEdit(result.getOrNull())
+                Toast.makeText(context, R.string.lyric_match_write_success, Toast.LENGTH_SHORT).show()
+                onDismiss()
+            } else {
+                Toast.makeText(
+                    context,
+                    context.getString(R.string.lyric_match_write_failed, error?.message.orEmpty()),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+        scope.launch { write() }
+    }
+
     fun runSearch() {
         if (enabledSources <= 0) {
             message = context.getString(R.string.lyric_match_no_sources)
@@ -158,36 +185,35 @@ internal fun PluginLyricsMatchSheet(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
-            Button(
-                onClick = {
-                    if (song.path.startsWith("http://", true) || song.path.startsWith("https://", true)) {
-                        Toast.makeText(context, R.string.lyric_match_remote_not_supported, Toast.LENGTH_SHORT).show()
-                    } else {
-                        suspend fun writeLyrics() {
-                            val result = mainViewModel.writeSongMetadata(song, AudioTagInfo(lyrics = lyricsText))
-                            val error = result.exceptionOrNull()
-                            if (error is WritePermissionRequiredException) {
-                                onWritePermissionRequired(error) { writeLyrics() }
-                                return
-                            }
-                            if (result.isSuccess) {
-                                playerViewModel.refreshCurrentSongAfterExternalEdit(result.getOrNull())
-                                Toast.makeText(context, R.string.lyric_match_write_success, Toast.LENGTH_SHORT).show()
-                                onDismiss()
-                            } else {
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.lyric_match_write_failed, error?.message.orEmpty()),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                        scope.launch { writeLyrics() }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(text = stringResource(R.string.lyric_match_write_embedded))
+            if (lyricsResult?.rawTtml?.isNotBlank() == true) {
+                Text(
+                    text = stringResource(R.string.lyric_match_ttml_write_choice),
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Button(
+                    onClick = {
+                        writeLyrics(AudioTagInfo(customTags = mapOf("TTMLLYRIC" to listOf(lyricsText))))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = stringResource(R.string.lyric_match_write_ttml_tag))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { writeLyrics(AudioTagInfo(lyrics = lyricsText)) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = stringResource(R.string.lyric_match_write_lyrics_tag))
+                }
+            } else {
+                Button(
+                    onClick = { writeLyrics(AudioTagInfo(lyrics = lyricsText)) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = stringResource(R.string.lyric_match_write_embedded))
+                }
             }
         }
     }
