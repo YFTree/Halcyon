@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.DOLBY_MARK
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
@@ -314,7 +315,7 @@ private fun AudioQualityBadge(tag: String) {
 
 private fun audioQualityColor(tag: String): Color {
     return when (tag) {
-        "AC3", "EC3", "EAC3", "SUR" -> Color(0xFF6EE7FF)
+        "AC3", "EC3", "EAC3", "SUR", DOLBY_MARK -> Color(0xFF6EE7FF)
         "MQ" -> Color(0xFFFF8F3D)
         "HR" -> Color(0xFFFFC23A)
         "SQ" -> Color(0xFF9B59FF)

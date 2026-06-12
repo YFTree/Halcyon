@@ -2,6 +2,7 @@ package com.ella.music.ui.album
 
 import androidx.compose.ui.graphics.Color
 import com.ella.music.R
+import com.ella.music.data.DOLBY_MARK
 import com.ella.music.data.model.Song
 import java.util.Locale
 
@@ -53,7 +54,7 @@ internal fun List<Song>.sortedForAlbumDetail(mode: AlbumDetailSongSortMode): Lis
 
 internal fun albumDetailQualityColor(tag: String): Color {
     return when (tag) {
-        "AC3", "EC3", "EAC3", "SUR" -> Color(0xFF6EE7FF)
+        "AC3", "EC3", "EAC3", "SUR", DOLBY_MARK -> Color(0xFF6EE7FF)
         "MQ" -> Color(0xFFFF8F3D)
         "HR" -> Color(0xFFFFC23A)
         "SQ" -> Color(0xFF9B59FF)

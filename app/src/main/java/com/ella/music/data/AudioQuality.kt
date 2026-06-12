@@ -11,18 +11,30 @@ data class AudioQualitySummary(
     val showMobius: Boolean
 )
 
+/**
+ * Compact Dolby mark built from the left/right half black-circle glyphs, mimicking the
+ * facing "double-D" Dolby logo. Used as the list tag and as the player-badge prefix for
+ * Dolby (AC3 / E-AC-3) streams.
+ */
+const val DOLBY_MARK = "◖◗"
+
 fun audioQualitySummary(info: AudioInfo): AudioQualitySummary {
     val normalizedFormat = normalizedAudioFormat(info.format)
     val bitDepth = normalizedBitDepth(info)
-    val isSurround = normalizedFormat in setOf("AC3", "EC3", "EAC3") || info.channels >= 6
+    val isDolby = normalizedFormat in setOf("AC3", "EC3", "EAC3")
+    val isSurround = isDolby || info.channels >= 6
     val isMq = bitDepth >= 24 && info.sampleRate >= 192_000
     val isHiRes = bitDepth >= 24 && info.sampleRate >= 48_000
     val isAppleLossless = normalizedFormat == "ALAC"
     val isLossless = isAppleLossless || normalizedFormat in setOf("FLAC", "WAV", "APE")
     val isSq = isLossless && info.sampleRate >= 44_100 && bitDepth >= 16
     val isKnownLossy = normalizedFormat in setOf("MP3", "AAC", "M4A", "OGG", "OPUS")
-    val surroundLabel = normalizedFormat.takeIf { it in setOf("AC3", "EC3", "EAC3") } ?: "Surround"
-    val surroundTag = normalizedFormat.takeIf { it in setOf("AC3", "EC3", "EAC3") } ?: "SUR"
+    // Player badge: "◖◗ Dolby Atmos" for Dolby, plain "Surround" otherwise.
+    val surroundLabel = if (isDolby) "$DOLBY_MARK Dolby Atmos" else "Surround"
+    // List tag: just the compact Dolby mark, or "SUR" for generic multichannel.
+    val surroundTag = if (isDolby) DOLBY_MARK else "SUR"
+    // Analytics keeps the codec name so format grouping/ordering stays intact.
+    val surroundAnalytics = normalizedFormat.takeIf { isDolby } ?: "Surround"
     val compact = when {
         isSurround -> surroundLabel
         isMq -> "MQ"
@@ -43,7 +55,7 @@ fun audioQualitySummary(info: AudioInfo): AudioQualitySummary {
         else -> null
     }
     val analytics = when {
-        isSurround -> surroundLabel
+        isSurround -> surroundAnalytics
         isMq -> "MQ"
         isHiRes -> "Hi-Res"
         isSq -> "无损"
