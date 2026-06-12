@@ -47,7 +47,10 @@ data class EqualizerCapabilities(
     /** presetIndex -> per-band levels in millibels, used by the UI when a preset is selected. */
     val presetBandLevelsMb: List<List<Int>>,
     val bassBoostSupported: Boolean,
-    val virtualizerSupported: Boolean
+    val virtualizerSupported: Boolean,
+    /** Whether the device exposes a *variable* strength control (vs. plain on/off). */
+    val bassBoostStrengthAdjustable: Boolean,
+    val virtualizerStrengthAdjustable: Boolean
 ) {
     companion object {
         val Unsupported = EqualizerCapabilities(
@@ -59,7 +62,9 @@ data class EqualizerCapabilities(
             presetNames = emptyList(),
             presetBandLevelsMb = emptyList(),
             bassBoostSupported = false,
-            virtualizerSupported = false
+            virtualizerSupported = false,
+            bassBoostStrengthAdjustable = false,
+            virtualizerStrengthAdjustable = false
         )
     }
 }
@@ -151,8 +156,10 @@ class AudioEffectController {
 
     private fun captureCapabilities(): EqualizerCapabilities {
         val eq = equalizer ?: return EqualizerCapabilities.Unsupported.copy(
-            bassBoostSupported = bassBoost?.strengthSupported == true,
-            virtualizerSupported = virtualizer?.strengthSupported == true
+            bassBoostSupported = bassBoost != null,
+            virtualizerSupported = virtualizer != null,
+            bassBoostStrengthAdjustable = runCatching { bassBoost?.strengthSupported == true }.getOrDefault(false),
+            virtualizerStrengthAdjustable = runCatching { virtualizer?.strengthSupported == true }.getOrDefault(false)
         )
         return runCatching {
             val bandCount = eq.numberOfBands.toInt()
@@ -184,8 +191,10 @@ class AudioEffectController {
                 maxLevelMb = maxMb,
                 presetNames = presetNames,
                 presetBandLevelsMb = presetLevels,
-                bassBoostSupported = bassBoost?.strengthSupported == true,
-                virtualizerSupported = virtualizer?.strengthSupported == true
+                bassBoostSupported = bassBoost != null,
+                virtualizerSupported = virtualizer != null,
+                bassBoostStrengthAdjustable = runCatching { bassBoost?.strengthSupported == true }.getOrDefault(false),
+                virtualizerStrengthAdjustable = runCatching { virtualizer?.strengthSupported == true }.getOrDefault(false)
             )
         }.getOrElse { EqualizerCapabilities.Unsupported }
     }

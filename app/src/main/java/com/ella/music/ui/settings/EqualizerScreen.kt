@@ -200,6 +200,7 @@ fun EqualizerScreen(onBack: () -> Unit) {
                                 title = stringResource(R.string.equalizer_bass_boost),
                                 enabled = bassBoostEnabled,
                                 strength = bassBoostStrength,
+                                strengthAdjustable = caps.bassBoostStrengthAdjustable,
                                 accent = accent,
                                 onEnabledChange = { enabled ->
                                     scope.launch {
@@ -218,6 +219,7 @@ fun EqualizerScreen(onBack: () -> Unit) {
                                 title = stringResource(R.string.equalizer_virtualizer),
                                 enabled = virtualizerEnabled,
                                 strength = virtualizerStrength,
+                                strengthAdjustable = caps.virtualizerStrengthAdjustable,
                                 accent = accent,
                                 onEnabledChange = { enabled ->
                                     scope.launch {
@@ -282,6 +284,7 @@ private fun EffectStrengthRow(
     title: String,
     enabled: Boolean,
     strength: Int,
+    strengthAdjustable: Boolean,
     accent: Color,
     onEnabledChange: (Boolean) -> Unit,
     onStrengthChange: (Int) -> Unit
@@ -297,20 +300,25 @@ private fun EffectStrengthRow(
                 color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
-            Text(
-                text = "${(strength * 100 / AudioEffectSettings.STRENGTH_MAX)}%",
-                fontSize = 13.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-            )
-            Spacer(modifier = Modifier.width(12.dp))
+            // Only meaningful when the device exposes variable strength.
+            if (strengthAdjustable) {
+                Text(
+                    text = "${(strength * 100 / AudioEffectSettings.STRENGTH_MAX)}%",
+                    fontSize = 13.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+            }
             Switch(checked = enabled, onCheckedChange = onEnabledChange)
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Slider(
-            value = strength.toFloat() / AudioEffectSettings.STRENGTH_MAX,
-            onValueChange = { onStrengthChange((it.coerceIn(0f, 1f) * AudioEffectSettings.STRENGTH_MAX).roundToInt()) },
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (strengthAdjustable) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Slider(
+                value = strength.toFloat() / AudioEffectSettings.STRENGTH_MAX,
+                onValueChange = { onStrengthChange((it.coerceIn(0f, 1f) * AudioEffectSettings.STRENGTH_MAX).roundToInt()) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
