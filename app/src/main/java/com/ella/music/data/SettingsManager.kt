@@ -223,6 +223,49 @@ class SettingsManager(private val context: Context) {
         val KEY_BLUETOOTH_LYRIC_TRANSLATION = booleanPreferencesKey("bluetooth_lyric_translation")
         val KEY_BLUETOOTH_LYRIC_PRONUNCIATION = booleanPreferencesKey("bluetooth_lyric_pronunciation")
 
+        val KEY_APP_ICON = intPreferencesKey("app_icon_variant")
+
+        const val APP_ICON_DEFAULT = 0
+        const val APP_ICON_BLUE = 1
+        const val APP_ICON_DARK = 2
+        const val APP_ICON_BLUEPURPLE = 3
+        const val APP_ICON_TEAL = 4
+        const val APP_ICON_ORANGE = 5
+        const val APP_ICON_GRAY = 6
+
+        private val LAUNCHER_ALIASES = listOf(
+            APP_ICON_DEFAULT to ".LauncherDefault",
+            APP_ICON_BLUE to ".LauncherBlue",
+            APP_ICON_DARK to ".LauncherDark",
+            APP_ICON_BLUEPURPLE to ".LauncherBluePurple",
+            APP_ICON_TEAL to ".LauncherTeal",
+            APP_ICON_ORANGE to ".LauncherOrange",
+            APP_ICON_GRAY to ".LauncherGray"
+        )
+
+        fun applyIconVariant(context: Context, variant: Int) {
+            val pm = context.packageManager
+            val packageName = context.packageName
+            LAUNCHER_ALIASES.forEach { (id, aliasName) ->
+                val componentName = android.content.ComponentName(packageName, aliasName)
+                val shouldBeEnabled = id == variant
+                val currentState = pm.getComponentEnabledSetting(componentName)
+                val isCurrentlyEnabled = currentState ==
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                if (isCurrentlyEnabled != shouldBeEnabled) {
+                    pm.setComponentEnabledSetting(
+                        componentName,
+                        if (shouldBeEnabled) {
+                            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                        } else {
+                            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                        },
+                        android.content.pm.PackageManager.DONT_KILL_APP
+                    )
+                }
+            }
+        }
+
         const val SHUFFLE_MODE_PSEUDO = 0
         const val SHUFFLE_MODE_TRUE_RANDOM = 1
 
@@ -572,6 +615,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_SHORTCUT_LIBRARY_LABEL] ?: DEFAULT_SHORTCUT_LIBRARY_LABEL }
     val shortcutPlaylistsLabel: Flow<String> =
         context.dataStore.data.map { it[KEY_SHORTCUT_PLAYLISTS_LABEL] ?: DEFAULT_SHORTCUT_PLAYLISTS_LABEL }
+    val appIconVariant: Flow<Int> =
+        context.dataStore.data.map { it[KEY_APP_ICON] ?: APP_ICON_DEFAULT }
     val shortcutFolderLabel: Flow<String> =
         context.dataStore.data.map { it[KEY_SHORTCUT_FOLDER_LABEL] ?: DEFAULT_SHORTCUT_FOLDER_LABEL }
     val webDavUrl: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_URL] ?: "" }
@@ -1207,6 +1252,12 @@ class SettingsManager(private val context: Context) {
             val safeLabel = label.trim().take(24)
             if (safeLabel.isBlank() || safeLabel == defaultLabel) it.remove(key) else it[key] = safeLabel
         }
+    }
+
+    suspend fun setAppIconVariant(variant: Int) {
+        val clamped = variant.coerceIn(APP_ICON_DEFAULT, APP_ICON_GRAY)
+        context.dataStore.edit { it[KEY_APP_ICON] = clamped }
+        applyIconVariant(context, clamped)
     }
 
     suspend fun setWebDavConfig(url: String, username: String, password: String) {

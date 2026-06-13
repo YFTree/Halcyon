@@ -787,6 +787,16 @@
     <string name="settings_home_card_color_default">跟随主题默认色</string>
     <string name="settings_home_card_opacity">首页功能卡片透明度</string>
     <string name="settings_home_card_opacity_summary">调节音乐库和在线音乐功能卡片的背景透明度</string>
+    <string name="settings_app_icon">应用图标</string>
+    <string name="settings_app_icon_summary">切换桌面启动器图标样式</string>
+    <string name="settings_app_icon_default">默认</string>
+    <string name="settings_app_icon_blue">简洁蓝</string>
+    <string name="settings_app_icon_dark">深色</string>
+    <string name="settings_app_icon_bluepurple">蓝紫渐变</string>
+    <string name="settings_app_icon_teal">青绿</string>
+    <string name="settings_app_icon_orange">橙红</string>
+    <string name="settings_app_icon_gray">灰色</string>
+    <string name="settings_app_icon_restart_hint">切换后部分桌面启动器可能需要几秒刷新</string>
     <string name="settings_hi_res_logo">Hi-Res 封面标识</string>
     <string name="settings_hi_res_logo_summary">非沉浸播放页中，Hi-Res 音质歌曲的封面右下角显示小标识</string>
     <string name="settings_hi_res_logo_image">选择 Hi-Res 标识图片</string>

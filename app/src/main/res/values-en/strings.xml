@@ -1408,6 +1408,16 @@
     <string name="settings_home_card_color_default">Follow theme default</string>
     <string name="settings_home_card_opacity">Home card opacity</string>
     <string name="settings_home_card_opacity_summary">Adjust the background opacity of home library and online music cards.</string>
+    <string name="settings_app_icon">App icon</string>
+    <string name="settings_app_icon_summary">Switch the launcher icon style</string>
+    <string name="settings_app_icon_default">Default</string>
+    <string name="settings_app_icon_blue">Simple blue</string>
+    <string name="settings_app_icon_dark">Dark</string>
+    <string name="settings_app_icon_bluepurple">Blue-purple</string>
+    <string name="settings_app_icon_teal">Teal</string>
+    <string name="settings_app_icon_orange">Orange</string>
+    <string name="settings_app_icon_gray">Gray</string>
+    <string name="settings_app_icon_restart_hint">Some launchers may take a few seconds to refresh after switching</string>
     <string name="song_more_metadata_section_cover">Song cover</string>
     <string name="song_more_metadata_cover_empty">No cover</string>
     <string name="song_more_metadata_cover_choose">Choose cover</string>

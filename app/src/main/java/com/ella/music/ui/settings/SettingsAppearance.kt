@@ -1,10 +1,18 @@
 package com.ella.music.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -12,15 +20,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.BottomBarGlassEffect
 import com.ella.music.data.SettingsManager
 import com.ella.music.ui.components.EllaMiuixBottomSheet
+import com.ella.music.ui.player.LocalPlayerContentColor
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ColorPicker
@@ -218,11 +232,26 @@ internal fun SettingsAppearanceSection() {
     )
     val dynamicCoverPermissionLauncher = rememberDynamicCoverPermissionLauncher(settingsManager)
     var showHomeCardColorPicker by remember { mutableStateOf(false) }
+    var showAppIconPicker by remember { mutableStateOf(false) }
+    val appIconVariant by settingsManager.appIconVariant.collectAsState(initial = SettingsManager.APP_ICON_DEFAULT)
 
     SmallTitle(text = stringResource(R.string.settings_appearance))
 
     SettingsCardGroup {
         Column {
+            ArrowPreference(
+                title = stringResource(R.string.settings_app_icon),
+                summary = when (appIconVariant) {
+                    SettingsManager.APP_ICON_BLUE -> stringResource(R.string.settings_app_icon_blue)
+                    SettingsManager.APP_ICON_DARK -> stringResource(R.string.settings_app_icon_dark)
+                    SettingsManager.APP_ICON_BLUEPURPLE -> stringResource(R.string.settings_app_icon_bluepurple)
+                    SettingsManager.APP_ICON_TEAL -> stringResource(R.string.settings_app_icon_teal)
+                    SettingsManager.APP_ICON_ORANGE -> stringResource(R.string.settings_app_icon_orange)
+                    SettingsManager.APP_ICON_GRAY -> stringResource(R.string.settings_app_icon_gray)
+                    else -> stringResource(R.string.settings_app_icon_default)
+                },
+                onClick = { showAppIconPicker = true }
+            )
             WindowSpinnerPreference(
                 title = stringResource(R.string.settings_theme_mode),
                 summary = stringResource(R.string.settings_theme_mode_summary),
@@ -640,6 +669,101 @@ internal fun SettingsAppearanceSection() {
             ) {
                 Text(text = stringResource(R.string.common_reset))
             }
+        }
+    }
+
+    EllaMiuixBottomSheet(
+        show = showAppIconPicker,
+        title = stringResource(R.string.settings_app_icon),
+        onDismissRequest = { showAppIconPicker = false }
+    ) {
+        val iconOptions = listOf(
+            SettingsManager.APP_ICON_DEFAULT to stringResource(R.string.settings_app_icon_default),
+            SettingsManager.APP_ICON_BLUE to stringResource(R.string.settings_app_icon_blue),
+            SettingsManager.APP_ICON_DARK to stringResource(R.string.settings_app_icon_dark),
+            SettingsManager.APP_ICON_BLUEPURPLE to stringResource(R.string.settings_app_icon_bluepurple),
+            SettingsManager.APP_ICON_TEAL to stringResource(R.string.settings_app_icon_teal),
+            SettingsManager.APP_ICON_ORANGE to stringResource(R.string.settings_app_icon_orange),
+            SettingsManager.APP_ICON_GRAY to stringResource(R.string.settings_app_icon_gray)
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+        ) {
+            iconOptions.forEach { (variant, label) ->
+                val isSelected = appIconVariant == variant
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSelected) Color(0xFF2979FF).copy(alpha = 0.15f)
+                            else Color.Transparent
+                        )
+                        .clickable {
+                            showAppIconPicker = false
+                            scope.launch { settingsManager.setAppIconVariant(variant) }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                when (variant) {
+                                    SettingsManager.APP_ICON_BLUE -> Color(0xFF1976D2)
+                                    SettingsManager.APP_ICON_DARK -> Color(0xFF212121)
+                                    SettingsManager.APP_ICON_BLUEPURPLE -> Color(0xFF5C6BC0)
+                                    SettingsManager.APP_ICON_TEAL -> Color(0xFF00897B)
+                                    SettingsManager.APP_ICON_ORANGE -> Color(0xFFF4511E)
+                                    SettingsManager.APP_ICON_GRAY -> Color(0xFF424242)
+                                    else -> Color(0xFF0D63F3)
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "\u266B",
+                            color = Color.White,
+                            fontSize = 18.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = label,
+                        color = LocalPlayerContentColor.current,
+                        fontSize = 16.sp
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2979FF)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "\u2713",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.settings_app_icon_restart_hint),
+                color = LocalPlayerContentColor.current.copy(alpha = 0.5f),
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
     }
 }
