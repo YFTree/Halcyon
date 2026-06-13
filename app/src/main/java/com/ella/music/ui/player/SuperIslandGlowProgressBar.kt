@@ -73,6 +73,13 @@ class SuperIslandGlowProgressBar @JvmOverloads constructor(
             invalidate()
         }
 
+    /** Tints the glow shader output; set to a dark color to invert the bar on a light background. */
+    var glowColor: Int = Color.WHITE
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private val shaderPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var runtimeShader: RuntimeShader? = null
@@ -141,6 +148,12 @@ class SuperIslandGlowProgressBar @JvmOverloads constructor(
         shader.setFloatUniform("uTrackProgress", progressFraction)
         shader.setFloatUniform("uHeadGlowAlpha", headGlowAlpha)
         shader.setIntUniform("uIsRtl", if (layoutDirection == LAYOUT_DIRECTION_RTL) 1 else 0)
+        shader.setFloatUniform(
+            "uContentColor",
+            Color.red(glowColor) / 255f,
+            Color.green(glowColor) / 255f,
+            Color.blue(glowColor) / 255f
+        )
 
         canvas.drawRect(0f, 0f, widthPx, heightPx, shaderPaint)
     }
@@ -214,6 +227,7 @@ class SuperIslandGlowProgressBar @JvmOverloads constructor(
             uniform vec2 uHeadSize;
             uniform float uHeadGlowAlpha;
             uniform int uIsRtl;
+            uniform vec3 uContentColor;
 
             vec4 alphaBlend(vec4 src, vec4 dst) {
                 vec3 color = src.rgb + (1.0 - src.a) * dst.rgb;
@@ -278,7 +292,8 @@ class SuperIslandGlowProgressBar @JvmOverloads constructor(
                 vec4 color = vec4(0.0);
                 color = alphaBlend(draw_track(vUv), color);
                 color = alphaBlend(draw_track_progress(vUv, uTrackProgress), color);
-                return color;
+                // Tint the (premultiplied) output so the bar can invert to dark on a light player.
+                return vec4(color.rgb * uContentColor, color.a);
             }
         """.trimIndent()
 

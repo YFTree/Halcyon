@@ -134,6 +134,9 @@ internal fun GlowSeekBar(
     val safeProgress = value.coerceIn(0f, 1f)
     var draggingProgress by remember { mutableStateOf<Float?>(null) }
     val displayProgress = draggingProgress ?: safeProgress
+    // Invert the white glow to dark on a light player background so the bar stays visible.
+    val glowArgb = LocalPlayerContentColor.current.toArgb()
+    val trackArgb = LocalPlayerContentColor.current.copy(alpha = 0.19f).toArgb()
 
     fun progressAt(width: Float, x: Float): Float {
         return (x / width.coerceAtLeast(1f)).coerceIn(0f, 1f)
@@ -149,11 +152,12 @@ internal fun GlowSeekBar(
                     trackHeightPx = resources.displayMetrics.density * 4.5f
                     trackHorizontalPaddingPx = 0f
                     headGlowAlpha = 1f
-                    trackColor = AndroidColor.argb(48, 255, 255, 255)
                 }
             },
             update = { view ->
                 view.progressFraction = displayProgress
+                view.glowColor = glowArgb
+                view.trackColor = trackArgb
                 view.fallbackProgressColor = accent.copy(alpha = 0.82f).toArgb()
             },
             modifier = Modifier.fillMaxSize()
