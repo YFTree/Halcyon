@@ -53,7 +53,7 @@ internal fun LandscapeCoverModeBackground(
                 palette = palette,
                 positionMs = currentPosition,
                 isPlaying = isPlaying,
-                animate = !visualizerEnabled,
+                animate = true,
                 modifier = Modifier.fillMaxSize()
             )
         } else {

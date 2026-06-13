@@ -56,6 +56,9 @@ internal fun SettingsAppearanceSection() {
     val playerBackgroundOpacity by settingsManager.playerBackgroundOpacity.collectAsState(initial = 100)
     val playerBackgroundDim by settingsManager.playerBackgroundDim.collectAsState(initial = 26)
     val beautifulLyricsBackground by settingsManager.playerBeautifulLyricsBackground.collectAsState(initial = false)
+    val beautifulLyricsSpeed by settingsManager.playerBeautifulLyricsSpeed.collectAsState(initial = 25)
+    val beautifulLyricsBlur by settingsManager.playerBeautifulLyricsBlur.collectAsState(initial = 32)
+    val beautifulLyricsBrightness by settingsManager.playerBeautifulLyricsBrightness.collectAsState(initial = 70)
     val homeCardColor by settingsManager.homeCardColor.collectAsState(initial = "")
     val homeCardOpacity by settingsManager.homeCardOpacity.collectAsState(initial = 58)
     val dynamicCoverEnabled by settingsManager.dynamicCoverEnabled.collectAsState(initial = false)
@@ -430,6 +433,33 @@ internal fun SettingsAppearanceSection() {
                 onCheckedChange = {
                     scope.launch { settingsManager.setPlayerBeautifulLyricsBackground(it) }
                 }
+            )
+            SettingsIntSliderPreference(
+                title = stringResource(R.string.settings_beautiful_lyrics_speed),
+                summary = stringResource(R.string.settings_beautiful_lyrics_speed_summary),
+                value = beautifulLyricsSpeed,
+                valueRange = 5..60,
+                valueText = beautifulLyricsSpeed.toString(),
+                enabled = beautifulLyricsBackground,
+                onValueChange = { scope.launch { settingsManager.setPlayerBeautifulLyricsSpeed(it) } }
+            )
+            SettingsIntSliderPreference(
+                title = stringResource(R.string.settings_beautiful_lyrics_blur),
+                summary = stringResource(R.string.settings_beautiful_lyrics_blur_summary),
+                value = beautifulLyricsBlur,
+                valueRange = 0..80,
+                valueText = "${beautifulLyricsBlur}px",
+                enabled = beautifulLyricsBackground,
+                onValueChange = { scope.launch { settingsManager.setPlayerBeautifulLyricsBlur(it) } }
+            )
+            SettingsIntSliderPreference(
+                title = stringResource(R.string.settings_beautiful_lyrics_brightness),
+                summary = stringResource(R.string.settings_beautiful_lyrics_brightness_summary),
+                value = beautifulLyricsBrightness,
+                valueRange = 30..120,
+                valueText = "$beautifulLyricsBrightness%",
+                enabled = beautifulLyricsBackground,
+                onValueChange = { scope.launch { settingsManager.setPlayerBeautifulLyricsBrightness(it) } }
             )
             ArrowPreference(
                 title = stringResource(R.string.settings_home_card_color),

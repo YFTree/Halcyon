@@ -1428,5 +1428,12 @@
     <string name="remote_source_invalid_response">Unexpected server response</string>
     <string name="remote_source_request_failed">Remote source request failed</string>
     <string name="remote_source_url_invalid">Invalid server URL</string>
+    <string name="settings_beautiful_lyrics_speed">Beautiful Lyrics animation speed</string>
+    <string name="settings_beautiful_lyrics_speed_summary">Higher values make the circular background texture move faster</string>
+    <string name="settings_beautiful_lyrics_blur">Beautiful Lyrics background blur</string>
+    <string name="settings_beautiful_lyrics_blur_summary">Adjust the softness of the dynamic background</string>
+    <string name="settings_beautiful_lyrics_brightness">Beautiful Lyrics background brightness</string>
+    <string name="settings_beautiful_lyrics_brightness_summary">Adjust the overall brightness of the dynamic background</string>
 </resources>
+
 

@@ -15,6 +15,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.remote.RemoteMusicProvider
 import com.ella.music.ui.about.AboutScreen
 import com.ella.music.ui.about.UpdateScreen
 import com.ella.music.ui.analytics.AnalyticsScreen
@@ -117,6 +118,8 @@ sealed class Screen(val route: String) {
     data object LyricFont : Screen("lyric_font")
     data object Logs : Screen("logs")
     data object LxOnline : Screen("lx_online")
+    data object NavidromeOnline : Screen("navidrome_online")
+    data object EmbyOnline : Screen("emby_online")
     data object LxSourceSettings : Screen("lx_source_settings")
     data object Analytics : Screen("analytics")
     data object AiChat : Screen("ai_chat")
@@ -176,6 +179,8 @@ fun AppNavigation(
                 onNavigateToFolder = { navController.navigate(Screen.Folder.createRoute()) },
                 onNavigateToPlaylists = { navController.navigate(Screen.Playlists.createRoute()) },
                 onNavigateToLxOnline = { navController.navigate(Screen.LxOnline.route) },
+                onNavigateToNavidrome = { navController.navigate(Screen.NavidromeOnline.route) },
+                onNavigateToEmby = { navController.navigate(Screen.EmbyOnline.route) },
                 onNavigateToWebDav = { navController.navigate(Screen.WebDav.route) },
                 onNavigateToAnalytics = { navController.navigate(Screen.Analytics.route) },
                 onNavigateToAiChat = { navController.navigate(Screen.AiChat.route) },
@@ -547,6 +552,36 @@ fun AppNavigation(
             LxOnlineScreen(
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
+                providerOverride = RemoteMusicProvider.Lx,
+                titleOverride = "LX Music",
+                onBack = { navController.popBackStack() },
+                onNavigateToPlayer = onNavigateToPlayer,
+                onNavigateToSourceSettings = { navController.navigate(Screen.LxSourceSettings.route) },
+                onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
+                onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) }
+            )
+        }
+
+        composable(Screen.NavidromeOnline.route) {
+            LxOnlineScreen(
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
+                providerOverride = RemoteMusicProvider.Navidrome,
+                titleOverride = "Navidrome",
+                onBack = { navController.popBackStack() },
+                onNavigateToPlayer = onNavigateToPlayer,
+                onNavigateToSourceSettings = { navController.navigate(Screen.LxSourceSettings.route) },
+                onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
+                onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) }
+            )
+        }
+
+        composable(Screen.EmbyOnline.route) {
+            LxOnlineScreen(
+                mainViewModel = mainViewModel,
+                playerViewModel = playerViewModel,
+                providerOverride = RemoteMusicProvider.Emby,
+                titleOverride = "Emby",
                 onBack = { navController.popBackStack() },
                 onNavigateToPlayer = onNavigateToPlayer,
                 onNavigateToSourceSettings = { navController.navigate(Screen.LxSourceSettings.route) },

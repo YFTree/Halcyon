@@ -131,6 +131,9 @@ class SettingsManager(private val context: Context) {
         val KEY_PLAYER_BACKGROUND_OPACITY = intPreferencesKey("player_background_opacity")
         val KEY_PLAYER_BACKGROUND_DIM = intPreferencesKey("player_background_dim")
         val KEY_PLAYER_BEAUTIFUL_LYRICS_BACKGROUND = booleanPreferencesKey("player_beautiful_lyrics_background")
+        val KEY_PLAYER_BEAUTIFUL_LYRICS_SPEED = intPreferencesKey("player_beautiful_lyrics_speed")
+        val KEY_PLAYER_BEAUTIFUL_LYRICS_BLUR = intPreferencesKey("player_beautiful_lyrics_blur")
+        val KEY_PLAYER_BEAUTIFUL_LYRICS_BRIGHTNESS = intPreferencesKey("player_beautiful_lyrics_brightness")
         val KEY_HOME_CARD_COLOR = stringPreferencesKey("home_card_color")
         val KEY_HOME_CARD_OPACITY = intPreferencesKey("home_card_opacity")
         val KEY_HI_RES_LOGO_ENABLED = booleanPreferencesKey("hi_res_logo_enabled")
@@ -527,6 +530,12 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_PLAYER_BACKGROUND_DIM]?.coerceIn(0, 80) ?: 26 }
     val playerBeautifulLyricsBackground: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_PLAYER_BEAUTIFUL_LYRICS_BACKGROUND] ?: false }
+    val playerBeautifulLyricsSpeed: Flow<Int> =
+        context.dataStore.data.map { it[KEY_PLAYER_BEAUTIFUL_LYRICS_SPEED]?.coerceIn(5, 60) ?: 25 }
+    val playerBeautifulLyricsBlur: Flow<Int> =
+        context.dataStore.data.map { it[KEY_PLAYER_BEAUTIFUL_LYRICS_BLUR]?.coerceIn(0, 80) ?: 32 }
+    val playerBeautifulLyricsBrightness: Flow<Int> =
+        context.dataStore.data.map { it[KEY_PLAYER_BEAUTIFUL_LYRICS_BRIGHTNESS]?.coerceIn(30, 120) ?: 70 }
     val homeCardColor: Flow<String> =
         context.dataStore.data.map { it[KEY_HOME_CARD_COLOR] ?: "" }
     val homeCardOpacity: Flow<Int> =
@@ -1079,6 +1088,18 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setPlayerBeautifulLyricsBackground(enabled: Boolean) {
         context.dataStore.edit { it[KEY_PLAYER_BEAUTIFUL_LYRICS_BACKGROUND] = enabled }
+    }
+
+    suspend fun setPlayerBeautifulLyricsSpeed(value: Int) {
+        context.dataStore.edit { it[KEY_PLAYER_BEAUTIFUL_LYRICS_SPEED] = value.coerceIn(5, 60) }
+    }
+
+    suspend fun setPlayerBeautifulLyricsBlur(value: Int) {
+        context.dataStore.edit { it[KEY_PLAYER_BEAUTIFUL_LYRICS_BLUR] = value.coerceIn(0, 80) }
+    }
+
+    suspend fun setPlayerBeautifulLyricsBrightness(value: Int) {
+        context.dataStore.edit { it[KEY_PLAYER_BEAUTIFUL_LYRICS_BRIGHTNESS] = value.coerceIn(30, 120) }
     }
 
     suspend fun setHomeCardColor(color: String) {
@@ -1684,6 +1705,9 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_PLAYER_BACKGROUND_OPACITY)
             setInt(KEY_PLAYER_BACKGROUND_DIM)
             setInt(KEY_HOME_CARD_OPACITY)
+            setInt(KEY_PLAYER_BEAUTIFUL_LYRICS_SPEED)
+            setInt(KEY_PLAYER_BEAUTIFUL_LYRICS_BLUR)
+            setInt(KEY_PLAYER_BEAUTIFUL_LYRICS_BRIGHTNESS)
 
             val dynamicSortKeyPrefixes = listOf(
                 "sort_metadata_category_",

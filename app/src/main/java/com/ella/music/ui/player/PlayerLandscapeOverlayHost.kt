@@ -83,9 +83,10 @@ internal fun PlayerLandscapeOverlayHost(
         dynamicCoverFailedPath
     ) {
         val current = song
-        value = if (dynamicCoverEnabled && current != null) {
+        value = if (current != null) {
             withContext(Dispatchers.IO) {
-                current.dynamicCoverSource(context)?.takeUnless { it.failureKey == dynamicCoverFailedPath }
+                current.dynamicCoverSource(context, includeExternalFiles = dynamicCoverEnabled)
+                    ?.takeUnless { it.failureKey == dynamicCoverFailedPath }
             }
         } else {
             null

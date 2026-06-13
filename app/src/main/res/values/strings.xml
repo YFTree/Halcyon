@@ -775,6 +775,12 @@
     <string name="settings_player_background_dim_summary">在播放页自定义背景上叠加暗色遮罩</string>
     <string name="settings_beautiful_lyrics_background">Beautiful Lyrics 动态背景</string>
     <string name="settings_beautiful_lyrics_background_summary">在歌词页、平板横屏播放页和横屏专辑播放页使用封面取色动态背景</string>
+    <string name="settings_beautiful_lyrics_speed">Beautiful Lyrics 动画速度</string>
+    <string name="settings_beautiful_lyrics_speed_summary">数值越大，背景圆形纹理移动越快</string>
+    <string name="settings_beautiful_lyrics_blur">Beautiful Lyrics 背景模糊</string>
+    <string name="settings_beautiful_lyrics_blur_summary">调节动态背景的柔化程度</string>
+    <string name="settings_beautiful_lyrics_brightness">Beautiful Lyrics 背景亮度</string>
+    <string name="settings_beautiful_lyrics_brightness_summary">调节动态背景的整体亮度</string>
     <string name="settings_home_card_color">首页功能卡片颜色</string>
     <string name="settings_home_card_color_default">跟随主题默认色</string>
     <string name="settings_home_card_opacity">首页功能卡片透明度</string>

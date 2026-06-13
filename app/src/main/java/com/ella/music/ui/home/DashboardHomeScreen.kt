@@ -55,6 +55,8 @@ fun HomeScreen(
     onNavigateToFolder: () -> Unit,
     onNavigateToPlaylists: () -> Unit,
     onNavigateToLxOnline: () -> Unit,
+    onNavigateToNavidrome: () -> Unit,
+    onNavigateToEmby: () -> Unit,
     onNavigateToWebDav: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToAiChat: () -> Unit = {},
@@ -286,6 +288,8 @@ fun HomeScreen(
                         HomeTileGrid(
                             tiles = listOf(
                                 HomeTileSpec("lx", "LX Music", stringResource(R.string.home_import_api_source), Color(0xFF00A896), Screen.LxOnline.route, onNavigateToLxOnline),
+                                HomeTileSpec("navidrome", "Navidrome", stringResource(R.string.remote_source_navidrome_summary), Color(0xFF5E60CE), Screen.NavidromeOnline.route, onNavigateToNavidrome),
+                                HomeTileSpec("emby", "Emby", stringResource(R.string.remote_source_emby_summary), Color(0xFF118AB2), Screen.EmbyOnline.route, onNavigateToEmby),
                                 HomeTileSpec("webdav", "WebDAV", stringResource(R.string.home_connect_cloud_music), Color(0xFF5E60CE), Screen.WebDav.route, onNavigateToWebDav)
                             ),
                             context = context,

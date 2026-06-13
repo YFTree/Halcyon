@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
@@ -23,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.Song
@@ -117,12 +120,18 @@ internal fun BeautifulLyricsDynamicBackground(
     animate: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val settingsManager = remember(context) { SettingsManager.getInstance(context) }
+    val speed by settingsManager.playerBeautifulLyricsSpeed.collectAsState(initial = 25)
+    val blurPx by settingsManager.playerBeautifulLyricsBlur.collectAsState(initial = 32)
+    val brightness by settingsManager.playerBeautifulLyricsBrightness.collectAsState(initial = 70)
     val transition = rememberInfiniteTransition(label = "beautiful_lyrics_background")
+    val durationMs = (120_000 / speed.coerceIn(5, 60)).coerceIn(2_000, 24_000)
     val drift by transition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 12_000, easing = LinearEasing),
+            animation = tween(durationMillis = durationMs, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "beautiful_lyrics_background_drift"
@@ -134,8 +143,17 @@ internal fun BeautifulLyricsDynamicBackground(
         0.36f
     }
     val scrim = if (palette.isLight) Color.White else Color.Black
+    val brightnessAlpha = (brightness.coerceIn(30, 120) / 100f).coerceIn(0.3f, 1.2f)
 
-    Canvas(modifier = modifier.background(palette.middle)) {
+    Canvas(
+        modifier = modifier
+            .background(palette.middle)
+            .blur(blurPx.coerceIn(0, 80).dp)
+            .graphicsLayer {
+                scaleX = 1.08f
+                scaleY = 1.08f
+            }
+    ) {
         val w = size.width
         val h = size.height
         val t = activeDrift * kotlin.math.PI.toFloat() * 2f
@@ -154,23 +172,23 @@ internal fun BeautifulLyricsDynamicBackground(
 
         val blobs = listOf(
             Triple(
-                palette.accent.copy(alpha = 0.34f + pulse * 0.08f),
-                Offset((0.20f + 0.18f * kotlin.math.sin(t)) * w, (0.20f + 0.14f * kotlin.math.cos(t)) * h),
+                palette.accent.copy(alpha = (0.42f + pulse * 0.12f) * brightnessAlpha),
+                Offset((0.20f + 0.34f * kotlin.math.sin(t)) * w, (0.20f + 0.28f * kotlin.math.cos(t)) * h),
                 0.54f
             ),
             Triple(
-                palette.top.copy(alpha = 0.30f),
-                Offset((0.82f + 0.16f * kotlin.math.cos(t * 0.7f)) * w, (0.28f + 0.18f * kotlin.math.sin(t * 0.8f)) * h),
+                palette.top.copy(alpha = 0.38f * brightnessAlpha),
+                Offset((0.82f + 0.30f * kotlin.math.cos(t * 0.7f)) * w, (0.28f + 0.30f * kotlin.math.sin(t * 0.8f)) * h),
                 0.46f
             ),
             Triple(
-                Color.White.copy(alpha = if (palette.isLight) 0.22f else 0.13f),
-                Offset((0.46f + 0.20f * kotlin.math.sin(t * 0.55f)) * w, (0.58f + 0.16f * kotlin.math.cos(t * 0.9f)) * h),
+                Color.White.copy(alpha = (if (palette.isLight) 0.28f else 0.18f) * brightnessAlpha),
+                Offset((0.46f + 0.38f * kotlin.math.sin(t * 0.55f)) * w, (0.58f + 0.26f * kotlin.math.cos(t * 0.9f)) * h),
                 0.40f
             ),
             Triple(
-                palette.bottom.copy(alpha = 0.36f),
-                Offset((0.70f + 0.18f * kotlin.math.cos(t * 0.95f)) * w, (0.84f + 0.10f * kotlin.math.sin(t)) * h),
+                palette.bottom.copy(alpha = 0.48f * brightnessAlpha),
+                Offset((0.70f + 0.34f * kotlin.math.cos(t * 0.95f)) * w, (0.84f + 0.22f * kotlin.math.sin(t)) * h),
                 0.58f
             )
         )
@@ -189,9 +207,9 @@ internal fun BeautifulLyricsDynamicBackground(
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    scrim.copy(alpha = if (palette.isLight) 0.18f else 0.16f),
+                    scrim.copy(alpha = if (palette.isLight) 0.14f else 0.10f),
                     Color.Transparent,
-                    scrim.copy(alpha = if (palette.isLight) 0.30f else 0.46f)
+                    scrim.copy(alpha = if (palette.isLight) 0.26f else 0.38f)
                 )
             )
         )

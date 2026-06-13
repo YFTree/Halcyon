@@ -3,6 +3,7 @@ package com.ella.music.ui.player
 import android.content.Context
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
@@ -11,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -19,11 +21,18 @@ import androidx.media3.common.Player as Media3Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.SafeCoverImage
 import java.io.File
+
+internal enum class DynamicCoverKind {
+    Video,
+    AnimatedImage
+}
 
 internal data class DynamicCoverSource(
     val uri: Uri,
-    val failureKey: String
+    val failureKey: String,
+    val kind: DynamicCoverKind = DynamicCoverKind.Video
 )
 
 @Composable
@@ -33,6 +42,18 @@ internal fun DynamicCoverVideo(
     onPlaybackError: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (source.kind == DynamicCoverKind.AnimatedImage) {
+        SafeCoverImage(
+            model = source.uri,
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = ContentScale.Crop,
+            sizePx = 1200,
+            showDefaultPlaceholder = false
+        )
+        return
+    }
+
     val context = LocalContext.current
 
     val exoPlayer = remember(source.failureKey) {
@@ -90,10 +111,13 @@ internal fun DynamicCoverVideo(
     )
 }
 
-internal fun Song.dynamicCoverSource(context: Context): DynamicCoverSource? {
-    dynamicCoverVideoFile(context)?.let { file ->
-        return DynamicCoverSource(uri = Uri.fromFile(file), failureKey = file.absolutePath)
+internal fun Song.dynamicCoverSource(context: Context, includeExternalFiles: Boolean = true): DynamicCoverSource? {
+    if (includeExternalFiles) {
+        dynamicCoverVideoFile(context)?.let { file ->
+            return DynamicCoverSource(uri = Uri.fromFile(file), failureKey = file.absolutePath)
+        }
     }
+    embeddedDynamicImageSource(context)?.let { return it }
     return embeddedDynamicVideoSource(context)
 }
 
@@ -104,6 +128,63 @@ private fun Song.embeddedDynamicVideoSource(context: Context): DynamicCoverSourc
         uri = mediaUri,
         failureKey = "embedded-video:$path:${dateModified}:${fileSize}"
     )
+}
+
+private fun Song.embeddedDynamicImageSource(context: Context): DynamicCoverSource? {
+    val mediaUri = dynamicCoverMediaUri() ?: return null
+    val picture = runCatching {
+        MediaMetadataRetriever().useCompat { retriever ->
+            if (mediaUri.scheme.equals("content", ignoreCase = true)) {
+                retriever.setDataSource(context, mediaUri)
+            } else {
+                retriever.setDataSource(mediaUri.path.orEmpty())
+            }
+            retriever.embeddedPicture
+        }
+    }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return null
+
+    val format = picture.embeddedPictureFormat() ?: return null
+    val cacheFile = File(context.cacheDir, "dynamic_covers/${path.hashCode()}_${dateModified}_${fileSize}.${format.extension}")
+    return runCatching {
+        cacheFile.parentFile?.mkdirs()
+        if (!cacheFile.exists() || cacheFile.length() != picture.size.toLong()) {
+            cacheFile.writeBytes(picture)
+        }
+        DynamicCoverSource(
+            uri = Uri.fromFile(cacheFile),
+            failureKey = "embedded-image:${cacheFile.absolutePath}:${cacheFile.length()}",
+            kind = DynamicCoverKind.AnimatedImage
+        )
+    }.getOrNull()
+}
+
+private data class EmbeddedPictureFormat(val extension: String)
+
+private fun ByteArray.embeddedPictureFormat(): EmbeddedPictureFormat? {
+    if (size < 16) return null
+    val asciiHead = take(32).map { it.toInt().toChar() }.joinToString("")
+    return when {
+        startsWithBytes(0x00, 0x00) && asciiHead.contains("ftyp") && asciiHead.contains("avif") -> EmbeddedPictureFormat("avif")
+        startsWithBytes(0xFF, 0xD8, 0xFF) -> EmbeddedPictureFormat("jpg")
+        startsWithAscii("GIF8") -> EmbeddedPictureFormat("gif")
+        startsWithAscii("RIFF") && asciiHead.contains("WEBP") -> EmbeddedPictureFormat("webp")
+        startsWithBytes(0x89, 0x50, 0x4E, 0x47) -> EmbeddedPictureFormat("png")
+        else -> null
+    }
+}
+
+private fun ByteArray.startsWithBytes(vararg bytes: Int): Boolean =
+    size >= bytes.size && bytes.indices.all { (this[it].toInt() and 0xFF) == bytes[it] }
+
+private fun ByteArray.startsWithAscii(prefix: String): Boolean =
+    size >= prefix.length && prefix.indices.all { this[it].toInt().toChar() == prefix[it] }
+
+private inline fun <T> MediaMetadataRetriever.useCompat(block: (MediaMetadataRetriever) -> T): T {
+    try {
+        return block(this)
+    } finally {
+        release()
+    }
 }
 
 private fun Song.dynamicCoverMediaUri(): Uri? {

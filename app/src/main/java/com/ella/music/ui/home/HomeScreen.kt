@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -154,8 +155,14 @@ fun LibraryScreen(
     val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     val pageBackground = ellaPageBackground()
     val wallpaperVisible = appWallpaperEnabled && appWallpaperUri.isNotBlank()
+    val isWallpaperDarkText = MiuixTheme.colorScheme.background.luminance() >= 0.5f
+    val libraryPageBackground = if (wallpaperVisible) {
+        if (isWallpaperDarkText) Color.White.copy(alpha = 0.34f) else Color.Black.copy(alpha = 0.26f)
+    } else {
+        pageBackground
+    }
     val searchBarColor = if (wallpaperVisible) {
-        MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.62f)
+        MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.74f)
     } else {
         MiuixTheme.colorScheme.surfaceContainerHigh
     }
@@ -388,13 +395,13 @@ fun LibraryScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(pageBackground)
+            .background(libraryPageBackground)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Box {
             EllaSmallTopAppBar(
                 title = "",
-                color = pageBackground,
+                color = libraryPageBackground,
                 titleStartPadding = if (!selectionMode && songs.isNotEmpty()) 156.dp else 20.dp,
                 titleEndPadding = if (selectionMode) 170.dp else 152.dp,
                 navigationIcon = {
@@ -680,6 +687,16 @@ fun LibraryScreen(
             }
 
             Box(modifier = Modifier.fillMaxSize()) {
+                if (wallpaperVisible) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                if (isWallpaperDarkText) Color.White.copy(alpha = 0.22f)
+                                else Color.Black.copy(alpha = 0.18f)
+                            )
+                    )
+                }
                 val showScrollIndicator = sortedSongs.size > 30 && !showFastIndexBar
                 // Inset rows so the song "more" button clears the side index bar (matches Lyrico)
                 // and is no longer easy to mis-tap.

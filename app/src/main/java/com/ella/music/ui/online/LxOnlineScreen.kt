@@ -69,6 +69,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun LxOnlineScreen(
     mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
+    providerOverride: RemoteMusicProvider? = null,
+    titleOverride: String? = null,
     onBack: () -> Unit,
     onNavigateToPlayer: () -> Unit,
     onNavigateToSourceSettings: () -> Unit,
@@ -85,7 +87,8 @@ fun LxOnlineScreen(
     val embyService = remember(context) { EmbyService(context) }
     val scope = rememberCoroutineScope()
 
-    val selectedProvider by settingsManager.selectedOnlineProvider.collectAsState(initial = RemoteMusicProvider.Lx)
+    val selectedProviderSetting by settingsManager.selectedOnlineProvider.collectAsState(initial = RemoteMusicProvider.Lx)
+    val selectedProvider = providerOverride ?: selectedProviderSetting
     val navidromeConfig by settingsManager.navidromeConfig.collectAsState(
         initial = RemoteMusicSourceConfig(RemoteMusicProvider.Navidrome, "")
     )
@@ -206,7 +209,7 @@ fun LxOnlineScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         EllaSmallTopAppBar(
-            title = selectedProvider.displayName(context),
+            title = titleOverride ?: selectedProvider.displayName(context),
             color = ellaPageBackground(),
             navigationIcon = {
                 IconButton(onClick = onBack) {
