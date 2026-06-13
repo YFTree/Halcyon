@@ -32,43 +32,55 @@ class NavidromeService(private val context: Context) {
             ?.optJSONObject("searchResult3")
             ?.optJSONArray("song")
             ?: return@withContext emptyList()
-        List(songs.length()) { index ->
-            val item = songs.getJSONObject(index)
-            val id = item.optString("id")
-            val title = item.optString("title").ifBlank { context.getString(R.string.common_unknown) }
-            val artist = item.optString("artist").ifBlank { context.getString(R.string.player_unknown_artist) }
-            val album = item.optString("album").ifBlank { "Navidrome" }
-            val durationMs = item.optLong("duration", 0L).coerceAtLeast(0L) * 1000L
-            val suffix = item.optString("suffix").ifBlank { "mp3" }
-            val stream = endpoint(config, "stream", mapOf("id" to id))
-            val cover = item.optString("coverArt").takeIf { it.isNotBlank() }
-                ?.let { endpoint(config, "getCoverArt", mapOf("id" to it, "size" to "512")) }
-                .orEmpty()
-            RemoteOnlineSong(
-                song = Song(
-                    id = stableId("navidrome:$id"),
-                    title = title,
-                    artist = artist,
-                    album = album,
-                    albumId = 0L,
-                    duration = durationMs,
-                    path = stream,
-                    fileName = "$title.$suffix",
-                    mimeType = item.optString("contentType"),
-                    coverUrl = cover,
-                    onlineSource = RemoteMusicProvider.Navidrome.id,
-                    onlineId = id
-                ),
-                provider = RemoteMusicProvider.Navidrome,
-                remoteId = id,
-                streamUrl = stream,
-                coverUrl = cover
-            )
-        }.filter { it.remoteId.isNotBlank() }
+        List(songs.length()) { index -> songFromJson(songs.getJSONObject(index), config) }
+            .filter { it.remoteId.isNotBlank() }
+    }
+
+    suspend fun listSongs(config: RemoteMusicSourceConfig, limit: Int = 200): List<RemoteOnlineSong> = withContext(Dispatchers.IO) {
+        val root = request(config, "getRandomSongs", mapOf("size" to limit.coerceIn(20, 500).toString()))
+        val songs = root.optJSONObject("subsonic-response")
+            ?.optJSONObject("randomSongs")
+            ?.optJSONArray("song")
+            ?: return@withContext emptyList()
+        List(songs.length()) { index -> songFromJson(songs.getJSONObject(index), config) }
+            .filter { it.remoteId.isNotBlank() }
     }
 
     fun resolvePlayableSong(item: RemoteOnlineSong): Song =
         item.song.copy(path = item.streamUrl, coverUrl = item.coverUrl, onlineSource = RemoteMusicProvider.Navidrome.id)
+
+    private fun songFromJson(item: JSONObject, config: RemoteMusicSourceConfig): RemoteOnlineSong {
+        val id = item.optString("id")
+        val title = item.optString("title").ifBlank { context.getString(R.string.common_unknown) }
+        val artist = item.optString("artist").ifBlank { context.getString(R.string.player_unknown_artist) }
+        val album = item.optString("album").ifBlank { "Navidrome" }
+        val durationMs = item.optLong("duration", 0L).coerceAtLeast(0L) * 1000L
+        val suffix = item.optString("suffix").ifBlank { "mp3" }
+        val stream = endpoint(config, "stream", mapOf("id" to id))
+        val cover = item.optString("coverArt").takeIf { it.isNotBlank() }
+            ?.let { endpoint(config, "getCoverArt", mapOf("id" to it, "size" to "512")) }
+            .orEmpty()
+        return RemoteOnlineSong(
+            song = Song(
+                id = stableId("navidrome:$id"),
+                title = title,
+                artist = artist,
+                album = album,
+                albumId = 0L,
+                duration = durationMs,
+                path = stream,
+                fileName = "$title.$suffix",
+                mimeType = item.optString("contentType"),
+                coverUrl = cover,
+                onlineSource = RemoteMusicProvider.Navidrome.id,
+                onlineId = id
+            ),
+            provider = RemoteMusicProvider.Navidrome,
+            remoteId = id,
+            streamUrl = stream,
+            coverUrl = cover
+        )
+    }
 
     private fun request(
         config: RemoteMusicSourceConfig,
@@ -119,4 +131,3 @@ class NavidromeService(private val context: Context) {
         const val USER_AGENT = "Halcyon/1.0 Navidrome"
     }
 }
-

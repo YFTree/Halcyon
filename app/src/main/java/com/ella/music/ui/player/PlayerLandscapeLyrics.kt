@@ -76,6 +76,7 @@ internal fun LandscapeLyricsOverlay(
         if (beautifulLyricsBackground) {
             BeautifulLyricsDynamicBackground(
                 palette = palette,
+                coverBitmap = embeddedCover,
                 positionMs = currentPosition,
                 isPlaying = isPlaying,
                 modifier = Modifier.fillMaxSize()

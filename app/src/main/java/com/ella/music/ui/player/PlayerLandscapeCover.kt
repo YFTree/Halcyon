@@ -101,6 +101,7 @@ internal fun LandscapeCoverPlayerPage(
     Box(modifier = modifier.background(palette.middle)) {
         LandscapeCoverModeBackground(
             palette = palette,
+            embeddedCover = embeddedCover,
             currentPosition = currentPosition,
             isPlaying = isPlaying,
             flowEffectMode = flowEffectMode,

@@ -94,6 +94,7 @@ import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.wallpaperContentOverlayColor
 import com.ella.music.ui.components.requestPinnedEllaShortcut
 import com.ella.music.ui.navigation.Screen
 import top.yukonga.miuix.kmp.basic.Button
@@ -208,12 +209,20 @@ fun MetadataCategoryScreen(
         }
     }
 
-    Column(
+    val overlayColor = wallpaperContentOverlayColor()
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(pageBackground)
-            .windowInsetsPadding(WindowInsets.statusBars)
     ) {
+        if (overlayColor.alpha > 0f) {
+            Box(modifier = Modifier.fillMaxSize().background(overlayColor))
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+        ) {
         Box {
             EllaSmallTopAppBar(
                 title = type.categoryTitle(),
@@ -517,6 +526,7 @@ fun MetadataCategoryScreen(
             }
         )
     }
+}
 }
 
 /**

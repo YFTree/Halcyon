@@ -129,6 +129,7 @@ internal fun LandscapeCoverPlaybackOverlay(
     ) {
         LandscapeCoverModeBackground(
             palette = palette,
+            embeddedCover = embeddedCover,
             currentPosition = currentPosition,
             isPlaying = isPlaying,
             flowEffectMode = flowEffectMode,

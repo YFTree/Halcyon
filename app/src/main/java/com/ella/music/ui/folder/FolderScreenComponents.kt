@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.webdav.WebDavItem
 import com.ella.music.ui.components.FolderOutlineIcon
+import com.ella.music.ui.components.wallpaperAwareCardColor
+import com.ella.music.ui.components.wallpaperAwareCardColors
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -44,12 +46,13 @@ internal fun FolderListRow(
     onLongClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val rowColor = wallpaperAwareCardColor(defaultAlpha = 0.50f)
     Row(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 6.dp)
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(MiuixTheme.colorScheme.surfaceContainer)
+            .background(rowColor)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -97,6 +100,7 @@ internal fun LibraryAnalysisEntryCard(onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp),
+        colors = wallpaperAwareCardColors(defaultAlpha = 0.50f),
         onClick = onClick
     ) {
         Row(
@@ -141,7 +145,8 @@ internal fun WebDavBrowserCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        colors = wallpaperAwareCardColors(defaultAlpha = 0.50f)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

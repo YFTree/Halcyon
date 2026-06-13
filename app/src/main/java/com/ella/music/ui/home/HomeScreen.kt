@@ -108,6 +108,7 @@ import com.ella.music.ui.components.launchTagEditorOption
 import com.ella.music.ui.components.openSongSpectrumWithAspectPro
 import com.ella.music.ui.components.shareLocalSong
 import com.ella.music.ui.components.toFastIndexLetters
+import com.ella.music.ui.components.wallpaperContentOverlayColor
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -151,16 +152,10 @@ fun LibraryScreen(
     val settingsManager = remember(context) { SettingsManager.getInstance(context) }
     val openPlayerOnPlay by settingsManager.openPlayerOnPlay.collectAsState(initial = false)
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
-    val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
-    val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     val pageBackground = ellaPageBackground()
-    val wallpaperVisible = appWallpaperEnabled && appWallpaperUri.isNotBlank()
-    val isWallpaperDarkText = MiuixTheme.colorScheme.background.luminance() >= 0.5f
-    val libraryPageBackground = if (wallpaperVisible) {
-        if (isWallpaperDarkText) Color.White.copy(alpha = 0.34f) else Color.Black.copy(alpha = 0.26f)
-    } else {
-        pageBackground
-    }
+    val contentOverlayColor = wallpaperContentOverlayColor()
+    val wallpaperVisible = contentOverlayColor.alpha > 0f
+    val libraryPageBackground = if (wallpaperVisible) contentOverlayColor else pageBackground
     val searchBarColor = if (wallpaperVisible) {
         MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.74f)
     } else {
@@ -691,10 +686,7 @@ fun LibraryScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(
-                                if (isWallpaperDarkText) Color.White.copy(alpha = 0.22f)
-                                else Color.Black.copy(alpha = 0.18f)
-                            )
+                            .background(contentOverlayColor)
                     )
                 }
                 val showScrollIndicator = sortedSongs.size > 30 && !showFastIndexBar

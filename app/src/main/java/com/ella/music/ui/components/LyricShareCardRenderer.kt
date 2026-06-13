@@ -121,9 +121,10 @@ private fun drawShareBackground(
         Color.rgb(19, 25, 34)
     )
     val picked = colors.filter { Color.alpha(it) > 0 }.ifEmpty { fallbackColors }
-    val c1 = picked.first().boostForShare()
-    val c2 = picked.getOrElse(1) { c1 }.boostForShare()
-    val c3 = picked.last().boostForShare()
+    val boosted = picked.map { it.boostForShare() }
+    val c1 = boosted.first()
+    val c2 = boosted.getOrElse(1) { c1 }
+    val c3 = boosted.last()
 
     Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = LinearGradient(
@@ -142,9 +143,26 @@ private fun drawShareBackground(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), this)
     }
 
-    drawShareColorBlob(canvas, width * 0.14f, height * 0.16f, width * 0.76f, c1.lightenForShare(1.12f), 112)
-    drawShareColorBlob(canvas, width * 0.84f, height * 0.24f, width * 0.62f, c2.lightenForShare(1.08f), 96)
-    drawShareColorBlob(canvas, width * 0.46f, height * 0.86f, width * 0.82f, c3.lightenForShare(1.10f), 108)
+    val blobSlots = listOf(
+        ShareColorBlob(width * 0.14f, height * 0.16f, width * 0.76f, 112, 1.12f),
+        ShareColorBlob(width * 0.84f, height * 0.24f, width * 0.62f, 96, 1.08f),
+        ShareColorBlob(width * 0.46f, height * 0.86f, width * 0.82f, 108, 1.10f),
+        ShareColorBlob(width * 0.18f, height * 0.68f, width * 0.60f, 82, 1.08f),
+        ShareColorBlob(width * 0.76f, height * 0.72f, width * 0.58f, 84, 1.06f),
+        ShareColorBlob(width * 0.50f, height * 0.38f, width * 0.66f, 74, 1.10f),
+        ShareColorBlob(width * 0.58f, height * 0.08f, width * 0.48f, 68, 1.10f)
+    )
+    boosted.forEachIndexed { index, color ->
+        val slot = blobSlots[index % blobSlots.size]
+        drawShareColorBlob(
+            canvas = canvas,
+            cx = slot.cx,
+            cy = slot.cy,
+            radius = slot.radius,
+            color = color.lightenForShare(slot.lightenFactor),
+            alpha = slot.alpha
+        )
+    }
 
     Paint(Paint.ANTI_ALIAS_FLAG).apply {
         shader = RadialGradient(
@@ -183,6 +201,14 @@ private fun drawShareBackground(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), this)
     }
 }
+
+private data class ShareColorBlob(
+    val cx: Float,
+    val cy: Float,
+    val radius: Float,
+    val alpha: Int,
+    val lightenFactor: Float
+)
 
 private fun drawShareColorBlob(
     canvas: Canvas,

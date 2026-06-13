@@ -93,6 +93,7 @@ import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.rememberSongArtworkState
+import com.ella.music.ui.components.wallpaperContentOverlayColor
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -247,6 +248,10 @@ fun ArtistScreen(
             .fillMaxSize()
             .background(ellaPageBackground())
     ) {
+        val overlayColor = wallpaperContentOverlayColor()
+        if (overlayColor.alpha > 0f) {
+            Box(modifier = Modifier.fillMaxSize().background(overlayColor))
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),

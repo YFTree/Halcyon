@@ -29,6 +29,7 @@ import kotlin.math.abs
 @Composable
 internal fun LandscapeCoverModeBackground(
     palette: PlayerPalette,
+    embeddedCover: Bitmap? = null,
     currentPosition: Long,
     isPlaying: Boolean,
     flowEffectMode: Int,
@@ -51,6 +52,7 @@ internal fun LandscapeCoverModeBackground(
         } else if (beautifulLyricsBackground) {
             BeautifulLyricsDynamicBackground(
                 palette = palette,
+                coverBitmap = embeddedCover,
                 positionMs = currentPosition,
                 isPlaying = isPlaying,
                 animate = true,

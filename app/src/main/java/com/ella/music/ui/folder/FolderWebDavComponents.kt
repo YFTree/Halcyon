@@ -23,6 +23,7 @@ import com.ella.music.ui.components.EllaMiuixAction
 import com.ella.music.ui.components.EllaMiuixActionRow
 import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixTextField
+import com.ella.music.ui.components.wallpaperAwareCardColors
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -46,6 +47,7 @@ internal fun WebDavItemRow(
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp),
         cornerRadius = 16.dp,
+        colors = wallpaperAwareCardColors(defaultAlpha = 0.50f),
         onClick = onClick
     ) {
         Row(

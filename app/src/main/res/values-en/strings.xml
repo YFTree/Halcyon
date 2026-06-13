@@ -1396,6 +1396,8 @@
     <string name="settings_wallpaper_opacity_summary">Adjust the strength of the custom app wallpaper.</string>
     <string name="settings_wallpaper_dim">Wallpaper dim</string>
     <string name="settings_wallpaper_dim_summary">Add a dark or light wash above the wallpaper to keep text readable.</string>
+    <string name="settings_wallpaper_content_overlay">Interface overlay strength</string>
+    <string name="settings_wallpaper_content_overlay_summary">Adjust the frosted overlay behind lists and detail pages when a custom wallpaper is enabled.</string>
     <string name="settings_player_background_opacity">Player background opacity</string>
     <string name="settings_player_background_opacity_summary">Adjust the strength of the custom player background image.</string>
     <string name="settings_player_background_dim">Player background dim</string>

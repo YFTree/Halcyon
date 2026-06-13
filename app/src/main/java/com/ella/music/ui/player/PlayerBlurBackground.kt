@@ -115,6 +115,7 @@ internal fun FluidLyricBackground(
 @Composable
 internal fun BeautifulLyricsDynamicBackground(
     palette: PlayerPalette,
+    coverBitmap: Bitmap? = null,
     positionMs: Long,
     isPlaying: Boolean,
     animate: Boolean = true,
@@ -144,6 +145,7 @@ internal fun BeautifulLyricsDynamicBackground(
     }
     val scrim = if (palette.isLight) Color.White else Color.Black
     val brightnessAlpha = (brightness.coerceIn(30, 120) / 100f).coerceIn(0.3f, 1.2f)
+    val sampledColors = remember(coverBitmap, palette) { beautifulLyricsSampleColors(coverBitmap, palette) }
 
     Canvas(
         modifier = modifier
@@ -161,9 +163,9 @@ internal fun BeautifulLyricsDynamicBackground(
         drawRect(
             brush = Brush.linearGradient(
                 colors = listOf(
-                    palette.top.copy(alpha = 0.96f),
-                    palette.accent.copy(alpha = if (palette.isLight) 0.34f else 0.42f),
-                    palette.bottom.copy(alpha = 0.98f)
+                    sampledColors[0].copy(alpha = 0.96f),
+                    sampledColors[1].copy(alpha = if (palette.isLight) 0.42f else 0.58f),
+                    sampledColors[2].copy(alpha = 0.98f)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
@@ -172,24 +174,24 @@ internal fun BeautifulLyricsDynamicBackground(
 
         val blobs = listOf(
             Triple(
-                palette.accent.copy(alpha = (0.42f + pulse * 0.12f) * brightnessAlpha),
-                Offset((0.20f + 0.34f * kotlin.math.sin(t)) * w, (0.20f + 0.28f * kotlin.math.cos(t)) * h),
-                0.54f
+                sampledColors[3].copy(alpha = (0.48f + pulse * 0.16f) * brightnessAlpha),
+                Offset((0.12f + 0.42f * kotlin.math.sin(t)) * w, (0.18f + 0.34f * kotlin.math.cos(t)) * h),
+                0.70f
             ),
             Triple(
-                palette.top.copy(alpha = 0.38f * brightnessAlpha),
-                Offset((0.82f + 0.30f * kotlin.math.cos(t * 0.7f)) * w, (0.28f + 0.30f * kotlin.math.sin(t * 0.8f)) * h),
-                0.46f
+                sampledColors[4].copy(alpha = 0.46f * brightnessAlpha),
+                Offset((0.86f + 0.36f * kotlin.math.cos(t * 0.7f)) * w, (0.26f + 0.36f * kotlin.math.sin(t * 0.8f)) * h),
+                0.62f
             ),
             Triple(
-                Color.White.copy(alpha = (if (palette.isLight) 0.28f else 0.18f) * brightnessAlpha),
-                Offset((0.46f + 0.38f * kotlin.math.sin(t * 0.55f)) * w, (0.58f + 0.26f * kotlin.math.cos(t * 0.9f)) * h),
-                0.40f
-            ),
-            Triple(
-                palette.bottom.copy(alpha = 0.48f * brightnessAlpha),
-                Offset((0.70f + 0.34f * kotlin.math.cos(t * 0.95f)) * w, (0.84f + 0.22f * kotlin.math.sin(t)) * h),
+                sampledColors[5].copy(alpha = (if (palette.isLight) 0.34f else 0.28f) * brightnessAlpha),
+                Offset((0.44f + 0.46f * kotlin.math.sin(t * 0.55f)) * w, (0.58f + 0.32f * kotlin.math.cos(t * 0.9f)) * h),
                 0.58f
+            ),
+            Triple(
+                sampledColors[6].copy(alpha = 0.54f * brightnessAlpha),
+                Offset((0.72f + 0.42f * kotlin.math.cos(t * 0.95f)) * w, (0.84f + 0.28f * kotlin.math.sin(t)) * h),
+                0.72f
             )
         )
         blobs.forEach { (color, center, radiusFactor) ->
@@ -213,6 +215,28 @@ internal fun BeautifulLyricsDynamicBackground(
                 )
             )
         )
+    }
+}
+
+private fun beautifulLyricsSampleColors(bitmap: Bitmap?, palette: PlayerPalette): List<Color> {
+    if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) {
+        return listOf(palette.top, palette.accent, palette.bottom, palette.accent, palette.top, Color.White, palette.bottom)
+    }
+    val points = listOf(
+        0.18f to 0.18f,
+        0.78f to 0.20f,
+        0.52f to 0.50f,
+        0.22f to 0.78f,
+        0.82f to 0.72f,
+        0.50f to 0.28f,
+        0.64f to 0.88f
+    )
+    return points.map { (fx, fy) ->
+        val x = (bitmap.width * fx).toInt().coerceIn(0, bitmap.width - 1)
+        val y = (bitmap.height * fy).toInt().coerceIn(0, bitmap.height - 1)
+        Color(bitmap.getPixel(x, y)).boosted().let { color ->
+            if (palette.isLight) color.lighten(0.28f) else color
+        }
     }
 }
 

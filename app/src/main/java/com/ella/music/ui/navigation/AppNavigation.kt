@@ -36,6 +36,7 @@ import com.ella.music.ui.home.HomeScreen
 import com.ella.music.ui.home.LibraryScreen
 import com.ella.music.ui.online.LxOnlineScreen
 import com.ella.music.ui.online.LxSourceSettingsScreen
+import com.ella.music.ui.online.RemoteDirectoryScreen
 import com.ella.music.ui.playlist.PlaylistDetailScreen
 import com.ella.music.ui.playlist.PlaylistScreen
 import com.ella.music.ui.search.LibrarySearchScreen
@@ -563,30 +564,22 @@ fun AppNavigation(
         }
 
         composable(Screen.NavidromeOnline.route) {
-            LxOnlineScreen(
-                mainViewModel = mainViewModel,
+            RemoteDirectoryScreen(
+                provider = RemoteMusicProvider.Navidrome,
+                title = "Navidrome",
                 playerViewModel = playerViewModel,
-                providerOverride = RemoteMusicProvider.Navidrome,
-                titleOverride = "Navidrome",
                 onBack = { navController.popBackStack() },
-                onNavigateToPlayer = onNavigateToPlayer,
-                onNavigateToSourceSettings = { navController.navigate(Screen.LxSourceSettings.route) },
-                onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
-                onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) }
+                onNavigateToPlayer = onNavigateToPlayer
             )
         }
 
         composable(Screen.EmbyOnline.route) {
-            LxOnlineScreen(
-                mainViewModel = mainViewModel,
+            RemoteDirectoryScreen(
+                provider = RemoteMusicProvider.Emby,
+                title = "Emby",
                 playerViewModel = playerViewModel,
-                providerOverride = RemoteMusicProvider.Emby,
-                titleOverride = "Emby",
                 onBack = { navController.popBackStack() },
-                onNavigateToPlayer = onNavigateToPlayer,
-                onNavigateToSourceSettings = { navController.navigate(Screen.LxSourceSettings.route) },
-                onNavigateToAlbum = { albumId -> navController.navigate(Screen.AlbumDetail.createRoute(albumId)) },
-                onNavigateToArtist = { artistName -> navController.navigate(Screen.ArtistDetail.createRoute(artistName)) }
+                onNavigateToPlayer = onNavigateToPlayer
             )
         }
 

@@ -126,6 +126,7 @@ class SettingsManager(private val context: Context) {
         val KEY_APP_WALLPAPER_URI = stringPreferencesKey("app_wallpaper_uri")
         val KEY_APP_WALLPAPER_OPACITY = intPreferencesKey("app_wallpaper_opacity")
         val KEY_APP_WALLPAPER_DIM = intPreferencesKey("app_wallpaper_dim")
+        val KEY_APP_WALLPAPER_CONTENT_OVERLAY = intPreferencesKey("app_wallpaper_content_overlay")
         val KEY_PLAYER_BACKGROUND_ENABLED = booleanPreferencesKey("player_background_enabled")
         val KEY_PLAYER_BACKGROUND_URI = stringPreferencesKey("player_background_uri")
         val KEY_PLAYER_BACKGROUND_OPACITY = intPreferencesKey("player_background_opacity")
@@ -520,6 +521,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_APP_WALLPAPER_OPACITY]?.coerceIn(20, 100) ?: 100 }
     val appWallpaperDim: Flow<Int> =
         context.dataStore.data.map { it[KEY_APP_WALLPAPER_DIM]?.coerceIn(0, 80) ?: 30 }
+    val appWallpaperContentOverlay: Flow<Int> =
+        context.dataStore.data.map { it[KEY_APP_WALLPAPER_CONTENT_OVERLAY]?.coerceIn(0, 80) ?: 24 }
     val playerBackgroundEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_PLAYER_BACKGROUND_ENABLED] ?: false }
     val playerBackgroundUri: Flow<String> =
@@ -1065,6 +1068,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setAppWallpaperDim(dim: Int) {
         context.dataStore.edit { it[KEY_APP_WALLPAPER_DIM] = dim.coerceIn(0, 80) }
+    }
+
+    suspend fun setAppWallpaperContentOverlay(strength: Int) {
+        context.dataStore.edit { it[KEY_APP_WALLPAPER_CONTENT_OVERLAY] = strength.coerceIn(0, 80) }
     }
 
     suspend fun setPlayerBackgroundEnabled(enabled: Boolean) {
@@ -1702,6 +1709,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_SLEEP_TIMER_CUSTOM_MINUTES)
             setInt(KEY_APP_WALLPAPER_OPACITY)
             setInt(KEY_APP_WALLPAPER_DIM)
+            setInt(KEY_APP_WALLPAPER_CONTENT_OVERLAY)
             setInt(KEY_PLAYER_BACKGROUND_OPACITY)
             setInt(KEY_PLAYER_BACKGROUND_DIM)
             setInt(KEY_HOME_CARD_OPACITY)

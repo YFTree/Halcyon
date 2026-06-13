@@ -12,6 +12,11 @@ private data class SharePaletteRegion(
     val bottomFraction: Float
 )
 
+private data class SharePalettePoint(
+    val xFraction: Float,
+    val yFraction: Float
+)
+
 internal fun resolveLyricShareBackgroundColors(
     cover: Bitmap?,
     fallbackColors: List<Int>
@@ -25,9 +30,17 @@ private fun Bitmap?.extractSharePalette(fallback: List<Int>): List<Int> {
         SharePaletteRegion(0.10f, 0.44f, 0.92f, 1f),
         SharePaletteRegion(0.18f, 0.18f, 0.82f, 0.82f)
     )
-    val sampledColors = regions.mapNotNull { region ->
-        sampleShareRegionColor(region)
-    }
+    val points = listOf(
+        SharePalettePoint(0.16f, 0.18f),
+        SharePalettePoint(0.50f, 0.18f),
+        SharePalettePoint(0.84f, 0.20f),
+        SharePalettePoint(0.20f, 0.52f),
+        SharePalettePoint(0.50f, 0.50f),
+        SharePalettePoint(0.82f, 0.58f),
+        SharePalettePoint(0.50f, 0.84f)
+    )
+    val sampledColors = regions.mapNotNull { sampleShareRegionColor(it) } +
+        points.mapNotNull { sampleSharePointColor(it) }
     val fallbackColors = fallback.filter { Color.alpha(it) > 0 }
     val palette = mutableListOf<Int>()
     sampledColors
@@ -38,7 +51,7 @@ private fun Bitmap?.extractSharePalette(fallback: List<Int>): List<Int> {
             }
         }
     fallbackColors.forEach { color ->
-        if (palette.size >= 3) return@forEach
+        if (palette.size >= SHARE_BACKGROUND_COLOR_LIMIT) return@forEach
         if (palette.none { it.shareColorDistanceTo(color) < 56f }) {
             palette += color.boostForShare()
         }
@@ -52,7 +65,7 @@ private fun Bitmap?.extractSharePalette(fallback: List<Int>): List<Int> {
         val bridge = blendShareColors(palette.first(), palette.last(), 0.45f).lightenForShare(1.04f)
         palette.add(if (palette.none { it.shareColorDistanceTo(bridge) < 36f }) bridge else palette.last().darkenForShare(0.78f))
     }
-    return palette.take(3)
+    return palette.take(SHARE_BACKGROUND_COLOR_LIMIT)
 }
 
 private fun Bitmap.sampleShareRegionColor(region: SharePaletteRegion): Int? {
@@ -93,6 +106,24 @@ private fun Bitmap.sampleShareRegionColor(region: SharePaletteRegion): Int? {
         (red / weightSum).toInt().coerceIn(0, 255),
         (green / weightSum).toInt().coerceIn(0, 255),
         (blue / weightSum).toInt().coerceIn(0, 255)
+    )
+}
+
+private fun Bitmap.sampleSharePointColor(point: SharePalettePoint): Int? {
+    val centerX = (width * point.xFraction).roundToInt().coerceIn(0, width - 1)
+    val centerY = (height * point.yFraction).roundToInt().coerceIn(0, height - 1)
+    val radius = (minOf(width, height) * 0.13f).roundToInt().coerceAtLeast(2)
+    val left = (centerX - radius).coerceAtLeast(0)
+    val top = (centerY - radius).coerceAtLeast(0)
+    val right = (centerX + radius).coerceAtMost(width - 1)
+    val bottom = (centerY + radius).coerceAtMost(height - 1)
+    return sampleShareRegionColor(
+        SharePaletteRegion(
+            left.toFloat() / width,
+            top.toFloat() / height,
+            (right + 1).toFloat() / width,
+            (bottom + 1).toFloat() / height
+        )
     )
 }
 
@@ -142,3 +173,5 @@ private fun blendShareColors(start: Int, end: Int, fraction: Float): Int {
         (Color.blue(start) * inverse + Color.blue(end) * t).roundToInt().coerceIn(0, 255)
     )
 }
+
+private const val SHARE_BACKGROUND_COLOR_LIMIT = 7

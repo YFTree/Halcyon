@@ -70,43 +70,63 @@ class EmbyService(private val context: Context) {
             )
         )
         val items = root.optJSONArray("Items") ?: return@withContext emptyList()
-        List(items.length()) { index ->
-            val item = items.getJSONObject(index)
-            val id = item.optString("Id")
-            val title = item.optString("Name").ifBlank { context.getString(R.string.common_unknown) }
-            val artist = item.optJSONArray("Artists")?.optString(0).orEmpty()
-                .ifBlank { item.optString("AlbumArtist") }
-                .ifBlank { context.getString(R.string.player_unknown_artist) }
-            val album = item.optString("Album").ifBlank { "Emby" }
-            val ticks = item.optLong("RunTimeTicks", 0L)
-            val durationMs = if (ticks > 0L) ticks / 10_000L else 0L
-            val stream = streamUrl(config, id)
-            val cover = imageUrl(config, id)
-            RemoteOnlineSong(
-                song = Song(
-                    id = stableId("emby:$id"),
-                    title = title,
-                    artist = artist,
-                    album = album,
-                    albumId = 0L,
-                    duration = durationMs,
-                    path = stream,
-                    fileName = "$title.mp3",
-                    mimeType = "audio/*",
-                    coverUrl = cover,
-                    onlineSource = RemoteMusicProvider.Emby.id,
-                    onlineId = id
-                ),
-                provider = RemoteMusicProvider.Emby,
-                remoteId = id,
-                streamUrl = stream,
-                coverUrl = cover
+        List(items.length()) { index -> itemFromJson(items.getJSONObject(index), config) }
+            .filter { it.remoteId.isNotBlank() }
+    }
+
+    suspend fun listSongs(config: RemoteMusicSourceConfig, limit: Int = 200): List<RemoteOnlineSong> = withContext(Dispatchers.IO) {
+        val root = get(
+            config,
+            "Users/${config.userId}/Items",
+            mapOf(
+                "Recursive" to "true",
+                "IncludeItemTypes" to "Audio",
+                "Fields" to "Genres,MediaSources,AlbumArtist",
+                "SortBy" to "SortName",
+                "SortOrder" to "Ascending",
+                "Limit" to limit.coerceIn(20, 500).toString()
             )
-        }.filter { it.remoteId.isNotBlank() }
+        )
+        val items = root.optJSONArray("Items") ?: return@withContext emptyList()
+        List(items.length()) { index -> itemFromJson(items.getJSONObject(index), config) }
+            .filter { it.remoteId.isNotBlank() }
     }
 
     fun resolvePlayableSong(item: RemoteOnlineSong): Song =
         item.song.copy(path = item.streamUrl, coverUrl = item.coverUrl, onlineSource = RemoteMusicProvider.Emby.id)
+
+    private fun itemFromJson(item: JSONObject, config: RemoteMusicSourceConfig): RemoteOnlineSong {
+        val id = item.optString("Id")
+        val title = item.optString("Name").ifBlank { context.getString(R.string.common_unknown) }
+        val artist = item.optJSONArray("Artists")?.optString(0).orEmpty()
+            .ifBlank { item.optString("AlbumArtist") }
+            .ifBlank { context.getString(R.string.player_unknown_artist) }
+        val album = item.optString("Album").ifBlank { "Emby" }
+        val ticks = item.optLong("RunTimeTicks", 0L)
+        val durationMs = if (ticks > 0L) ticks / 10_000L else 0L
+        val stream = streamUrl(config, id)
+        val cover = imageUrl(config, id)
+        return RemoteOnlineSong(
+            song = Song(
+                id = stableId("emby:$id"),
+                title = title,
+                artist = artist,
+                album = album,
+                albumId = 0L,
+                duration = durationMs,
+                path = stream,
+                fileName = "$title.mp3",
+                mimeType = "audio/*",
+                coverUrl = cover,
+                onlineSource = RemoteMusicProvider.Emby.id,
+                onlineId = id
+            ),
+            provider = RemoteMusicProvider.Emby,
+            remoteId = id,
+            streamUrl = stream,
+            coverUrl = cover
+        )
+    }
 
     private fun get(
         config: RemoteMusicSourceConfig,

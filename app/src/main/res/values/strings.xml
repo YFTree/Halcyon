@@ -766,6 +766,8 @@
     <string name="settings_wallpaper_opacity_summary">调节全局自定义壁纸本身的显示强度</string>
     <string name="settings_wallpaper_dim">全局壁纸压暗</string>
     <string name="settings_wallpaper_dim_summary">在壁纸上叠加暗色或亮色遮罩，保证文字可读</string>
+    <string name="settings_wallpaper_content_overlay">界面遮罩强度</string>
+    <string name="settings_wallpaper_content_overlay_summary">开启自定义壁纸后，调节列表和详情页内容背后的雾面遮罩</string>
     <string name="settings_player_background">播放页自定义背景</string>
     <string name="settings_player_background_summary">仅在平板横屏播放页和手机非沉浸播放页显示</string>
     <string name="settings_player_background_image">选择播放页背景图片</string>

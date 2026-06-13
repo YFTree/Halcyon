@@ -51,6 +51,7 @@ internal fun SettingsAppearanceSection() {
     val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     val appWallpaperOpacity by settingsManager.appWallpaperOpacity.collectAsState(initial = 100)
     val appWallpaperDim by settingsManager.appWallpaperDim.collectAsState(initial = 30)
+    val appWallpaperContentOverlay by settingsManager.appWallpaperContentOverlay.collectAsState(initial = 24)
     val playerBackgroundEnabled by settingsManager.playerBackgroundEnabled.collectAsState(initial = false)
     val playerBackgroundUri by settingsManager.playerBackgroundUri.collectAsState(initial = "")
     val playerBackgroundOpacity by settingsManager.playerBackgroundOpacity.collectAsState(initial = 100)
@@ -378,6 +379,15 @@ internal fun SettingsAppearanceSection() {
                 valueText = "$appWallpaperDim%",
                 enabled = appWallpaperEnabled,
                 onValueChange = { scope.launch { settingsManager.setAppWallpaperDim(it) } }
+            )
+            SettingsIntSliderPreference(
+                title = stringResource(R.string.settings_wallpaper_content_overlay),
+                summary = stringResource(R.string.settings_wallpaper_content_overlay_summary),
+                value = appWallpaperContentOverlay,
+                valueRange = 0..80,
+                valueText = "$appWallpaperContentOverlay%",
+                enabled = appWallpaperEnabled,
+                onValueChange = { scope.launch { settingsManager.setAppWallpaperContentOverlay(it) } }
             )
             SwitchPreference(
                 title = stringResource(R.string.settings_player_background),

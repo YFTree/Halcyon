@@ -35,6 +35,7 @@ import com.ella.music.data.model.Song
 import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.FolderOutlineIcon
 import com.ella.music.ui.components.SafeCoverImage
+import com.ella.music.ui.components.isAppWallpaperVisible
 import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.viewmodel.MetadataCategoryItem
 import top.yukonga.miuix.kmp.basic.Icon
@@ -92,7 +93,10 @@ internal fun MetadataCategoryCard(
         }
     }
 
-    val cardColor = remember(item.name) { item.name.categoryCardColor() }
+    val wallpaperVisible = isAppWallpaperVisible()
+    val cardColor = remember(item.name, wallpaperVisible) {
+        item.name.categoryCardColor().copy(alpha = if (wallpaperVisible) 0.62f else 1f)
+    }
     val hasCover = coverModel != null
     val isGenreCard = type == "genre"
     val useSmallCover = type == "genre" || type == "year"

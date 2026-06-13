@@ -52,6 +52,7 @@ import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.wallpaperContentOverlayColor
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import com.ella.music.viewmodel.PlayerViewModel
@@ -111,12 +112,22 @@ fun FolderScreen(
         }
     }
 
-    Column(
+    val pageBackground = ellaPageBackground()
+    val overlayColor = wallpaperContentOverlayColor()
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ellaPageBackground())
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .background(pageBackground)
     ) {
+        if (overlayColor.alpha > 0f) {
+            Box(modifier = Modifier.fillMaxSize().background(overlayColor))
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.statusBars)
+        ) {
         Box {
             EllaSmallTopAppBar(
                 title = stringResource(R.string.tab_folder),
@@ -351,6 +362,7 @@ fun FolderScreen(
                     )
                 }
             }
+        }
         }
     }
 }

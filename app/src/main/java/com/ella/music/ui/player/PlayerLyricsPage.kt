@@ -123,6 +123,7 @@ internal fun LyricsPlayerPage(
         } else if (beautifulLyricsBackground) {
             BeautifulLyricsDynamicBackground(
                 palette = palette,
+                coverBitmap = embeddedCover,
                 positionMs = currentPositionMs,
                 isPlaying = isPlaying,
                 modifier = Modifier.fillMaxSize()
