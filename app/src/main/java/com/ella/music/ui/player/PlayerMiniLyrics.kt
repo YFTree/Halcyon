@@ -88,6 +88,8 @@ internal fun MiniLyricsPreview(
         nonCurrentLineBlurEnabled = false,
         nonCurrentLineBlurDistance = Int.MAX_VALUE,
         autoScrollResumeEnabled = true,
+        // The mini preview is tap-to-open only; don't let it scroll on drag.
+        userScrollEnabled = false,
         lineGapDp = if (singleLinePreview) 4f else null,
         modifier = modifier.fillMaxWidth()
     )

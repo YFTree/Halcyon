@@ -141,6 +141,7 @@ class RawsLyricView @JvmOverloads constructor(
     private var lineAlphaAnimationsEnabled = true
     private var pronunciationAboveMainEnabled = false
     private var autoScrollResumeEnabled = true
+    private var userScrollEnabled = true
     private var centerUnalignedLinesEnabled = false
     private var maxMainLines = 0 // 0 = unlimited
     private var placeholderFormat = PlaceholderFormat.NAME_ARTIST
@@ -229,8 +230,9 @@ class RawsLyricView @JvmOverloads constructor(
 
     private val interludePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val argbEvaluator = ArgbEvaluator()
-    private val interludeColorDim = Color.argb(46, 255, 255, 255)
-    private val interludeColorBright = Color.argb(240, 255, 255, 255)
+    // Derived from the current text color so the interlude dots invert on a light theme too.
+    private var interludeColorDim = Color.argb(46, 255, 255, 255)
+    private var interludeColorBright = Color.argb(240, 255, 255, 255)
     private val interludeColorPath = PathInterpolator(0f, 0.25f, 1f, 0.58f)
     private val interludeAccel = AccelerateInterpolator()
     private val interludeExitUpPath = PathInterpolator(0.25f, 0.1f, 0.25f, 1.0f)
@@ -437,6 +439,11 @@ class RawsLyricView @JvmOverloads constructor(
         invalidate()
     }
 
+    /** When false, the user can't scroll the lyrics by dragging (taps still work). */
+    fun setUserScrollEnabled(enabled: Boolean) {
+        userScrollEnabled = enabled
+    }
+
     fun setAutoScrollResumeEnabled(enabled: Boolean) {
         if (autoScrollResumeEnabled == enabled) return
         autoScrollResumeEnabled = enabled
@@ -468,8 +475,14 @@ class RawsLyricView @JvmOverloads constructor(
         if (background.isNotEmpty()) {
             dimColor = background[0]
         }
+        applyInterludeColors()
         applyColors()
         invalidate()
+    }
+
+    private fun applyInterludeColors() {
+        interludeColorDim = blendAlpha(hlColor, 46f / 255f)
+        interludeColorBright = blendAlpha(hlColor, 240f / 255f)
     }
 
     fun setStyle(config: RichLyricLineConfig) {
@@ -502,6 +515,7 @@ class RawsLyricView @JvmOverloads constructor(
             hlTransColor = blendAlpha(config.secondary.textColor[0], 0.8f)
             dimTransColor = blendAlpha(config.secondary.textColor[0], 0.25f)
         }
+        applyInterludeColors()
         placeholderFormat = config.placeholderFormat
         enableAnim = config.enableAnim
         mainPaint.typeface = config.primary.typeface
@@ -1835,6 +1849,10 @@ class RawsLyricView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_MOVE -> {
                 velocityTracker?.addMovement(event)
+                if (!userScrollEnabled) {
+                    // Mini-lyric preview: never scroll on drag; taps still open the lyrics page.
+                    return true
+                }
                 if (!isDragging) {
                     val totalDx = event.x - downTouchX
                     val totalDy = event.y - downTouchY
