@@ -256,6 +256,16 @@ class ExoPlayerManager(private val context: Context) {
         }
     }
 
+    /**
+     * Cap the queue handed to the media session so it never overflows the Binder transaction limit
+     * on pathologically large libraries; play a window centered on the chosen song instead.
+     */
+    private fun List<Song>.windowedForController(index: Int): Pair<List<Song>, Int> {
+        if (size <= MAX_CONTROLLER_QUEUE) return this to index
+        val from = (index - MAX_CONTROLLER_QUEUE / 2).coerceIn(0, size - MAX_CONTROLLER_QUEUE)
+        return subList(from, from + MAX_CONTROLLER_QUEUE).toList() to (index - from)
+    }
+
     fun setPlaylist(songs: List<Song>, startIndex: Int = 0) {
         if (songs.isEmpty()) return
         AppLogStore.debug(context, "PlayerQueue", "setPlaylist size=${songs.size} start=$startIndex")
@@ -268,21 +278,25 @@ class ExoPlayerManager(private val context: Context) {
         artworkAppliedSongId = null
         bluetoothMetadataSongId = null
         bluetoothMetadataPayload = null
+        // The whole queue is shipped to the playback service over Binder (~1MB transaction limit);
+        // a 60k-song library overflows it and crashes with TransactionTooLargeException. For
+        // pathologically large queues, play a window around the chosen song instead of everything.
+        val requestedIndex = startIndex.coerceIn(songs.indices)
+        val (queueSongs, safeIndex) = songs.windowedForController(requestedIndex)
         playlist.clear()
-        playlist.addAll(songs)
+        playlist.addAll(queueSongs)
         _playlist.value = playlist.toList()
 
-        val safeIndex = startIndex.coerceIn(songs.indices)
-        val mediaItems = songs.map(::songToMediaItem)
+        val mediaItems = queueSongs.map(::songToMediaItem)
         val controller = activeController()
         if (controller == null) {
             // No live controller (first launch, or the session was torn down while backgrounded).
             // Reconnect and queue the request so it is applied once the controller is back, and
             // optimistically reflect the requested song in the UI right away.
             ensureConnected()
-            pendingPlaylist = PendingPlaylist(songs.toList(), safeIndex)
-            _currentSong.value = songs.getOrNull(safeIndex)
-            _duration.value = songs.getOrNull(safeIndex)?.duration ?: 0L
+            pendingPlaylist = PendingPlaylist(queueSongs, safeIndex)
+            _currentSong.value = queueSongs.getOrNull(safeIndex)
+            _duration.value = queueSongs.getOrNull(safeIndex)?.duration ?: 0L
             _repeatMode.value = Player.REPEAT_MODE_ALL
             savePlaybackQueue(force = true)
             return
@@ -1335,6 +1349,9 @@ class ExoPlayerManager(private val context: Context) {
         const val TIMING_TAG = "EllaPlaybackTiming"
         // Guard so a seek never lands on the last frame and trips end-of-stream auto-advance.
         const val SEEK_END_GUARD_MS = 600L
+        // Max items handed to the media session at once; larger queues overflow the ~1MB Binder
+        // transaction limit (TransactionTooLargeException) on very large libraries.
+        const val MAX_CONTROLLER_QUEUE = 1000
         const val EXTRA_ONLINE_SOURCE = "com.ella.music.extra.ONLINE_SOURCE"
         const val EXTRA_ONLINE_ID = "com.ella.music.extra.ONLINE_ID"
         const val EXTRA_SONG_JSON = "com.ella.music.extra.SONG_JSON"
