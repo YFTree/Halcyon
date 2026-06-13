@@ -48,6 +48,7 @@ internal fun CoverPlayerPage(
     playerViewModel: PlayerViewModel,
     song: Song?,
     embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     annotation: String,
     dynamicCoverFailedPath: String?,
     dynamicCoverEnabled: Boolean,
@@ -191,6 +192,7 @@ internal fun CoverPlayerPage(
             LandscapeCoverPlayerPage(
                 song = song,
                 embeddedCover = embeddedCover,
+                paletteBitmap = paletteBitmap,
                 annotation = annotation,
                 dynamicCoverSource = dynamicCoverSource,
                 isPlaying = isPlaying,

@@ -1,6 +1,7 @@
 package com.ella.music.ui.player
 
 import android.graphics.Bitmap
+import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.util.Log
 import androidx.compose.animation.core.LinearEasing
@@ -143,7 +144,7 @@ internal fun BeautifulLyricsDynamicBackground(
     } else {
         0.36f
     }
-    val scrim = if (palette.isLight) Color.White else Color.Black
+    
     val brightnessAlpha = (brightness.coerceIn(30, 120) / 100f).coerceIn(0.3f, 1.2f)
     val sampledColors = remember(coverBitmap, palette) { beautifulLyricsSampleColors(coverBitmap, palette) }
 
@@ -163,9 +164,9 @@ internal fun BeautifulLyricsDynamicBackground(
         drawRect(
             brush = Brush.linearGradient(
                 colors = listOf(
-                    sampledColors[0].copy(alpha = 0.96f),
-                    sampledColors[1].copy(alpha = if (palette.isLight) 0.42f else 0.58f),
-                    sampledColors[2].copy(alpha = 0.98f)
+                    sampledColors[0].copy(alpha = 1f),
+                    sampledColors[1].copy(alpha = 0.92f),
+                    sampledColors[2].copy(alpha = 1f)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
@@ -174,22 +175,22 @@ internal fun BeautifulLyricsDynamicBackground(
 
         val blobs = listOf(
             Triple(
-                sampledColors[3].copy(alpha = (0.48f + pulse * 0.16f) * brightnessAlpha),
+                sampledColors[3].copy(alpha = (0.70f + pulse * 0.18f) * brightnessAlpha),
                 Offset((0.12f + 0.42f * kotlin.math.sin(t)) * w, (0.18f + 0.34f * kotlin.math.cos(t)) * h),
                 0.70f
             ),
             Triple(
-                sampledColors[4].copy(alpha = 0.46f * brightnessAlpha),
+                sampledColors[4].copy(alpha = 0.66f * brightnessAlpha),
                 Offset((0.86f + 0.36f * kotlin.math.cos(t * 0.7f)) * w, (0.26f + 0.36f * kotlin.math.sin(t * 0.8f)) * h),
                 0.62f
             ),
             Triple(
-                sampledColors[5].copy(alpha = (if (palette.isLight) 0.34f else 0.28f) * brightnessAlpha),
+                sampledColors[5].copy(alpha = 0.58f * brightnessAlpha),
                 Offset((0.44f + 0.46f * kotlin.math.sin(t * 0.55f)) * w, (0.58f + 0.32f * kotlin.math.cos(t * 0.9f)) * h),
                 0.58f
             ),
             Triple(
-                sampledColors[6].copy(alpha = 0.54f * brightnessAlpha),
+                sampledColors[6].copy(alpha = 0.72f * brightnessAlpha),
                 Offset((0.72f + 0.42f * kotlin.math.cos(t * 0.95f)) * w, (0.84f + 0.28f * kotlin.math.sin(t)) * h),
                 0.72f
             )
@@ -206,16 +207,18 @@ internal fun BeautifulLyricsDynamicBackground(
                 center = center
             )
         }
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    scrim.copy(alpha = if (palette.isLight) 0.14f else 0.10f),
-                    Color.Transparent,
-                    scrim.copy(alpha = if (palette.isLight) 0.26f else 0.38f)
-                )
-            )
-        )
     }
+}
+
+private fun Color.beautifulLyricsVibrant(): Color {
+    val r = (red * 255f).toInt().coerceIn(0, 255)
+    val g = (green * 255f).toInt().coerceIn(0, 255)
+    val b = (blue * 255f).toInt().coerceIn(0, 255)
+    val hsv = FloatArray(3)
+    AndroidColor.RGBToHSV(r, g, b, hsv)
+    hsv[1] = (hsv[1] * 1.55f).coerceIn(0.42f, 1f)
+    hsv[2] = (hsv[2] * 1.18f).coerceIn(0.50f, 1f)
+    return Color(AndroidColor.HSVToColor(hsv))
 }
 
 private fun beautifulLyricsSampleColors(bitmap: Bitmap?, palette: PlayerPalette): List<Color> {
@@ -234,9 +237,7 @@ private fun beautifulLyricsSampleColors(bitmap: Bitmap?, palette: PlayerPalette)
     return points.map { (fx, fy) ->
         val x = (bitmap.width * fx).toInt().coerceIn(0, bitmap.width - 1)
         val y = (bitmap.height * fy).toInt().coerceIn(0, bitmap.height - 1)
-        Color(bitmap.getPixel(x, y)).boosted().let { color ->
-            if (palette.isLight) color.lighten(0.28f) else color
-        }
+        Color(bitmap.getPixel(x, y)).beautifulLyricsVibrant()
     }
 }
 

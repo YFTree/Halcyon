@@ -23,6 +23,7 @@ internal fun PlayerLandscapeOverlayHost(
     dynamicCoverEnabled: Boolean,
     song: Song?,
     embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     annotation: String,
     dynamicCoverFailedPath: String?,
     isPlaying: Boolean,
@@ -95,6 +96,7 @@ internal fun PlayerLandscapeOverlayHost(
     LandscapeCoverPlaybackOverlay(
         song = song,
         embeddedCover = embeddedCover,
+        paletteBitmap = paletteBitmap,
         annotation = annotation,
         dynamicCoverSource = landscapeDynamicCoverSource,
         isPlaying = isPlaying,

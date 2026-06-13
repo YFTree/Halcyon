@@ -36,6 +36,7 @@ import kotlin.math.abs
 internal fun LyricsPlayerPage(
     song: Song?,
     embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     annotation: String,
     lyrics: List<LyricLine>,
     currentLyricIndex: Int,
@@ -123,7 +124,7 @@ internal fun LyricsPlayerPage(
         } else if (beautifulLyricsBackground) {
             BeautifulLyricsDynamicBackground(
                 palette = palette,
-                coverBitmap = embeddedCover,
+                coverBitmap = embeddedCover ?: paletteBitmap,
                 positionMs = currentPositionMs,
                 isPlaying = isPlaying,
                 modifier = Modifier.fillMaxSize()

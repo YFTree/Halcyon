@@ -41,6 +41,7 @@ import top.yukonga.miuix.kmp.icon.extended.Photos
 internal fun LandscapeLyricsOverlay(
     song: Song?,
     embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     annotation: String,
     lyrics: List<LyricLine>,
     currentLyricIndex: Int,
@@ -76,7 +77,7 @@ internal fun LandscapeLyricsOverlay(
         if (beautifulLyricsBackground) {
             BeautifulLyricsDynamicBackground(
                 palette = palette,
-                coverBitmap = embeddedCover,
+                coverBitmap = embeddedCover ?: paletteBitmap,
                 positionMs = currentPosition,
                 isPlaying = isPlaying,
                 modifier = Modifier.fillMaxSize()

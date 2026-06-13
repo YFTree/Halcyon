@@ -40,6 +40,7 @@ internal fun CoverPageContent(
     scope: CoroutineScope,
     song: Song?,
     embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     songAnnotation: String,
     dynamicCoverFailedPath: String?,
     dynamicCoverEnabled: Boolean,
@@ -136,6 +137,7 @@ internal fun CoverPageContent(
         playerViewModel = playerViewModel,
         song = song,
         embeddedCover = embeddedCover,
+        paletteBitmap = paletteBitmap,
         annotation = songAnnotation,
         dynamicCoverFailedPath = dynamicCoverFailedPath,
         dynamicCoverEnabled = dynamicCoverEnabled,
@@ -384,6 +386,7 @@ internal fun CoverPageContent(
 internal fun LyricsPageContent(
     song: Song?,
     embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     songAnnotation: String,
     lyrics: List<LyricLine>,
     currentLyricIndex: Int,
@@ -422,6 +425,7 @@ internal fun LyricsPageContent(
     LyricsPlayerPage(
         song = song,
         embeddedCover = embeddedCover,
+        paletteBitmap = paletteBitmap,
         annotation = songAnnotation,
         lyrics = lyrics,
         currentLyricIndex = currentLyricIndex,

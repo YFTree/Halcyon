@@ -30,6 +30,7 @@ import kotlin.math.abs
 internal fun LandscapeCoverModeBackground(
     palette: PlayerPalette,
     embeddedCover: Bitmap? = null,
+    paletteBitmap: Bitmap? = null,
     currentPosition: Long,
     isPlaying: Boolean,
     flowEffectMode: Int,
@@ -52,7 +53,7 @@ internal fun LandscapeCoverModeBackground(
         } else if (beautifulLyricsBackground) {
             BeautifulLyricsDynamicBackground(
                 palette = palette,
-                coverBitmap = embeddedCover,
+                coverBitmap = embeddedCover ?: paletteBitmap,
                 positionMs = currentPosition,
                 isPlaying = isPlaying,
                 animate = true,

@@ -44,6 +44,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 internal fun LandscapeCoverPlayerPage(
     song: Song?,
     embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     annotation: String,
     dynamicCoverSource: DynamicCoverSource?,
     isPlaying: Boolean,
@@ -102,6 +103,7 @@ internal fun LandscapeCoverPlayerPage(
         LandscapeCoverModeBackground(
             palette = palette,
             embeddedCover = embeddedCover,
+            paletteBitmap = paletteBitmap,
             currentPosition = currentPosition,
             isPlaying = isPlaying,
             flowEffectMode = flowEffectMode,

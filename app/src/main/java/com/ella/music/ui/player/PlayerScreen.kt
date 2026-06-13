@@ -398,6 +398,7 @@ fun PlayerScreen(
                         scope = scope,
                         song = song,
                         embeddedCover = embeddedCover,
+                        paletteBitmap = paletteBitmap,
                         songAnnotation = songAnnotation,
                         dynamicCoverFailedPath = uiState.dynamicCoverFailedPath,
                         dynamicCoverEnabled = dynamicCoverEnabled,
@@ -471,6 +472,7 @@ fun PlayerScreen(
                     LyricsPageContent(
                         song = song,
                         embeddedCover = embeddedCover,
+                        paletteBitmap = paletteBitmap,
                         songAnnotation = songAnnotation,
                         lyrics = lyrics,
                         currentLyricIndex = currentLyricIndex,
@@ -535,6 +537,7 @@ fun PlayerScreen(
                 dynamicCoverEnabled = dynamicCoverEnabled,
                 song = song,
                 embeddedCover = embeddedCover,
+                paletteBitmap = paletteBitmap,
                 annotation = songAnnotation,
                 dynamicCoverFailedPath = uiState.dynamicCoverFailedPath,
                 isPlaying = isPlaying,
