@@ -128,6 +128,10 @@ internal fun PlayerBlurBackground(
         Log.d("PlayerScreenPerf", "blur background static")
     }
 
+    // On a light player theme, wash the blurred cover toward white (dark lyrics on top) instead of
+    // darkening it like the dark theme does.
+    val isLight = palette.isLight
+    val scrim = if (isLight) Color.White else Color.Black
     Box(modifier = modifier.background(palette.middle)) {
         if (coverModel != null) {
             PlayerCoverImage(
@@ -153,9 +157,9 @@ internal fun PlayerBlurBackground(
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
-                            palette.accent.copy(alpha = 0.28f),
-                            palette.top.copy(alpha = 0.42f),
-                            Color.Black.copy(alpha = 0.34f)
+                            palette.accent.copy(alpha = if (isLight) 0.18f else 0.28f),
+                            palette.top.copy(alpha = if (isLight) 0.34f else 0.42f),
+                            scrim.copy(alpha = 0.34f)
                         ),
                         start = Offset.Zero,
                         end = Offset.Infinite
@@ -170,7 +174,7 @@ internal fun PlayerBlurBackground(
                         colors = listOf(
                             Color.White.copy(alpha = 0.06f),
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.32f)
+                            scrim.copy(alpha = 0.32f)
                         )
                     )
                 )
