@@ -196,7 +196,8 @@ fun LibrarySearchScreen(
                 },
                 onSearch = { commitSearch() },
                 placeholder = stringResource(R.string.library_search_page_placeholder),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                autoFocus = false
             )
         }
 
