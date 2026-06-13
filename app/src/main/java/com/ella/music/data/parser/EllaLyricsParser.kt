@@ -357,7 +357,7 @@ internal object EllaLyricsParser {
                     translation = inlineTranslation?.takeUsefulText() ?: translations[key]?.splitAppleTranslation()?.first,
                     pronunciation = pronunciation?.takeUsefulText(),
                     pronunciationWords = pronunciationWords.toDisplayWords(pronunciation.orEmpty()),
-                    agent = agentInfo[agent]?.alignment ?: agent,
+                    agent = agent,
                     agentName = agentInfo[agent]?.name,
                     backgroundText = bg?.text,
                     backgroundWords = bg?.words.orEmpty().toDisplayWords(bg?.text.orEmpty()),
@@ -370,7 +370,7 @@ internal object EllaLyricsParser {
             }
 
             LrcParser.LrcResult(
-                lyrics = lines.sortedBy { it.timeMs },
+                lyrics = assignTtmlAgentSides(lines.sortedBy { it.timeMs }, agentInfo),
                 title = metadata.title,
                 artist = metadata.artist,
                 album = metadata.album
@@ -411,7 +411,8 @@ internal object EllaLyricsParser {
     }
 
     private data class TtmlAgentInfo(
-        val alignment: String,
+        /** ttm:agent type: person / organization / group / other (lower-cased; may be blank). */
+        val type: String,
         val name: String?
     )
 
@@ -420,19 +421,53 @@ internal object EllaLyricsParser {
     }
 
     private fun parseAgentInfo(root: Element): Map<String, TtmlAgentInfo> {
-        val agents = root.allElements()
+        return root.allElements()
             .filter { it.localTagName() == "agent" }
             .mapNotNull { agent ->
                 val id = agent.attr("xml:id").ifBlank { agent.attr("id") }.takeIf(String::isNotBlank)
                     ?: return@mapNotNull null
-                id to agent.displayName()
+                id to TtmlAgentInfo(
+                    type = agent.attr("type").lowercase(),
+                    name = agent.displayName()
+                )
             }
-        return agents.mapIndexed { index, (id, name) ->
-            id to TtmlAgentInfo(
-                alignment = if (index == 1) "v2" else "v1",
-                name = name
-            )
-        }.toMap()
+            .toMap()
+    }
+
+    /**
+     * Assign each TTML line a display side (left = "v1", right = "v2") from its agent type, per the
+     * AMLL convention:
+     *  - group  -> always left
+     *  - other  -> always right
+     *  - person / organization (or untyped) -> the first one is left, then every switch to a
+     *    different solo/organization agent flips to the opposite of the previous one; repeats of the
+     *    same agent keep the current side. Group/other lines don't disturb that running side.
+     * Lines must already be in playback (time) order.
+     */
+    private fun assignTtmlAgentSides(
+        lines: List<LyricLine>,
+        agentInfo: Map<String, TtmlAgentInfo>
+    ): List<LyricLine> {
+        var prevSoloId: String? = null
+        var prevSoloSide: String? = null
+        return lines.map { line ->
+            val id = line.agent
+            val side = when (agentInfo[id]?.type) {
+                "group" -> "v1"
+                "other" -> "v2"
+                else -> {
+                    val resolved = when {
+                        prevSoloSide == null -> "v1"
+                        id == prevSoloId -> prevSoloSide!!
+                        else -> if (prevSoloSide == "v1") "v2" else "v1"
+                    }
+                    prevSoloId = id
+                    prevSoloSide = resolved
+                    resolved
+                }
+            }
+            line.copy(agent = side)
+        }
     }
 
     private fun parseTimedTextMap(root: Element, containerTag: String, itemTag: String): Map<String, String> {
