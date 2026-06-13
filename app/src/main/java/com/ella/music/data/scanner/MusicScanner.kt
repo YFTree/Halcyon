@@ -44,6 +44,10 @@ class MusicScanner(private val context: Context) {
 
     companion object {
         private const val TAG = "MusicScanner"
+
+        private val DEFAULT_EXCLUDE_FOLDERS = listOf(
+            "/storage/emulated/0/Music/Recordings"
+        )
     }
 
     suspend fun enumerateAudioFiles(
@@ -52,7 +56,7 @@ class MusicScanner(private val context: Context) {
     ): List<MediaStoreAudioItem> = withContext(Dispatchers.IO) {
         val items = mutableListOf<MediaStoreAudioItem>()
         val normalizedIncludeFolders = includeFolders.mapNotNull { it.normalizedFolderPath() }
-        val normalizedExcludeFolders = excludeFolders.mapNotNull { it.normalizedFolderPath() }
+        val normalizedExcludeFolders = (DEFAULT_EXCLUDE_FOLDERS + excludeFolders).mapNotNull { it.normalizedFolderPath() }
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -250,7 +254,7 @@ class MusicScanner(private val context: Context) {
     ): List<Song> = withContext(Dispatchers.IO) {
         val songs = mutableListOf<Song>()
         val normalizedIncludeFolders = includeFolders.mapNotNull { it.normalizedFolderPath() }
-        val normalizedExcludeFolders = excludeFolders.mapNotNull { it.normalizedFolderPath() }
+        val normalizedExcludeFolders = (DEFAULT_EXCLUDE_FOLDERS + excludeFolders).mapNotNull { it.normalizedFolderPath() }
         val collection = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
