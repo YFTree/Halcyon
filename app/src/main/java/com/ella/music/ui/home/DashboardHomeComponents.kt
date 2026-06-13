@@ -10,20 +10,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -33,7 +37,11 @@ import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.requestPinnedEllaShortcut
+import com.ella.music.ui.player.PlayerPalette
+import com.ella.music.ui.player.loadPaletteCoverBitmap
 import com.ella.music.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -143,7 +151,6 @@ internal fun HomeTileGrid(
                 HomeTile(
                     title = tile.title,
                     subtitle = tile.subtitle,
-                    color = tile.color,
                     onClick = tile.onClick,
                     onPinClick = if (showPinButtons) {
                         {
@@ -172,6 +179,21 @@ internal fun DailyMixCard(
     onPlay: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val coverSong = featuredSongs.firstOrNull() ?: songs.firstOrNull()
+    val fallbackAccent = Color(0xFF2B2F3A)
+    // Android-8 media-notification style: the cover sits on the right and a color sampled from it
+    // fills the left, where the text and play button live.
+    val accent by produceState(fallbackAccent, coverSong?.id) {
+        val s = coverSong
+        value = if (s != null) {
+            withContext(Dispatchers.IO) {
+                PlayerPalette.fromCoverBackground(loadPaletteCoverBitmap(context, s)).middle
+            }
+        } else {
+            fallbackAccent
+        }
+    }
     Card(
         modifier = modifier,
         cornerRadius = 18.dp,
@@ -180,45 +202,51 @@ internal fun DailyMixCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(190.dp)
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFF4DD6B6), Color(0xFFFFD166), Color(0xFFFF7A90))
-                    )
-                )
-                .padding(20.dp)
+                .height(152.dp)
+                .background(accent)
         ) {
-            featuredSongs.forEachIndexed { index, song ->
-                val size = listOf(68, 58, 48).getOrElse(index) { 48 }.dp
+            coverSong?.let { song ->
                 SafeCoverImage(
                     model = mainViewModel.getAlbumArtUri(song.albumId),
                     contentDescription = null,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-16 - index * 28).dp, y = (14 + index * 14).dp)
-                        .size(size)
-                        .clip(CircleShape),
-                    sizePx = 96
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .aspectRatio(1f),
+                    contentScale = ContentScale.Crop,
+                    sizePx = 256
                 )
             }
-
+            // Blend the cover's left edge into the sampled color so it reads as one surface.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(152.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            0.0f to accent,
+                            0.5f to accent,
+                            0.82f to Color.Transparent
+                        )
+                    )
+            )
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxWidth()
-                    .padding(end = 140.dp)
+                    .padding(start = 20.dp, end = 150.dp)
             ) {
                 Text(
                     text = stringResource(R.string.home_daily_mix),
-                    fontSize = 30.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF101014)
+                    color = Color.White
                 )
                 Text(
                     text = currentSongTitle?.let { stringResource(R.string.home_now_playing_song, it) }
                         ?: stringResource(R.string.home_random_song_count, songs.size),
                     fontSize = 14.sp,
-                    color = Color(0xFF33333A),
+                    color = Color.White.copy(alpha = 0.85f),
                     lineHeight = 19.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -227,12 +255,12 @@ internal fun DailyMixCard(
                         .fillMaxWidth()
                         .padding(top = 6.dp)
                 )
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 IconButton(onClick = onPlay) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Play,
                         contentDescription = stringResource(R.string.home_play_daily_mix),
-                        tint = Color(0xFF101014),
+                        tint = Color.White,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -296,7 +324,6 @@ internal fun SectionTitle(text: String) {
 private fun HomeTile(
     title: String,
     subtitle: String,
-    color: Color,
     onClick: () -> Unit,
     onPinClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -305,7 +332,8 @@ private fun HomeTile(
         modifier = modifier
             .height(96.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(color.copy(alpha = if (MiuixTheme.colorScheme.background.luminance() < 0.5f) 0.34f else 0.22f))
+            // Neutral card surface (Monet-tinted when dynamic color is on), matching the playlist page.
+            .background(MiuixTheme.colorScheme.surfaceContainer)
             .combinedClickable(onClick = onClick, onLongClick = onPinClick)
             .padding(14.dp),
         verticalArrangement = Arrangement.SpaceBetween
