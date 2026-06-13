@@ -57,7 +57,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -81,6 +80,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
@@ -257,7 +257,9 @@ fun PlayerScreen(
     val playerLight = when (playerBackgroundTheme) {
         SettingsManager.PLAYER_BG_THEME_LIGHT -> true
         SettingsManager.PLAYER_BG_THEME_DARK -> false
-        else -> !isSystemInDarkTheme()
+        // Follow the app's effective theme (which itself follows the system or an in-app override),
+        // not the raw OS dark mode, so the player tracks an in-app light/dark switch too.
+        else -> MiuixTheme.colorScheme.background.luminance() >= 0.5f
     }
     val songPresentation = rememberPlayerSongPresentationState(
         context = context,
