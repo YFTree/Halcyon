@@ -48,6 +48,7 @@ internal fun LandscapeSongTitle(
         artistFontSize = 16.sp,
         artistAlpha = 0.50f,
         fallbackTitle = stringResource(R.string.app_name),
+        contentColor = LocalPlayerContentColor.current,
         modifier = modifier.padding(end = 16.dp)
     )
 }

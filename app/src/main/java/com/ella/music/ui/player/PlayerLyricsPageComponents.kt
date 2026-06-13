@@ -49,6 +49,7 @@ internal fun LyricsPlayerHeader(
             titleFontSize = 22.sp,
             artistFontSize = 14.sp,
             artistAlpha = 0.72f,
+            contentColor = LocalPlayerContentColor.current,
             onArtistClick = onArtist,
             modifier = Modifier
                 .weight(1f)
