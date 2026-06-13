@@ -100,6 +100,10 @@ class ExoPlayerManager(private val context: Context) {
     private var bluetoothMetadataSongId: Long? = null
     private var bluetoothMetadataPayload: Pair<String?, String?>? = null
 
+    init {
+        _shuffleEnabled.value = loadAppShuffleEnabled()
+    }
+
     fun connect() {
         val sessionToken = SessionToken(
             context,
@@ -188,13 +192,6 @@ class ExoPlayerManager(private val context: Context) {
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 Log.d(TIMING_TAG, "controller media transition reason=$reason mediaId=${mediaItem?.mediaId}")
-                if (
-                    reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO &&
-                    shouldUseTrueRandomShuffle() &&
-                    mediaController?.playWhenReady == true
-                ) {
-                    if (playTrueRandomItem()) return
-                }
                 updateCurrentSong()
             }
 
@@ -245,7 +242,7 @@ class ExoPlayerManager(private val context: Context) {
         val pending = pendingPlaylist
         if (pending != null) {
             pendingPlaylist = null
-            setPlaylist(pending.songs, pending.startIndex)
+            setPlaylist(pending.songs, pending.startIndex, honorShuffle = pending.honorShuffle)
         } else {
             restoreSavedQueueIfNeeded()
         }
@@ -267,10 +264,13 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     fun setPlaylist(songs: List<Song>, startIndex: Int = 0) {
+        setPlaylist(songs, startIndex, honorShuffle = true)
+    }
+
+    private fun setPlaylist(songs: List<Song>, startIndex: Int, honorShuffle: Boolean) {
         if (songs.isEmpty()) return
         AppLogStore.debug(context, "PlayerQueue", "setPlaylist size=${songs.size} start=$startIndex")
         virtualPlaylistCurrentIndex = null
-        playlistBeforeShuffle = null
         resetPlayNextForwardStack()
         notificationArtworkJob?.cancel()
         notificationArtworkJob = null
@@ -282,7 +282,10 @@ class ExoPlayerManager(private val context: Context) {
         // a 60k-song library overflows it and crashes with TransactionTooLargeException. For
         // pathologically large queues, play a window around the chosen song instead of everything.
         val requestedIndex = startIndex.coerceIn(songs.indices)
-        val (queueSongs, safeIndex) = songs.windowedForController(requestedIndex)
+        val prepared = preparePlaybackQueue(songs, requestedIndex, honorShuffle)
+        val queueSongs = prepared.songs
+        val safeIndex = prepared.startIndex
+        playlistBeforeShuffle = prepared.sourceOrderBeforeShuffle
         playlist.clear()
         playlist.addAll(queueSongs)
         _playlist.value = playlist.toList()
@@ -294,7 +297,7 @@ class ExoPlayerManager(private val context: Context) {
             // Reconnect and queue the request so it is applied once the controller is back, and
             // optimistically reflect the requested song in the UI right away.
             ensureConnected()
-            pendingPlaylist = PendingPlaylist(queueSongs, safeIndex)
+            pendingPlaylist = PendingPlaylist(queueSongs, safeIndex, honorShuffle = false)
             _currentSong.value = queueSongs.getOrNull(safeIndex)
             _duration.value = queueSongs.getOrNull(safeIndex)?.duration ?: 0L
             _repeatMode.value = Player.REPEAT_MODE_ALL
@@ -312,6 +315,40 @@ class ExoPlayerManager(private val context: Context) {
         }
         updateCurrentSong()
         savePlaybackQueue(force = true)
+    }
+
+    private data class PreparedPlaybackQueue(
+        val songs: List<Song>,
+        val startIndex: Int,
+        val sourceOrderBeforeShuffle: List<Song>?
+    )
+
+    private fun preparePlaybackQueue(
+        songs: List<Song>,
+        requestedIndex: Int,
+        honorShuffle: Boolean
+    ): PreparedPlaybackQueue {
+        if (!honorShuffle || !_shuffleEnabled.value || songs.size <= 1) {
+            val (queueSongs, safeIndex) = songs.windowedForController(requestedIndex)
+            return PreparedPlaybackQueue(queueSongs, safeIndex, sourceOrderBeforeShuffle = null)
+        }
+
+        val currentSong = songs[requestedIndex]
+        val shuffleSeed = if (shuffleMode == SettingsManager.SHUFFLE_MODE_TRUE_RANDOM) {
+            SystemClock.elapsedRealtimeNanos()
+        } else {
+            buildPseudoShuffleSeed(songs, currentSong)
+        }
+        val shuffledSongs = songs
+            .filterIndexed { index, _ -> index != requestedIndex }
+            .shuffled(Random(shuffleSeed))
+        val shuffledQueue = listOf(currentSong) + shuffledSongs
+
+        // Keep the original-order controller window so turning shuffle off never tries to send a
+        // huge source library through the media-session Binder transaction.
+        val (sourceWindow, _) = songs.windowedForController(requestedIndex)
+        val (queueSongs, safeIndex) = shuffledQueue.windowedForController(0)
+        return PreparedPlaybackQueue(queueSongs, safeIndex, sourceWindow)
     }
 
     fun playResolvedFromVirtualQueue(songs: List<Song>, currentIndex: Int, resolvedSong: Song) {
@@ -555,12 +592,10 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     fun skipToNext() {
-        if (!playTrueRandomItem()) {
-            if (!seekAdjacentMediaItemInRepeatOne(1)) {
-                mediaController?.seekToNextMediaItem()
-            }
-            updateCurrentSong()
+        if (!seekAdjacentMediaItemInRepeatOne(1)) {
+            mediaController?.seekToNextMediaItem()
         }
+        updateCurrentSong()
         savePlaybackQueue(force = true)
     }
 
@@ -1184,32 +1219,6 @@ class ExoPlayerManager(private val context: Context) {
             return itemSong.isSamePlaybackIdentity(song)
         }
         return localConfiguration?.uri?.toString().orEmpty() == song.path
-    }
-
-    private fun shouldUseTrueRandomShuffle(): Boolean =
-        shuffleMode == SettingsManager.SHUFFLE_MODE_TRUE_RANDOM && _shuffleEnabled.value
-
-    private fun playTrueRandomItem(): Boolean {
-        if (!shouldUseTrueRandomShuffle()) return false
-        if (virtualPlaylistCurrentIndex != null) return false
-
-        val controller = mediaController ?: return false
-        val shouldKeepPlaying = controller.playWhenReady
-        val itemCount = controller.mediaItemCount
-        if (itemCount <= 0) return false
-
-        val currentIndex = controller.currentMediaItemIndex
-        val randomIndex = if (itemCount > 1 && currentIndex in 0 until itemCount) {
-            var nextIndex = Random.nextInt(itemCount - 1)
-            if (nextIndex >= currentIndex) nextIndex += 1
-            nextIndex
-        } else {
-            Random.nextInt(itemCount)
-        }
-        controller.seekToDefaultPosition(randomIndex)
-        if (shouldKeepPlaying) controller.play()
-        updateCurrentSong()
-        return true
     }
 
     private fun restoreSavedQueueIfNeeded() {

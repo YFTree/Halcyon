@@ -37,7 +37,8 @@ internal data class PlaybackStateSnapshot(
 
 internal data class PendingPlaylist(
     val songs: List<Song>,
-    val startIndex: Int
+    val startIndex: Int,
+    val honorShuffle: Boolean = true
 )
 
 internal fun playbackQueueJson(snapshot: PlaybackStateSnapshot, songs: List<Song>): JSONObject =
