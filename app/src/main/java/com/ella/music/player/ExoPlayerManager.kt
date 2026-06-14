@@ -72,6 +72,14 @@ class ExoPlayerManager(private val context: Context) {
     val playbackPitch: StateFlow<Float> = _playbackPitch.asStateFlow()
 
     private var playlist = mutableListOf<Song>()
+
+    private data class PendingManualTransition(
+        val targetIndex: Int,
+        val targetSong: Song?,
+        val startedAtMs: Long
+    )
+
+    private var pendingManualTransition: PendingManualTransition? = null
     private val _playlist = MutableStateFlow<List<Song>>(emptyList())
     val playlistFlow: StateFlow<List<Song>> = _playlist.asStateFlow()
     private var playerListener: Player.Listener? = null
@@ -661,17 +669,92 @@ class ExoPlayerManager(private val context: Context) {
         } else {
             Math.floorMod(currentIndex + offset, itemCount)
         }
+
         val targetSong = playlist.getOrNull(targetIndex)
+            ?: controller.getMediaItemAt(targetIndex).toSongFromMediaItemExtras()
+            ?: controller.getMediaItemAt(targetIndex).toSong()
+
+        pendingManualTransition = PendingManualTransition(
+            targetIndex = targetIndex,
+            targetSong = targetSong,
+            startedAtMs = SystemClock.elapsedRealtime()
+        )
+
+        forceCurrentSongFromManualTransition(targetIndex, targetSong)
+
         controller.repeatMode = Player.REPEAT_MODE_ALL
         controller.seekToDefaultPosition(targetIndex)
         controller.play()
-        controller.repeatMode = Player.REPEAT_MODE_ONE
-        _repeatMode.value = Player.REPEAT_MODE_ONE
-        _currentSong.value = targetSong ?: controller.currentMediaItem?.toSongFromMediaItemExtras() ?: controller.currentMediaItem?.toSong()
-        _duration.value = targetSong?.duration ?: controller.duration.coerceAtLeast(0)
-        _currentPosition.value = 0L
-        targetSong?.let { refreshCurrentSessionMetadata(controller, it) }
+
+        scheduleRepeatOneRestoreAfterTransition(targetIndex, targetSong)
+
         return true
+    }
+
+    private fun forceCurrentSongFromManualTransition(targetIndex: Int, targetSong: Song?) {
+        val previousSong = _currentSong.value
+        _currentSong.value = targetSong
+        _duration.value = targetSong?.duration?.coerceAtLeast(0L) ?: 0L
+        _currentPosition.value = 0L
+
+        if (targetSong != null && !previousSong.isSamePlaybackIdentity(targetSong)) {
+            resetPlayNextForwardStack()
+            notificationArtworkJob?.cancel()
+            notificationArtworkJob = null
+            artworkAppliedSongId = null
+            sessionMetadataSongId = null
+            bluetoothMetadataSongId = null
+            bluetoothMetadataPayload = null
+        }
+
+        mediaController?.let { controller ->
+            if (targetSong != null) {
+                refreshCurrentSessionMetadata(controller, targetSong)
+                refreshCurrentNotificationArtwork(targetSong)
+            }
+        }
+
+        savePlaybackState(force = true)
+    }
+
+    private fun scheduleRepeatOneRestoreAfterTransition(targetIndex: Int, targetSong: Song?) {
+        persistenceScope.launch {
+            var settled = false
+            repeat(8) { attempt ->
+                if (settled) return@repeat
+                delay(80L + attempt * 80L)
+                withContext(Dispatchers.Main.immediate) {
+                    val controller = mediaController ?: return@withContext
+                    val currentIndex = controller.currentMediaItemIndex
+                    val currentItem = controller.currentMediaItem
+                    val matches = currentIndex == targetIndex ||
+                        (targetSong != null && currentItem?.matchesSong(targetSong) == true)
+
+                    if (matches) {
+                        if (controller.repeatMode != Player.REPEAT_MODE_ONE) {
+                            controller.repeatMode = Player.REPEAT_MODE_ONE
+                        }
+                        _repeatMode.value = Player.REPEAT_MODE_ONE
+                        pendingManualTransition = null
+                        refreshStateFromController()
+                        settled = true
+                    } else {
+                        forceCurrentSongFromManualTransition(targetIndex, targetSong)
+                    }
+                }
+            }
+
+            withContext(Dispatchers.Main.immediate) {
+                mediaController?.let {
+                    if (it.repeatMode != Player.REPEAT_MODE_ONE) {
+                        it.repeatMode = Player.REPEAT_MODE_ONE
+                    }
+                }
+                _repeatMode.value = Player.REPEAT_MODE_ONE
+                pendingManualTransition = null
+                refreshStateFromController()
+            }
+        }
     }
 
     private fun scheduleCurrentSongRefresh() {
@@ -985,6 +1068,26 @@ class ExoPlayerManager(private val context: Context) {
 
     private fun updateCurrentSong() {
         val controller = mediaController ?: return
+
+        val pending = pendingManualTransition
+        if (pending != null) {
+            val now = SystemClock.elapsedRealtime()
+            val targetSong = pending.targetSong ?: playlist.getOrNull(pending.targetIndex)
+            val currentItem = controller.currentMediaItem
+            val controllerMatchesTarget =
+                controller.currentMediaItemIndex == pending.targetIndex ||
+                    (targetSong != null && currentItem?.matchesSong(targetSong) == true)
+
+            if (targetSong != null && !controllerMatchesTarget && now - pending.startedAtMs < 1500L) {
+                forceCurrentSongFromManualTransition(pending.targetIndex, targetSong)
+                return
+            }
+
+            if (controllerMatchesTarget) {
+                pendingManualTransition = null
+            }
+        }
+
         val currentIndex = controller.currentMediaItemIndex
         val currentItem = controller.currentMediaItem
         val itemSong = currentItem?.toSongFromMediaItemExtras() ?: currentItem?.toSong()

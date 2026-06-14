@@ -75,6 +75,13 @@ class PlaybackService : MediaLibraryService() {
         private const val TIMING_TAG = "EllaPlaybackTiming"
 
         val bluetoothConnectEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+        fun isXiaomiFamilyDevice(): Boolean {
+            val manufacturer = android.os.Build.MANUFACTURER.orEmpty().lowercase()
+            val brand = android.os.Build.BRAND.orEmpty().lowercase()
+            return manufacturer in setOf("xiaomi", "redmi", "poco") ||
+                brand in setOf("xiaomi", "redmi", "poco")
+        }
     }
 
     private var mediaSession: MediaLibrarySession? = null
@@ -343,7 +350,7 @@ class PlaybackService : MediaLibraryService() {
 
             ACTION_SKIP_PREVIOUS -> {
                 AppLogStore.info(this, TAG, "NotificationAction previous clicked")
-                mediaSession?.player?.seekAdjacentFromNotification(-1)
+                mediaSession?.player?.seekToPreviousMediaItem()
                 updateMediaButtonPreferences()
                 notificationProvider.refresh()
                 true
@@ -351,36 +358,13 @@ class PlaybackService : MediaLibraryService() {
 
             ACTION_SKIP_NEXT -> {
                 AppLogStore.info(this, TAG, "NotificationAction next clicked")
-                mediaSession?.player?.seekAdjacentFromNotification(1)
+                mediaSession?.player?.seekToNextMediaItem()
                 updateMediaButtonPreferences()
                 notificationProvider.refresh()
                 true
             }
 
             else -> false
-        }
-    }
-
-    private fun Player.seekAdjacentFromNotification(offset: Int) {
-        if (mediaItemCount <= 0) return
-        if (repeatMode == Player.REPEAT_MODE_ONE) {
-            val currentIndex = currentMediaItemIndex
-            if (currentIndex !in 0 until mediaItemCount) return
-            val targetIndex = if (mediaItemCount == 1) {
-                currentIndex
-            } else {
-                Math.floorMod(currentIndex + offset, mediaItemCount)
-            }
-            repeatMode = Player.REPEAT_MODE_ALL
-            seekToDefaultPosition(targetIndex)
-            play()
-            repeatMode = Player.REPEAT_MODE_ONE
-            return
-        }
-        if (offset > 0) {
-            seekToNextMediaItem()
-        } else {
-            seekToPreviousMediaItem()
         }
     }
 
@@ -396,52 +380,55 @@ class PlaybackService : MediaLibraryService() {
 
         appShuffleEnabled = loadAppShuffleEnabled()
         val playbackModeAction = player.notificationPlaybackModeAction()
+        val isXiaomi = isXiaomiFamilyDevice()
 
-        session.setMediaButtonPreferences(
-            ImmutableList.of(
-                CommandButton.Builder()
-                    .setDisplayName(if (isFavorite) getString(R.string.common_unfavorite) else getString(R.string.common_favorite))
-                    .setIconResId(
-                        if (isFavorite) {
-                            R.drawable.ic_notification_favorite_filled
-                        } else {
-                            R.drawable.ic_notification_favorite
-                        }
-                    )
-                    .setSessionCommand(SessionCommand(ACTION_TOGGLE_FAVORITE, Bundle.EMPTY))
-                    .build(),
+        val buttons = mutableListOf<CommandButton>()
 
-                CommandButton.Builder()
-                    .setDisplayName(getString(R.string.common_previous))
-                    .setIconResId(R.drawable.ic_skip_previous)
-                    .setSessionCommand(SessionCommand(ACTION_SKIP_PREVIOUS, Bundle.EMPTY))
-                    .build(),
-
-                CommandButton.Builder()
-                    .setDisplayName(if (player.isPlaying) getString(R.string.common_pause) else getString(R.string.common_play))
-                    .setIconResId(
-                        if (player.isPlaying) {
-                            R.drawable.ic_player_pause
-                        } else {
-                            R.drawable.ic_player_play
-                        }
-                    )
-                    .setPlayerCommand(Player.COMMAND_PLAY_PAUSE)
-                    .build(),
-
-                CommandButton.Builder()
-                    .setDisplayName(getString(R.string.common_next))
-                    .setIconResId(R.drawable.ic_skip_next)
-                    .setSessionCommand(SessionCommand(ACTION_SKIP_NEXT, Bundle.EMPTY))
-                    .build(),
-
-                CommandButton.Builder()
-                    .setDisplayName(playbackModeAction.title)
-                    .setIconResId(playbackModeAction.icon)
-                    .setSessionCommand(SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY))
-                    .build()
+        buttons += CommandButton.Builder()
+            .setDisplayName(if (isFavorite) getString(R.string.common_unfavorite) else getString(R.string.common_favorite))
+            .setIconResId(
+                if (isFavorite) {
+                    R.drawable.ic_notification_favorite_filled
+                } else {
+                    R.drawable.ic_notification_favorite
+                }
             )
-        )
+            .setSessionCommand(SessionCommand(ACTION_TOGGLE_FAVORITE, Bundle.EMPTY))
+            .build()
+
+        buttons += CommandButton.Builder()
+            .setDisplayName(getString(R.string.common_previous))
+            .setIconResId(R.drawable.ic_skip_previous)
+            .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .build()
+
+        buttons += CommandButton.Builder()
+            .setDisplayName(if (player.isPlaying) getString(R.string.common_pause) else getString(R.string.common_play))
+            .setIconResId(
+                if (player.isPlaying) {
+                    R.drawable.ic_player_pause
+                } else {
+                    R.drawable.ic_player_play
+                }
+            )
+            .setPlayerCommand(Player.COMMAND_PLAY_PAUSE)
+            .build()
+
+        buttons += CommandButton.Builder()
+            .setDisplayName(getString(R.string.common_next))
+            .setIconResId(R.drawable.ic_skip_next)
+            .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)
+            .build()
+
+        if (!isXiaomi) {
+            buttons += CommandButton.Builder()
+                .setDisplayName(playbackModeAction.title)
+                .setIconResId(playbackModeAction.icon)
+                .setSessionCommand(SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY))
+                .build()
+        }
+
+        session.setMediaButtonPreferences(ImmutableList.copyOf(buttons))
     }
 
     private data class MediaButtonPlaybackModeAction(
@@ -601,8 +588,6 @@ class PlaybackService : MediaLibraryService() {
                 .buildUpon()
                 .add(SessionCommand(ACTION_TOGGLE_FAVORITE, Bundle.EMPTY))
                 .add(SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY))
-                .add(SessionCommand(ACTION_SKIP_PREVIOUS, Bundle.EMPTY))
-                .add(SessionCommand(ACTION_SKIP_NEXT, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
@@ -843,6 +828,7 @@ class PlaybackService : MediaLibraryService() {
                 PlaylistStore.getInstance(service).isFavorite(it)
             } == true
             val playbackModeAction = player.playbackModeAction()
+            val isXiaomi = isXiaomiFamilyDevice()
 
             addCustomAction(
                 ACTION_TOGGLE_FAVORITE,
@@ -851,8 +837,8 @@ class PlaybackService : MediaLibraryService() {
                 compact = false
             )
 
-            addCustomAction(
-                ACTION_SKIP_PREVIOUS,
+            addAction(
+                Player.COMMAND_SEEK_TO_PREVIOUS,
                 R.drawable.ic_skip_previous,
                 service.getString(R.string.common_previous),
                 compact = true
@@ -868,19 +854,21 @@ class PlaybackService : MediaLibraryService() {
                 if (player.isPlaying) service.getString(R.string.common_pause) else service.getString(R.string.common_play)
             )
 
-            addCustomAction(
-                ACTION_SKIP_NEXT,
+            addAction(
+                Player.COMMAND_SEEK_TO_NEXT,
                 R.drawable.ic_skip_next,
                 service.getString(R.string.common_next),
                 compact = true
             )
 
-            addCustomAction(
-                ACTION_TOGGLE_SHUFFLE,
-                playbackModeAction.icon,
-                playbackModeAction.title,
-                compact = false
-            )
+            if (!isXiaomi) {
+                addCustomAction(
+                    ACTION_TOGGLE_SHUFFLE,
+                    playbackModeAction.icon,
+                    playbackModeAction.title,
+                    compact = false
+                )
+            }
 
             val style = MediaStyleNotificationHelper.MediaStyle(mediaSession)
                 .setShowActionsInCompactView(*compactIndices.toIntArray())
