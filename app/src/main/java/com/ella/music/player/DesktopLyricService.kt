@@ -43,7 +43,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 class DesktopLyricService : Service() {
@@ -69,8 +68,13 @@ class DesktopLyricService : Service() {
     private var opacityPercent = 100
     private var lyricTextColor = Color.WHITE
     private var statusBarMode = false
+    private var desktopLyricWidthPercent = 72
     private var statusBarTopOffsetDp = 16
     private var statusBarPosition = SettingsManager.DESKTOP_LYRIC_STATUS_POSITION_CENTER
+    private var statusBarWidthPercent = 72
+    private var statusBarXOffsetDp = 0
+    private var statusBarTextAlign = SettingsManager.DESKTOP_LYRIC_STATUS_ALIGN_LEFT
+    private var statusBarVerticalAlign = SettingsManager.DESKTOP_LYRIC_STATUS_VERTICAL_TOP
     private var statusBarSecondaryMode = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF
     private var lyricFontPath = ""
     private var lyricFontWeight = 800
@@ -196,13 +200,13 @@ class DesktopLyricService : Service() {
         val lyricWidth = if (statusBarMode) {
             statusLyricWidth
         } else {
-            max(dp(280), resources.displayMetrics.widthPixels - dp(32)).coerceAtMost(dp(660))
+            desktopLyricWidth()
         }
         val lyricHeight = if (statusBarMode) {
             if (statusBarSecondaryMode == SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF) {
-                max(statusBarHeight() + dp(2), dp(28))
+                dp(96)
             } else {
-                max(statusBarHeight() + dp(12), dp(40))
+                dp(128)
             }
         } else {
             dp(150)
@@ -530,23 +534,36 @@ class DesktopLyricService : Service() {
         dp(if (statusBarSecondaryMode == SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF) 6 else 4)
 
     private fun statusBarLyricWidth(): Int =
-        (resources.displayMetrics.widthPixels - dp(144)).coerceIn(dp(160), dp(520))
+        (resources.displayMetrics.widthPixels * statusBarWidthPercent.coerceIn(40, 100) / 100f)
+            .roundToInt()
+            .coerceIn(dp(160), resources.displayMetrics.widthPixels - dp(16))
+
+    private fun desktopLyricWidth(): Int =
+        (resources.displayMetrics.widthPixels * desktopLyricWidthPercent.coerceIn(40, 100) / 100f)
+            .roundToInt()
+            .coerceIn(dp(280), resources.displayMetrics.widthPixels - dp(16))
 
     private fun statusBarLyricX(lyricWidth: Int): Int {
         val sideOffset = ((resources.displayMetrics.widthPixels - lyricWidth) / 2 - dp(12)).coerceAtLeast(0)
-        return when (statusBarPosition) {
+        val anchoredX = when (statusBarPosition) {
             SettingsManager.DESKTOP_LYRIC_STATUS_POSITION_LEFT -> -sideOffset
             SettingsManager.DESKTOP_LYRIC_STATUS_POSITION_RIGHT -> sideOffset
             else -> 0
         }
+        return anchoredX + dp(statusBarXOffsetDp.coerceIn(-640, 640))
     }
 
     private fun loadSettingsFromStore() {
         runBlocking(Dispatchers.IO) {
             locked = settingsManager.desktopLyricLocked.first()
             statusBarMode = settingsManager.desktopLyricStatusBarMode.first()
+            desktopLyricWidthPercent = settingsManager.desktopLyricWidth.first()
             statusBarTopOffsetDp = settingsManager.desktopLyricStatusBarTopOffset.first()
             statusBarPosition = settingsManager.desktopLyricStatusBarPosition.first()
+            statusBarWidthPercent = settingsManager.desktopLyricStatusBarWidth.first()
+            statusBarXOffsetDp = settingsManager.desktopLyricStatusBarXOffset.first()
+            statusBarTextAlign = settingsManager.desktopLyricStatusBarTextAlign.first()
+            statusBarVerticalAlign = settingsManager.desktopLyricStatusBarVerticalAlign.first()
             statusBarSecondaryMode = settingsManager.desktopLyricStatusBarSecondary.first()
             fontScale = settingsManager.desktopLyricFontScale.first().coerceIn(80, 220) / 100f
             translationScale = settingsManager.desktopLyricTranslationScale.first().coerceIn(80, 220) / 100f
@@ -579,6 +596,21 @@ class DesktopLyricService : Service() {
             val view = rootView
             val params = layoutParams
             if (view != null && params != null) {
+                lyricView?.layoutParams = lyricView?.layoutParams?.apply {
+                    width = statusBarLyricWidth()
+                    height = if (statusBarSecondaryMode == SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF) dp(96) else dp(128)
+                }
+                clampToScreen(view, params)
+                windowManager.updateViewLayout(view, params)
+            }
+        } else {
+            val view = rootView
+            val params = layoutParams
+            if (view != null && params != null) {
+                lyricView?.layoutParams = lyricView?.layoutParams?.apply {
+                    width = desktopLyricWidth()
+                    height = dp(150)
+                }
                 clampToScreen(view, params)
                 windowManager.updateViewLayout(view, params)
             }
@@ -594,6 +626,8 @@ class DesktopLyricService : Service() {
             textColor = lyricTextColor,
             statusBarMode = statusBarMode,
             statusBarSecondaryMode = statusBarSecondaryMode,
+            statusBarTextAlign = statusBarTextAlign,
+            statusBarVerticalAlign = statusBarVerticalAlign,
             lyricFontPath = lyricFontPath,
             lyricFontWeight = lyricFontWeight,
             lyricFontItalic = lyricFontItalic
@@ -681,6 +715,8 @@ class DesktopLyricService : Service() {
         private var textColor = Color.WHITE
         private var statusBarMode = false
         private var statusBarSecondaryMode = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF
+        private var statusBarTextAlign = SettingsManager.DESKTOP_LYRIC_STATUS_ALIGN_LEFT
+        private var statusBarVerticalAlign = SettingsManager.DESKTOP_LYRIC_STATUS_VERTICAL_TOP
         private var lyricFontPath = ""
         private var lyricFontWeight = 800
         private var lyricFontItalic = false
@@ -710,6 +746,8 @@ class DesktopLyricService : Service() {
             textColor: Int,
             statusBarMode: Boolean = false,
             statusBarSecondaryMode: Int = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF,
+            statusBarTextAlign: Int = SettingsManager.DESKTOP_LYRIC_STATUS_ALIGN_LEFT,
+            statusBarVerticalAlign: Int = SettingsManager.DESKTOP_LYRIC_STATUS_VERTICAL_TOP,
             lyricFontPath: String = "",
             lyricFontWeight: Int = 800,
             lyricFontItalic: Boolean = false
@@ -720,7 +758,10 @@ class DesktopLyricService : Service() {
             this.textColor = textColor
             this.statusBarMode = statusBarMode
             this.statusBarSecondaryMode = statusBarSecondaryMode.coerceIn(0, 2)
-            lyricView.setMaxMainLines(1)
+            this.statusBarTextAlign = statusBarTextAlign.coerceIn(0, 2)
+            this.statusBarVerticalAlign = statusBarVerticalAlign.coerceIn(0, 2)
+            lyricView.setMaxMainLines(if (statusBarMode) 0 else 1)
+            lyricView.setForcedTextAlignment(if (statusBarMode) this.statusBarTextAlign else -1)
             this.lyricFontPath = lyricFontPath
             this.lyricFontWeight = lyricFontWeight.coerceIn(100, 900)
             this.lyricFontItalic = lyricFontItalic
@@ -862,12 +903,12 @@ class DesktopLyricService : Service() {
         }
 
         private fun updateSong(force: Boolean) {
-            val key = "${currentLine.timeMs}|${currentLine.endMs}|${currentLine.text}|${currentLine.translation}|${currentLine.pronunciation}|${currentLine.backgroundText}|${currentLine.agent}|${currentLine.isTtml}|$statusBarMode|$statusBarSecondaryMode"
+            val key = "${currentLine.timeMs}|${currentLine.endMs}|${currentLine.text}|${currentLine.translation}|${currentLine.pronunciation}|${currentLine.backgroundText}|${currentLine.agent}|${currentLine.isTtml}|$statusBarMode|$statusBarSecondaryMode|$statusBarTextAlign|$statusBarVerticalAlign"
             if (!force && key == songKey) {
                 lyricView.setPosition(currentPositionMs)
                 return
             }
-            lyricView.setCenterUnalignedLinesEnabled(currentLine.shouldCenterUnalignedDesktopLine())
+            lyricView.setCenterUnalignedLinesEnabled(!statusBarMode && currentLine.shouldCenterUnalignedDesktopLine())
             val currentSong = listOf(currentLine).toLyriconSong(
                 songId = -1L,
                 songTitle = "Halcyon",
@@ -886,7 +927,12 @@ class DesktopLyricService : Service() {
 
         private fun updateLyricLayoutOffsets() {
             if (height <= 0) return
-            lyricView.updateAnchorOffset(if (statusBarMode) 0f else -height * 0.04f)
+            val statusOffset = when (statusBarVerticalAlign) {
+                SettingsManager.DESKTOP_LYRIC_STATUS_VERTICAL_CENTER -> 0f
+                SettingsManager.DESKTOP_LYRIC_STATUS_VERTICAL_BOTTOM -> height * 0.40f
+                else -> -height * 0.42f
+            }
+            lyricView.updateAnchorOffset(if (statusBarMode) statusOffset else -height * 0.04f)
             lyricView.setTopContentPadding(0f)
         }
 

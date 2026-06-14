@@ -59,8 +59,7 @@ internal fun rememberPlayerVisualizerPermissionState(
             audioVisualizerEnabled &&
             hasVisualizerPermission &&
             isPlaying &&
-            !showLyrics &&
-            !landscapeExpanded,
+            (!showLyrics || landscapeExpanded),
         setEnabled = { enabled ->
             if (enabled && !immersiveAlbumCover) {
                 Toast.makeText(

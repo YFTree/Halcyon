@@ -69,11 +69,16 @@ internal fun HomeDisplaySettingsPage(
     tileItems: List<HomePreferenceItem>,
     tileOrder: String,
     hiddenTiles: String,
+    onlineItems: List<HomePreferenceItem>,
+    onlineOrder: String,
+    hiddenOnlineTiles: String,
     tilePinButtonsVisible: Boolean,
     onHiddenSectionsChange: (String) -> Unit,
     onHiddenTilesChange: (String) -> Unit,
+    onHiddenOnlineTilesChange: (String) -> Unit,
     onSectionOrderChange: (String) -> Unit,
     onTileOrderChange: (String) -> Unit,
+    onOnlineOrderChange: (String) -> Unit,
     onTilePinButtonsVisibleChange: (Boolean) -> Unit
 ) {
     val orderedSections = remember(sectionItems, sectionOrder) {
@@ -82,8 +87,12 @@ internal fun HomeDisplaySettingsPage(
     val orderedTiles = remember(tileItems, tileOrder) {
         tileItems.orderedByCsv(tileOrder, SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
     }
+    val orderedOnlineTiles = remember(onlineItems, onlineOrder) {
+        onlineItems.orderedByCsv(onlineOrder, SettingsManager.DEFAULT_HOME_ONLINE_TILE_ORDER)
+    }
     val hiddenSectionIds = remember(hiddenSections) { hiddenSections.csvIdSet() }
     val hiddenTileIds = remember(hiddenTiles) { hiddenTiles.csvIdSet() }
+    val hiddenOnlineTileIds = remember(hiddenOnlineTiles) { hiddenOnlineTiles.csvIdSet() }
 
     HomeDisplayGroup(
         title = stringResource(R.string.settings_home_sections_title),
@@ -99,6 +108,14 @@ internal fun HomeDisplaySettingsPage(
         hiddenIds = hiddenTileIds,
         onHiddenIdsChange = onHiddenTilesChange,
         onOrderChange = onTileOrderChange
+    )
+    SmallTitle(text = stringResource(R.string.settings_home_online_grid_title))
+    HomeDisplayGroup(
+        title = null,
+        items = orderedOnlineTiles,
+        hiddenIds = hiddenOnlineTileIds,
+        onHiddenIdsChange = onHiddenOnlineTilesChange,
+        onOrderChange = onOnlineOrderChange
     )
     SettingsCardGroup {
         SwitchPreference(

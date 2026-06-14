@@ -114,6 +114,7 @@ internal fun PlayerLandscapeOverlayHost(
         fontPath = fontPath,
         fontWeight = fontWeight,
         fontScale = fontScale,
+        showTotalDuration = showTotalDuration,
         queueExpanded = queueExpanded,
         playlist = playlist,
         audioSessionId = audioSessionId,

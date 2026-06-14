@@ -66,6 +66,8 @@ fun SettingsDetailScreen(
     val homeHiddenSections by settingsManager.homeHiddenSections.collectAsState(initial = "")
     val homeLibraryTileOrder by settingsManager.homeLibraryTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
     val homeHiddenLibraryTiles by settingsManager.homeHiddenLibraryTiles.collectAsState(initial = "")
+    val homeOnlineTileOrder by settingsManager.homeOnlineTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_ONLINE_TILE_ORDER)
+    val homeHiddenOnlineTiles by settingsManager.homeHiddenOnlineTiles.collectAsState(initial = "")
     val homeTilePinButtonsVisible by settingsManager.homeTilePinButtonsVisible.collectAsState(initial = false)
     val homeSectionItems = listOf(
         HomePreferenceItem("library", stringResource(R.string.settings_home_section_library), stringResource(R.string.settings_home_section_library_summary)),
@@ -83,6 +85,12 @@ fun SettingsDetailScreen(
         HomePreferenceItem("year", stringResource(R.string.settings_library_tile_year), stringResource(R.string.settings_library_tile_year_summary)),
         HomePreferenceItem("composer", stringResource(R.string.settings_library_tile_composer), stringResource(R.string.settings_library_tile_composer_summary)),
         HomePreferenceItem("lyricist", stringResource(R.string.settings_library_tile_lyricist), stringResource(R.string.settings_library_tile_lyricist_summary))
+    )
+    val homeOnlineTileItems = listOf(
+        HomePreferenceItem("lx", "LX Music", stringResource(R.string.home_import_api_source)),
+        HomePreferenceItem("navidrome", stringResource(R.string.remote_source_navidrome), stringResource(R.string.remote_source_navidrome_summary)),
+        HomePreferenceItem("emby", stringResource(R.string.remote_source_emby), stringResource(R.string.remote_source_emby_summary)),
+        HomePreferenceItem("webdav", "WebDAV", stringResource(R.string.home_connect_cloud_music))
     )
     var showHomeDisplayPage by remember { mutableStateOf(false) }
     val contentScrollState = rememberScrollState()
@@ -134,6 +142,9 @@ fun SettingsDetailScreen(
                     tileItems = homeLibraryTileItems,
                     tileOrder = homeLibraryTileOrder,
                     hiddenTiles = homeHiddenLibraryTiles,
+                    onlineItems = homeOnlineTileItems,
+                    onlineOrder = homeOnlineTileOrder,
+                    hiddenOnlineTiles = homeHiddenOnlineTiles,
                     tilePinButtonsVisible = homeTilePinButtonsVisible,
                     onHiddenSectionsChange = { value ->
                         scope.launch { settingsManager.setHomeHiddenSections(value) }
@@ -141,11 +152,17 @@ fun SettingsDetailScreen(
                     onHiddenTilesChange = { value ->
                         scope.launch { settingsManager.setHomeHiddenLibraryTiles(value) }
                     },
+                    onHiddenOnlineTilesChange = { value ->
+                        scope.launch { settingsManager.setHomeHiddenOnlineTiles(value) }
+                    },
                     onSectionOrderChange = { value ->
                         scope.launch { settingsManager.setHomeSectionOrder(value) }
                     },
                     onTileOrderChange = { value ->
                         scope.launch { settingsManager.setHomeLibraryTileOrder(value) }
+                    },
+                    onOnlineOrderChange = { value ->
+                        scope.launch { settingsManager.setHomeOnlineTileOrder(value) }
                     },
                     onTilePinButtonsVisibleChange = { value ->
                         scope.launch { settingsManager.setHomeTilePinButtonsVisible(value) }

@@ -11,18 +11,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.sqrt
 
 @Composable
@@ -35,13 +33,11 @@ internal fun AudioVisualizer(
     modifier: Modifier = Modifier
 ) {
     if (!enabled) return
-    var fftData by remember { mutableStateOf<ByteArray?>(null) }
     var levels by remember { mutableStateOf<List<Float>>(emptyList()) }
     var visualizerFailed by remember { mutableStateOf(false) }
     val playingState by rememberUpdatedState(isPlaying)
 
     LaunchedEffect(enabled, audioSessionId) {
-        fftData = null
         levels = emptyList()
         visualizerFailed = false
         if (!enabled || audioSessionId <= 0) return@LaunchedEffect
@@ -55,18 +51,21 @@ internal fun AudioVisualizer(
 
         Log.d("PlayerScreenPerf", "visualizer start")
         val buffer = ByteArray(visualizer.captureSize)
+        var smoothedLevels = emptyList<Float>()
         try {
             while (isActive) {
                 if (playingState) {
                     if (visualizer.getFft(buffer) == Visualizer.SUCCESS) {
-                        fftData = buffer.copyOf()
+                        smoothedLevels = mapFftToLogBars(buffer, smoothedLevels, barCount = 64)
+                        levels = smoothedLevels
                     }
                 } else {
-                    fftData = null
+                    smoothedLevels = emptyList()
+                    levels = emptyList()
                     delay(120L)
                     continue
                 }
-                delay(66L)
+                delay(50L)
             }
         } finally {
             Log.d("PlayerScreenPerf", "visualizer stop")
@@ -75,49 +74,70 @@ internal fun AudioVisualizer(
         }
     }
 
-    LaunchedEffect(fftData, enabled, visualizerFailed) {
-        val fft = fftData
-        levels = if (enabled && !visualizerFailed && fft != null && fft.size > 8) {
-            mapFftToLogBars(fft, levels, barCount = 84)
-        } else {
-            emptyList()
-        }
-    }
-
     Canvas(modifier = modifier.graphicsLayer { alpha = if (isPlaying) 1f else 0.42f }) {
-        val barCount = 84
-        val horizontalPadding = size.width * 0.065f
-        val usableWidth = (size.width - horizontalPadding * 2f).coerceAtLeast(1f)
-        val gap = usableWidth / barCount
-        val barWidth = (gap * 0.34f).coerceIn(2.dp.toPx(), 3.8.dp.toPx())
-        val minHeight = 2.5.dp.toPx()
-        val visualHeight = min(size.height * 0.34f, 18.dp.toPx())
-        val centerY = size.height - 11.dp.toPx()
-        val glowWidth = (barWidth * 2.7f).coerceAtLeast(5.dp.toPx())
-        val halfCount = (barCount - 1) / 2f
-        for (index in 0 until barCount) {
-            val x = horizontalPadding + gap * index + gap / 2f
-            val normalized = (levels.getOrNull(index) ?: 0.06f).coerceIn(0.04f, 1f)
-            val distance = abs(index - halfCount) / halfCount
-            val edgeFade = (1f - distance * distance * 0.48f).coerceIn(0.48f, 1f)
-            val height = (minHeight + visualHeight * normalized).coerceAtMost(visualHeight + minHeight)
-            val top = centerY - height / 2f
-            val alpha = (0.18f + normalized * 0.54f) * edgeFade
-
-            drawRoundRect(
-                color = accent.copy(alpha = alpha * 0.18f),
-                topLeft = Offset(x - glowWidth / 2f, top - 1.5.dp.toPx()),
-                size = Size(glowWidth, height + 3.dp.toPx()),
-                cornerRadius = CornerRadius(glowWidth, glowWidth)
-            )
-            drawRoundRect(
-                color = accent.copy(alpha = alpha),
-                topLeft = Offset(x - barWidth / 2f, top),
-                size = Size(barWidth, height),
-                cornerRadius = CornerRadius(barWidth, barWidth)
-            )
-        }
+        val barCount = 64
+        drawBetterLyricsSpectrumCurve(
+            levels = List(barCount) { index -> levels.getOrNull(index) ?: 0.04f },
+            accent = accent
+        )
     }
+}
+
+private fun DrawScope.drawBetterLyricsSpectrumCurve(
+    levels: List<Float>,
+    accent: Color
+) {
+    if (levels.size < 2 || size.width <= 0f || size.height <= 0f) return
+
+    fun spectrumPath(heightScale: Float): Path {
+        val path = Path()
+        val bottom = size.height
+        val visualHeight = size.height * heightScale
+        val points = levels.mapIndexed { index, raw ->
+            val x = size.width * index.toFloat() / (levels.lastIndex).toFloat()
+            val shaped = raw.coerceIn(0f, 1f)
+            val y = bottom - visualHeight * shaped
+            Offset(x, y)
+        }
+
+        path.moveTo(0f, bottom)
+        path.lineTo(points.first().x, points.first().y)
+        for (index in 0 until points.lastIndex) {
+            val p0 = points[(index - 1).coerceAtLeast(0)]
+            val p1 = points[index]
+            val p2 = points[index + 1]
+            val p3 = points[(index + 2).coerceAtMost(points.lastIndex)]
+            val cp1 = p1 + (p2 - p0) * 0.1666f
+            val cp2 = p2 - (p3 - p1) * 0.1666f
+            path.cubicTo(cp1.x, cp1.y, cp2.x, cp2.y, p2.x, p2.y)
+        }
+        path.lineTo(size.width, bottom)
+        path.close()
+        return path
+    }
+
+    val glowPath = spectrumPath(0.82f)
+    val mainPath = spectrumPath(0.68f)
+    val glowBrush = Brush.verticalGradient(
+        0f to Color.Transparent,
+        0.52f to accent.copy(alpha = 0.10f),
+        1f to accent.copy(alpha = 0.28f)
+    )
+    val mainBrush = Brush.verticalGradient(
+        0f to Color.Transparent,
+        0.58f to accent.copy(alpha = 0.22f),
+        1f to accent.copy(alpha = 0.58f)
+    )
+
+    drawPath(glowPath, glowBrush)
+    drawPath(mainPath, mainBrush)
+    drawPath(
+        path = spectrumPath(0.44f),
+        brush = Brush.verticalGradient(
+            0f to Color.Transparent,
+            1f to Color.White.copy(alpha = 0.08f)
+        )
+    )
 }
 
 private fun mapFftToLogBars(

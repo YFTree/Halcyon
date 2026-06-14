@@ -38,8 +38,8 @@ internal fun PlayerFlowBackground(
             initialValue = 0f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 46_000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
+                animation = tween(durationMillis = 92_000, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
             ),
             label = "player_flow_background_drift"
         )
@@ -147,7 +147,7 @@ internal fun NonImmersiveAlbumFlowBackground(
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 28_000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            repeatMode = RepeatMode.Reverse
         ),
         label = "non_immersive_album_flow_drift"
     )

@@ -73,8 +73,13 @@ class SettingsManager(private val context: Context) {
         val KEY_DESKTOP_LYRIC_ENABLED = booleanPreferencesKey("desktop_lyric_enabled")
         val KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED = booleanPreferencesKey("desktop_lyric_hide_when_paused")
         val KEY_DESKTOP_LYRIC_STATUS_BAR_MODE = booleanPreferencesKey("desktop_lyric_status_bar_mode")
+        val KEY_DESKTOP_LYRIC_WIDTH = intPreferencesKey("desktop_lyric_width")
         val KEY_DESKTOP_LYRIC_STATUS_BAR_TOP_OFFSET = intPreferencesKey("desktop_lyric_status_bar_top_offset")
         val KEY_DESKTOP_LYRIC_STATUS_BAR_POSITION = intPreferencesKey("desktop_lyric_status_bar_position")
+        val KEY_DESKTOP_LYRIC_STATUS_BAR_WIDTH = intPreferencesKey("desktop_lyric_status_bar_width")
+        val KEY_DESKTOP_LYRIC_STATUS_BAR_X_OFFSET = intPreferencesKey("desktop_lyric_status_bar_x_offset")
+        val KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN = intPreferencesKey("desktop_lyric_status_bar_text_align")
+        val KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN = intPreferencesKey("desktop_lyric_status_bar_vertical_align")
         val KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY = intPreferencesKey("desktop_lyric_status_bar_secondary")
         val KEY_DESKTOP_LYRIC_LOCKED = booleanPreferencesKey("desktop_lyric_locked")
         val KEY_DESKTOP_LYRIC_FONT_SCALE = intPreferencesKey("desktop_lyric_font_scale")
@@ -216,55 +221,14 @@ class SettingsManager(private val context: Context) {
         val KEY_HOME_HIDDEN_SECTIONS = stringPreferencesKey("home_hidden_sections")
         val KEY_HOME_LIBRARY_TILE_ORDER = stringPreferencesKey("home_library_tile_order")
         val KEY_HOME_HIDDEN_LIBRARY_TILES = stringPreferencesKey("home_hidden_library_tiles")
+        val KEY_HOME_ONLINE_TILE_ORDER = stringPreferencesKey("home_online_tile_order")
+        val KEY_HOME_HIDDEN_ONLINE_TILES = stringPreferencesKey("home_hidden_online_tiles")
         val KEY_HOME_TILE_PIN_BUTTONS_VISIBLE = booleanPreferencesKey("home_tile_pin_buttons_visible")
         val KEY_NOTIFICATION_PERMISSION_PROMPT_HANDLED = booleanPreferencesKey("notification_permission_prompt_handled")
 
         val KEY_BLUETOOTH_LYRIC_ENABLED = booleanPreferencesKey("bluetooth_lyric_enabled")
         val KEY_BLUETOOTH_LYRIC_TRANSLATION = booleanPreferencesKey("bluetooth_lyric_translation")
         val KEY_BLUETOOTH_LYRIC_PRONUNCIATION = booleanPreferencesKey("bluetooth_lyric_pronunciation")
-
-        val KEY_APP_ICON = intPreferencesKey("app_icon_variant")
-
-        const val APP_ICON_DEFAULT = 0
-        const val APP_ICON_BLUE = 1
-        const val APP_ICON_DARK = 2
-        const val APP_ICON_BLUEPURPLE = 3
-        const val APP_ICON_TEAL = 4
-        const val APP_ICON_ORANGE = 5
-        const val APP_ICON_GRAY = 6
-
-        private val LAUNCHER_ALIASES = listOf(
-            APP_ICON_DEFAULT to ".LauncherDefault",
-            APP_ICON_BLUE to ".LauncherBlue",
-            APP_ICON_DARK to ".LauncherDark",
-            APP_ICON_BLUEPURPLE to ".LauncherBluePurple",
-            APP_ICON_TEAL to ".LauncherTeal",
-            APP_ICON_ORANGE to ".LauncherOrange",
-            APP_ICON_GRAY to ".LauncherGray"
-        )
-
-        fun applyIconVariant(context: Context, variant: Int) {
-            val pm = context.packageManager
-            val packageName = context.packageName
-            LAUNCHER_ALIASES.forEach { (id, aliasName) ->
-                val componentName = android.content.ComponentName(packageName, aliasName)
-                val shouldBeEnabled = id == variant
-                val currentState = pm.getComponentEnabledSetting(componentName)
-                val isCurrentlyEnabled = currentState ==
-                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                if (isCurrentlyEnabled != shouldBeEnabled) {
-                    pm.setComponentEnabledSetting(
-                        componentName,
-                        if (shouldBeEnabled) {
-                            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                        } else {
-                            android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                        },
-                        android.content.pm.PackageManager.DONT_KILL_APP
-                    )
-                }
-            }
-        }
 
         const val SHUFFLE_MODE_PSEUDO = 0
         const val SHUFFLE_MODE_TRUE_RANDOM = 1
@@ -319,6 +283,12 @@ class SettingsManager(private val context: Context) {
         const val DESKTOP_LYRIC_STATUS_POSITION_LEFT = 0
         const val DESKTOP_LYRIC_STATUS_POSITION_CENTER = 1
         const val DESKTOP_LYRIC_STATUS_POSITION_RIGHT = 2
+        const val DESKTOP_LYRIC_STATUS_ALIGN_LEFT = 0
+        const val DESKTOP_LYRIC_STATUS_ALIGN_CENTER = 1
+        const val DESKTOP_LYRIC_STATUS_ALIGN_RIGHT = 2
+        const val DESKTOP_LYRIC_STATUS_VERTICAL_TOP = 0
+        const val DESKTOP_LYRIC_STATUS_VERTICAL_CENTER = 1
+        const val DESKTOP_LYRIC_STATUS_VERTICAL_BOTTOM = 2
         const val DESKTOP_LYRIC_STATUS_SECONDARY_OFF = 0
         const val DESKTOP_LYRIC_STATUS_SECONDARY_TRANSLATION = 1
         const val DESKTOP_LYRIC_STATUS_SECONDARY_PRONUNCIATION = 2
@@ -351,6 +321,7 @@ class SettingsManager(private val context: Context) {
             context.getString(DEFAULT_SHORTCUT_FOLDER_LABEL_RES)
         const val DEFAULT_HOME_SECTION_ORDER = "library,online,recent"
         const val DEFAULT_HOME_LIBRARY_TILE_ORDER = "artist,album,folder,folder_tree,playlist,analytics,genre,year,composer,lyricist"
+        const val DEFAULT_HOME_ONLINE_TILE_ORDER = "lx,navidrome,emby,webdav"
 
         val LYRIC_SOURCE_PRIORITY_IDS = listOf(
             LYRIC_SOURCE_EMBEDDED_TTML,
@@ -441,10 +412,20 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED] ?: true }
     val desktopLyricStatusBarMode: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MODE] ?: false }
+    val desktopLyricWidth: Flow<Int> =
+        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_WIDTH] ?: 72).coerceIn(40, 100) }
     val desktopLyricStatusBarTopOffset: Flow<Int> =
         context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_TOP_OFFSET] ?: 16).coerceIn(0, 120) }
     val desktopLyricStatusBarPosition: Flow<Int> =
         context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_POSITION] ?: DESKTOP_LYRIC_STATUS_POSITION_CENTER).coerceIn(0, 2) }
+    val desktopLyricStatusBarWidth: Flow<Int> =
+        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_WIDTH] ?: 72).coerceIn(40, 100) }
+    val desktopLyricStatusBarXOffset: Flow<Int> =
+        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_X_OFFSET] ?: 0).coerceIn(-640, 640) }
+    val desktopLyricStatusBarTextAlign: Flow<Int> =
+        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN] ?: DESKTOP_LYRIC_STATUS_ALIGN_LEFT).coerceIn(0, 2) }
+    val desktopLyricStatusBarVerticalAlign: Flow<Int> =
+        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN] ?: DESKTOP_LYRIC_STATUS_VERTICAL_TOP).coerceIn(0, 2) }
     val desktopLyricStatusBarSecondary: Flow<Int> =
         context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY] ?: DESKTOP_LYRIC_STATUS_SECONDARY_OFF).coerceIn(0, 2) }
     val desktopLyricLocked: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_LOCKED] ?: false }
@@ -615,8 +596,6 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_SHORTCUT_LIBRARY_LABEL] ?: DEFAULT_SHORTCUT_LIBRARY_LABEL }
     val shortcutPlaylistsLabel: Flow<String> =
         context.dataStore.data.map { it[KEY_SHORTCUT_PLAYLISTS_LABEL] ?: DEFAULT_SHORTCUT_PLAYLISTS_LABEL }
-    val appIconVariant: Flow<Int> =
-        context.dataStore.data.map { it[KEY_APP_ICON] ?: APP_ICON_DEFAULT }
     val shortcutFolderLabel: Flow<String> =
         context.dataStore.data.map { it[KEY_SHORTCUT_FOLDER_LABEL] ?: DEFAULT_SHORTCUT_FOLDER_LABEL }
     val webDavUrl: Flow<String> = context.dataStore.data.map { it[KEY_WEBDAV_URL] ?: "" }
@@ -728,6 +707,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_HOME_LIBRARY_TILE_ORDER] ?: DEFAULT_HOME_LIBRARY_TILE_ORDER }
     val homeHiddenLibraryTiles: Flow<String> =
         context.dataStore.data.map { it[KEY_HOME_HIDDEN_LIBRARY_TILES] ?: "" }
+    val homeOnlineTileOrder: Flow<String> =
+        context.dataStore.data.map { it[KEY_HOME_ONLINE_TILE_ORDER] ?: DEFAULT_HOME_ONLINE_TILE_ORDER }
+    val homeHiddenOnlineTiles: Flow<String> =
+        context.dataStore.data.map { it[KEY_HOME_HIDDEN_ONLINE_TILES] ?: "" }
     val homeTilePinButtonsVisible: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_HOME_TILE_PIN_BUTTONS_VISIBLE] ?: false }
     fun metadataCategorySortIndex(type: String): Flow<Int> =
@@ -842,12 +825,32 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MODE] = enabled }
     }
 
+    suspend fun setDesktopLyricWidth(widthPercent: Int) {
+        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_WIDTH] = widthPercent.coerceIn(40, 100) }
+    }
+
     suspend fun setDesktopLyricStatusBarTopOffset(offsetDp: Int) {
         context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_TOP_OFFSET] = offsetDp.coerceIn(0, 120) }
     }
 
     suspend fun setDesktopLyricStatusBarPosition(position: Int) {
         context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_POSITION] = position.coerceIn(0, 2) }
+    }
+
+    suspend fun setDesktopLyricStatusBarWidth(widthPercent: Int) {
+        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_WIDTH] = widthPercent.coerceIn(40, 100) }
+    }
+
+    suspend fun setDesktopLyricStatusBarXOffset(offsetDp: Int) {
+        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_X_OFFSET] = offsetDp.coerceIn(-640, 640) }
+    }
+
+    suspend fun setDesktopLyricStatusBarTextAlign(align: Int) {
+        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN] = align.coerceIn(0, 2) }
+    }
+
+    suspend fun setDesktopLyricStatusBarVerticalAlign(align: Int) {
+        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN] = align.coerceIn(0, 2) }
     }
 
     suspend fun setDesktopLyricStatusBarSecondary(mode: Int) {
@@ -1254,12 +1257,6 @@ class SettingsManager(private val context: Context) {
         }
     }
 
-    suspend fun setAppIconVariant(variant: Int) {
-        val clamped = variant.coerceIn(APP_ICON_DEFAULT, APP_ICON_GRAY)
-        context.dataStore.edit { it[KEY_APP_ICON] = clamped }
-        applyIconVariant(context, clamped)
-    }
-
     suspend fun setWebDavConfig(url: String, username: String, password: String) {
         context.dataStore.edit {
             it[KEY_WEBDAV_URL] = url.trim()
@@ -1572,6 +1569,14 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_HOME_HIDDEN_LIBRARY_TILES] = hidden.trim() }
     }
 
+    suspend fun setHomeOnlineTileOrder(order: String) {
+        context.dataStore.edit { it[KEY_HOME_ONLINE_TILE_ORDER] = order.trim() }
+    }
+
+    suspend fun setHomeHiddenOnlineTiles(hidden: String) {
+        context.dataStore.edit { it[KEY_HOME_HIDDEN_ONLINE_TILES] = hidden.trim() }
+    }
+
     suspend fun setHomeTilePinButtonsVisible(visible: Boolean) {
         context.dataStore.edit { it[KEY_HOME_TILE_PIN_BUTTONS_VISIBLE] = visible }
     }
@@ -1735,6 +1740,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_STARTUP_PLAY_MODE)
             setInt(KEY_LYRIC_SOURCE_MODE)
             setInt(KEY_DESKTOP_LYRIC_FONT_SCALE)
+            setInt(KEY_DESKTOP_LYRIC_WIDTH)
             setInt(KEY_DESKTOP_LYRIC_TRANSLATION_SCALE)
             setInt(KEY_DESKTOP_LYRIC_OPACITY)
             setInt(KEY_DESKTOP_LYRIC_TEXT_COLOR)
@@ -1756,6 +1762,10 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_MINI_PLAYER_LYRIC_SECONDARY)
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_TOP_OFFSET)
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_POSITION)
+            setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_WIDTH)
+            setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_X_OFFSET)
+            setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN)
+            setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN)
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY)
             setInt(KEY_SLEEP_TIMER_CUSTOM_MINUTES)
             setInt(KEY_APP_WALLPAPER_OPACITY)
@@ -1764,6 +1774,8 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_PLAYER_BACKGROUND_OPACITY)
             setInt(KEY_PLAYER_BACKGROUND_DIM)
             setInt(KEY_HOME_CARD_OPACITY)
+            setString(KEY_HOME_ONLINE_TILE_ORDER)
+            setString(KEY_HOME_HIDDEN_ONLINE_TILES)
             setInt(KEY_PLAYER_BEAUTIFUL_LYRICS_SPEED)
             setInt(KEY_PLAYER_BEAUTIFUL_LYRICS_BLUR)
             setInt(KEY_PLAYER_BEAUTIFUL_LYRICS_BRIGHTNESS)

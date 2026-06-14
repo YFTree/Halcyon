@@ -143,6 +143,7 @@ class RawsLyricView @JvmOverloads constructor(
     private var autoScrollResumeEnabled = true
     private var userScrollEnabled = true
     private var centerUnalignedLinesEnabled = false
+    private var forcedTextAlignment = -1 // -1 = lyric metadata, 0 = left, 1 = center, 2 = right
     private var maxMainLines = 0 // 0 = unlimited
     private var placeholderFormat = PlaceholderFormat.NAME_ARTIST
     private var currentStyleConfig: RichLyricLineConfig? = null
@@ -274,6 +275,14 @@ class RawsLyricView @JvmOverloads constructor(
     fun setCenterUnalignedLinesEnabled(enabled: Boolean) {
         if (centerUnalignedLinesEnabled == enabled) return
         centerUnalignedLinesEnabled = enabled
+        rebuildEntries()
+        invalidate()
+    }
+
+    fun setForcedTextAlignment(alignment: Int) {
+        val safeAlignment = alignment.coerceIn(-1, 2)
+        if (forcedTextAlignment == safeAlignment) return
+        forcedTextAlignment = safeAlignment
         rebuildEntries()
         invalidate()
     }
@@ -640,8 +649,8 @@ class RawsLyricView @JvmOverloads constructor(
                     secondaryWords = line.secondaryWords,
                     secondaryStart = secondaryStart,
                     secondaryEnd = secondaryEnd,
-                    alignedRight = line.isAlignedRight,
-                    centered = centerUnalignedLinesEnabled && !line.isAlignedRight,
+                    alignedRight = forcedTextAlignment == 2 || (forcedTextAlignment < 0 && line.isAlignedRight),
+                    centered = forcedTextAlignment == 1 || (forcedTextAlignment < 0 && centerUnalignedLinesEnabled && !line.isAlignedRight),
                     begin = line.begin,
                     end = line.end
                 )
@@ -831,7 +840,7 @@ class RawsLyricView @JvmOverloads constructor(
     private fun scrollToCurrentLine(animated: Boolean) {
         if (currentIndex < 0 || currentIndex >= entries.size) return
         val entry = entries[currentIndex]
-        val anchorY = (height / 2f + anchorOffsetPx).coerceIn(height * 0.32f, height * 0.62f)
+        val anchorY = (height / 2f + anchorOffsetPx).coerceIn(height * 0.08f, height * 0.92f)
         val target = (entry.yTop + entry.totalH / 2f - anchorY).coerceIn(0f, maxScrollY)
         if (animated) {
             animateScrollTo(target)
@@ -1747,7 +1756,13 @@ class RawsLyricView @JvmOverloads constructor(
         }.coerceIn(0f, 1f)
         if (edgeFade <= 0f) return
 
-        val glowColor = Color.argb((82 * edgeFade).toInt().coerceIn(0, 110), 255, 255, 255)
+        val baseColor = sourcePaint.color
+        val glowColor = Color.argb(
+            (82 * edgeFade).toInt().coerceIn(0, 110),
+            Color.red(baseColor),
+            Color.green(baseColor),
+            Color.blue(baseColor)
+        )
         canvas.save()
         canvas.clipRect(x - 8f * density, 0f, x + width + 8f * density, height.toFloat())
         sustainPaint.set(sourcePaint)

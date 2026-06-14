@@ -232,26 +232,11 @@ internal fun SettingsAppearanceSection() {
     )
     val dynamicCoverPermissionLauncher = rememberDynamicCoverPermissionLauncher(settingsManager)
     var showHomeCardColorPicker by remember { mutableStateOf(false) }
-    var showAppIconPicker by remember { mutableStateOf(false) }
-    val appIconVariant by settingsManager.appIconVariant.collectAsState(initial = SettingsManager.APP_ICON_DEFAULT)
 
     SmallTitle(text = stringResource(R.string.settings_appearance))
 
     SettingsCardGroup {
         Column {
-            ArrowPreference(
-                title = stringResource(R.string.settings_app_icon),
-                summary = when (appIconVariant) {
-                    SettingsManager.APP_ICON_BLUE -> stringResource(R.string.settings_app_icon_blue)
-                    SettingsManager.APP_ICON_DARK -> stringResource(R.string.settings_app_icon_dark)
-                    SettingsManager.APP_ICON_BLUEPURPLE -> stringResource(R.string.settings_app_icon_bluepurple)
-                    SettingsManager.APP_ICON_TEAL -> stringResource(R.string.settings_app_icon_teal)
-                    SettingsManager.APP_ICON_ORANGE -> stringResource(R.string.settings_app_icon_orange)
-                    SettingsManager.APP_ICON_GRAY -> stringResource(R.string.settings_app_icon_gray)
-                    else -> stringResource(R.string.settings_app_icon_default)
-                },
-                onClick = { showAppIconPicker = true }
-            )
             WindowSpinnerPreference(
                 title = stringResource(R.string.settings_theme_mode),
                 summary = stringResource(R.string.settings_theme_mode_summary),
@@ -478,7 +463,7 @@ internal fun SettingsAppearanceSection() {
                 summary = stringResource(R.string.settings_beautiful_lyrics_speed_summary),
                 value = beautifulLyricsSpeed,
                 valueRange = 5..60,
-                valueText = beautifulLyricsSpeed.toString(),
+                valueText = beautifulLyricsSpeed.formatBeautifulLyricsSpeed(),
                 enabled = beautifulLyricsBackground,
                 onValueChange = { scope.launch { settingsManager.setPlayerBeautifulLyricsSpeed(it) } }
             )
@@ -672,100 +657,12 @@ internal fun SettingsAppearanceSection() {
         }
     }
 
-    EllaMiuixBottomSheet(
-        show = showAppIconPicker,
-        title = stringResource(R.string.settings_app_icon),
-        onDismissRequest = { showAppIconPicker = false }
-    ) {
-        val iconOptions = listOf(
-            SettingsManager.APP_ICON_DEFAULT to stringResource(R.string.settings_app_icon_default),
-            SettingsManager.APP_ICON_BLUE to stringResource(R.string.settings_app_icon_blue),
-            SettingsManager.APP_ICON_DARK to stringResource(R.string.settings_app_icon_dark),
-            SettingsManager.APP_ICON_BLUEPURPLE to stringResource(R.string.settings_app_icon_bluepurple),
-            SettingsManager.APP_ICON_TEAL to stringResource(R.string.settings_app_icon_teal),
-            SettingsManager.APP_ICON_ORANGE to stringResource(R.string.settings_app_icon_orange),
-            SettingsManager.APP_ICON_GRAY to stringResource(R.string.settings_app_icon_gray)
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp)
-        ) {
-            iconOptions.forEach { (variant, label) ->
-                val isSelected = appIconVariant == variant
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (isSelected) Color(0xFF2979FF).copy(alpha = 0.15f)
-                            else Color.Transparent
-                        )
-                        .clickable {
-                            showAppIconPicker = false
-                            scope.launch { settingsManager.setAppIconVariant(variant) }
-                        }
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                when (variant) {
-                                    SettingsManager.APP_ICON_BLUE -> Color(0xFF1976D2)
-                                    SettingsManager.APP_ICON_DARK -> Color(0xFF212121)
-                                    SettingsManager.APP_ICON_BLUEPURPLE -> Color(0xFF5C6BC0)
-                                    SettingsManager.APP_ICON_TEAL -> Color(0xFF00897B)
-                                    SettingsManager.APP_ICON_ORANGE -> Color(0xFFF4511E)
-                                    SettingsManager.APP_ICON_GRAY -> Color(0xFF424242)
-                                    else -> Color(0xFF0D63F3)
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "\u266B",
-                            color = Color.White,
-                            fontSize = 18.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        text = label,
-                        color = LocalPlayerContentColor.current,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    if (isSelected) {
-                        Box(
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF2979FF)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "\u2713",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.settings_app_icon_restart_hint),
-                color = LocalPlayerContentColor.current.copy(alpha = 0.5f),
-                fontSize = 13.sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-    }
+}
+
+private fun Int.formatBeautifulLyricsSpeed(): String {
+    val whole = this / 10
+    val decimal = this % 10
+    return if (decimal == 0) "${whole}x" else "$whole.${decimal}x"
 }
 
 private fun String.parseSettingsColorOrNull(): Color? {

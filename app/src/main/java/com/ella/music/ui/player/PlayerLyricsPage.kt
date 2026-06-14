@@ -87,8 +87,6 @@ internal fun LyricsPlayerPage(
         lyrics.activeTtmlAgentLabel(currentPosition)
     }
 
-    val lyricBackgroundMotion = 0.42f
-
     val swipeDismissModifier = if (enableSwipeDismiss) {
         Modifier.pointerInput(onDismissLyrics) {
             detectDragGestures(
@@ -114,31 +112,21 @@ internal fun LyricsPlayerPage(
 
     Box(modifier = modifier.then(swipeDismissModifier)) {
         val useCustomPlayerBackground = playerBackgroundEnabled && playerBackgroundUri.isNotBlank() && !useBlurBackground
-        if (useCustomPlayerBackground) {
-            PlayerCustomBackground(
-                uri = playerBackgroundUri,
-                imageAlpha = playerBackgroundOpacity,
-                dimAlpha = playerBackgroundDim,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else if (beautifulLyricsBackground) {
-            BeautifulLyricsDynamicBackground(
-                palette = palette,
-                coverBitmap = embeddedCover ?: paletteBitmap,
-                positionMs = currentPositionMs,
-                isPlaying = isPlaying,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else if (useBlurBackground) {
-            PlayerBlurBackground(
-                song = song,
-                embeddedCover = embeddedCover,
-                palette = palette,
-                motion = lyricBackgroundMotion,
-                isPlaying = isPlaying,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+        SharedPlayerPageBackground(
+            song = song,
+            embeddedCover = embeddedCover,
+            paletteBitmap = paletteBitmap,
+            palette = palette,
+            currentPositionMs = currentPositionMs,
+            isPlaying = isPlaying,
+            playerBackgroundEnabled = playerBackgroundEnabled,
+            playerBackgroundUri = playerBackgroundUri,
+            playerBackgroundOpacity = playerBackgroundOpacity,
+            playerBackgroundDim = playerBackgroundDim,
+            beautifulLyricsBackground = beautifulLyricsBackground,
+            useBlurBackground = useBlurBackground,
+            modifier = Modifier.fillMaxSize()
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()

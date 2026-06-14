@@ -21,14 +21,18 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -42,6 +46,7 @@ import com.ella.music.R
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Text
 
@@ -67,6 +72,7 @@ internal fun LandscapeCoverPlaybackOverlay(
     fontPath: String,
     fontWeight: FontWeight,
     fontScale: Float,
+    showTotalDuration: Boolean,
     queueExpanded: Boolean,
     playlist: List<Song>,
     audioSessionId: Int,
@@ -106,26 +112,37 @@ internal fun LandscapeCoverPlaybackOverlay(
     val swipeThresholdPx = with(LocalDensity.current) { 92.dp.toPx() }
     val swipeScope = rememberCoroutineScope()
     val dragOffset = remember { Animatable(0f) }
+    var coverControlsVisible by remember(song?.id) { mutableStateOf(false) }
+    var coverControlsInteraction by remember(song?.id) { mutableStateOf(0) }
+    LaunchedEffect(coverControlsVisible, coverControlsInteraction) {
+        if (coverControlsVisible) {
+            delay(2_000L)
+            coverControlsVisible = false
+        }
+    }
+    suspend fun PointerInputScope.detectCoverSwipeToSkip() {
+        detectHorizontalDragGestures(
+            onDragCancel = { swipeScope.launch { dragOffset.animateTo(0f) } },
+            onDragEnd = {
+                val travel = dragOffset.value
+                swipeScope.launch { dragOffset.animateTo(0f) }
+                when {
+                    travel > swipeThresholdPx -> onSwipePrevious()
+                    travel < -swipeThresholdPx -> onNext()
+                }
+            },
+            onHorizontalDrag = { change, dragAmount ->
+                change.consume()
+                swipeScope.launch { dragOffset.snapTo(dragOffset.value + dragAmount) }
+            }
+        )
+    }
 
     Box(
         modifier = modifier
             .background(palette.middle)
             .pointerInput(onSwipePrevious, onNext) {
-                detectHorizontalDragGestures(
-                    onDragCancel = { swipeScope.launch { dragOffset.animateTo(0f) } },
-                    onDragEnd = {
-                        val travel = dragOffset.value
-                        swipeScope.launch { dragOffset.animateTo(0f) }
-                        when {
-                            travel > swipeThresholdPx -> onSwipePrevious()
-                            travel < -swipeThresholdPx -> onNext()
-                        }
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        swipeScope.launch { dragOffset.snapTo(dragOffset.value + dragAmount) }
-                    }
-                )
+                detectCoverSwipeToSkip()
             }
     ) {
         LandscapeCoverModeBackground(
@@ -174,7 +191,10 @@ internal fun LandscapeCoverPlaybackOverlay(
                     .padding(top = 18.dp)
                     // Follow the finger (damped) so swiping the cover wall feels direct; the
                     // offset springs back to 0 on release while the song change re-centers.
-                    .graphicsLayer { translationX = dragOffset.value * 0.5f },
+                    .graphicsLayer { translationX = dragOffset.value * 0.5f }
+                    .pointerInput(onSwipePrevious, onNext) {
+                        detectCoverSwipeToSkip()
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 LandscapeCoverStack(
@@ -184,6 +204,41 @@ internal fun LandscapeCoverPlaybackOverlay(
                     isPlaying = isPlaying,
                     coverItems = coverItems,
                     onDynamicCoverFailed = onDynamicCoverFailed,
+                    onCenterCoverClick = {
+                        coverControlsVisible = true
+                        coverControlsInteraction++
+                    },
+                    centerOverlay = if (coverControlsVisible) {
+                        {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.18f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(74.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.34f))
+                                        .playerNoIndicationClick {
+                                            coverControlsVisible = true
+                                            coverControlsInteraction++
+                                            onPlayPause()
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CenteredPlayPauseGlyph(
+                                        isPlaying = isPlaying,
+                                        tint = Color.White.copy(alpha = 0.96f),
+                                        modifier = Modifier.size(42.dp)
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        null
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }

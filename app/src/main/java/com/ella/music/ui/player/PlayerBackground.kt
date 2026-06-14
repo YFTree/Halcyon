@@ -1,5 +1,6 @@
 package com.ella.music.ui.player
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +44,59 @@ internal fun ImmersiveCoverBackground(
                         end = Offset.Infinite
                     )
                 )
+        )
+    }
+}
+
+@Composable
+internal fun SharedPlayerPageBackground(
+    song: com.ella.music.data.model.Song?,
+    embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
+    palette: PlayerPalette,
+    currentPositionMs: Long,
+    isPlaying: Boolean,
+    playerBackgroundEnabled: Boolean,
+    playerBackgroundUri: String,
+    playerBackgroundOpacity: Float,
+    playerBackgroundDim: Float,
+    beautifulLyricsBackground: Boolean,
+    useBlurBackground: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val useCustomPlayerBackground = playerBackgroundEnabled && playerBackgroundUri.isNotBlank() && !useBlurBackground
+    when {
+        useCustomPlayerBackground -> PlayerCustomBackground(
+            uri = playerBackgroundUri,
+            imageAlpha = playerBackgroundOpacity,
+            dimAlpha = playerBackgroundDim,
+            modifier = modifier
+        )
+        beautifulLyricsBackground -> BeautifulLyricsDynamicBackground(
+            palette = palette,
+            coverBitmap = embeddedCover ?: paletteBitmap,
+            positionMs = currentPositionMs,
+            isPlaying = isPlaying,
+            modifier = modifier
+        )
+        useBlurBackground -> PlayerBlurBackground(
+            song = song,
+            embeddedCover = embeddedCover,
+            palette = palette,
+            motion = 0.42f,
+            isPlaying = isPlaying,
+            modifier = modifier
+        )
+        else -> Box(
+            modifier = modifier.background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        palette.top,
+                        palette.middle,
+                        palette.bottom
+                    )
+                )
+            )
         )
     }
 }

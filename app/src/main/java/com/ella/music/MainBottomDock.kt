@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -341,6 +342,7 @@ private fun CompactBottomDock(
     onNavigateSearch: () -> Unit,
     onExpand: () -> Unit
 ) {
+    val showCompactLyrics = LocalConfiguration.current.smallestScreenWidthDp >= 600
     val isHomeSelected = currentTabRoute == Screen.Home.route
     val leftIcon = if (isHomeSelected) MiuixIcons.Regular.Music else MiuixIcons.Regular.Playlist
     val leftLabel = if (isHomeSelected) stringResource(R.string.tab_home) else stringResource(R.string.tab_library)
@@ -371,9 +373,9 @@ private fun CompactBottomDock(
             song = song,
             isPlaying = isPlaying,
             progress = progress,
-            lyricText = null,
-            lyricTranslation = null,
-            lyricProgress = 0f,
+            lyricText = if (showCompactLyrics) lyricText else null,
+            lyricTranslation = if (showCompactLyrics) lyricTranslation else null,
+            lyricProgress = if (showCompactLyrics) lyricProgress else 0f,
             coverRotationEnabled = coverRotationEnabled,
             albumArtUri = albumArtUri,
             loadCoverArt = loadCoverArt,

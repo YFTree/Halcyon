@@ -81,6 +81,8 @@ fun HomeScreen(
     val homeHiddenSections by settingsManager.homeHiddenSections.collectAsState(initial = "")
     val homeLibraryTileOrder by settingsManager.homeLibraryTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
     val homeHiddenLibraryTiles by settingsManager.homeHiddenLibraryTiles.collectAsState(initial = "")
+    val homeOnlineTileOrder by settingsManager.homeOnlineTileOrder.collectAsState(initial = SettingsManager.DEFAULT_HOME_ONLINE_TILE_ORDER)
+    val homeHiddenOnlineTiles by settingsManager.homeHiddenOnlineTiles.collectAsState(initial = "")
     val homeTilePinButtonsVisible by settingsManager.homeTilePinButtonsVisible.collectAsState(initial = false)
     val appWallpaperEnabled by settingsManager.appWallpaperEnabled.collectAsState(initial = false)
     val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
@@ -246,6 +248,10 @@ fun HomeScreen(
             val tileOrder = remember(homeLibraryTileOrder) {
                 homeLibraryTileOrder.csvIds(SettingsManager.DEFAULT_HOME_LIBRARY_TILE_ORDER)
             }
+            val hiddenOnlineTiles = remember(homeHiddenOnlineTiles) { homeHiddenOnlineTiles.csvIdSet() }
+            val onlineTileOrder = remember(homeOnlineTileOrder) {
+                homeOnlineTileOrder.csvIds(SettingsManager.DEFAULT_HOME_ONLINE_TILE_ORDER)
+            }
             val libraryTiles = remember(
                 context,
                 tileOrder,
@@ -273,6 +279,15 @@ fun HomeScreen(
                 )
                 tileOrder.mapNotNull { all[it] }.filterNot { it.id in hiddenTiles }
             }
+            val onlineTiles = remember(context, onlineTileOrder, hiddenOnlineTiles) {
+                val all = mapOf(
+                    "lx" to HomeTileSpec("lx", "LX Music", context.getString(R.string.home_import_api_source), Color(0xFF00A896), Screen.LxOnline.route, onNavigateToLxOnline),
+                    "navidrome" to HomeTileSpec("navidrome", "Navidrome", context.getString(R.string.remote_source_navidrome_summary), Color(0xFF5E60CE), Screen.NavidromeOnline.route, onNavigateToNavidrome),
+                    "emby" to HomeTileSpec("emby", "Emby", context.getString(R.string.remote_source_emby_summary), Color(0xFF118AB2), Screen.EmbyOnline.route, onNavigateToEmby),
+                    "webdav" to HomeTileSpec("webdav", "WebDAV", context.getString(R.string.home_connect_cloud_music), Color(0xFF5E60CE), Screen.WebDav.route, onNavigateToWebDav)
+                )
+                onlineTileOrder.mapNotNull { all[it] }.filterNot { it.id in hiddenOnlineTiles }
+            }
 
             sectionOrder.filterNot { it in hiddenSections }.forEach { section ->
                 when (section) {
@@ -284,18 +299,15 @@ fun HomeScreen(
                         cardColor = homeTileCardColor
                     )
                     "online" -> {
-                        SectionTitle(stringResource(R.string.home_online_music))
-                        HomeTileGrid(
-                            tiles = listOf(
-                                HomeTileSpec("lx", "LX Music", stringResource(R.string.home_import_api_source), Color(0xFF00A896), Screen.LxOnline.route, onNavigateToLxOnline),
-                                HomeTileSpec("navidrome", "Navidrome", stringResource(R.string.remote_source_navidrome_summary), Color(0xFF5E60CE), Screen.NavidromeOnline.route, onNavigateToNavidrome),
-                                HomeTileSpec("emby", "Emby", stringResource(R.string.remote_source_emby_summary), Color(0xFF118AB2), Screen.EmbyOnline.route, onNavigateToEmby),
-                                HomeTileSpec("webdav", "WebDAV", stringResource(R.string.home_connect_cloud_music), Color(0xFF5E60CE), Screen.WebDav.route, onNavigateToWebDav)
-                            ),
-                            context = context,
-                            showPinButtons = homeTilePinButtonsVisible,
-                            cardColor = homeTileCardColor
-                        )
+                        if (onlineTiles.isNotEmpty()) {
+                            SectionTitle(stringResource(R.string.home_online_music))
+                            HomeTileGrid(
+                                tiles = onlineTiles,
+                                context = context,
+                                showPinButtons = homeTilePinButtonsVisible,
+                                cardColor = homeTileCardColor
+                            )
+                        }
                     }
                     "recent" -> {
                         SectionTitle(stringResource(R.string.home_recent))

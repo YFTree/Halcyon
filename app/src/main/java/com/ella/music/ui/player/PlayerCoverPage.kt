@@ -178,13 +178,23 @@ internal fun CoverPlayerPage(
         val compactWindow = !useWidePlayer && (maxHeight < 720.dp || maxWidth < 340.dp)
         val effectiveMiniLyricLine = miniLyricLine.takeUnless { isSmallWindow }
         val showHiResLogo = hiResLogoEnabled && audioInfo?.isHiResLogoTrack() == true
+        val pagePalette = palette
         val showCustomPlayerBackground =
             playerBackgroundEnabled && playerBackgroundUri.isNotBlank() && (useWidePlayer || !immersiveAlbumCover)
-        if (showCustomPlayerBackground && !useWidePlayer) {
-            PlayerCustomBackground(
-                uri = playerBackgroundUri,
-                imageAlpha = playerBackgroundOpacity,
-                dimAlpha = playerBackgroundDim,
+        if (!useWidePlayer) {
+            SharedPlayerPageBackground(
+                song = song,
+                embeddedCover = embeddedCover,
+                paletteBitmap = paletteBitmap,
+                palette = pagePalette,
+                currentPositionMs = currentPosition,
+                isPlaying = isPlaying,
+                playerBackgroundEnabled = playerBackgroundEnabled,
+                playerBackgroundUri = playerBackgroundUri,
+                playerBackgroundOpacity = playerBackgroundOpacity,
+                playerBackgroundDim = playerBackgroundDim,
+                beautifulLyricsBackground = beautifulLyricsBackground,
+                useBlurBackground = immersiveAlbumCover,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -201,7 +211,7 @@ internal fun CoverPlayerPage(
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
                 audioInfo = audioInfo,
-                palette = palette,
+                palette = pagePalette,
                 flowEffectMode = flowEffectMode,
                 dynamicFlowEnabled = dynamicFlowEnabled,
                 customBackgroundUri = playerBackgroundUri.takeIf { showCustomPlayerBackground }.orEmpty(),
@@ -289,9 +299,9 @@ internal fun CoverPlayerPage(
                                     Brush.verticalGradient(
                                         colorStops = arrayOf(
                                             0.0f to Color.Transparent,
-                                            0.48f to palette.middle.copy(alpha = 0.42f),
-                                            0.78f to palette.middle.copy(alpha = 0.86f),
-                                            1.0f to palette.middle
+                                            0.48f to pagePalette.middle.copy(alpha = 0.42f),
+                                            0.78f to pagePalette.middle.copy(alpha = 0.86f),
+                                            1.0f to pagePalette.middle
                                         )
                                     )
                                 )
@@ -301,7 +311,7 @@ internal fun CoverPlayerPage(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            .background(playerContentSurfaceBrush(palette, flowEffectMode))
+                            .background(playerContentSurfaceBrush(pagePalette, flowEffectMode))
                             .windowInsetsPadding(WindowInsets.navigationBars)
                             .padding(horizontal = 28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -319,7 +329,7 @@ internal fun CoverPlayerPage(
                                 artistFontSize = 14.sp,
                                 artistAlpha = 0.54f,
                                 showArtistWithAnnotation = true,
-                                contentColor = palette.onBackground,
+                                contentColor = pagePalette.onBackground,
                                 onArtistClick = onArtist,
                                 modifier = Modifier
                                     .weight(1f)
@@ -350,7 +360,7 @@ internal fun CoverPlayerPage(
                                 fontWeight = fontWeight,
                                 fontScale = fontScale,
                                 compact = compactWindow,
-                                contentColor = palette.onBackground,
+                                contentColor = pagePalette.onBackground,
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -370,7 +380,7 @@ internal fun CoverPlayerPage(
                             duration = duration,
                             audioInfo = audioInfo,
                             bluetoothDeviceName = bluetoothDeviceName,
-                            palette = palette,
+                            palette = pagePalette,
                             allowTapSeek = playerTapSeekEnabled,
                             showTotalDuration = playerShowTotalDuration,
                             onSeek = onSeek
@@ -380,7 +390,7 @@ internal fun CoverPlayerPage(
                             isPlaying = isPlaying,
                             shuffleEnabled = shuffleEnabled,
                             repeatMode = repeatMode,
-                            palette = palette,
+                            palette = pagePalette,
                             queueExpanded = queueExpanded,
                             playlist = playlist,
                             currentSongId = song?.id,
@@ -457,7 +467,7 @@ internal fun CoverPlayerPage(
                                 artistFontSize = 14.sp,
                                 artistAlpha = 0.62f,
                                 showArtistWithAnnotation = true,
-                                contentColor = palette.onBackground,
+                                contentColor = pagePalette.onBackground,
                                 onArtistClick = onArtist,
                                 modifier = Modifier.weight(1f)
                             )
@@ -485,7 +495,7 @@ internal fun CoverPlayerPage(
                                 fontWeight = fontWeight,
                                 fontScale = fontScale,
                                 compact = compactWindow,
-                                contentColor = palette.onBackground,
+                                contentColor = pagePalette.onBackground,
                                 onLineClick = { onShowLyrics() },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -516,7 +526,7 @@ internal fun CoverPlayerPage(
                             duration = duration,
                             audioInfo = audioInfo,
                             bluetoothDeviceName = bluetoothDeviceName,
-                            palette = palette,
+                            palette = pagePalette,
                             allowTapSeek = playerTapSeekEnabled,
                             showTotalDuration = playerShowTotalDuration,
                             onSeek = onSeek
@@ -526,7 +536,7 @@ internal fun CoverPlayerPage(
                             isPlaying = isPlaying,
                             shuffleEnabled = shuffleEnabled,
                             repeatMode = repeatMode,
-                            palette = palette,
+                            palette = pagePalette,
                             queueExpanded = queueExpanded,
                             playlist = playlist,
                             currentSongId = song?.id,

@@ -1,5 +1,6 @@
 package com.ella.music.ui.player
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -33,8 +34,16 @@ import top.yukonga.miuix.kmp.basic.Text
 @Composable
 internal fun PlayerDetailPage(
     song: Song?,
+    embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     tagInfo: SongTagInfo?,
     neteaseInfo: NeteaseKeyInfo?,
+    palette: PlayerPalette,
+    currentPositionMs: Long,
+    isPlaying: Boolean,
+    beautifulLyricsBackground: Boolean,
+    useBlurBackground: Boolean,
+    playerBackgroundEnabled: Boolean,
     customBackgroundUri: String,
     customBackgroundOpacity: Float = 1f,
     customBackgroundDim: Float = 0.26f,
@@ -73,14 +82,21 @@ internal fun PlayerDetailPage(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        if (customBackgroundUri.isNotBlank()) {
-            PlayerCustomBackground(
-                uri = customBackgroundUri,
-                imageAlpha = customBackgroundOpacity,
-                dimAlpha = customBackgroundDim,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+        SharedPlayerPageBackground(
+            song = song,
+            embeddedCover = embeddedCover,
+            paletteBitmap = paletteBitmap,
+            palette = palette,
+            currentPositionMs = currentPositionMs,
+            isPlaying = isPlaying,
+            playerBackgroundEnabled = playerBackgroundEnabled,
+            playerBackgroundUri = customBackgroundUri,
+            playerBackgroundOpacity = customBackgroundOpacity,
+            playerBackgroundDim = customBackgroundDim,
+            beautifulLyricsBackground = beautifulLyricsBackground,
+            useBlurBackground = useBlurBackground,
+            modifier = Modifier.fillMaxSize()
+        )
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

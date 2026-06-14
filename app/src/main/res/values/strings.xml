@@ -143,6 +143,20 @@
     <string name="settings_floating_lyric_hide_when_paused_summary">暂停播放时隐藏悬浮歌词，恢复播放后自动显示</string>
     <string name="settings_status_lyric_top_offset_value">状态栏歌词顶部偏移 %1$ddp</string>
     <string name="settings_status_lyric_top_offset_summary">为挖孔屏和状态栏预留额外垂直距离</string>
+    <string name="settings_status_lyric_width_value">状态栏歌词宽度 %1$d%%</string>
+    <string name="settings_status_lyric_width_summary">调整状态栏模式下歌词可用宽度，长歌词会自动换行</string>
+    <string name="settings_desktop_lyric_width_value">桌面歌词宽度 %1$d%%</string>
+    <string name="settings_desktop_lyric_width_summary">调整普通桌面歌词悬浮窗的可用宽度</string>
+    <string name="settings_status_lyric_x_offset_value">状态栏歌词左右偏移 %1$ddp</string>
+    <string name="settings_status_lyric_x_offset_summary">在当前左/中/右位置基础上微调歌词横向位置</string>
+    <string name="settings_status_bar_lyric_text_align">状态栏歌词文字对齐</string>
+    <string name="settings_status_bar_lyric_vertical_align">状态栏歌词垂直对齐</string>
+    <string name="settings_status_align_left">左对齐</string>
+    <string name="settings_status_align_center">居中对齐</string>
+    <string name="settings_status_align_right">右对齐</string>
+    <string name="settings_status_vertical_top">上对齐</string>
+    <string name="settings_status_vertical_center">中间对齐</string>
+    <string name="settings_status_vertical_bottom">下对齐</string>
 
     <string name="settings_app">应用</string>
     <string name="settings_appearance">外观</string>
@@ -548,6 +562,7 @@
     <string name="settings_home_display_items_summary">显示项目、首页区块顺序和音乐库宫格顺序</string>
     <string name="settings_home_sections_title">首页区块</string>
     <string name="settings_home_library_grid_title">音乐库宫格</string>
+    <string name="settings_home_online_grid_title">在线音乐入口</string>
     <string name="settings_display_order_title">显示顺序</string>
     <string name="settings_home_sections_order">首页区块顺序</string>
     <string name="settings_home_library_grid_order">音乐库宫格顺序</string>
@@ -787,16 +802,6 @@
     <string name="settings_home_card_color_default">跟随主题默认色</string>
     <string name="settings_home_card_opacity">首页功能卡片透明度</string>
     <string name="settings_home_card_opacity_summary">调节音乐库和在线音乐功能卡片的背景透明度</string>
-    <string name="settings_app_icon">应用图标</string>
-    <string name="settings_app_icon_summary">切换桌面启动器图标样式</string>
-    <string name="settings_app_icon_default">默认</string>
-    <string name="settings_app_icon_blue">简洁蓝</string>
-    <string name="settings_app_icon_dark">深色</string>
-    <string name="settings_app_icon_bluepurple">蓝紫渐变</string>
-    <string name="settings_app_icon_teal">青绿</string>
-    <string name="settings_app_icon_orange">橙红</string>
-    <string name="settings_app_icon_gray">灰色</string>
-    <string name="settings_app_icon_restart_hint">切换后部分桌面启动器可能需要几秒刷新</string>
     <string name="settings_hi_res_logo">Hi-Res 封面标识</string>
     <string name="settings_hi_res_logo_summary">非沉浸播放页中，Hi-Res 音质歌曲的封面右下角显示小标识</string>
     <string name="settings_hi_res_logo_image">选择 Hi-Res 标识图片</string>

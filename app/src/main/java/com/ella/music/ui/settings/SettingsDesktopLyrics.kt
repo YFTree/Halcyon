@@ -49,8 +49,13 @@ internal fun SettingsDesktopLyricControls(
     val desktopLyricEnabled by settingsManager.desktopLyricEnabled.collectSettingsState(initialValue = false)
     val desktopLyricHideWhenPaused by settingsManager.desktopLyricHideWhenPaused.collectSettingsState(initialValue = false)
     val desktopLyricStatusBarMode by settingsManager.desktopLyricStatusBarMode.collectSettingsState(initialValue = false)
+    val desktopLyricWidth by settingsManager.desktopLyricWidth.collectSettingsState(initialValue = 72)
     val desktopLyricStatusBarTopOffset by settingsManager.desktopLyricStatusBarTopOffset.collectSettingsState(initialValue = 16)
     val desktopLyricStatusBarPosition by settingsManager.desktopLyricStatusBarPosition.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_POSITION_CENTER)
+    val desktopLyricStatusBarWidth by settingsManager.desktopLyricStatusBarWidth.collectSettingsState(initialValue = 72)
+    val desktopLyricStatusBarXOffset by settingsManager.desktopLyricStatusBarXOffset.collectSettingsState(initialValue = 0)
+    val desktopLyricStatusBarTextAlign by settingsManager.desktopLyricStatusBarTextAlign.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_ALIGN_LEFT)
+    val desktopLyricStatusBarVerticalAlign by settingsManager.desktopLyricStatusBarVerticalAlign.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_VERTICAL_TOP)
     val desktopLyricStatusBarSecondary by settingsManager.desktopLyricStatusBarSecondary.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF)
     val desktopLyricLocked by settingsManager.desktopLyricLocked.collectSettingsState(initialValue = false)
     val desktopLyricFontScale by settingsManager.desktopLyricFontScale.collectSettingsState(initialValue = 100)
@@ -88,6 +93,22 @@ internal fun SettingsDesktopLyricControls(
     }
     val statusLyricPositionEntries = remember(statusLyricPositionLabels) {
         statusLyricPositionLabels.map { DropdownItem(title = it) }
+    }
+    val statusLyricTextAlignLabels = listOf(
+        stringResource(R.string.settings_status_align_left),
+        stringResource(R.string.settings_status_align_center),
+        stringResource(R.string.settings_status_align_right)
+    )
+    val statusLyricTextAlignEntries = remember(statusLyricTextAlignLabels) {
+        statusLyricTextAlignLabels.map { DropdownItem(title = it) }
+    }
+    val statusLyricVerticalAlignLabels = listOf(
+        stringResource(R.string.settings_status_vertical_top),
+        stringResource(R.string.settings_status_vertical_center),
+        stringResource(R.string.settings_status_vertical_bottom)
+    )
+    val statusLyricVerticalAlignEntries = remember(statusLyricVerticalAlignLabels) {
+        statusLyricVerticalAlignLabels.map { DropdownItem(title = it) }
     }
     val statusLyricSecondaryLabels = listOf(
         stringResource(R.string.settings_status_secondary_off),
@@ -162,6 +183,21 @@ internal fun SettingsDesktopLyricControls(
         }
     )
 
+    SettingsIntSliderPreference(
+        title = stringResource(R.string.settings_desktop_lyric_width_value, desktopLyricWidth),
+        summary = stringResource(R.string.settings_desktop_lyric_width_summary),
+        value = desktopLyricWidth,
+        valueRange = 40..100,
+        valueText = "${desktopLyricWidth.coerceIn(40, 100)}%",
+        enabled = desktopLyricEnabled && !desktopLyricStatusBarMode,
+        onValueChange = { width ->
+            scope.launch {
+                settingsManager.setDesktopLyricWidth(width)
+                applyDesktopLyricSettings()
+            }
+        }
+    )
+
     WindowSpinnerPreference(
         title = stringResource(R.string.settings_status_bar_lyric_position),
         summary = stringResource(
@@ -174,6 +210,70 @@ internal fun SettingsDesktopLyricControls(
         onSelectedIndexChange = { index ->
             scope.launch {
                 settingsManager.setDesktopLyricStatusBarPosition(index)
+                applyDesktopLyricSettings()
+            }
+        }
+    )
+
+    SettingsIntSliderPreference(
+        title = stringResource(R.string.settings_status_lyric_width_value, desktopLyricStatusBarWidth),
+        summary = stringResource(R.string.settings_status_lyric_width_summary),
+        value = desktopLyricStatusBarWidth,
+        valueRange = 40..100,
+        valueText = "${desktopLyricStatusBarWidth.coerceIn(40, 100)}%",
+        enabled = desktopLyricEnabled && desktopLyricStatusBarMode,
+        onValueChange = { width ->
+            scope.launch {
+                settingsManager.setDesktopLyricStatusBarWidth(width)
+                applyDesktopLyricSettings()
+            }
+        }
+    )
+
+    SettingsIntSliderPreference(
+        title = stringResource(R.string.settings_status_lyric_x_offset_value, desktopLyricStatusBarXOffset),
+        summary = stringResource(R.string.settings_status_lyric_x_offset_summary),
+        value = desktopLyricStatusBarXOffset,
+        valueRange = -640..640,
+        valueText = "${desktopLyricStatusBarXOffset.coerceIn(-640, 640)}dp",
+        enabled = desktopLyricEnabled && desktopLyricStatusBarMode,
+        onValueChange = { offset ->
+            scope.launch {
+                settingsManager.setDesktopLyricStatusBarXOffset(offset)
+                applyDesktopLyricSettings()
+            }
+        }
+    )
+
+    WindowSpinnerPreference(
+        title = stringResource(R.string.settings_status_bar_lyric_text_align),
+        summary = stringResource(
+            R.string.settings_current_value,
+            statusLyricTextAlignLabels[desktopLyricStatusBarTextAlign.coerceIn(0, 2)]
+        ),
+        enabled = desktopLyricEnabled && desktopLyricStatusBarMode,
+        items = statusLyricTextAlignEntries,
+        selectedIndex = desktopLyricStatusBarTextAlign.coerceIn(0, 2),
+        onSelectedIndexChange = { index ->
+            scope.launch {
+                settingsManager.setDesktopLyricStatusBarTextAlign(index)
+                applyDesktopLyricSettings()
+            }
+        }
+    )
+
+    WindowSpinnerPreference(
+        title = stringResource(R.string.settings_status_bar_lyric_vertical_align),
+        summary = stringResource(
+            R.string.settings_current_value,
+            statusLyricVerticalAlignLabels[desktopLyricStatusBarVerticalAlign.coerceIn(0, 2)]
+        ),
+        enabled = desktopLyricEnabled && desktopLyricStatusBarMode,
+        items = statusLyricVerticalAlignEntries,
+        selectedIndex = desktopLyricStatusBarVerticalAlign.coerceIn(0, 2),
+        onSelectedIndexChange = { index ->
+            scope.launch {
+                settingsManager.setDesktopLyricStatusBarVerticalAlign(index)
                 applyDesktopLyricSettings()
             }
         }

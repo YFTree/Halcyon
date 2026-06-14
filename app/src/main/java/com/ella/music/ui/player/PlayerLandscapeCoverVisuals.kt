@@ -87,6 +87,9 @@ internal fun LandscapeCoverStack(
     isPlaying: Boolean,
     coverItems: List<Pair<Int, Song>>,
     onDynamicCoverFailed: (String) -> Unit,
+    coverWidthFraction: Float = 0.30f,
+    onCenterCoverClick: (() -> Unit)? = null,
+    centerOverlay: (@Composable BoxScope.() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val visibleItems = remember(coverItems) {
@@ -96,7 +99,7 @@ internal fun LandscapeCoverStack(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-        val coverSize = minOf(maxHeight * 0.84f, maxWidth * 0.30f).coerceAtLeast(118.dp)
+        val coverSize = minOf(maxHeight * 0.84f, maxWidth * coverWidthFraction).coerceAtLeast(118.dp)
         val maxDistance = visibleItems.maxOfOrNull { abs(it.first) } ?: 0
         val outerScale = (1f - maxDistance * 0.13f).coerceAtLeast(0.58f)
         val horizontalStep = if (maxDistance > 0) {
@@ -125,7 +128,11 @@ internal fun LandscapeCoverStack(
                 }
 
             Box(
-                modifier = coverModifier,
+                modifier = if (isCenter && onCenterCoverClick != null) {
+                    coverModifier.playerNoIndicationClick(onCenterCoverClick)
+                } else {
+                    coverModifier
+                },
                 contentAlignment = Alignment.Center
             ) {
                 LandscapeCoverReflection(
@@ -161,6 +168,9 @@ internal fun LandscapeCoverStack(
                                 .fillMaxSize()
                                 .background(Color.Black.copy(alpha = 0.16f + distance * 0.05f))
                         )
+                    }
+                    if (isCenter && centerOverlay != null) {
+                        centerOverlay()
                     }
                 }
             }

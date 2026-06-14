@@ -18,7 +18,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
@@ -127,17 +130,23 @@ internal fun BeautifulLyricsDynamicBackground(
     val speed by settingsManager.playerBeautifulLyricsSpeed.collectAsState(initial = 25)
     val blurPx by settingsManager.playerBeautifulLyricsBlur.collectAsState(initial = 32)
     val brightness by settingsManager.playerBeautifulLyricsBrightness.collectAsState(initial = 70)
-    val transition = rememberInfiniteTransition(label = "beautiful_lyrics_background")
-    val durationMs = (120_000 / speed.coerceIn(5, 60)).coerceIn(2_000, 24_000)
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = durationMs, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "beautiful_lyrics_background_drift"
-    )
+    var drift by remember { mutableStateOf(0.42f) }
+    LaunchedEffect(animate, isPlaying, speed) {
+        if (!animate) {
+            drift = 0.42f
+            return@LaunchedEffect
+        }
+        var lastFrameNs = withFrameNanos { it }
+        while (true) {
+            val frameNs = withFrameNanos { it }
+            val deltaSeconds = ((frameNs - lastFrameNs).coerceAtLeast(0L)) / 1_000_000_000f
+            lastFrameNs = frameNs
+            if (isPlaying) {
+                val speedMultiplier = speed.coerceIn(5, 60) / 10f
+                drift = (drift + deltaSeconds * speedMultiplier / 96f) % 1f
+            }
+        }
+    }
     val activeDrift = if (animate) drift else 0.42f
     val pulse = if (isPlaying) {
         0.5f + 0.5f * kotlin.math.sin(positionMs / 760.0).toFloat()
@@ -164,9 +173,9 @@ internal fun BeautifulLyricsDynamicBackground(
         drawRect(
             brush = Brush.linearGradient(
                 colors = listOf(
-                    sampledColors[0].copy(alpha = 1f),
-                    sampledColors[1].copy(alpha = 0.92f),
-                    sampledColors[2].copy(alpha = 1f)
+                    sampledColors[0].copy(alpha = (0.88f * brightnessAlpha).coerceIn(0.3f, 1f)),
+                    sampledColors[1].copy(alpha = (0.82f * brightnessAlpha).coerceIn(0.3f, 1f)),
+                    sampledColors[2].copy(alpha = (0.88f * brightnessAlpha).coerceIn(0.3f, 1f))
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
@@ -216,6 +225,7 @@ private fun Color.beautifulLyricsVibrant(): Color {
     val b = (blue * 255f).toInt().coerceIn(0, 255)
     val hsv = FloatArray(3)
     AndroidColor.RGBToHSV(r, g, b, hsv)
+    if (hsv[1] < 0.08f) return this
     hsv[1] = (hsv[1] * 1.55f).coerceIn(0.42f, 1f)
     hsv[2] = (hsv[2] * 1.18f).coerceIn(0.50f, 1f)
     return Color(AndroidColor.HSVToColor(hsv))
@@ -225,6 +235,7 @@ private fun beautifulLyricsSampleColors(bitmap: Bitmap?, palette: PlayerPalette)
     if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) {
         return listOf(palette.top, palette.accent, palette.bottom, palette.accent, palette.top, Color.White, palette.bottom)
     }
+    beautifulLyricsNeutralPalette(bitmap, palette)?.let { return it }
     val points = listOf(
         0.18f to 0.18f,
         0.78f to 0.20f,
@@ -239,6 +250,71 @@ private fun beautifulLyricsSampleColors(bitmap: Bitmap?, palette: PlayerPalette)
         val y = (bitmap.height * fy).toInt().coerceIn(0, bitmap.height - 1)
         Color(bitmap.getPixel(x, y)).beautifulLyricsVibrant()
     }
+}
+
+private fun beautifulLyricsNeutralPalette(bitmap: Bitmap, palette: PlayerPalette): List<Color>? {
+    val sampleStep = (minOf(bitmap.width, bitmap.height) / 42).coerceAtLeast(1)
+    val hsv = FloatArray(3)
+    var total = 0
+    var neutral = 0
+    var brightNeutral = 0
+    var darkNeutral = 0
+    var saturated = 0
+    var rSum = 0L
+    var gSum = 0L
+    var bSum = 0L
+
+    var y = 0
+    while (y < bitmap.height) {
+        var x = 0
+        while (x < bitmap.width) {
+            val pixel = bitmap.getPixel(x, y)
+            val alpha = AndroidColor.alpha(pixel)
+            if (alpha > 24) {
+                val r = AndroidColor.red(pixel)
+                val g = AndroidColor.green(pixel)
+                val b = AndroidColor.blue(pixel)
+                AndroidColor.RGBToHSV(r, g, b, hsv)
+                total++
+                rSum += r.toLong()
+                gSum += g.toLong()
+                bSum += b.toLong()
+                if (hsv[1] < 0.22f) neutral++
+                if (hsv[2] > 0.72f && hsv[1] < 0.24f) brightNeutral++
+                if (hsv[2] < 0.28f && hsv[1] < 0.28f) darkNeutral++
+                if (hsv[1] > 0.30f && hsv[2] > 0.18f) saturated++
+            }
+            x += sampleStep
+        }
+        y += sampleStep
+    }
+    if (total == 0) return null
+    val neutralShare = neutral.toFloat() / total.toFloat()
+    val brightNeutralShare = brightNeutral.toFloat() / total.toFloat()
+    val darkNeutralShare = darkNeutral.toFloat() / total.toFloat()
+    val saturatedShare = saturated.toFloat() / total.toFloat()
+    if (neutralShare < 0.45f || saturatedShare > 0.38f || (brightNeutralShare < 0.32f && darkNeutralShare < 0.32f)) return null
+
+    val avgR = (rSum / total).toInt().coerceIn(0, 255)
+    val avgG = (gSum / total).toInt().coerceIn(0, 255)
+    val avgB = (bSum / total).toInt().coerceIn(0, 255)
+    val luma = (avgR * 0.299f + avgG * 0.587f + avgB * 0.114f).toInt().coerceIn(0, 255)
+    val base = Color(luma, luma, luma)
+    val soft = if (brightNeutralShare >= darkNeutralShare) {
+        Color(210, 210, 210)
+    } else {
+        Color(42, 42, 42)
+    }
+    val accentGray = if (brightNeutralShare >= darkNeutralShare) Color(150, 150, 150) else Color(92, 92, 92)
+    return listOf(
+        soft.lighten(0.10f),
+        base,
+        soft.darken(0.18f),
+        soft,
+        accentGray,
+        base,
+        soft.darken(0.28f)
+    )
 }
 
 @Composable

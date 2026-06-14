@@ -123,6 +123,9 @@ internal data class PlayerPalette(
             val buckets = linkedMapOf<Int, LongArray>()
             val fallback = LongArray(4)
             val hsv = FloatArray(3)
+            var sampled = 0
+            var brightNeutral = 0
+            var eligible = 0
 
             var y = 0
             while (y < bitmap.height) {
@@ -138,12 +141,15 @@ internal data class PlayerPalette(
                         val saturation = hsv[1]
                         val value = hsv[2]
 
+                        sampled++
                         fallback[0]++
                         fallback[1] += r.toLong()
                         fallback[2] += g.toLong()
                         fallback[3] += b.toLong()
+                        if (value > 0.78f && saturation < 0.18f) brightNeutral++
 
                         if (value > 0.08f && !(value > 0.94f && saturation < 0.20f)) {
+                            eligible++
                             val key = ((r ushr 4) shl 8) or ((g ushr 4) shl 4) or (b ushr 4)
                             val bucket = buckets.getOrPut(key) { LongArray(4) }
                             bucket[0]++
@@ -157,6 +163,18 @@ internal data class PlayerPalette(
                 y += sampleStep
             }
             if (fallback[0] == 0L) return null
+            if (
+                sampled > 0 &&
+                brightNeutral.toFloat() / sampled.toFloat() > 0.56f &&
+                eligible.toFloat() / sampled.toFloat() < 0.24f
+            ) {
+                val count = fallback[0].coerceAtLeast(1L)
+                return Color(
+                    (fallback[1] / count).toInt(),
+                    (fallback[2] / count).toInt(),
+                    (fallback[3] / count).toInt()
+                )
+            }
 
             val best = buckets.values.maxByOrNull { bucket ->
                 val count = bucket[0].coerceAtLeast(1L)

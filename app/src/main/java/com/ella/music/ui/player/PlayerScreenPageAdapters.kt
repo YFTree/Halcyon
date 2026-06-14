@@ -155,7 +155,7 @@ internal fun CoverPageContent(
         shuffleEnabled = shuffleEnabled,
         repeatMode = repeatMode,
         audioInfo = audioInfo,
-        palette = palette,
+        palette = lyricPalette,
         flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
         dynamicFlowEnabled = false,
         lyrics = lyrics,
@@ -490,8 +490,14 @@ internal fun LyricsPageContent(
 internal fun DetailPageContent(
     context: Context,
     song: Song?,
+    embeddedCover: Bitmap?,
+    paletteBitmap: Bitmap?,
     tagInfo: SongTagInfo?,
     neteaseInfo: NeteaseKeyInfo?,
+    lyricPalette: PlayerPalette,
+    currentPosition: Long,
+    isPlaying: Boolean,
+    beautifulLyricsBackground: Boolean,
     playerBackgroundUri: String,
     playerBackgroundOpacity: Float,
     playerBackgroundDim: Float,
@@ -505,8 +511,16 @@ internal fun DetailPageContent(
 ) {
     PlayerDetailPage(
         song = song,
+        embeddedCover = embeddedCover,
+        paletteBitmap = paletteBitmap,
         tagInfo = tagInfo,
         neteaseInfo = neteaseInfo,
+        palette = lyricPalette,
+        currentPositionMs = currentPosition,
+        isPlaying = isPlaying,
+        beautifulLyricsBackground = beautifulLyricsBackground,
+        useBlurBackground = immersiveAlbumCover,
+        playerBackgroundEnabled = playerBackgroundEnabled,
         customBackgroundUri = playerBackgroundUri.takeIf {
             !immersiveAlbumCover && playerBackgroundEnabled && playerBackgroundUri.isNotBlank()
         }.orEmpty(),
