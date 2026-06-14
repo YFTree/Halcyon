@@ -406,9 +406,14 @@ fun ArtistListScreen(
                 Text(text = stringResource(R.string.artist_list_empty), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
             }
         } else {
+            val artistScrollKey = remember(sortMode) { sortMode.name }
+            val savedArtistScroll = remember(artistScrollKey) {
+                LibrarySortUiState.artistListScrollPositions[artistScrollKey]
+                    ?: (LibrarySortUiState.artistListFirstVisibleItemIndex to LibrarySortUiState.artistListFirstVisibleItemScrollOffset)
+            }
             val listState = rememberLazyListState(
-                initialFirstVisibleItemIndex = LibrarySortUiState.artistListFirstVisibleItemIndex,
-                initialFirstVisibleItemScrollOffset = LibrarySortUiState.artistListFirstVisibleItemScrollOffset
+                initialFirstVisibleItemIndex = savedArtistScroll.first,
+                initialFirstVisibleItemScrollOffset = savedArtistScroll.second
             )
             var fastScrollJob by remember { mutableStateOf<Job?>(null) }
             var skipInitialReset by remember { mutableStateOf(true) }
@@ -422,11 +427,12 @@ fun ArtistListScreen(
             LaunchedEffect(scrollToTopRequest) {
                 if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
             }
-            LaunchedEffect(listState) {
+            LaunchedEffect(artistScrollKey, listState) {
                 snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
                     .collect { (index, offset) ->
                         LibrarySortUiState.artistListFirstVisibleItemIndex = index
                         LibrarySortUiState.artistListFirstVisibleItemScrollOffset = offset
+                        LibrarySortUiState.artistListScrollPositions[artistScrollKey] = index to offset
                     }
             }
             val fastIndexLetters = remember(filteredArtists) {

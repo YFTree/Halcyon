@@ -1275,6 +1275,7 @@
     <string name="settings_default_custom_font_name">Пользовательский шрифт</string>
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">Справочник по размытию фона обложки проигрывателя и лирическим визуальным эффектам</string>
+    <string name="about_summary_beautiful_lyrics">Справочник по динамическим фонам, полноэкранным текстам и визуальному опыту текстов</string>
     <string name="about_summary_splayer">Справочник по анимации игроков и текстам.</string>
     <string name="about_title_lightcone">Лайткоун Музыка</string>
     <string name="about_summary_lightcone">Справочник по некоторым визуальным элементам и эффектам пользовательского интерфейса.</string>

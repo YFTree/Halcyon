@@ -243,51 +243,53 @@ internal fun LandscapeCoverPlaybackOverlay(
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 58.dp)
-                    .padding(horizontal = 34.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Crossfade(targetState = currentLyricIndex, label = "coverOverlayLyric") { lineIndex ->
-                    val line = lyrics.getOrNull(lineIndex)
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = line?.text?.trim().orEmpty(),
-                            color = LocalPlayerContentColor.current.copy(alpha = 0.92f),
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = fontFamily,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        val secondary = line?.translation?.trim()
-                            ?.takeIf { showTranslation && it.isNotEmpty() }
-                        if (secondary != null) {
+            if (lyrics.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 58.dp)
+                        .padding(horizontal = 34.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Crossfade(targetState = currentLyricIndex, label = "coverOverlayLyric") { lineIndex ->
+                        val line = lyrics.getOrNull(lineIndex)
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
                             Text(
-                                text = secondary,
-                                color = LocalPlayerContentColor.current.copy(alpha = 0.55f),
-                                fontSize = 13.sp,
+                                text = line?.text?.trim().orEmpty(),
+                                color = LocalPlayerContentColor.current.copy(alpha = 0.92f),
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = fontFamily,
                                 textAlign = TextAlign.Center,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 2.dp)
+                                modifier = Modifier.fillMaxWidth()
                             )
+                            val secondary = line?.translation?.trim()
+                                ?.takeIf { showTranslation && it.isNotEmpty() }
+                            if (secondary != null) {
+                                Text(
+                                    text = secondary,
+                                    color = LocalPlayerContentColor.current.copy(alpha = 0.55f),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = fontFamily,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 2.dp)
+                                )
+                            }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(10.dp))
             }
-            Spacer(modifier = Modifier.height(10.dp))
         }
         Box(
             modifier = Modifier

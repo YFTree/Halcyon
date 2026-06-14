@@ -12,6 +12,9 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.splitGenreNames
 import com.ella.music.viewmodel.MainViewModel
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -321,6 +324,101 @@ internal fun buildLibraryAnalysis(
         totalCount = songs.size,
         totalSizeBytes = songs.sumOf { it.fileSize }
     )
+}
+
+internal fun readCachedLibraryAnalysis(
+    context: Context,
+    songs: List<Song>
+): LibraryAnalysis? {
+    if (songs.isEmpty()) return LibraryAnalysis(emptyList(), emptyList(), 0, 0L)
+    return runCatching {
+        val file = libraryAnalysisCacheFile(context)
+        if (!file.exists()) return@runCatching null
+        val root = JSONObject(file.readText())
+        if (root.optString("key") != songs.libraryAnalysisCacheKey()) return@runCatching null
+        root.optJSONObject("analysis")?.toLibraryAnalysis()
+    }.getOrNull()
+}
+
+internal fun writeCachedLibraryAnalysis(
+    context: Context,
+    songs: List<Song>,
+    analysis: LibraryAnalysis
+) {
+    runCatching {
+        val file = libraryAnalysisCacheFile(context)
+        val root = JSONObject()
+            .put("version", 1)
+            .put("key", songs.libraryAnalysisCacheKey())
+            .put("updatedAt", System.currentTimeMillis())
+            .put("analysis", analysis.toJson())
+        file.parentFile?.mkdirs()
+        file.writeText(root.toString())
+    }
+}
+
+internal fun prewarmLibraryAnalysisCache(
+    context: Context,
+    songs: List<Song>,
+    mainViewModel: MainViewModel
+) {
+    if (songs.isEmpty() || readCachedLibraryAnalysis(context, songs) != null) return
+    val analysis = buildLibraryAnalysis(songs, mainViewModel)
+    writeCachedLibraryAnalysis(context, songs, analysis)
+}
+
+private fun libraryAnalysisCacheFile(context: Context): File =
+    File(context.applicationContext.filesDir, "library_analysis_cache.json")
+
+private fun List<Song>.libraryAnalysisCacheKey(): String {
+    var idHash = 1125899906842597L
+    var modifiedHash = 1469598103934665603L
+    var sizeSum = 0L
+    for (song in this) {
+        idHash = 31L * idHash + song.id
+        modifiedHash = 1099511628211L * (modifiedHash xor song.dateModified)
+        sizeSum += song.fileSize
+    }
+    return "$size-$idHash-$modifiedHash-$sizeSum"
+}
+
+private fun LibraryAnalysis.toJson(): JSONObject =
+    JSONObject()
+        .put("formatBuckets", formatBuckets.toJson())
+        .put("qualityBuckets", qualityBuckets.toJson())
+        .put("totalCount", totalCount)
+        .put("totalSizeBytes", totalSizeBytes)
+
+private fun List<AnalysisBucket>.toJson(): JSONArray =
+    JSONArray().also { array ->
+        forEach { bucket ->
+            array.put(
+                JSONObject()
+                    .put("label", bucket.label)
+                    .put("count", bucket.count)
+                    .put("sizeBytes", bucket.sizeBytes)
+            )
+        }
+    }
+
+private fun JSONObject.toLibraryAnalysis(): LibraryAnalysis =
+    LibraryAnalysis(
+        formatBuckets = optJSONArray("formatBuckets").toAnalysisBuckets(),
+        qualityBuckets = optJSONArray("qualityBuckets").toAnalysisBuckets(),
+        totalCount = optInt("totalCount", 0),
+        totalSizeBytes = optLong("totalSizeBytes", 0L)
+    )
+
+private fun JSONArray?.toAnalysisBuckets(): List<AnalysisBucket> {
+    if (this == null) return emptyList()
+    return List(length()) { index ->
+        val obj = optJSONObject(index) ?: JSONObject()
+        AnalysisBucket(
+            label = obj.optString("label"),
+            count = obj.optInt("count", 0),
+            sizeBytes = obj.optLong("sizeBytes", 0L)
+        )
+    }.filter { it.label.isNotBlank() }
 }
 
 internal fun List<SongWithInfo>.toBuckets(labelOf: (SongWithInfo) -> String): List<AnalysisBucket> {

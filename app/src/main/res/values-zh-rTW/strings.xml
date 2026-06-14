@@ -1286,6 +1286,7 @@
 
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">播放頁封面模糊背景和歌詞視覺效果參考</string>
+    <string name="about_summary_beautiful_lyrics">動態背景、全螢幕歌詞與歌詞視覺體驗參考</string>
     <string name="about_summary_splayer">播放頁動效和歌詞體驗參考</string>
     <string name="about_title_lightcone">光錐音樂</string>
     <string name="about_summary_lightcone">部分介面視覺與 UI 效果參考</string>

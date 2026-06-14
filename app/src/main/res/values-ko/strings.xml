@@ -1286,6 +1286,7 @@
 
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">플레이어 커버 블러 배경 및 가사 시각 효과에 대한 참조</string>
+    <string name="about_summary_beautiful_lyrics">동적 배경, 전체 화면 가사 및 가사 시각 경험에 대한 참조</string>
     <string name="about_summary_splayer">플레이어 애니메이션 및 가사 경험에 대한 참고 자료</string>
     <string name="about_title_lightcone">Lightcone Music</string>
     <string name="about_summary_lightcone">일부 UI 시각적 요소 및 효과에 대한 참조</string>

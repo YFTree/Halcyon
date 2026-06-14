@@ -1286,6 +1286,7 @@
 
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">Reference for player cover blur background and lyric visual effects</string>
+    <string name="about_summary_beautiful_lyrics">Reference for dynamic backgrounds, fullscreen lyrics, and lyric visual experience</string>
     <string name="about_summary_splayer">Reference for player animations and lyric experience</string>
     <string name="about_title_lightcone">Lightcone Music</string>
     <string name="about_summary_lightcone">Reference for some UI visuals and effects</string>

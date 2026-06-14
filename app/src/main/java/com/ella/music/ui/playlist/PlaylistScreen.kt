@@ -317,6 +317,7 @@ fun PlaylistScreen(
                     text = stringResource(mode.labelRes),
                     selected = playlistSortMode == mode,
                     onClick = {
+                        LibrarySortUiState.playlistListSortIndex = mode.ordinal
                         scope.launch { mainViewModel.settingsManager.setPlaylistListSortIndex(mode.ordinal) }
                         scope.launch { listState.animateScrollToItem(0) }
                     }
@@ -357,11 +358,12 @@ fun PlaylistScreen(
         PlaylistSortSection(
             visible = sortExpanded,
             selectedMode = playlistSortMode,
-            onModeSelected = { mode ->
-                sortExpanded = false
-                scope.launch { mainViewModel.settingsManager.setPlaylistListSortIndex(mode.ordinal) }
-                scope.launch { listState.animateScrollToItem(0) }
-            }
+        onModeSelected = { mode ->
+            sortExpanded = false
+            LibrarySortUiState.playlistListSortIndex = mode.ordinal
+            scope.launch { mainViewModel.settingsManager.setPlaylistListSortIndex(mode.ordinal) }
+            scope.launch { listState.animateScrollToItem(0) }
+        }
         )
 
         Box(modifier = Modifier.fillMaxSize()) {

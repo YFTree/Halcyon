@@ -81,6 +81,8 @@ class SettingsManager(private val context: Context) {
         val KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN = intPreferencesKey("desktop_lyric_status_bar_text_align")
         val KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN = intPreferencesKey("desktop_lyric_status_bar_vertical_align")
         val KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY = intPreferencesKey("desktop_lyric_status_bar_secondary")
+        val KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY_OPACITY = intPreferencesKey("desktop_lyric_status_bar_secondary_opacity")
+        val KEY_DESKTOP_LYRIC_STATUS_BAR_MERGE_SECONDARY = booleanPreferencesKey("desktop_lyric_status_bar_merge_secondary")
         val KEY_DESKTOP_LYRIC_LOCKED = booleanPreferencesKey("desktop_lyric_locked")
         val KEY_DESKTOP_LYRIC_FONT_SCALE = intPreferencesKey("desktop_lyric_font_scale")
         val KEY_DESKTOP_LYRIC_TRANSLATION_SCALE = intPreferencesKey("desktop_lyric_translation_scale")
@@ -112,6 +114,7 @@ class SettingsManager(private val context: Context) {
         val KEY_TRANSPORT_BUTTON_OUTLINES = booleanPreferencesKey("transport_button_outlines")
         val KEY_PLAYER_TAP_SEEK_ENABLED = booleanPreferencesKey("player_tap_seek_enabled")
         val KEY_PLAYER_SHOW_TOTAL_DURATION = booleanPreferencesKey("player_show_total_duration")
+        val KEY_PLAYER_SHOW_SONG_ANNOTATION = booleanPreferencesKey("player_show_song_annotation")
         val KEY_PLAYER_HDR_GLOW = booleanPreferencesKey("player_hdr_glow")
         val KEY_PLAYER_IMMERSIVE_COVER = booleanPreferencesKey("player_immersive_cover")
         val KEY_HIDE_SYSTEM_BARS = booleanPreferencesKey("hide_system_bars")
@@ -428,6 +431,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN] ?: DESKTOP_LYRIC_STATUS_VERTICAL_TOP).coerceIn(0, 2) }
     val desktopLyricStatusBarSecondary: Flow<Int> =
         context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY] ?: DESKTOP_LYRIC_STATUS_SECONDARY_OFF).coerceIn(0, 2) }
+    val desktopLyricStatusBarSecondaryOpacity: Flow<Int> =
+        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY_OPACITY] ?: 67).coerceIn(20, 100) }
+    val desktopLyricStatusBarMergeSecondary: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MERGE_SECONDARY] ?: false }
     val desktopLyricLocked: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_LOCKED] ?: false }
     val desktopLyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_FONT_SCALE] ?: 100 }
     val desktopLyricTranslationScale: Flow<Int> =
@@ -485,6 +492,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_PLAYER_TAP_SEEK_ENABLED] ?: true }
     val playerShowTotalDuration: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_PLAYER_SHOW_TOTAL_DURATION] ?: false }
+    val playerShowSongAnnotation: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_PLAYER_SHOW_SONG_ANNOTATION] ?: true }
     val playerHdrGlow: Flow<Boolean> = context.dataStore.data.map { it[KEY_PLAYER_HDR_GLOW] ?: false }
     val playerImmersiveCover: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_PLAYER_IMMERSIVE_COVER] ?: true }
@@ -855,6 +864,14 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setDesktopLyricStatusBarSecondary(mode: Int) {
         context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY] = mode.coerceIn(0, 2) }
+    }
+
+    suspend fun setDesktopLyricStatusBarSecondaryOpacity(opacity: Int) {
+        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY_OPACITY] = opacity.coerceIn(20, 100) }
+    }
+
+    suspend fun setDesktopLyricStatusBarMergeSecondary(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MERGE_SECONDARY] = enabled }
     }
 
     suspend fun setDesktopLyricLocked(locked: Boolean) {
@@ -1467,6 +1484,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_PLAYER_SHOW_TOTAL_DURATION] = enabled }
     }
 
+    suspend fun setPlayerShowSongAnnotation(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_PLAYER_SHOW_SONG_ANNOTATION] = enabled }
+    }
+
     suspend fun setLibrarySongSortIndex(index: Int) {
         context.dataStore.edit { it[KEY_SORT_LIBRARY_SONG] = index.coerceAtLeast(0) }
     }
@@ -1672,6 +1693,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_DESKTOP_LYRIC_ENABLED)
             setBoolean(KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED)
             setBoolean(KEY_DESKTOP_LYRIC_STATUS_BAR_MODE)
+            setBoolean(KEY_DESKTOP_LYRIC_STATUS_BAR_MERGE_SECONDARY)
             setBoolean(KEY_DESKTOP_LYRIC_LOCKED)
             setBoolean(KEY_SUPER_LYRIC_ENABLED)
             setBoolean(KEY_SUPER_LYRIC_TRANSLATION)
@@ -1692,6 +1714,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_TRANSPORT_BUTTON_OUTLINES)
             setBoolean(KEY_PLAYER_TAP_SEEK_ENABLED)
             setBoolean(KEY_PLAYER_SHOW_TOTAL_DURATION)
+            setBoolean(KEY_PLAYER_SHOW_SONG_ANNOTATION)
             setBoolean(KEY_PLAYER_HDR_GLOW)
             setBoolean(KEY_PLAYER_IMMERSIVE_COVER)
             setBoolean(KEY_HIDE_SYSTEM_BARS)
@@ -1767,6 +1790,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN)
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN)
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY)
+            setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY_OPACITY)
             setInt(KEY_SLEEP_TIMER_CUSTOM_MINUTES)
             setInt(KEY_APP_WALLPAPER_OPACITY)
             setInt(KEY_APP_WALLPAPER_DIM)

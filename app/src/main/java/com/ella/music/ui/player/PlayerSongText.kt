@@ -64,6 +64,7 @@ internal fun PlayerSongMetaText(
     fallbackTitle: String? = null,
     showArtistWithAnnotation: Boolean = false,
     contentColor: Color = Color.White,
+    textAlign: TextAlign = TextAlign.Start,
     onArtistClick: (() -> Unit)? = null,
     onAlbumClick: (() -> Unit)? = null
 ) {
@@ -85,6 +86,7 @@ internal fun PlayerSongMetaText(
             fontSize = titleFontSize,
             fontWeight = FontWeight.ExtraBold,
             color = contentColor.copy(alpha = 0.96f),
+            textAlign = textAlign,
             modifier = Modifier.fillMaxWidth()
         )
         if (annotation.isNotBlank()) {
@@ -93,6 +95,7 @@ internal fun PlayerSongMetaText(
                 fontSize = (artistFontSize.value * 0.82f).sp,
                 fontWeight = FontWeight.Bold,
                 color = contentColor.copy(alpha = (artistAlpha + 0.16f).coerceAtMost(0.82f)),
+                textAlign = textAlign,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -102,6 +105,7 @@ internal fun PlayerSongMetaText(
                 fontSize = artistFontSize,
                 fontWeight = FontWeight.Bold,
                 color = contentColor.copy(alpha = artistAlpha),
+                textAlign = textAlign,
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(clickableMetaModifier(artist.isNotBlank(), onArtistClick))
@@ -116,6 +120,7 @@ internal fun PlayerSongTitleText(
     fontSize: TextUnit,
     fontWeight: FontWeight,
     color: Color,
+    textAlign: TextAlign = TextAlign.Start,
     modifier: Modifier = Modifier
 ) {
     Text(
@@ -126,6 +131,7 @@ internal fun PlayerSongTitleText(
         maxLines = 1,
         softWrap = false,
         overflow = TextOverflow.Clip,
+        textAlign = textAlign,
         modifier = modifier.basicMarquee(iterations = Int.MAX_VALUE)
     )
 }
@@ -136,6 +142,7 @@ internal fun PlayerMarqueeText(
     fontSize: TextUnit,
     fontWeight: FontWeight,
     color: Color,
+    textAlign: TextAlign = TextAlign.Start,
     modifier: Modifier = Modifier
 ) {
     LyriconStyleMarqueeText(
@@ -146,7 +153,7 @@ internal fun PlayerMarqueeText(
             color = color
         ),
         enabled = true,
-        textAlign = TextAlign.Start,
+        textAlign = textAlign,
         modifier = modifier
     )
 }
@@ -186,13 +193,13 @@ internal fun LyriconStyleMarqueeText(
         content = {
             BasicText(
                 text = text,
-                style = style.copy(textAlign = TextAlign.Start),
+                style = style.copy(textAlign = textAlign),
                 maxLines = 1,
                 overflow = TextOverflow.Visible
             )
             BasicText(
                 text = text,
-                style = style.copy(textAlign = TextAlign.Start),
+                style = style.copy(textAlign = textAlign),
                 maxLines = 1,
                 overflow = TextOverflow.Visible
             )

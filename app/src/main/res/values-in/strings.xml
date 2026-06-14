@@ -1286,6 +1286,7 @@
 
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">Referensi untuk latar belakang blur cover pemutar dan efek visual lirik</string>
+    <string name="about_summary_beautiful_lyrics">Referensi untuk latar dinamis, lirik layar penuh, dan pengalaman visual lirik</string>
     <string name="about_summary_splayer">Referensi untuk animasi pemutar dan pengalaman lirik</string>
     <string name="about_title_lightcone">Lightcone Music</string>
     <string name="about_summary_lightcone">Referensi untuk beberapa visual dan efek UI</string>

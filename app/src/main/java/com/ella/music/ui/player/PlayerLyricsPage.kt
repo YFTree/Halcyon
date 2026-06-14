@@ -79,6 +79,7 @@ internal fun LyricsPlayerPage(
     onArtist: () -> Unit,
     enableSwipeDismiss: Boolean,
     useBlurBackground: Boolean,
+    drawBackground: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var lyricMenuExpanded by remember { mutableStateOf(false) }
@@ -112,21 +113,23 @@ internal fun LyricsPlayerPage(
 
     Box(modifier = modifier.then(swipeDismissModifier)) {
         val useCustomPlayerBackground = playerBackgroundEnabled && playerBackgroundUri.isNotBlank() && !useBlurBackground
-        SharedPlayerPageBackground(
-            song = song,
-            embeddedCover = embeddedCover,
-            paletteBitmap = paletteBitmap,
-            palette = palette,
-            currentPositionMs = currentPositionMs,
-            isPlaying = isPlaying,
-            playerBackgroundEnabled = playerBackgroundEnabled,
-            playerBackgroundUri = playerBackgroundUri,
-            playerBackgroundOpacity = playerBackgroundOpacity,
-            playerBackgroundDim = playerBackgroundDim,
-            beautifulLyricsBackground = beautifulLyricsBackground,
-            useBlurBackground = useBlurBackground,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (drawBackground) {
+            SharedPlayerPageBackground(
+                song = song,
+                embeddedCover = embeddedCover,
+                paletteBitmap = paletteBitmap,
+                palette = palette,
+                currentPositionMs = currentPositionMs,
+                isPlaying = isPlaying,
+                playerBackgroundEnabled = playerBackgroundEnabled,
+                playerBackgroundUri = playerBackgroundUri,
+                playerBackgroundOpacity = playerBackgroundOpacity,
+                playerBackgroundDim = playerBackgroundDim,
+                beautifulLyricsBackground = beautifulLyricsBackground,
+                useBlurBackground = useBlurBackground,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()

@@ -81,6 +81,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -613,12 +614,15 @@ fun EllaApp(
     }
 
     val currentLyricLine = lyrics.getOrNull(currentLyricIndex)
-    val miniPlayerLyricText = if (isPlaying && miniPlayerLyricsEnabled) {
+    val isTabletDevice = LocalConfiguration.current.smallestScreenWidthDp >= 600
+    val allowTabletExpandedMiniLyrics = isTabletDevice && bottomDockMode == BottomDockMode.Expanded
+    val miniPlayerLyricsVisible = miniPlayerLyricsEnabled || allowTabletExpandedMiniLyrics
+    val miniPlayerLyricText = if (isPlaying && miniPlayerLyricsVisible) {
         currentLyricLine?.text?.takeIf { it.isNotBlank() && !it.isMusicSymbolOnly() }
     } else {
         null
     }
-    val miniPlayerLyricSecondaryText = if (isPlaying && miniPlayerLyricsEnabled) {
+    val miniPlayerLyricSecondaryText = if (isPlaying && miniPlayerLyricsVisible) {
         when (miniPlayerLyricSecondary) {
             SettingsManager.LYRIC_SECONDARY_TRANSLATION -> currentLyricLine?.translation?.takeIf { it.isNotBlank() }
             SettingsManager.LYRIC_SECONDARY_PRONUNCIATION -> currentLyricLine?.pronunciation?.takeIf { it.isNotBlank() }

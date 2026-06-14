@@ -240,6 +240,11 @@ private fun AboutContent(
                         onClick = { uriHandler.openUri("https://github.com/jayfunc/BetterLyrics") },
                     )
                     BasicComponent(
+                        title = "Beautiful Lyrics",
+                        summary = stringResource(R.string.about_summary_beautiful_lyrics),
+                        onClick = { uriHandler.openUri("https://github.com/surfbryce/beautiful-lyrics") },
+                    )
+                    BasicComponent(
                         title = "SPlayer",
                         summary = stringResource(R.string.about_summary_splayer),
                         onClick = { uriHandler.openUri("https://github.com/imsyy/SPlayer") },

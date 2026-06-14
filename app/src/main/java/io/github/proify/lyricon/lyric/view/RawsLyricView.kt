@@ -78,6 +78,9 @@ class RawsLyricView @JvmOverloads constructor(
         private const val INTERLUDE_EXTRA_DP = 48f
         private const val INTERLUDE_EXPAND_MS = 500L
         private const val INTERLUDE_COLLAPSE_MS = 300L
+        private const val MARQUEE_HOLD_MS = 900L
+        private const val MARQUEE_SPEED_DP_PER_SEC = 36f
+        private const val MARQUEE_RESTART_GAP_DP = 48f
         private const val LINE_BLUR_RADIUS_DP = 4f
         private const val LINE_OFFSET_MIN_MS = 480L
         private const val LINE_OFFSET_MAX_MS = 750L
@@ -144,7 +147,9 @@ class RawsLyricView @JvmOverloads constructor(
     private var userScrollEnabled = true
     private var centerUnalignedLinesEnabled = false
     private var forcedTextAlignment = -1 // -1 = lyric metadata, 0 = left, 1 = center, 2 = right
+    private var forcedVerticalAlignment = -1 // -1 = lyric scroll anchor, 0 = top, 1 = center, 2 = bottom
     private var maxMainLines = 0 // 0 = unlimited
+    private var singleLineMarqueeEnabled = false
     private var placeholderFormat = PlaceholderFormat.NAME_ARTIST
     private var currentStyleConfig: RichLyricLineConfig? = null
     private var songName: String? = null
@@ -287,10 +292,27 @@ class RawsLyricView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun setForcedVerticalAlignment(alignment: Int) {
+        val safeAlignment = alignment.coerceIn(-1, 2)
+        if (forcedVerticalAlignment == safeAlignment) return
+        forcedVerticalAlignment = safeAlignment
+        rebuildEntries()
+        scrollToCurrentLine(false)
+        invalidate()
+    }
+
     fun setMaxMainLines(lines: Int) {
         if (maxMainLines == lines) return
         maxMainLines = lines
         rebuildEntries()
+        invalidate()
+    }
+
+    fun setSingleLineMarqueeEnabled(enabled: Boolean) {
+        if (singleLineMarqueeEnabled == enabled) return
+        singleLineMarqueeEnabled = enabled
+        rebuildEntries()
+        scrollToCurrentLine(false)
         invalidate()
     }
 
@@ -657,10 +679,26 @@ class RawsLyricView @JvmOverloads constructor(
             )
             y += totalH
         }
-        entries = result
-        totalHeight = y
+        entries = result.applyForcedVerticalAlignment()
+        totalHeight = entries.maxOfOrNull { it.yTop + it.totalH } ?: y
         val bottomPad = if (height > 0) height * BOTTOM_OFFSET_RATIO else 0f
         maxScrollY = max(0f, totalHeight + bottomPad - height)
+    }
+
+    private fun MutableList<LineEntry>.applyForcedVerticalAlignment(): List<LineEntry> {
+        if (forcedVerticalAlignment < 0 || height <= 0 || isEmpty()) return this
+        val firstTop = first().yTop
+        val lastBottom = maxOf { it.yTop + it.totalH }
+        val contentHeight = (lastBottom - firstTop).coerceAtLeast(0f)
+        val available = (height - contentHeight).coerceAtLeast(0f)
+        val targetTop = when (forcedVerticalAlignment) {
+            1 -> available / 2f
+            2 -> available
+            else -> 0f
+        }
+        val delta = targetTop - firstTop
+        if (abs(delta) < 0.5f) return this
+        return map { it.copy(yTop = it.yTop + delta) }
     }
 
     private fun updateSecondaryVisibilityIfNeeded() {
@@ -690,6 +728,7 @@ class RawsLyricView @JvmOverloads constructor(
     }
 
     private fun measureMainHeight(text: String): Float {
+        if (singleLineMarqueeEnabled) return mainPaint.fontSpacing
         val w = width - paddingLeft - paddingRight
         if (w <= 0) return mainPaint.fontSpacing
         val layout = buildLayout(text, mainPaint, w, forMain = true)
@@ -705,6 +744,7 @@ class RawsLyricView @JvmOverloads constructor(
     }
 
     private fun measureTransHeight(text: String): Float {
+        if (singleLineMarqueeEnabled) return transPaint.fontSpacing
         val w = width - paddingLeft - paddingRight
         if (w <= 0) return transPaint.fontSpacing
         val layout = buildLayout(text, transPaint, w)
@@ -712,6 +752,7 @@ class RawsLyricView @JvmOverloads constructor(
     }
 
     private fun measureWordsHeight(words: List<LyricWord>?, paint: TextPaint): Float {
+        if (singleLineMarqueeEnabled) return 0f
         if (words.isNullOrEmpty()) return 0f
         val availW = (width - paddingLeft - paddingRight).toFloat()
         if (availW <= 0f) return paint.fontSpacing
@@ -934,6 +975,7 @@ class RawsLyricView @JvmOverloads constructor(
 
     private fun postFrame() {
         val needFrame = (playbackActive && continuousFrameUpdatesEnabled && lyrics.any { it.words?.isNotEmpty() == true || it.secondaryWords?.isNotEmpty() == true }) ||
+                (playbackActive && singleLineMarqueeEnabled && entries.isNotEmpty()) ||
                 (autoScrollResumeEnabled && isUserScrolling) ||
                 !scroller.isFinished ||
                 popAnimators.isNotEmpty() ||
@@ -1075,7 +1117,7 @@ class RawsLyricView @JvmOverloads constructor(
         // 但卡拉OK直接用 baseline 绘制，不含 topPad，所以需要分开处理
         val topPad = mainPaint.fontMetrics.let { it.top - it.ascent }.coerceAtLeast(0f)
         val mainBaseline = mainTopY + topPad + (-mainPaint.fontMetrics.ascent)
-        if (!entry.words.isNullOrEmpty() && isCurrent) {
+        if (!singleLineMarqueeEnabled && !entry.words.isNullOrEmpty() && isCurrent) {
             drawKaraokeWords(canvas, entry, index, textStartX, mainBaseline, entry.alignedRight, entry.centered)
         } else {
             val paint = when {
@@ -1101,7 +1143,7 @@ class RawsLyricView @JvmOverloads constructor(
         if (entry.secondaryText != null && shouldDrawSecondary) {
             val secondaryBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
             val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
-            if (!entry.secondaryWords.isNullOrEmpty() && isCurrent) {
+            if (!singleLineMarqueeEnabled && !entry.secondaryWords.isNullOrEmpty() && isCurrent) {
                 drawKaraokeWords(canvas, entry, index, textStartX, secondaryBaseline, entry.alignedRight, entry.centered, useSecondary = true)
             } else {
                 drawTextAligned(canvas, entry.secondaryText, tPaint, textStartX, secondaryBaseline, entry.alignedRight, entry.centered, farBlur)
@@ -1148,6 +1190,11 @@ class RawsLyricView @JvmOverloads constructor(
         if (w <= 0) return
         val oldMask = paint.maskFilter
         if (blur) paint.maskFilter = distantLineBlur
+        if (singleLineMarqueeEnabled) {
+            drawSingleLineMarqueeText(canvas, text, paint, startX, baseline, w.toFloat(), alignedRight, centered)
+            paint.maskFilter = oldMask
+            return
+        }
         val layout = buildLayout(text, paint, w, alignedRight, centered, forMain)
         canvas.save()
         // StaticLayout line 0 baseline is at getLineTop(0) + getLineBaseline(0) - getLineTop(0)
@@ -1158,6 +1205,54 @@ class RawsLyricView @JvmOverloads constructor(
         layout.draw(canvas)
         canvas.restore()
         paint.maskFilter = oldMask
+    }
+
+    private fun drawSingleLineMarqueeText(
+        canvas: Canvas,
+        text: String,
+        paint: TextPaint,
+        startX: Float,
+        baseline: Float,
+        availableWidth: Float,
+        alignedRight: Boolean,
+        centered: Boolean,
+    ) {
+        if (text.isBlank() || availableWidth <= 0f) return
+        val textWidth = paint.measureText(text)
+        val drawX = if (textWidth <= availableWidth) {
+            when {
+                alignedRight -> startX + availableWidth - textWidth
+                centered -> startX + (availableWidth - textWidth) / 2f
+                else -> startX
+            }
+        } else {
+            startX - marqueeOffsetPx(textWidth, availableWidth)
+        }
+        val fm = paint.fontMetrics
+        canvas.save()
+        canvas.clipRect(
+            startX,
+            baseline + fm.top - density * 2f,
+            startX + availableWidth,
+            baseline + fm.bottom + density * 2f
+        )
+        canvas.drawText(text, drawX, baseline, paint)
+        canvas.restore()
+    }
+
+    private fun marqueeOffsetPx(textWidth: Float, availableWidth: Float): Float {
+        val overflow = (textWidth - availableWidth).coerceAtLeast(0f)
+        if (overflow <= 0f) return 0f
+        val speed = (MARQUEE_SPEED_DP_PER_SEC * density).coerceAtLeast(1f)
+        val restartGap = MARQUEE_RESTART_GAP_DP * density
+        val scrollDistance = overflow + restartGap
+        val scrollMs = ((scrollDistance / speed) * 1000f).toLong().coerceAtLeast(1L)
+        val cycleMs = MARQUEE_HOLD_MS + scrollMs
+        val phase = SystemClock.uptimeMillis() % cycleMs
+        return when {
+            phase < MARQUEE_HOLD_MS -> 0f
+            else -> scrollDistance * ((phase - MARQUEE_HOLD_MS).toFloat() / scrollMs.toFloat())
+        }
     }
 
     private fun clearBlurCache() {

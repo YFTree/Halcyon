@@ -206,7 +206,21 @@ fun MetadataCategoryDetailScreen(
     val pageTitle = remember(type, name, folderRootName, defaultCategoryTitle) {
         if (type == "folder") name.folderDisplayName(folderRootName) else name.ifBlank { defaultCategoryTitle }
     }
-    val listState = rememberLazyListState()
+    val detailScrollKey = remember(type, name, selectedTab, sortMode, albumSortMode) {
+        val activeSort = if (selectedTab == MetadataDetailTab.Albums) {
+            albumSortMode.name
+        } else {
+            sortMode.name
+        }
+        "$type\u0000$name\u0000${selectedTab.name}\u0000$activeSort"
+    }
+    val savedDetailScroll = remember(detailScrollKey) {
+        LibrarySortUiState.metadataCategoryDetailScrollPositions[detailScrollKey] ?: (0 to 0)
+    }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = savedDetailScroll.first,
+        initialFirstVisibleItemScrollOffset = savedDetailScroll.second
+    )
     val scope = rememberCoroutineScope()
     var fastScrollJob by remember { mutableStateOf<Job?>(null) }
     val deleteRequestLauncher = rememberLauncherForActivityResult(
@@ -284,6 +298,20 @@ fun MetadataCategoryDetailScreen(
                 MetadataDetailSongSortMode.Title.ordinal
             )
         }
+    }
+    LaunchedEffect(detailScrollKey) {
+        val position = LibrarySortUiState.metadataCategoryDetailScrollPositions[detailScrollKey] ?: (0 to 0)
+        if (listState.firstVisibleItemIndex != position.first ||
+            listState.firstVisibleItemScrollOffset != position.second
+        ) {
+            listState.scrollToItem(position.first, position.second)
+        }
+    }
+    LaunchedEffect(detailScrollKey, listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { position ->
+                LibrarySortUiState.metadataCategoryDetailScrollPositions[detailScrollKey] = position
+            }
     }
 
     Column(

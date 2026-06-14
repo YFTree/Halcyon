@@ -57,6 +57,8 @@ internal fun SettingsDesktopLyricControls(
     val desktopLyricStatusBarTextAlign by settingsManager.desktopLyricStatusBarTextAlign.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_ALIGN_LEFT)
     val desktopLyricStatusBarVerticalAlign by settingsManager.desktopLyricStatusBarVerticalAlign.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_VERTICAL_TOP)
     val desktopLyricStatusBarSecondary by settingsManager.desktopLyricStatusBarSecondary.collectSettingsState(initialValue = SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF)
+    val desktopLyricStatusBarSecondaryOpacity by settingsManager.desktopLyricStatusBarSecondaryOpacity.collectSettingsState(initialValue = 67)
+    val desktopLyricStatusBarMergeSecondary by settingsManager.desktopLyricStatusBarMergeSecondary.collectSettingsState(initialValue = false)
     val desktopLyricLocked by settingsManager.desktopLyricLocked.collectSettingsState(initialValue = false)
     val desktopLyricFontScale by settingsManager.desktopLyricFontScale.collectSettingsState(initialValue = 100)
     val desktopLyricTranslationScale by settingsManager.desktopLyricTranslationScale.collectSettingsState(initialValue = 110)
@@ -291,6 +293,34 @@ internal fun SettingsDesktopLyricControls(
         onSelectedIndexChange = { index ->
             scope.launch {
                 settingsManager.setDesktopLyricStatusBarSecondary(index)
+                applyDesktopLyricSettings()
+            }
+        }
+    )
+
+    SettingsIntSliderPreference(
+        title = stringResource(R.string.settings_status_lyric_secondary_opacity_value, desktopLyricStatusBarSecondaryOpacity),
+        summary = stringResource(R.string.settings_status_lyric_secondary_opacity_summary),
+        value = desktopLyricStatusBarSecondaryOpacity,
+        valueRange = 20..100,
+        valueText = "${desktopLyricStatusBarSecondaryOpacity.coerceIn(20, 100)}%",
+        enabled = desktopLyricEnabled && desktopLyricStatusBarMode && desktopLyricStatusBarSecondary != SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF,
+        onValueChange = { opacity ->
+            scope.launch {
+                settingsManager.setDesktopLyricStatusBarSecondaryOpacity(opacity)
+                applyDesktopLyricSettings()
+            }
+        }
+    )
+
+    SwitchPreference(
+        title = stringResource(R.string.settings_status_lyric_merge_secondary),
+        summary = stringResource(R.string.settings_status_lyric_merge_secondary_summary),
+        enabled = desktopLyricEnabled && desktopLyricStatusBarMode && desktopLyricStatusBarSecondary != SettingsManager.DESKTOP_LYRIC_STATUS_SECONDARY_OFF,
+        checked = desktopLyricStatusBarMergeSecondary,
+        onCheckedChange = { enabled ->
+            scope.launch {
+                settingsManager.setDesktopLyricStatusBarMergeSecondary(enabled)
                 applyDesktopLyricSettings()
             }
         }

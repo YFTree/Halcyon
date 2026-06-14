@@ -331,9 +331,14 @@ fun AlbumScreen(
                 )
             }
         } else {
+            val albumScrollKey = remember(sortMode) { sortMode.name }
+            val savedAlbumScroll = remember(albumScrollKey) {
+                LibrarySortUiState.albumListScrollPositions[albumScrollKey]
+                    ?: (LibrarySortUiState.albumListFirstVisibleItemIndex to LibrarySortUiState.albumListFirstVisibleItemScrollOffset)
+            }
             val gridState = rememberLazyGridState(
-                initialFirstVisibleItemIndex = LibrarySortUiState.albumListFirstVisibleItemIndex,
-                initialFirstVisibleItemScrollOffset = LibrarySortUiState.albumListFirstVisibleItemScrollOffset
+                initialFirstVisibleItemIndex = savedAlbumScroll.first,
+                initialFirstVisibleItemScrollOffset = savedAlbumScroll.second
             )
             var fastScrollJob by remember { mutableStateOf<Job?>(null) }
             var skipInitialReset by remember { mutableStateOf(true) }
@@ -347,11 +352,12 @@ fun AlbumScreen(
             LaunchedEffect(scrollToTopRequest) {
                 if (scrollToTopRequest > 0) gridState.animateScrollToItem(0)
             }
-            LaunchedEffect(gridState) {
+            LaunchedEffect(albumScrollKey, gridState) {
                 snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
                     .collect { (index, offset) ->
                         LibrarySortUiState.albumListFirstVisibleItemIndex = index
                         LibrarySortUiState.albumListFirstVisibleItemScrollOffset = offset
+                        LibrarySortUiState.albumListScrollPositions[albumScrollKey] = index to offset
                     }
             }
             val fastIndexLetters = remember(sortedAlbums, sortMode) {

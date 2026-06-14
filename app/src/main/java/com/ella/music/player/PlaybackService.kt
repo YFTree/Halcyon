@@ -70,6 +70,8 @@ class PlaybackService : MediaLibraryService() {
         private const val KEY_APP_SHUFFLE = "app_shuffle_enabled"
         const val ACTION_TOGGLE_FAVORITE = "com.ella.music.action.TOGGLE_FAVORITE"
         const val ACTION_TOGGLE_SHUFFLE = "com.ella.music.action.TOGGLE_SHUFFLE"
+        const val ACTION_SKIP_PREVIOUS = "com.ella.music.action.SKIP_PREVIOUS"
+        const val ACTION_SKIP_NEXT = "com.ella.music.action.SKIP_NEXT"
         private const val TIMING_TAG = "EllaPlaybackTiming"
 
         val bluetoothConnectEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -339,7 +341,46 @@ class PlaybackService : MediaLibraryService() {
                 true
             }
 
+            ACTION_SKIP_PREVIOUS -> {
+                AppLogStore.info(this, TAG, "NotificationAction previous clicked")
+                mediaSession?.player?.seekAdjacentFromNotification(-1)
+                updateMediaButtonPreferences()
+                notificationProvider.refresh()
+                true
+            }
+
+            ACTION_SKIP_NEXT -> {
+                AppLogStore.info(this, TAG, "NotificationAction next clicked")
+                mediaSession?.player?.seekAdjacentFromNotification(1)
+                updateMediaButtonPreferences()
+                notificationProvider.refresh()
+                true
+            }
+
             else -> false
+        }
+    }
+
+    private fun Player.seekAdjacentFromNotification(offset: Int) {
+        if (mediaItemCount <= 0) return
+        if (repeatMode == Player.REPEAT_MODE_ONE) {
+            val currentIndex = currentMediaItemIndex
+            if (currentIndex !in 0 until mediaItemCount) return
+            val targetIndex = if (mediaItemCount == 1) {
+                currentIndex
+            } else {
+                Math.floorMod(currentIndex + offset, mediaItemCount)
+            }
+            repeatMode = Player.REPEAT_MODE_ALL
+            seekToDefaultPosition(targetIndex)
+            play()
+            repeatMode = Player.REPEAT_MODE_ONE
+            return
+        }
+        if (offset > 0) {
+            seekToNextMediaItem()
+        } else {
+            seekToPreviousMediaItem()
         }
     }
 
@@ -373,7 +414,7 @@ class PlaybackService : MediaLibraryService() {
                 CommandButton.Builder()
                     .setDisplayName(getString(R.string.common_previous))
                     .setIconResId(R.drawable.ic_skip_previous)
-                    .setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                    .setSessionCommand(SessionCommand(ACTION_SKIP_PREVIOUS, Bundle.EMPTY))
                     .build(),
 
                 CommandButton.Builder()
@@ -391,7 +432,7 @@ class PlaybackService : MediaLibraryService() {
                 CommandButton.Builder()
                     .setDisplayName(getString(R.string.common_next))
                     .setIconResId(R.drawable.ic_skip_next)
-                    .setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                    .setSessionCommand(SessionCommand(ACTION_SKIP_NEXT, Bundle.EMPTY))
                     .build(),
 
                 CommandButton.Builder()
@@ -560,6 +601,8 @@ class PlaybackService : MediaLibraryService() {
                 .buildUpon()
                 .add(SessionCommand(ACTION_TOGGLE_FAVORITE, Bundle.EMPTY))
                 .add(SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY))
+                .add(SessionCommand(ACTION_SKIP_PREVIOUS, Bundle.EMPTY))
+                .add(SessionCommand(ACTION_SKIP_NEXT, Bundle.EMPTY))
                 .build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                 .setAvailableSessionCommands(sessionCommands)
@@ -697,8 +740,10 @@ class PlaybackService : MediaLibraryService() {
             } else {
                 Math.floorMod(index + offset, mediaItemCount)
             }
+            setRepeatMode(Player.REPEAT_MODE_ALL)
             seekToDefaultPosition(targetIndex)
             play()
+            setRepeatMode(Player.REPEAT_MODE_ONE)
             return true
         }
     }
@@ -806,10 +851,11 @@ class PlaybackService : MediaLibraryService() {
                 compact = false
             )
 
-            addAction(
-                Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+            addCustomAction(
+                ACTION_SKIP_PREVIOUS,
                 R.drawable.ic_skip_previous,
-                service.getString(R.string.common_previous)
+                service.getString(R.string.common_previous),
+                compact = true
             )
 
             addAction(
@@ -822,10 +868,11 @@ class PlaybackService : MediaLibraryService() {
                 if (player.isPlaying) service.getString(R.string.common_pause) else service.getString(R.string.common_play)
             )
 
-            addAction(
-                Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+            addCustomAction(
+                ACTION_SKIP_NEXT,
                 R.drawable.ic_skip_next,
-                service.getString(R.string.common_next)
+                service.getString(R.string.common_next),
+                compact = true
             )
 
             addCustomAction(

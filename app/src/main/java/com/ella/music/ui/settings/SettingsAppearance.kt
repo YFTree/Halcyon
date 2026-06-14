@@ -83,6 +83,7 @@ internal fun SettingsAppearanceSection() {
     val transportButtonOutlines by settingsManager.transportButtonOutlines.collectAsState(initial = false)
     val playerTapSeekEnabled by settingsManager.playerTapSeekEnabled.collectAsState(initial = true)
     val playerShowTotalDuration by settingsManager.playerShowTotalDuration.collectAsState(initial = false)
+    val playerShowSongAnnotation by settingsManager.playerShowSongAnnotation.collectAsState(initial = true)
     val playlistSpecialEntriesVisible by settingsManager.playlistSpecialEntriesVisible.collectAsState(initial = false)
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = false)
@@ -609,6 +610,14 @@ internal fun SettingsAppearanceSection() {
                 checked = playerShowTotalDuration,
                 onCheckedChange = {
                     scope.launch { settingsManager.setPlayerShowTotalDuration(it) }
+                }
+            )
+            SwitchPreference(
+                title = stringResource(R.string.settings_player_show_song_annotation),
+                summary = stringResource(R.string.settings_player_show_song_annotation_summary),
+                checked = playerShowSongAnnotation,
+                onCheckedChange = {
+                    scope.launch { settingsManager.setPlayerShowSongAnnotation(it) }
                 }
             )
         }

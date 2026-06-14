@@ -17,9 +17,9 @@ internal fun miniLyricsPreviewHeight(
 ) = when (line?.miniVisiblePartCount(showTranslation, showPronunciation) ?: 1) {
     // Single-line (e.g. Chinese only): keep a tall area and let the tighter line gap fit 5 lines.
     0, 1 -> if (compact) 150.dp else 186.dp
-    2 -> if (compact) 150.dp else 190.dp
-    3 -> if (compact) 162.dp else 206.dp
-    else -> if (compact) 170.dp else 214.dp
+    2 -> if (compact) 154.dp else 202.dp
+    3 -> if (compact) 168.dp else 220.dp
+    else -> if (compact) 176.dp else 232.dp
 }
 
 /**
@@ -32,8 +32,8 @@ internal fun miniLyricsCompactHeight(
     showPronunciation: Boolean
 ) = when (line?.miniVisiblePartCount(showTranslation, showPronunciation) ?: 1) {
     0, 1 -> 40.dp
-    2 -> 60.dp
-    else -> 78.dp
+    2 -> 64.dp
+    else -> 84.dp
 }
 
 @Composable
@@ -65,7 +65,7 @@ internal fun MiniLyricsPreview(
     // In a cramped floating window, shrink the type so long (e.g. English) lines fit the narrow
     // width instead of overflowing, and take less vertical room.
     val primarySizeSp = if (compact) 15.5f else 19f
-    val secondarySizeSp = if (compact) 11.5f else 13.5f
+    val secondarySizeSp = if (compact) 12.8f else 15.5f
     SmoothLyricView(
         songId = songId,
         songTitle = songTitle,
@@ -90,7 +90,7 @@ internal fun MiniLyricsPreview(
         autoScrollResumeEnabled = true,
         // The mini preview is tap-to-open only; don't let it scroll on drag.
         userScrollEnabled = false,
-        lineGapDp = if (singleLinePreview) 4f else null,
+        lineGapDp = if (singleLinePreview) 4f else if (compact) 5f else 7f,
         modifier = modifier.fillMaxWidth()
     )
 }

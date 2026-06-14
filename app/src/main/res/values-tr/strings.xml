@@ -1275,6 +1275,7 @@
     <string name="settings_default_custom_font_name">Özel yazı tipi</string>
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">Oyuncu kapağı bulanıklığı arka planı ve şarkı sözü görsel efektleri için referans</string>
+    <string name="about_summary_beautiful_lyrics">Dinamik arka planlar, tam ekran sözler ve şarkı sözü görsel deneyimi için referans</string>
     <string name="about_summary_splayer">Oyuncu animasyonları ve şarkı sözü deneyimi için referans</string>
     <string name="about_title_lightcone">Lightcone Müzik</string>
     <string name="about_summary_lightcone">Bazı kullanıcı arayüzü görselleri ve efektleri için referans</string>

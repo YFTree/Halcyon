@@ -195,6 +195,15 @@ class ExoPlayerManager(private val context: Context) {
                 updateCurrentSong()
             }
 
+            override fun onEvents(player: Player, events: Player.Events) {
+                if (
+                    events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ||
+                    events.contains(Player.EVENT_POSITION_DISCONTINUITY)
+                ) {
+                    updateCurrentSong()
+                }
+            }
+
             override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
                 if (reorderingPlaylistForShuffle) return
                 refreshStateFromController()
@@ -592,18 +601,24 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     fun skipToNext() {
-        if (!seekAdjacentMediaItemInRepeatOne(1)) {
+        val handledRepeatOne = seekAdjacentMediaItemInRepeatOne(1)
+        if (!handledRepeatOne) {
             mediaController?.seekToNextMediaItem()
+            updateCurrentSong()
+        } else {
+            scheduleCurrentSongRefresh()
         }
-        updateCurrentSong()
         savePlaybackQueue(force = true)
     }
 
     fun skipToPrevious() {
-        if (!seekAdjacentMediaItemInRepeatOne(-1)) {
+        val handledRepeatOne = seekAdjacentMediaItemInRepeatOne(-1)
+        if (!handledRepeatOne) {
             mediaController?.seekToPreviousMediaItem()
+            updateCurrentSong()
+        } else {
+            scheduleCurrentSongRefresh()
         }
-        updateCurrentSong()
         savePlaybackQueue(force = true)
     }
 
@@ -646,10 +661,28 @@ class ExoPlayerManager(private val context: Context) {
         } else {
             Math.floorMod(currentIndex + offset, itemCount)
         }
+        val targetSong = playlist.getOrNull(targetIndex)
+        controller.repeatMode = Player.REPEAT_MODE_ALL
         controller.seekToDefaultPosition(targetIndex)
         controller.play()
+        controller.repeatMode = Player.REPEAT_MODE_ONE
+        _repeatMode.value = Player.REPEAT_MODE_ONE
+        _currentSong.value = targetSong ?: controller.currentMediaItem?.toSongFromMediaItemExtras() ?: controller.currentMediaItem?.toSong()
+        _duration.value = targetSong?.duration ?: controller.duration.coerceAtLeast(0)
         _currentPosition.value = 0L
+        targetSong?.let { refreshCurrentSessionMetadata(controller, it) }
         return true
+    }
+
+    private fun scheduleCurrentSongRefresh() {
+        persistenceScope.launch {
+            repeat(3) { attempt ->
+                delay(90L + attempt * 120L)
+                withContext(Dispatchers.Main.immediate) {
+                    refreshStateFromController()
+                }
+            }
+        }
     }
 
     fun seekTo(positionMs: Long) {

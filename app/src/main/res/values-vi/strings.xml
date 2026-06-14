@@ -1286,6 +1286,7 @@
 
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">Tham khảo về nền mờ của trình phát và hiệu ứng hình ảnh lời bài hát</string>
+    <string name="about_summary_beautiful_lyrics">Tham khảo về nền động, lời bài hát toàn màn hình và trải nghiệm hình ảnh lời bài hát</string>
     <string name="about_summary_splayer">Tài liệu tham khảo về hoạt ảnh của người chơi và trải nghiệm lời bài hát</string>
     <string name="about_title_lightcone">Nhạc Lightcone</string>
     <string name="about_summary_lightcone">Tham khảo một số hình ảnh và hiệu ứng UI</string>

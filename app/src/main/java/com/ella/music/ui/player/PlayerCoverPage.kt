@@ -3,6 +3,7 @@ package com.ella.music.ui.player
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -144,6 +147,7 @@ internal fun CoverPlayerPage(
     onPitch: (Float) -> Unit,
     onLyricOffset: (Long) -> Unit,
     actionMenuInitialPage: PlayerActionSheetPage,
+    drawBackground: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val bluetoothDeviceName = rememberBluetoothOutputName()
@@ -168,6 +172,10 @@ internal fun CoverPlayerPage(
     }
     // Stable local so the null-checked usages below can smart-cast (delegated props can't).
     val resolvedDynamicCover = dynamicCoverSource
+    val coverSwipeModifier = rememberCoverSwipeModifier(
+        onSwipePrevious = onPrevious,
+        onSwipeNext = onNext
+    )
 
     BoxWithConstraints(modifier = modifier) {
         val useWidePlayer = maxWidth > maxHeight && maxWidth >= 700.dp
@@ -181,7 +189,7 @@ internal fun CoverPlayerPage(
         val pagePalette = palette
         val showCustomPlayerBackground =
             playerBackgroundEnabled && playerBackgroundUri.isNotBlank() && (useWidePlayer || !immersiveAlbumCover)
-        if (!useWidePlayer) {
+        if (drawBackground && !useWidePlayer && !immersiveAlbumCover) {
             SharedPlayerPageBackground(
                 song = song,
                 embeddedCover = embeddedCover,
@@ -194,7 +202,7 @@ internal fun CoverPlayerPage(
                 playerBackgroundOpacity = playerBackgroundOpacity,
                 playerBackgroundDim = playerBackgroundDim,
                 beautifulLyricsBackground = beautifulLyricsBackground,
-                useBlurBackground = immersiveAlbumCover,
+                useBlurBackground = false,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -264,7 +272,8 @@ internal fun CoverPlayerPage(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(1f),
+                            .aspectRatio(1f)
+                            .then(coverSwipeModifier),
                         contentAlignment = Alignment.Center
                     ) {
                         if (resolvedDynamicCover != null) {
@@ -434,7 +443,8 @@ internal fun CoverPlayerPage(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1f)
-                                .clip(RoundedCornerShape(14.dp)),
+                                .clip(RoundedCornerShape(14.dp))
+                                .then(coverSwipeModifier),
                             contentAlignment = Alignment.Center
                         ) {
                             if (resolvedDynamicCover != null) {
@@ -553,7 +563,7 @@ internal fun CoverPlayerPage(
                             onClearQueue = onClearQueue,
                             modifier = Modifier.height(92.dp)
                         )
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }
@@ -601,6 +611,32 @@ internal fun CoverPlayerPage(
             onLyricOffset = onLyricOffset,
             onVisualizerEnabled = onVisualizerEnabled,
             initialPage = actionMenuInitialPage
+        )
+    }
+}
+
+@Composable
+private fun rememberCoverSwipeModifier(
+    onSwipePrevious: () -> Unit,
+    onSwipeNext: () -> Unit
+): Modifier {
+    val thresholdPx = with(LocalDensity.current) { 84.dp.toPx() }
+    return Modifier.pointerInput(onSwipePrevious, onSwipeNext, thresholdPx) {
+        var dragTravel = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { dragTravel = 0f },
+            onHorizontalDrag = { change, amount ->
+                dragTravel += amount
+                change.consume()
+            },
+            onDragEnd = {
+                when {
+                    dragTravel <= -thresholdPx -> onSwipeNext()
+                    dragTravel >= thresholdPx -> onSwipePrevious()
+                }
+                dragTravel = 0f
+            },
+            onDragCancel = { dragTravel = 0f }
         )
     }
 }

@@ -91,6 +91,9 @@ fun FolderScreen(
     val blockedFolders = remember(scanExcludeFolders) { scanExcludeFolders.toFolderSettingList() }
     val folderSortIndex by mainViewModel.settingsManager.folderListSortIndex.collectAsState(initial = LibrarySortUiState.folderListSortIndex)
     val folderSortMode = FolderListSortMode.entries.getOrElse(folderSortIndex) { FolderListSortMode.Name }
+    LaunchedEffect(folderSortIndex) {
+        LibrarySortUiState.folderListSortIndex = folderSortIndex
+    }
     var folderToBlock by remember { mutableStateOf<String?>(null) }
     var sortExpanded by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -255,8 +258,8 @@ fun FolderScreen(
                         mainViewModel.settingsManager.setScanExcludeFolders(
                             (blockedFolders + folderPath).distinct().joinToString("；")
                         )
+                        mainViewModel.scanMusic()
                     }
-                    Toast.makeText(context, R.string.folder_scan_manual_needed, Toast.LENGTH_SHORT).show()
                     folderToBlock = null
                 }
             )
@@ -313,9 +316,14 @@ fun FolderScreen(
                         }
                     }
             }
+            val folderScrollKey = remember(folderSortMode) { folderSortMode.name }
+            val savedFolderScroll = remember(folderScrollKey) {
+                LibrarySortUiState.folderListScrollPositions[folderScrollKey]
+                    ?: (LibrarySortUiState.folderListFirstVisibleItemIndex to LibrarySortUiState.folderListFirstVisibleItemScrollOffset)
+            }
             val listState = rememberLazyListState(
-                initialFirstVisibleItemIndex = LibrarySortUiState.folderListFirstVisibleItemIndex,
-                initialFirstVisibleItemScrollOffset = LibrarySortUiState.folderListFirstVisibleItemScrollOffset
+                initialFirstVisibleItemIndex = savedFolderScroll.first,
+                initialFirstVisibleItemScrollOffset = savedFolderScroll.second
             )
             var skipInitialReset by remember { mutableStateOf(true) }
             LaunchedEffect(folderSortMode, searchQuery) {
@@ -328,11 +336,12 @@ fun FolderScreen(
             LaunchedEffect(scrollToTopRequest) {
                 if (scrollToTopRequest > 0) listState.animateScrollToItem(0)
             }
-            LaunchedEffect(listState) {
+            LaunchedEffect(folderScrollKey, listState) {
                 snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
                     .collect { (index, offset) ->
                         LibrarySortUiState.folderListFirstVisibleItemIndex = index
                         LibrarySortUiState.folderListFirstVisibleItemScrollOffset = offset
+                        LibrarySortUiState.folderListScrollPositions[folderScrollKey] = index to offset
                     }
             }
             Box(modifier = Modifier.fillMaxSize()) {

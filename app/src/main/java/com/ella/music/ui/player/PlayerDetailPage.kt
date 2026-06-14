@@ -47,6 +47,7 @@ internal fun PlayerDetailPage(
     customBackgroundUri: String,
     customBackgroundOpacity: Float = 1f,
     customBackgroundDim: Float = 0.26f,
+    drawBackground: Boolean = true,
     onAlbum: () -> Unit,
     onArtist: (String) -> Unit,
     onComposer: (String) -> Unit,
@@ -82,21 +83,23 @@ internal fun PlayerDetailPage(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        SharedPlayerPageBackground(
-            song = song,
-            embeddedCover = embeddedCover,
-            paletteBitmap = paletteBitmap,
-            palette = palette,
-            currentPositionMs = currentPositionMs,
-            isPlaying = isPlaying,
-            playerBackgroundEnabled = playerBackgroundEnabled,
-            playerBackgroundUri = customBackgroundUri,
-            playerBackgroundOpacity = customBackgroundOpacity,
-            playerBackgroundDim = customBackgroundDim,
-            beautifulLyricsBackground = beautifulLyricsBackground,
-            useBlurBackground = useBlurBackground,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (drawBackground) {
+            SharedPlayerPageBackground(
+                song = song,
+                embeddedCover = embeddedCover,
+                paletteBitmap = paletteBitmap,
+                palette = palette,
+                currentPositionMs = currentPositionMs,
+                isPlaying = isPlaying,
+                playerBackgroundEnabled = playerBackgroundEnabled,
+                playerBackgroundUri = customBackgroundUri,
+                playerBackgroundOpacity = customBackgroundOpacity,
+                playerBackgroundDim = customBackgroundDim,
+                beautifulLyricsBackground = beautifulLyricsBackground,
+                useBlurBackground = useBlurBackground,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()

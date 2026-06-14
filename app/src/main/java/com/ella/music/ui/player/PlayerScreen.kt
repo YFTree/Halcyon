@@ -277,6 +277,7 @@ fun PlayerScreen(
     val audioInfo = songPresentation.audioInfo
     val tagInfo = songPresentation.tagInfo
     val songAnnotation = songPresentation.annotation
+    val displayAnnotation = if (playerSettings.showSongAnnotation) songAnnotation else ""
     val neteaseInfo = songPresentation.neteaseInfo
     var lyricShareInitialLine by remember { mutableStateOf<LyricLine?>(null) }
     fun openLyricSharePicker(line: LyricLine) {
@@ -375,6 +376,23 @@ fun PlayerScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             }
+            if (!immersiveAlbumCover) {
+                SharedPlayerPageBackground(
+                    song = song,
+                    embeddedCover = embeddedCover,
+                    paletteBitmap = paletteBitmap,
+                    palette = lyricPalette,
+                    currentPositionMs = currentPosition,
+                    isPlaying = isPlaying,
+                    playerBackgroundEnabled = playerBackgroundEnabled,
+                    playerBackgroundUri = playerBackgroundUri,
+                    playerBackgroundOpacity = playerBackgroundOpacity,
+                    playerBackgroundDim = playerBackgroundDim,
+                    beautifulLyricsBackground = beautifulLyricsBackground,
+                    useBlurBackground = false,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             PlayerScreenPageHost(
                 immersiveAlbumCover = immersiveAlbumCover,
@@ -399,7 +417,7 @@ fun PlayerScreen(
                         song = song,
                         embeddedCover = embeddedCover,
                         paletteBitmap = paletteBitmap,
-                        songAnnotation = songAnnotation,
+                        songAnnotation = displayAnnotation,
                         dynamicCoverFailedPath = uiState.dynamicCoverFailedPath,
                         dynamicCoverEnabled = dynamicCoverEnabled,
                         immersiveAlbumCover = immersiveAlbumCover,
@@ -465,6 +483,7 @@ fun PlayerScreen(
                         openLyricSharePicker = ::openLyricSharePicker,
                         navigateToArtistOrChoose = ::navigateToArtistOrChoose,
                         onShowLyrics = onShowLyrics,
+                        drawBackground = immersiveAlbumCover,
                         modifier = pageModifier
                     )
                 },
@@ -473,7 +492,7 @@ fun PlayerScreen(
                         song = song,
                         embeddedCover = embeddedCover,
                         paletteBitmap = paletteBitmap,
-                        songAnnotation = songAnnotation,
+                        songAnnotation = displayAnnotation,
                         lyrics = lyrics,
                         currentLyricIndex = currentLyricIndex,
                         currentPosition = currentPosition,
@@ -506,6 +525,7 @@ fun PlayerScreen(
                         onDismissLyrics = onDismissLyrics,
                         enableSwipeDismiss = enableSwipeDismiss,
                         immersiveAlbumCover = immersiveAlbumCover,
+                        drawBackground = immersiveAlbumCover,
                         modifier = pageModifier
                     )
                 },
@@ -530,6 +550,7 @@ fun PlayerScreen(
                         onNavigateToArtist = onNavigateToArtist,
                         onNavigateToMetadataCategory = onNavigateToMetadataCategory,
                         openNetease = ::openNetease,
+                        drawBackground = immersiveAlbumCover,
                         modifier = pageModifier
                     )
                 },
@@ -544,7 +565,7 @@ fun PlayerScreen(
                 song = song,
                 embeddedCover = embeddedCover,
                 paletteBitmap = paletteBitmap,
-                annotation = songAnnotation,
+                annotation = displayAnnotation,
                 dynamicCoverFailedPath = uiState.dynamicCoverFailedPath,
                 isPlaying = isPlaying,
                 currentPosition = currentPosition,

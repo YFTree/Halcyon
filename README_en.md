@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>Local Music · Local Playlists · WebDAV · Dynamic Player UI · Word-by-Word Lyrics · Floating Lyrics · Status Bar Lyrics</b>
+  <b>Local Music · Online Libraries · Dynamic Player UI · Word-by-Word Lyrics · Floating Lyrics · Status Bar Lyrics · Multilingual UI</b>
 </p>
 
 ---
@@ -24,7 +24,7 @@
 
 **Halcyon** is an Android local music player built with **Jetpack Compose, Miuix, and AndroidX Media3**.
 
-It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, word-by-word lyrics, floating lyrics, status-bar lyrics, dynamic covers, an in-app equalizer, Monet dynamic color, online lyric matching, WebDAV remote libraries, LX Music API sources, library analytics, and a highly customizable player experience.
+It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, word-by-word lyrics, floating lyrics, status-bar lyrics, dynamic covers, an in-app equalizer, Monet dynamic color, online lyric matching, WebDAV / Navidrome / Emby remote libraries, LX Music API sources, library analytics, full app-data backup, and a highly customizable player experience.
 
 ---
 
@@ -37,34 +37,38 @@ It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, 
 - Supports local playlists, favorites, five-star songs, playlist import / export, desktop shortcuts, and custom drag sorting.
 - Album grouping uses both album name and album artist to avoid merging same-name albums from different artists.
 - Includes library analytics, listening calendar, play-count ranking, listening-duration ranking, format distribution, and quality distribution.
+- Library analytics are cached and prewarmed after scanning, so larger local libraries can open the statistics page faster.
 
 ### 🖼 Player UI & Dynamic Covers
 
 - Provides an immersive lyric page, landscape lyric page, and landscape stacked-cover page.
 - Supports dynamic video covers matched by song, album, or global fallback.
 - Supports global custom wallpapers, launch posters, custom Hi-Res badges, and optional player button outlines.
+- Supports Beautiful Lyrics-style dynamic backgrounds for the lyrics page, tablet landscape player, and landscape cover page, with speed, blur, and brightness controls.
 - Supports Monet dynamic color derived from the system wallpaper or the current song cover.
 - Non-immersive player covers can show a Hi-Res / MQ badge.
-- The player supports pull-down dismissal, dynamic backgrounds, blurred cover backgrounds, and landscape queue-cover switching; the landscape cover wall shows the title / artist on top with a live scrolling lyric.
+- The player supports pull-down dismissal, dynamic backgrounds, blurred cover backgrounds, cover swipe-to-skip, and landscape queue-cover switching; tablet landscape docks can show the current lyric.
 
 ### 🎤 Lyrics
 
-- Supports LRC, Enhanced LRC, ELRC, TTML, and Lyricify lyric parsing.
+- Supports LRC, Enhanced LRC, ELRC, TTML, AMLL TTML, and Lyricify lyric parsing.
 - Supports word-by-word lyrics, translations, romanization / phonetics, background vocals, TTML duets, and ELRC V1/V2 duet tags.
 - Reads embedded lyrics and external lyric files, including matching `.lrc`, `.ttml`, and `.elrc` files.
-- Supports online lyric matching for local songs via Lyrico-compatible plugins: import / delete lyric source plugins and write results to embedded tags or a `.lrc` file.
+- Supports online lyric matching for local songs via Lyrico-compatible plugins: import / delete plugin bundles from zip files, configure plugin fields, and write results to embedded tags, `TTMLLYRIC`, or a `.lrc` file.
 - Provides floating desktop lyrics, status-bar lyrics, media notification lyrics, lyric barrage, SuperLyricApi, and Lyric Getter API integration.
 - Supports lyric card sharing, font import with a system-font picker, lyric offset, tap-to-seek, and secondary-line configuration.
 
-### 🌐 WebDAV & LX Online Music
+### 🌐 WebDAV, Navidrome, Emby & LX Online Music
 
 - Supports WebDAV remote libraries with connection testing, Digest authentication, remote browsing, and remote playback.
+- Supports Navidrome / Subsonic and Emby music library entries with the same directory-browsing style as WebDAV.
 - Supports LX Music API sources, online search, streaming playback, cover / lyric retrieval, and local downloads.
 
 ### 🎚 Audio Effects, Decoding, Tags & Quality
 
-- Includes an in-app equalizer with a 5-band EQ, bass boost, and virtualizer.
+- Includes an in-app equalizer with multi-band EQ mapped to the device output, bass boost, and virtualizer.
 - Uses lyrico-audiotag as the primary local metadata path, supporting artwork, basic tags, and embedded lyrics for common audio formats.
+- The built-in tag editor supports editing basic tags, lyrics, and embedded artwork.
 - Provides system, FFmpeg, and automatic decoding modes for better ALAC / AAC / M4A compatibility.
 - Supports ReplayGain, shuffle queue restoration, quality labels, and 24-bit / 96 kHz recognition.
 - Supports 163 key reading from standalone tags, Comment, and Description fields.
@@ -72,7 +76,7 @@ It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, 
 ### 🎨 UI & Integrations
 
 - Built with Miuix for a MIUI / HyperOS-inspired interface, including floating bottom navigation, MiniPlayer, blur / Liquid Glass effects, and unified sheets.
-- Supports basic Chinese / English UI, in-app language switching, GitHub update page, app logs, backup / restore, and data export.
+- Supports 12 interface languages, in-app language switching, GitHub update page, app logs, full app-data backup / restore, and Prism Music listening-history export.
 - Supports song information, tag editing, lyric timing tools, external tag-editor adaptation, and AI song interpretation.
 - Supports MediaSession custom commands for favorite and playback-mode controls in notifications / control centers.
 
@@ -229,11 +233,12 @@ The Halcyon main project is licensed under **Apache-2.0**. Third-party component
 ## 👥 Credits
 
 - **BetterLyrics** — Visual reference for blurred cover backgrounds and lyric display.
+- **Beautiful Lyrics** — Reference for dynamic backgrounds, fullscreen lyrics, and lyric visual experience.
 - **SPlayer** — Visual reference for playback page animations and lyric experience.
 - **Lyrico** — Reference for external tag editor adaptation and log page interaction.
 - **LX Music Mobile** — Provides LX Music API compatibility implementation and testing reference.
 - **Light Cone Music** — Interface design and feature implementation reference.
-- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, LyricGetter-API, lyrico-audiotag / Lyrico, TagLib, 163KeyDecrypter, Kyant Backdrop, Coil, OkHttp, Reorderable, accompanist-lyrics-core, accompanist-lyrics-ui, and other open source projects used by Halcyon.
+- Thanks to Miuix, Media3, FFmpeg, Lyricon, SuperLyricApi, LyricGetter-API, lyrico-audiotag / Lyrico, TagLib, 163KeyDecrypter, Kyant Backdrop, Coil, OkHttp, Reorderable, accompanist-lyrics-core, accompanist-lyrics-ui, Beautiful Lyrics, and other open source projects used by Halcyon.
 
 ---
 

@@ -28,6 +28,7 @@ import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.repository.CoverUsage
 import com.ella.music.data.repository.MusicRepository
 import com.ella.music.data.tagIdentityKey
+import com.ella.music.ui.analytics.prewarmLibraryAnalysisCache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -146,6 +147,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         preloadLibrarySearchSnapshot()
+        withContext(Dispatchers.IO) {
+            prewarmLibraryAnalysisCache(getApplication(), songs.value, this@MainViewModel)
+        }
     }
 
     fun loadCachedLibrary() {

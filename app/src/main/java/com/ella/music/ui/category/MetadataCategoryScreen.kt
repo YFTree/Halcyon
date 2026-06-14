@@ -177,8 +177,9 @@ fun MetadataCategoryScreen(
         gridColumns.coerceIn(1, 4)
     }
     val pageBackground = ellaPageBackground()
-    val savedCategoryScroll = remember(type) {
-        LibrarySortUiState.metadataCategoryScrollPositions[type] ?: (0 to 0)
+    val categoryScrollKey = remember(type, sortMode) { "$type\u0000${sortMode.name}" }
+    val savedCategoryScroll = remember(categoryScrollKey) {
+        LibrarySortUiState.metadataCategoryScrollPositions[categoryScrollKey] ?: (0 to 0)
     }
     val gridState = rememberLazyGridState(
         initialFirstVisibleItemIndex = savedCategoryScroll.first,
@@ -193,10 +194,10 @@ fun MetadataCategoryScreen(
             gridState.scrollToItem(0)
         }
     }
-    LaunchedEffect(type, gridState) {
+    LaunchedEffect(categoryScrollKey, gridState) {
         snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
             .collect { position ->
-                LibrarySortUiState.metadataCategoryScrollPositions[type] = position
+                LibrarySortUiState.metadataCategoryScrollPositions[categoryScrollKey] = position
             }
     }
     BackHandler(enabled = sortExpanded || searchExpanded) {
@@ -479,26 +480,33 @@ fun MetadataCategoryScreen(
     }
 
     playlistPickerSongs?.let { songs ->
-        AddToPlaylistSheet(
-            playlists = playlists,
-            songCount = songs.size,
-            onDismiss = { playlistPickerSongs = null },
-            onCreatePlaylist = {
-                createPlaylistSongs = songs
-                playlistPickerSongs = null
-            },
-            onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
-                selectedPlaylists.forEach { playlist ->
-                    mainViewModel.addSongsToPlaylist(playlist.id, songs, appendToEnd)
+        EllaMiuixBottomSheet(
+            show = true,
+            enableNestedScroll = false,
+            title = stringResource(R.string.song_more_add_to_playlist_title),
+            onDismissRequest = { playlistPickerSongs = null }
+        ) {
+            AddToPlaylistSheet(
+                playlists = playlists,
+                songCount = songs.size,
+                onDismiss = { playlistPickerSongs = null },
+                onCreatePlaylist = {
+                    createPlaylistSongs = songs
+                    playlistPickerSongs = null
+                },
+                onPlaylistsConfirm = { selectedPlaylists, appendToEnd ->
+                    selectedPlaylists.forEach { playlist ->
+                        mainViewModel.addSongsToPlaylist(playlist.id, songs, appendToEnd)
+                    }
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.player_added_to_playlists, selectedPlaylists.size),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    playlistPickerSongs = null
                 }
-                Toast.makeText(
-                    context,
-                    context.getString(R.string.player_added_to_playlists, selectedPlaylists.size),
-                    Toast.LENGTH_SHORT
-                ).show()
-                playlistPickerSongs = null
-            }
-        )
+            )
+        }
     }
 
     createPlaylistSongs?.let { songs ->

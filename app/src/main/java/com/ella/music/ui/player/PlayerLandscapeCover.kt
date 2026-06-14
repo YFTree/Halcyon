@@ -31,6 +31,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
@@ -99,6 +100,7 @@ internal fun LandscapeCoverPlayerPage(
     modifier: Modifier = Modifier
 ) {
     val bluetoothDeviceName = rememberBluetoothOutputName()
+    val hasLyrics = lyrics.isNotEmpty()
     Box(modifier = modifier.background(palette.middle)) {
         LandscapeCoverModeBackground(
             palette = palette,
@@ -121,23 +123,24 @@ internal fun LandscapeCoverPlayerPage(
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(horizontal = 32.dp, vertical = 22.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (hasLyrics) Arrangement.Start else Arrangement.Center
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(0.38f),
+                    .then(if (hasLyrics) Modifier.weight(0.38f) else Modifier.fillMaxWidth(0.46f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.BottomCenter
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(0.88f)
+                            .fillMaxWidth(if (hasLyrics) 0.88f else 0.78f)
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center
@@ -159,27 +162,42 @@ internal fun LandscapeCoverPlayerPage(
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                if (hasLyrics) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PlayerSongMetaText(
+                            song = song,
+                            annotation = annotation,
+                            titleFontSize = 20.sp,
+                            artistFontSize = 12.sp,
+                            artistAlpha = 0.56f,
+                            showArtistWithAnnotation = true,
+                            contentColor = palette.onBackground,
+                            onArtistClick = onArtist,
+                            modifier = Modifier.weight(1f)
+                        )
+                        PlayerHeaderAction(
+                            kind = PlayerHeaderActionKind.Favorite,
+                            selected = isFavorite,
+                            onClick = onToggleFavorite
+                        )
+                        PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
+                    }
+                } else {
                     PlayerSongMetaText(
                         song = song,
                         annotation = annotation,
-                        titleFontSize = 20.sp,
-                        artistFontSize = 12.sp,
-                        artistAlpha = 0.56f,
+                        titleFontSize = 24.sp,
+                        artistFontSize = 16.sp,
+                        artistAlpha = 0.62f,
                         showArtistWithAnnotation = true,
                         contentColor = palette.onBackground,
+                        textAlign = TextAlign.Center,
                         onArtistClick = onArtist,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    PlayerHeaderAction(
-                        kind = PlayerHeaderActionKind.Favorite,
-                        selected = isFavorite,
-                        onClick = onToggleFavorite
-                    )
-                    PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 PlayerProgressBlock(
@@ -214,39 +232,41 @@ internal fun LandscapeCoverPlayerPage(
                     onClearQueue = onClearQueue
                 )
             }
-            Spacer(modifier = Modifier.width(28.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .weight(0.62f)
-            ) {
-                SmoothLyricView(
-                    songId = song?.id ?: 0L,
-                    songTitle = song?.title.orEmpty(),
-                    songArtist = song?.artist.orEmpty(),
-                    lyrics = lyrics,
-                    currentIndex = currentLyricIndex,
-                    currentPositionMs = currentPosition,
-                    isPlaying = isPlaying,
-                    showTranslation = showTranslation,
-                    showPronunciation = showPronunciation,
-                    fontScale = fontScale,
-                    fontPath = fontPath,
-                    fontWeight = fontWeight,
-                    primaryTextSizeSp = 28f,
-                    secondaryTextSizeSp = 14f,
-                    anchorOffsetRatio = -0.08f,
-                    topContentPadding = 8.dp,
-                    contentColor = palette.onBackground,
-                    // A custom wallpaper is a busy background; blurring far lines makes them
-                    // unreadable, so keep all lines sharp when one is set.
-                    nonCurrentLineBlurEnabled = customBackgroundUri.isBlank(),
-                    onLineClick = onLyricLineClick,
-                    onLineLongClick = onLyricLineLongClick,
+            if (hasLyrics) {
+                Spacer(modifier = Modifier.width(64.dp))
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
                         .fillMaxHeight()
-                )
+                        .weight(0.62f)
+                ) {
+                    SmoothLyricView(
+                        songId = song?.id ?: 0L,
+                        songTitle = song?.title.orEmpty(),
+                        songArtist = song?.artist.orEmpty(),
+                        lyrics = lyrics,
+                        currentIndex = currentLyricIndex,
+                        currentPositionMs = currentPosition,
+                        isPlaying = isPlaying,
+                        showTranslation = showTranslation,
+                        showPronunciation = showPronunciation,
+                        fontScale = fontScale,
+                        fontPath = fontPath,
+                        fontWeight = fontWeight,
+                        primaryTextSizeSp = 28f,
+                        secondaryTextSizeSp = 14f,
+                        anchorOffsetRatio = -0.08f,
+                        topContentPadding = 8.dp,
+                        contentColor = palette.onBackground,
+                        // A custom wallpaper is a busy background; blurring far lines makes them
+                        // unreadable, so keep all lines sharp when one is set.
+                        nonCurrentLineBlurEnabled = customBackgroundUri.isBlank(),
+                        onLineClick = onLyricLineClick,
+                        onLineLongClick = onLyricLineLongClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight()
+                    )
+                }
             }
         }
         AudioVisualizer(

@@ -30,6 +30,7 @@ internal data class PlayerScreenSettings(
     val playerBackgroundOpacity: Int = 100,
     val playerBackgroundDim: Int = 26,
     val beautifulLyricsBackground: Boolean = false,
+    val showSongAnnotation: Boolean = true,
     val hiResLogoEnabled: Boolean = false,
     val hiResLogoUri: String = "",
     val lyricShareCustomInfo: String = "",
@@ -56,6 +57,7 @@ private data class PlayerSettingsGroupB(
     val playerBackgroundOpacity: Int,
     val playerBackgroundDim: Int,
     val beautifulLyricsBackground: Boolean,
+    val showSongAnnotation: Boolean,
     val hiResLogoEnabled: Boolean,
     val hiResLogoUri: String
 )
@@ -70,6 +72,7 @@ private data class PlayerSettingsGroupBBase(
 
 private data class PlayerSettingsGroupBExtra(
     val beautifulLyricsBackground: Boolean,
+    val showSongAnnotation: Boolean,
     val hiResLogoEnabled: Boolean,
     val hiResLogoUri: String
 )
@@ -110,10 +113,11 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
         }
         val groupBExtra = combine(
             settingsManager.playerBeautifulLyricsBackground,
+            settingsManager.playerShowSongAnnotation,
             settingsManager.hiResLogoEnabled,
             settingsManager.hiResLogoUri
-        ) { beautifulLyrics, hiResEnabled, hiResUri ->
-            PlayerSettingsGroupBExtra(beautifulLyrics, hiResEnabled, hiResUri)
+        ) { beautifulLyrics, showAnnotation, hiResEnabled, hiResUri ->
+            PlayerSettingsGroupBExtra(beautifulLyrics, showAnnotation, hiResEnabled, hiResUri)
         }
         val groupB = combine(groupBBase, groupBExtra) { base, extra ->
             PlayerSettingsGroupB(
@@ -123,6 +127,7 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
                 playerBackgroundOpacity = base.playerBackgroundOpacity,
                 playerBackgroundDim = base.playerBackgroundDim,
                 beautifulLyricsBackground = extra.beautifulLyricsBackground,
+                showSongAnnotation = extra.showSongAnnotation,
                 hiResLogoEnabled = extra.hiResLogoEnabled,
                 hiResLogoUri = extra.hiResLogoUri
             )
@@ -155,6 +160,7 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
                 playerBackgroundOpacity = b.playerBackgroundOpacity,
                 playerBackgroundDim = b.playerBackgroundDim,
                 beautifulLyricsBackground = b.beautifulLyricsBackground,
+                showSongAnnotation = b.showSongAnnotation,
                 hiResLogoEnabled = b.hiResLogoEnabled,
                 hiResLogoUri = b.hiResLogoUri,
                 lyricShareCustomInfo = c.lyricShareCustomInfo,

@@ -65,8 +65,6 @@ fun BackupSettingsScreen(
     val playbackStatsStore = remember { PlaybackStatsStore.getInstance(context) }
     val playlistStore = remember { PlaylistStore.getInstance(context) }
     val librarySongs by mainViewModel?.songs?.collectAsState(initial = emptyList()) ?: remember { mutableStateOf(emptyList()) }
-    var showPlaybackExportFormatDialog by remember { mutableStateOf(false) }
-    var playbackExportFormat by remember { mutableStateOf(PlaybackExportFormat.Ella) }
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
     suspend fun writeBackupText(uri: Uri, text: String) = withContext(Dispatchers.IO) {
@@ -78,18 +76,25 @@ fun BackupSettingsScreen(
             output.flush()
         } ?: error(context.getString(R.string.settings_backup_open_failed))
     }
+    suspend fun buildApplicationBackupJson(): JSONObject = withContext(Dispatchers.IO) {
+        JSONObject()
+            .put("version", 1)
+            .put("exportedAt", System.currentTimeMillis())
+            .put("settings", settingsManager.exportSettingsJson())
+            .put("playlists", playlistStore.exportJson())
+            .put("playback", playbackStatsStore.exportJson(librarySongs))
+            .put("aiChat", exportAiChatBackupJson(context))
+    }
+    suspend fun buildBackupJson(): String {
+        return buildApplicationBackupJson().toString(2)
+    }
     val settingsExportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         backupScope.launch {
             runCatching {
-                val backup = JSONObject()
-                    .put("version", 1)
-                    .put("exportedAt", System.currentTimeMillis())
-                    .put("settings", settingsManager.exportSettingsJson())
-                    .put("playlists", playlistStore.exportJson())
-                    .put("aiChat", exportAiChatBackupJson(context))
+                val backup = buildApplicationBackupJson()
                 writeBackupText(uri, backup.toString(2))
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_export_success), Toast.LENGTH_SHORT).show()
@@ -105,16 +110,10 @@ fun BackupSettingsScreen(
         backupScope.launch {
             runCatching {
                 val exported = playbackStatsStore.exportJson(librarySongs)
-                val backup = when (playbackExportFormat) {
-                    PlaybackExportFormat.Ella -> JSONObject()
-                        .put("version", 1)
-                        .put("exportedAt", System.currentTimeMillis())
-                        .put("playback", exported)
-                    PlaybackExportFormat.Sollin -> JSONObject()
-                        .put("version", 1)
-                        .put("exportedAtMs", System.currentTimeMillis())
-                        .put("sessions", exported.optJSONArray("sessions") ?: org.json.JSONArray())
-                }
+                val backup = JSONObject()
+                    .put("version", 1)
+                    .put("exportedAtMs", System.currentTimeMillis())
+                    .put("sessions", exported.optJSONArray("sessions") ?: org.json.JSONArray())
                 writeBackupText(uri, backup.toString(2))
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_export_success), Toast.LENGTH_SHORT).show()
@@ -135,8 +134,8 @@ fun BackupSettingsScreen(
                     } ?: error(context.getString(R.string.settings_backup_read_failed))
                 }
                 val root = JSONObject(text)
-                // Detect if this is a listening history backup
-                if (root.has("playback") || root.has("sessions") || root.has("stats") || root.has("history")) {
+                // Prism Music exports are listening-history only; app-data restore expects Halcyon JSON.
+                if (root.has("sessions") && !root.has("settings") && !root.has("playlists") && !root.has("playback")) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, context.getString(R.string.settings_backup_restore_wrong_type), Toast.LENGTH_LONG).show()
                     }
@@ -148,6 +147,7 @@ fun BackupSettingsScreen(
                 if (playlistPayload != null) {
                     playlistStore.restoreJson(playlistPayload)
                 }
+                root.optJSONObject("playback")?.let { playbackStatsStore.restoreJson(it) }
                 root.optJSONObject("aiChat")?.let { restoreAiChatBackupJson(context, it) }
             }.onSuccess {
                 Toast.makeText(context, context.getString(R.string.settings_backup_restore_success), Toast.LENGTH_SHORT).show()
@@ -219,16 +219,6 @@ fun BackupSettingsScreen(
         }
     }
 
-    suspend fun buildBackupJson(): String {
-        val backup = JSONObject()
-            .put("version", 1)
-            .put("exportedAt", System.currentTimeMillis())
-            .put("settings", settingsManager.exportSettingsJson())
-            .put("playlists", playlistStore.exportJson())
-            .put("aiChat", exportAiChatBackupJson(context))
-        return backup.toString(2)
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -286,14 +276,7 @@ fun BackupSettingsScreen(
                         title = stringResource(R.string.settings_backup_export_playback_title),
                         summary = stringResource(R.string.settings_backup_export_playback_summary),
                         onClick = {
-                            showPlaybackExportFormatDialog = true
-                        }
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_backup_restore_playback_title),
-                        summary = stringResource(R.string.settings_backup_restore_playback_summary),
-                        onClick = {
-                            playbackImportLauncher.launch(arrayOf("application/json", "text/json", "text/*"))
+                            playbackExportLauncher.launch("prism-listening-sessions_${System.currentTimeMillis()}.json")
                         }
                     )
                 }
@@ -424,21 +407,6 @@ fun BackupSettingsScreen(
         }
     }
 
-    if (showPlaybackExportFormatDialog) {
-        BackupFormatDialog(
-            onDismissRequest = { showPlaybackExportFormatDialog = false },
-            onFormatSelected = { format ->
-                playbackExportFormat = format
-                showPlaybackExportFormatDialog = false
-                val fileName = when (format) {
-                    PlaybackExportFormat.Ella -> "halcyon_listening_stats_${System.currentTimeMillis()}.json"
-                    PlaybackExportFormat.Sollin -> "prism-listening-stats_${System.currentTimeMillis()}.json"
-                }
-                playbackExportLauncher.launch(fileName)
-            }
-        )
-    }
-
     if (webDavBackupFiles.isNotEmpty()) {
         WebDavBackupPickerDialog(
             backupFiles = webDavBackupFiles,
@@ -469,6 +437,7 @@ fun BackupSettingsScreen(
                             if (playlistPayload != null) {
                                 playlistStore.restoreJson(playlistPayload)
                             }
+                            root.optJSONObject("playback")?.let { playbackStatsStore.restoreJson(it) }
                             root.optJSONObject("aiChat")?.let { restoreAiChatBackupJson(context, it) }
                             withContext(Dispatchers.IO) { tempFile.delete() }
                         }.onSuccess {

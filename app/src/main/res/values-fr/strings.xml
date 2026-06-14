@@ -1286,6 +1286,7 @@
 
     <!-- i18n : remerciements et résumés des projets open source de l’écran À propos -->
     <string name="about_summary_betterlyrics">Référence pour le fond flouté de pochette du lecteur et les effets visuels des paroles</string>
+    <string name="about_summary_beautiful_lyrics">Référence pour les arrière-plans dynamiques, les paroles plein écran et l’expérience visuelle des paroles</string>
     <string name="about_summary_splayer">Référence pour les animations du lecteur et l’expérience des paroles</string>
     <string name="about_title_lightcone">Lightcone Music</string>
     <string name="about_summary_lightcone">Référence pour certains visuels et effets de l’interface</string>

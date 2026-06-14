@@ -1286,6 +1286,7 @@
 
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">プレーヤーカバーのぼかし背景と歌詞ビジュアルエフェクトの参考</string>
+    <string name="about_summary_beautiful_lyrics">動的背景、全画面歌詞、歌詞ビジュアル体験の参考</string>
     <string name="about_summary_splayer">プレーヤーのアニメーションと歌詞エクスペリエンスの参考</string>
     <string name="about_title_lightcone">Lightcone Music</string>
     <string name="about_summary_lightcone">一部のインターフェースビジュアルと UI エフェクトの参考</string>

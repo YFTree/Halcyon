@@ -1286,6 +1286,7 @@
 
     <!-- i18n: About screen acknowledgements and open-source project summaries -->
     <string name="about_summary_betterlyrics">Referenz für Cover-Weichzeichnung im Player-Hintergrund und visuelle Liedtexteffekte</string>
+    <string name="about_summary_beautiful_lyrics">Referenz für dynamische Hintergründe, Vollbild-Liedtexte und das Liedtext-Erlebnis</string>
     <string name="about_summary_splayer">Referenz für Player-Animationen und Liedtexterlebnis</string>
     <string name="about_title_lightcone">Lightcone Music</string>
     <string name="about_summary_lightcone">Referenz für einige UI-Visuals und Effekte</string>

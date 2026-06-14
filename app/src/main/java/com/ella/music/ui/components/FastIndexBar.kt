@@ -231,14 +231,20 @@ fun LazyListScrollIndicator(
             val total = layoutInfo.totalItemsCount
             val visible = layoutInfo.visibleItemsInfo.size
             val first = state.firstVisibleItemIndex
-            Triple(first, visible, total)
+            ScrollIndicatorInfo(
+                firstVisibleIndex = first,
+                firstVisibleOffset = state.firstVisibleItemScrollOffset,
+                visibleCount = visible,
+                totalCount = total
+            )
         }
     }
     ScrollIndicator(
         scrollInProgress = state.isScrollInProgress,
-        firstVisibleIndex = info.first,
-        visibleCount = info.second,
-        totalCount = info.third,
+        firstVisibleIndex = info.firstVisibleIndex,
+        firstVisibleOffset = info.firstVisibleOffset,
+        visibleCount = info.visibleCount,
+        totalCount = info.totalCount,
         modifier = modifier,
         onDragToIndex = { index ->
             state.scrollToItem(index)
@@ -257,14 +263,20 @@ fun LazyGridScrollIndicator(
             val total = layoutInfo.totalItemsCount
             val visible = layoutInfo.visibleItemsInfo.size
             val first = state.firstVisibleItemIndex
-            Triple(first, visible, total)
+            ScrollIndicatorInfo(
+                firstVisibleIndex = first,
+                firstVisibleOffset = state.firstVisibleItemScrollOffset,
+                visibleCount = visible,
+                totalCount = total
+            )
         }
     }
     ScrollIndicator(
         scrollInProgress = state.isScrollInProgress,
-        firstVisibleIndex = info.first,
-        visibleCount = info.second,
-        totalCount = info.third,
+        firstVisibleIndex = info.firstVisibleIndex,
+        firstVisibleOffset = info.firstVisibleOffset,
+        visibleCount = info.visibleCount,
+        totalCount = info.totalCount,
         modifier = modifier,
         onDragToIndex = { index ->
             state.scrollToItem(index)
@@ -276,6 +288,7 @@ fun LazyGridScrollIndicator(
 private fun ScrollIndicator(
     scrollInProgress: Boolean,
     firstVisibleIndex: Int,
+    firstVisibleOffset: Int,
     visibleCount: Int,
     totalCount: Int,
     modifier: Modifier = Modifier,
@@ -288,17 +301,20 @@ private fun ScrollIndicator(
     var trackHeightPx by remember(totalCount, visibleCount) { mutableStateOf(1) }
     var visible by remember(totalCount, visibleCount) { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
+    var hasScrollActivity by remember(totalCount, visibleCount) { mutableStateOf(false) }
     val thumbAlpha by animateFloatAsState(targetValue = if (visible) 1f else 0f, label = "scrollThumbAlpha")
     val currentOnDragToIndex by rememberUpdatedState(onDragToIndex)
+    val scrollSignature = remember(firstVisibleIndex, firstVisibleOffset) {
+        firstVisibleIndex to firstVisibleOffset
+    }
 
-    LaunchedEffect(firstVisibleIndex, scrollInProgress, dragging) {
-        if (scrollInProgress || dragging) {
-            visible = true
-            return@LaunchedEffect
-        }
-        if (visible) {
+    LaunchedEffect(scrollSignature, scrollInProgress, dragging) {
+        if (scrollInProgress || dragging) hasScrollActivity = true
+        if (!hasScrollActivity) return@LaunchedEffect
+        visible = true
+        if (!scrollInProgress && !dragging) {
             delay(SCROLL_THUMB_IDLE_HIDE_MS)
-            if (!dragging) visible = false
+            visible = false
         }
     }
 
@@ -338,6 +354,14 @@ private fun ScrollIndicator(
                             }
 
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            if (!visible && !dragging) {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull() ?: break
+                                    if (change.changedToUpIgnoreConsumed() || !change.pressed) break
+                                }
+                                return@awaitEachGesture
+                            }
                             dragging = true
                             visible = true
                             down.consume()
@@ -377,4 +401,11 @@ private fun ScrollIndicator(
 }
 
 private const val SCROLL_THUMB_DRAG_THROTTLE_MS = 24L
-private const val SCROLL_THUMB_IDLE_HIDE_MS = 3_000L
+private const val SCROLL_THUMB_IDLE_HIDE_MS = 1_000L
+
+private data class ScrollIndicatorInfo(
+    val firstVisibleIndex: Int,
+    val firstVisibleOffset: Int,
+    val visibleCount: Int,
+    val totalCount: Int
+)

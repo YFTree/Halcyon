@@ -18,10 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
@@ -130,24 +127,12 @@ internal fun BeautifulLyricsDynamicBackground(
     val speed by settingsManager.playerBeautifulLyricsSpeed.collectAsState(initial = 25)
     val blurPx by settingsManager.playerBeautifulLyricsBlur.collectAsState(initial = 32)
     val brightness by settingsManager.playerBeautifulLyricsBrightness.collectAsState(initial = 70)
-    var drift by remember { mutableStateOf(0.42f) }
-    LaunchedEffect(animate, isPlaying, speed) {
-        if (!animate) {
-            drift = 0.42f
-            return@LaunchedEffect
-        }
-        var lastFrameNs = withFrameNanos { it }
-        while (true) {
-            val frameNs = withFrameNanos { it }
-            val deltaSeconds = ((frameNs - lastFrameNs).coerceAtLeast(0L)) / 1_000_000_000f
-            lastFrameNs = frameNs
-            if (isPlaying) {
-                val speedMultiplier = speed.coerceIn(5, 60) / 10f
-                drift = (drift + deltaSeconds * speedMultiplier / 96f) % 1f
-            }
-        }
-    }
-    val activeDrift = if (animate) drift else 0.42f
+    val durationMs = (960_000 / speed.coerceIn(5, 60)).coerceIn(16_000, 192_000)
+    val activeDrift = rememberSharedFlowProgress(
+        durationMillis = durationMs,
+        animate = animate,
+        fallback = 0.42f
+    )
     val pulse = if (isPlaying) {
         0.5f + 0.5f * kotlin.math.sin(positionMs / 760.0).toFloat()
     } else {
@@ -173,9 +158,9 @@ internal fun BeautifulLyricsDynamicBackground(
         drawRect(
             brush = Brush.linearGradient(
                 colors = listOf(
-                    sampledColors[0].copy(alpha = (0.88f * brightnessAlpha).coerceIn(0.3f, 1f)),
-                    sampledColors[1].copy(alpha = (0.82f * brightnessAlpha).coerceIn(0.3f, 1f)),
-                    sampledColors[2].copy(alpha = (0.88f * brightnessAlpha).coerceIn(0.3f, 1f))
+                    sampledColors[0].copy(alpha = 1f),
+                    sampledColors[1].copy(alpha = (0.92f * brightnessAlpha).coerceIn(0.55f, 1f)),
+                    sampledColors[2].copy(alpha = 1f)
                 ),
                 start = Offset(0f, 0f),
                 end = Offset(w, h)
@@ -216,6 +201,15 @@ internal fun BeautifulLyricsDynamicBackground(
                 center = center
             )
         }
+        drawRect(
+            brush = Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.0f to Color.Transparent,
+                    0.68f to Color.Transparent,
+                    1.0f to Color.Black.copy(alpha = 0.14f)
+                )
+            )
+        )
     }
 }
 

@@ -107,6 +107,7 @@ internal fun CoverPageContent(
     openLyricSharePicker: (LyricLine) -> Unit,
     navigateToArtistOrChoose: (String) -> Unit,
     onShowLyrics: () -> Unit,
+    drawBackground: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     var actionMenuInitialPage by remember { mutableStateOf(PlayerActionSheetPage.Main) }
@@ -378,6 +379,7 @@ internal fun CoverPageContent(
         lyricTimingEditorId = lyricTimingEditorId,
         onVisualizerEnabled = onVisualizerEnabled,
         actionMenuInitialPage = actionMenuInitialPage,
+        drawBackground = drawBackground,
         modifier = modifier
     )
 }
@@ -420,6 +422,7 @@ internal fun LyricsPageContent(
     onDismissLyrics: () -> Unit,
     enableSwipeDismiss: Boolean,
     immersiveAlbumCover: Boolean,
+    drawBackground: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     LyricsPlayerPage(
@@ -482,6 +485,7 @@ internal fun LyricsPageContent(
         },
         enableSwipeDismiss = enableSwipeDismiss,
         useBlurBackground = immersiveAlbumCover,
+        drawBackground = drawBackground,
         modifier = modifier
     )
 }
@@ -507,6 +511,7 @@ internal fun DetailPageContent(
     onNavigateToArtist: (String) -> Unit,
     onNavigateToMetadataCategory: (String, String) -> Unit,
     openNetease: (String?) -> Unit,
+    drawBackground: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     PlayerDetailPage(
@@ -526,6 +531,7 @@ internal fun DetailPageContent(
         }.orEmpty(),
         customBackgroundOpacity = playerBackgroundOpacity,
         customBackgroundDim = playerBackgroundDim,
+        drawBackground = drawBackground,
         onAlbum = {
             val albumId = song?.albumIdentityId() ?: 0L
             if (albumId > 0L) onNavigateToAlbum(albumId)

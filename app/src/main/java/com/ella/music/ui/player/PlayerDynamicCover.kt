@@ -47,7 +47,7 @@ internal fun DynamicCoverVideo(
             model = source.uri,
             contentDescription = null,
             modifier = modifier,
-            contentScale = ContentScale.Crop,
+            contentScale = ContentScale.Fit,
             sizePx = 1200,
             showDefaultPlaceholder = false
         )
@@ -92,7 +92,7 @@ internal fun DynamicCoverVideo(
                 useController = false
                 controllerAutoShow = false
                 controllerHideOnTouch = false
-                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                 setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                 findViewById<View>(androidx.media3.ui.R.id.exo_controller)?.visibility = View.GONE
                 player = exoPlayer
@@ -105,6 +105,7 @@ internal fun DynamicCoverVideo(
             view.controllerHideOnTouch = false
             view.findViewById<View>(androidx.media3.ui.R.id.exo_controller)?.visibility = View.GONE
             view.player = exoPlayer
+            view.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
             view.hideController()
             exoPlayer.playWhenReady = isPlaying
         }

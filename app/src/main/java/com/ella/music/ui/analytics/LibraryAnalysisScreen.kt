@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -40,11 +41,19 @@ fun LibraryAnalysisScreen(
     mainViewModel: MainViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val songs by mainViewModel.songs.collectAsState()
     val playbackStats by mainViewModel.playbackStats.collectAsState()
-    val analysis by produceState<LibraryAnalysis?>(initialValue = null, songs) {
-        value = if (songs.isEmpty()) LibraryAnalysis(emptyList(), emptyList(), 0, 0L)
-        else withContext(Dispatchers.IO) { buildLibraryAnalysis(songs, mainViewModel) }
+    val cachedAnalysis = readCachedLibraryAnalysis(context, songs)
+    val analysis by produceState<LibraryAnalysis?>(initialValue = cachedAnalysis, songs) {
+        if (songs.isEmpty()) {
+            value = LibraryAnalysis(emptyList(), emptyList(), 0, 0L)
+            return@produceState
+        }
+        if (cachedAnalysis != null) value = cachedAnalysis
+        val fresh = withContext(Dispatchers.IO) { buildLibraryAnalysis(songs, mainViewModel) }
+        writeCachedLibraryAnalysis(context, songs, fresh)
+        value = fresh
     }
 
     Column(

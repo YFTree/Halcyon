@@ -2,12 +2,6 @@ package com.ella.music.ui.player
 
 import android.graphics.Bitmap
 import android.util.Log
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -15,6 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -32,21 +30,12 @@ internal fun PlayerFlowBackground(
     LaunchedEffect(animate) {
         Log.d("PlayerScreenPerf", "flow background ${if (animate) "animated" else "static"}")
     }
-    val sweepDrift = if (animate) {
-        val transition = rememberInfiniteTransition(label = "player_flow_background")
-        val value by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 92_000, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "player_flow_background_drift"
-        )
-        value
-    } else {
-        0f
-    }
+    val sweepDrift = rememberSharedFlowProgress(
+        durationMillis = 92_000,
+        animate = animate,
+        reverse = true,
+        fallback = 0f
+    )
 
     Canvas(modifier = modifier.background(palette.middle)) {
         val w = size.width
@@ -141,15 +130,11 @@ internal fun NonImmersiveAlbumFlowBackground(
     isPlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val transition = rememberInfiniteTransition(label = "non_immersive_album_flow")
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 28_000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "non_immersive_album_flow_drift"
+    val drift = rememberSharedFlowProgress(
+        durationMillis = 28_000,
+        animate = true,
+        reverse = true,
+        fallback = 0f
     )
     val pulse = if (isPlaying) {
         0.5f + 0.5f * kotlin.math.sin(drift * kotlin.math.PI.toFloat() * 2f)
@@ -235,4 +220,29 @@ internal fun NonImmersiveAlbumFlowBackground(
             )
         }
     }
+}
+
+@Composable
+internal fun rememberSharedFlowProgress(
+    durationMillis: Int,
+    animate: Boolean,
+    reverse: Boolean = false,
+    fallback: Float = 0f
+): Float {
+    var frameTimeNs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(durationMillis, animate) {
+        if (!animate) {
+            frameTimeNs = 0L
+            return@LaunchedEffect
+        }
+        while (true) {
+            frameTimeNs = withFrameNanos { it }
+        }
+    }
+    if (!animate || frameTimeNs == 0L) return fallback
+    val safeDuration = durationMillis.coerceAtLeast(1)
+    val elapsedMs = frameTimeNs / 1_000_000L
+    val cycle = elapsedMs / safeDuration
+    val fraction = (elapsedMs % safeDuration).toFloat() / safeDuration.toFloat()
+    return if (reverse && cycle % 2L == 1L) 1f - fraction else fraction
 }
