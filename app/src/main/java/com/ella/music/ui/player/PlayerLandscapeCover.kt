@@ -2,6 +2,7 @@ package com.ella.music.ui.player
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,10 +24,15 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -39,6 +45,7 @@ import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.SmoothLyricView
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 
 @Composable
@@ -87,6 +94,7 @@ internal fun LandscapeCoverPlayerPage(
     onSeek: (Float) -> Unit,
     onCyclePlaybackMode: () -> Unit,
     onPrevious: () -> Unit,
+    onSwipePrevious: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onQueueSongClick: (Int) -> Unit,
@@ -101,6 +109,10 @@ internal fun LandscapeCoverPlayerPage(
 ) {
     val bluetoothDeviceName = rememberBluetoothOutputName()
     val hasLyrics = lyrics.isNotEmpty()
+    val swipeThresholdPx = with(LocalDensity.current) { 84.dp.toPx() }
+    val swipeScope = rememberCoroutineScope()
+    val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
+
     Box(modifier = modifier.background(palette.middle)) {
         LandscapeCoverModeBackground(
             palette = palette,
@@ -132,36 +144,6 @@ internal fun LandscapeCoverPlayerPage(
                     .then(if (hasLyrics) Modifier.weight(0.38f) else Modifier.fillMaxWidth(0.46f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.BottomCenter
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(if (hasLyrics) 0.88f else 0.78f)
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(14.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (dynamicCoverSource != null) {
-                            DynamicCoverVideo(
-                                source = dynamicCoverSource,
-                                isPlaying = isPlaying,
-                                onPlaybackError = { onDynamicCoverFailed(dynamicCoverSource.failureKey) },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            AlbumArtView(
-                                song = song,
-                                embeddedCover = embeddedCover,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
                 if (hasLyrics) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -199,7 +181,61 @@ internal fun LandscapeCoverPlayerPage(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(18.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(if (hasLyrics) 0.88f else 0.78f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .pointerInput(song?.id, onSwipePrevious, onNext) {
+                                detectHorizontalDragGestures(
+                                    onDragCancel = {
+                                        swipeScope.launch { dragOffset.animateTo(0f) }
+                                    },
+                                    onDragEnd = {
+                                        val travel = dragOffset.value
+                                        swipeScope.launch { dragOffset.animateTo(0f) }
+                                        when {
+                                            travel > swipeThresholdPx -> onSwipePrevious()
+                                            travel < -swipeThresholdPx -> onNext()
+                                        }
+                                    },
+                                    onHorizontalDrag = { change, dragAmount ->
+                                        change.consume()
+                                        swipeScope.launch {
+                                            dragOffset.snapTo(dragOffset.value + dragAmount)
+                                        }
+                                    }
+                                )
+                            }
+                            .graphicsLayer {
+                                translationX = dragOffset.value * 0.35f
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (dynamicCoverSource != null) {
+                            DynamicCoverVideo(
+                                source = dynamicCoverSource,
+                                isPlaying = isPlaying,
+                                onPlaybackError = { onDynamicCoverFailed(dynamicCoverSource.failureKey) },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            AlbumArtView(
+                                song = song,
+                                embeddedCover = embeddedCover,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(18.dp))
                 PlayerProgressBlock(
                     currentPosition = currentPosition,
                     duration = duration,

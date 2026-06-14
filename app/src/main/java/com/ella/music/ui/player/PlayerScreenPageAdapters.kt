@@ -107,6 +107,7 @@ internal fun CoverPageContent(
     openLyricSharePicker: (LyricLine) -> Unit,
     navigateToArtistOrChoose: (String) -> Unit,
     onShowLyrics: () -> Unit,
+    onSwipePrevious: () -> Unit,
     drawBackground: Boolean = true,
     modifier: Modifier = Modifier
 ) {
@@ -196,6 +197,7 @@ internal fun CoverPageContent(
         onSeek = { fraction -> playerViewModel.seekTo((fraction * duration).toLong()) },
         onCyclePlaybackMode = { playerViewModel.cyclePlaybackMode() },
         onPrevious = { playerViewModel.skipToPrevious() },
+        onSwipePrevious = onSwipePrevious,
         onPlayPause = { playerViewModel.togglePlayPause() },
         onNext = { playerViewModel.skipToNext() },
         onQueueSongClick = { index ->

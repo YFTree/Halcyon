@@ -483,6 +483,7 @@ fun PlayerScreen(
                         openLyricSharePicker = ::openLyricSharePicker,
                         navigateToArtistOrChoose = ::navigateToArtistOrChoose,
                         onShowLyrics = onShowLyrics,
+                        onSwipePrevious = { playerViewModel.skipToPreviousTrack() },
                         drawBackground = immersiveAlbumCover,
                         modifier = pageModifier
                     )
