@@ -190,6 +190,11 @@
     <string name="settings_scan_folders_summary">管理本機目錄、USB 目錄和隱藏資料夾</string>
     <string name="settings_lyrics">歌詞</string>
     <string name="settings_lyrics_summary">字幕、桌面歌詞、狀態列歌詞與車用歌詞</string>
+    <string name="settings_player_lyric_text_align">播放頁歌詞對齊</string>
+    <string name="player_output_bluetooth">藍牙裝置</string>
+    <string name="player_output_headphones">耳機</string>
+    <string name="player_output_usb_audio">USB 音訊</string>
+    <string name="player_output_speaker">揚聲器</string>
     <string name="settings_audio">音訊</string>
     <string name="settings_audio_summary">播放、解碼、隨機播放與音訊焦點</string>
     <string name="settings_backup">備份</string>
@@ -939,6 +944,7 @@
     <string name="analytics_heatmap_low">少</string>
     <string name="analytics_heatmap_high">多</string>
     <string name="analytics_heatmap_today">今天 %1$s</string>
+    <string name="analytics_heatmap_selected">%1$s 聽了 %2$s</string>
     <string name="analytics_view_all_records">檢視全部 %1$d 筆紀錄</string>
     <string name="analytics_history_empty">播放歌曲後會紀錄最近聽過的內容</string>
     <string name="analytics_times_count">%1$d 次</string>

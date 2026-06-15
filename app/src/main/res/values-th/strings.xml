@@ -24,6 +24,11 @@
     <string name="album_count">%d อัลบั้ม</string>
     <string name="duration_format" formatted="false">%02d:%02d</string>
     <string name="no_lyrics">ไม่มีเนื้อเพลง</string>
+    <string name="settings_player_lyric_text_align">Player lyric alignment</string>
+    <string name="player_output_bluetooth">Bluetooth device</string>
+    <string name="player_output_headphones">Headphones</string>
+    <string name="player_output_usb_audio">USB audio</string>
+    <string name="player_output_speaker">Speaker</string>
     <string name="now_playing">กำลังเล่น</string>
     <string name="play_all">เล่นทั้งหมด</string>
     <string name="album_play_all">เล่นทั้งหมด</string>
@@ -939,6 +944,7 @@
     <string name="analytics_heatmap_low">ต่ำ</string>
     <string name="analytics_heatmap_high">สูง</string>
     <string name="analytics_heatmap_today">วันนี้ %1$s</string>
+    <string name="analytics_heatmap_selected">%1$s listened for %2$s</string>
     <string name="analytics_view_all_records">ดูบันทึกทั้งหมด %1$d รายการ</string>
     <string name="analytics_history_empty">รายการที่เล่นล่าสุดจะปรากฏที่นี่หลังจากเริ่มเล่น</string>
     <string name="analytics_times_count">เล่น %1$d ครั้ง</string>

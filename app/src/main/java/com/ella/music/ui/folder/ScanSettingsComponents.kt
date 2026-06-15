@@ -28,6 +28,7 @@ import com.ella.music.ui.components.EllaMiuixActionRow
 import com.ella.music.ui.components.EllaMiuixDialog
 import com.ella.music.ui.components.EllaMiuixDialogActions
 import com.ella.music.ui.components.FolderOutlineIcon
+import com.ella.music.ui.components.ScanRefreshIconButton
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -37,7 +38,6 @@ import top.yukonga.miuix.kmp.icon.basic.ArrowRight
 import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Folder
-import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Locale
@@ -92,7 +92,9 @@ internal fun MediaSourceModeCard(
 internal fun UsbFoldersCard(
     usbFolderUris: List<String>,
     onRemove: (String) -> Unit,
-    onScan: () -> Unit
+    scanEnabled: Boolean,
+    onScan: () -> Unit,
+    onDeepRescan: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -114,14 +116,13 @@ internal fun UsbFoldersCard(
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 }
-                IconButton(onClick = onScan) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Refresh,
-                        contentDescription = stringResource(R.string.folder_full_scan),
-                        tint = MiuixTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                ScanRefreshIconButton(
+                    enabled = scanEnabled,
+                    onScan = onScan,
+                    onDeepRescan = onDeepRescan,
+                    iconSize = 22.dp,
+                    contentDescription = stringResource(R.string.folder_full_scan)
+                )
             }
             usbFolderUris.forEach { uri ->
                 val displayName = runCatching {
@@ -174,7 +175,9 @@ internal fun SavedScanFoldersCard(
     hiddenFolders: Set<String>,
     onVisibilityChange: (String, Boolean) -> Unit,
     onRemove: (String) -> Unit,
-    onScan: () -> Unit
+    scanEnabled: Boolean,
+    onScan: () -> Unit,
+    onDeepRescan: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -196,14 +199,13 @@ internal fun SavedScanFoldersCard(
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 }
-                IconButton(onClick = onScan) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Refresh,
-                        contentDescription = stringResource(R.string.folder_full_scan),
-                        tint = MiuixTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                ScanRefreshIconButton(
+                    enabled = scanEnabled,
+                    onScan = onScan,
+                    onDeepRescan = onDeepRescan,
+                    iconSize = 22.dp,
+                    contentDescription = stringResource(R.string.folder_full_scan)
+                )
             }
             folders.forEach { folder ->
                 val isVisible = folder.normalizeFolderPath().lowercase(Locale.ROOT) !in hiddenFolders

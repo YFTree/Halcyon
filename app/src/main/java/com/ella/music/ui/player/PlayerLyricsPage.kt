@@ -53,6 +53,7 @@ internal fun LyricsPlayerPage(
     italic: Boolean,
     fontScale: Float,
     perspectiveEffect: Boolean,
+    lyricTextAlign: Int,
     palette: PlayerPalette,
     flowEffectMode: Int,
     currentPositionMs: Long,
@@ -174,6 +175,7 @@ internal fun LyricsPlayerPage(
                     fontPath = fontPath,
                     fontWeight = fontWeight,
                     italic = italic,
+                    lyricTextAlign = lyricTextAlign,
                     contentColor = palette.onBackground,
                     // Keep far lines sharp over a busy custom wallpaper so they stay readable.
                     nonCurrentLineBlurEnabled = !useCustomPlayerBackground,

@@ -208,6 +208,11 @@
     <string name="settings_scan_folders_summary">Manage local directories, USB directories, and hidden folders</string>
     <string name="settings_lyrics">Lyrics</string>
     <string name="settings_lyrics_summary">Lyricon, desktop lyrics, status bar lyrics, and car lyrics</string>
+    <string name="settings_player_lyric_text_align">Player lyric alignment</string>
+    <string name="player_output_bluetooth">Bluetooth device</string>
+    <string name="player_output_headphones">Headphones</string>
+    <string name="player_output_usb_audio">USB audio</string>
+    <string name="player_output_speaker">Speaker</string>
     <string name="settings_audio">Audio</string>
     <string name="settings_audio_summary">Playback, decoding, shuffle, and audio focus</string>
     <string name="settings_backup">App data</string>
@@ -965,6 +970,7 @@
     <string name="analytics_heatmap_low">Low</string>
     <string name="analytics_heatmap_high">High</string>
     <string name="analytics_heatmap_today">Today %1$s</string>
+    <string name="analytics_heatmap_selected">%1$s listened for %2$s</string>
     <string name="analytics_view_all_records">View all %1$d records</string>
     <string name="analytics_history_empty">Recently played items will appear here after you start playback</string>
     <string name="analytics_times_count">%1$d plays</string>

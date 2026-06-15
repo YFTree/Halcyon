@@ -24,6 +24,11 @@
     <string name="album_count">%d 앨범</string>
     <string name="duration_format" formatted="false">%02d:%02d</string>
     <string name="no_lyrics">가사 없음</string>
+    <string name="settings_player_lyric_text_align">Player lyric alignment</string>
+    <string name="player_output_bluetooth">Bluetooth device</string>
+    <string name="player_output_headphones">Headphones</string>
+    <string name="player_output_usb_audio">USB audio</string>
+    <string name="player_output_speaker">Speaker</string>
     <string name="now_playing">지금 재생 중</string>
     <string name="play_all">모두 재생</string>
     <string name="album_play_all">모두 재생</string>
@@ -939,6 +944,7 @@
     <string name="analytics_heatmap_low">낮음</string>
     <string name="analytics_heatmap_high">높음</string>
     <string name="analytics_heatmap_today">오늘 %1$s</string>
+    <string name="analytics_heatmap_selected">%1$s listened for %2$s</string>
     <string name="analytics_view_all_records">모든 %1$d 기록 보기</string>
     <string name="analytics_history_empty">재생을 시작하면 최근에 재생한 항목이 여기에 표시됩니다</string>
     <string name="analytics_times_count">%1$d 재생</string>

@@ -22,6 +22,7 @@ import com.ella.music.player.LyriconBridge
 import com.ella.music.player.PlaybackService
 import com.ella.music.player.SuperLyricBridge
 import com.ella.music.player.TickerBridge
+import androidx.media3.common.Player
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -141,6 +142,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var lastBluetoothLyricPayload: Pair<String, String?>? = null
     private var externalLyricResendJob: Job? = null
     private var loadedLyricSongKey: String? = null
+    private var lastLyricPositionSongKey: String? = null
+    private var lastLyricPositionMs: Long = 0L
 
     init {
         playerManager.connect()
@@ -675,15 +678,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun updateCurrentLyricIndex() {
         val currentLyrics = _lyrics.value
-        if (currentLyrics.isEmpty()) return
+        if (currentLyrics.isEmpty()) {
+            lastLyricPositionSongKey = currentSong.value?.lyricIdentityKey()
+            lastLyricPositionMs = playerManager.currentPosition.value
+            return
+        }
 
         val position = playerManager.currentPosition.value
+        val songKey = currentSong.value?.lyricIdentityKey()
+        val previousPosition = if (lastLyricPositionSongKey == songKey) lastLyricPositionMs else position
+        val loopedToStart = playerManager.repeatMode.value == Player.REPEAT_MODE_ONE &&
+            previousPosition > 1_500L &&
+            position <= 750L &&
+            previousPosition - position > 1_500L
+
         var index = -1
         for (i in currentLyrics.indices.reversed()) {
             if (position >= currentLyrics[i].timeMs) {
                 index = i
                 break
             }
+        }
+        if (loopedToStart && index < 0 && _currentLyricIndex.value >= 0) {
+            _currentLyricIndex.value = -1
         }
         if (index != _currentLyricIndex.value) {
             _currentLyricIndex.value = index
@@ -695,6 +712,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 sendLyricGetterAt(index, currentLyrics)
             }
         }
+        lastLyricPositionSongKey = songKey
+        lastLyricPositionMs = position
     }
 
     private suspend fun updatePlaybackStats() {

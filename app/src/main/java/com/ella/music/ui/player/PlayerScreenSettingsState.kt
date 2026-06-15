@@ -39,7 +39,8 @@ internal data class PlayerScreenSettings(
     val sleepTimerCustomMinutes: Int = 45,
     val sleepTimerStopAfterCurrent: Boolean = false,
     val lyricPageKeepScreenOn: Boolean = false,
-    val lyricPerspectiveEffect: Boolean = false
+    val lyricPerspectiveEffect: Boolean = false,
+    val playerLyricTextAlign: Int = SettingsManager.PLAYER_LYRIC_ALIGN_LEFT
 )
 
 private data class PlayerSettingsGroupA(
@@ -87,7 +88,8 @@ private data class PlayerSettingsGroupC(
 
 private data class PlayerSettingsGroupD(
     val lyricPageKeepScreenOn: Boolean,
-    val lyricPerspectiveEffect: Boolean
+    val lyricPerspectiveEffect: Boolean,
+    val playerLyricTextAlign: Int
 )
 
 @Composable
@@ -143,9 +145,10 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
         }
         val groupD = combine(
             settingsManager.lyricPageKeepScreenOn,
-            settingsManager.lyricPerspectiveEffect
-        ) { keepScreenOn, perspective ->
-            PlayerSettingsGroupD(keepScreenOn, perspective)
+            settingsManager.lyricPerspectiveEffect,
+            settingsManager.playerLyricTextAlign
+        ) { keepScreenOn, perspective, lyricTextAlign ->
+            PlayerSettingsGroupD(keepScreenOn, perspective, lyricTextAlign)
         }
         combine(groupA, groupB, groupC, groupD) { a, b, c, d ->
             PlayerScreenSettings(
@@ -169,7 +172,8 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
                 sleepTimerCustomMinutes = c.sleepTimerCustomMinutes,
                 sleepTimerStopAfterCurrent = c.sleepTimerStopAfterCurrent,
                 lyricPageKeepScreenOn = d.lyricPageKeepScreenOn,
-                lyricPerspectiveEffect = d.lyricPerspectiveEffect
+                lyricPerspectiveEffect = d.lyricPerspectiveEffect,
+                playerLyricTextAlign = d.playerLyricTextAlign
             )
         }
     }

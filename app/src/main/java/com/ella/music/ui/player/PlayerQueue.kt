@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.media3.common.Player
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.playlistIdentityKey
@@ -69,6 +70,9 @@ private fun buildQueueEntries(items: List<Song>): List<QueueEntry> {
 internal fun PlayerQueueMenu(
     playlist: List<Song>,
     currentSongId: Long?,
+    shuffleEnabled: Boolean,
+    repeatMode: Int,
+    onCyclePlaybackMode: () -> Unit,
     onSongClick: (Int) -> Unit,
     onRemoveSong: (Int) -> Unit,
     onMoveSong: (Int, Int) -> Unit,
@@ -112,6 +116,19 @@ internal fun PlayerQueueMenu(
                 .padding(horizontal = 4.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .playerNoIndicationClick(onCyclePlaybackMode),
+                contentAlignment = Alignment.Center
+            ) {
+                QueuePlaybackModeIcon(
+                    shuffleEnabled = shuffleEnabled,
+                    repeatMode = repeatMode,
+                    color = MiuixTheme.colorScheme.primary
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
             if (playlist.isNotEmpty()) {
                 Box(
@@ -275,4 +292,30 @@ internal fun PlayerQueueMenu(
             }
         }
     }
+}
+
+@Composable
+private fun QueuePlaybackModeIcon(
+    shuffleEnabled: Boolean,
+    repeatMode: Int,
+    color: Color
+) {
+    val iconRes = when {
+        shuffleEnabled -> R.drawable.ic_shuffle
+        repeatMode == Player.REPEAT_MODE_ONE -> R.drawable.ic_repeat_one
+        repeatMode == Player.REPEAT_MODE_ALL -> R.drawable.ic_repeat
+        else -> R.drawable.ic_playback_order
+    }
+    val label = when {
+        shuffleEnabled -> stringResource(R.string.player_playback_mode_shuffle)
+        repeatMode == Player.REPEAT_MODE_ONE -> stringResource(R.string.player_playback_mode_repeat_one)
+        repeatMode == Player.REPEAT_MODE_ALL -> stringResource(R.string.player_playback_mode_repeat_all)
+        else -> stringResource(R.string.player_playback_mode_in_order)
+    }
+    Icon(
+        painter = painterResource(id = iconRes),
+        contentDescription = label,
+        tint = color,
+        modifier = Modifier.size(20.dp)
+    )
 }

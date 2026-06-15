@@ -24,6 +24,11 @@
     <string name="album_count">%d アルバム</string>
     <string name="duration_format" formatted="false">%02d:%02d</string>
     <string name="no_lyrics">歌詞なし</string>
+    <string name="settings_player_lyric_text_align">Player lyric alignment</string>
+    <string name="player_output_bluetooth">Bluetooth device</string>
+    <string name="player_output_headphones">Headphones</string>
+    <string name="player_output_usb_audio">USB audio</string>
+    <string name="player_output_speaker">Speaker</string>
     <string name="now_playing">再生中</string>
     <string name="play_all">すべて再生</string>
     <string name="album_play_all">すべて再生</string>
@@ -939,6 +944,7 @@
     <string name="analytics_heatmap_low">少</string>
     <string name="analytics_heatmap_high">多</string>
     <string name="analytics_heatmap_today">今日 %1$s</string>
+    <string name="analytics_heatmap_selected">%1$s listened for %2$s</string>
     <string name="analytics_view_all_records">全 %1$d 件の履歴を表示</string>
     <string name="analytics_history_empty">曲を再生すると最近聴いた内容が記録されます</string>
     <string name="analytics_times_count">%1$d 回</string>

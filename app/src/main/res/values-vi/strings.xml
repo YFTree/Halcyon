@@ -24,6 +24,11 @@
     <string name="album_count">Album %d</string>
     <string name="duration_format" formatted="false">%02d:%02d</string>
     <string name="no_lyrics">Không có lời bài hát</string>
+    <string name="settings_player_lyric_text_align">Player lyric alignment</string>
+    <string name="player_output_bluetooth">Bluetooth device</string>
+    <string name="player_output_headphones">Headphones</string>
+    <string name="player_output_usb_audio">USB audio</string>
+    <string name="player_output_speaker">Speaker</string>
     <string name="now_playing">Đang chơi</string>
     <string name="play_all">Chơi tất cả</string>
     <string name="album_play_all">Chơi tất cả</string>
@@ -939,6 +944,7 @@
     <string name="analytics_heatmap_low">Thấp</string>
     <string name="analytics_heatmap_high">Cao</string>
     <string name="analytics_heatmap_today">Hôm nay %1$s</string>
+    <string name="analytics_heatmap_selected">%1$s listened for %2$s</string>
     <string name="analytics_view_all_records">Xem tất cả các bản ghi %1$d</string>
     <string name="analytics_history_empty">Các mục đã phát gần đây sẽ xuất hiện ở đây sau khi bạn bắt đầu phát lại</string>
     <string name="analytics_times_count">%1$d phát</string>

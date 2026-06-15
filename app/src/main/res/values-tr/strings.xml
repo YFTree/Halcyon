@@ -24,6 +24,11 @@
     <string name="album_count">%d albümleri</string>
     <string name="duration_format" formatted="false">%02d:%02d</string>
     <string name="no_lyrics">Şarkı sözü yok</string>
+    <string name="settings_player_lyric_text_align">Player lyric alignment</string>
+    <string name="player_output_bluetooth">Bluetooth device</string>
+    <string name="player_output_headphones">Headphones</string>
+    <string name="player_output_usb_audio">USB audio</string>
+    <string name="player_output_speaker">Speaker</string>
     <string name="now_playing">Şimdi oynatılıyor</string>
     <string name="play_all">Tümünü oynat</string>
     <string name="album_play_all">Tümünü oynat</string>
@@ -937,6 +942,7 @@
     <string name="analytics_heatmap_low">Düşük</string>
     <string name="analytics_heatmap_high">Yüksek</string>
     <string name="analytics_heatmap_today">Bugün %1$s</string>
+    <string name="analytics_heatmap_selected">%1$s listened for %2$s</string>
     <string name="analytics_view_all_records">Tüm %1$d kayıtlarını görüntüleyin</string>
     <string name="analytics_history_empty">Son oynatılan öğeler, oynatmayı başlattıktan sonra burada görünecek</string>
     <string name="analytics_times_count">%1$d oynuyor</string>

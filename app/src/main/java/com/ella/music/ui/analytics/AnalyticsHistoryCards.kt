@@ -1,6 +1,7 @@
 package com.ella.music.ui.analytics
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +15,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +65,8 @@ internal fun ListenHeatmapCard(dailyListenMs: Map<String, Long>) {
     val days = remember(dailyListenMs) { recentDateKeys(56) }
     val maxMs = days.maxOfOrNull { dailyListenMs[it] ?: 0L }?.coerceAtLeast(1L) ?: 1L
     val todayListenMs = days.lastOrNull()?.let { dailyListenMs[it] } ?: 0L
+    var selectedDate by remember(days) { mutableStateOf(days.lastOrNull().orEmpty()) }
+    val selectedListenMs = dailyListenMs[selectedDate] ?: 0L
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = analyticsWallpaperCardColors()
@@ -79,6 +85,23 @@ internal fun ListenHeatmapCard(dailyListenMs: Map<String, Long>) {
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
             Spacer(modifier = Modifier.height(12.dp))
+            if (selectedDate.isNotBlank()) {
+                Text(
+                    text = stringResource(
+                        R.string.analytics_heatmap_selected,
+                        selectedDate,
+                        formatListenDuration(context, selectedListenMs)
+                    ),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MiuixTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -96,6 +119,7 @@ internal fun ListenHeatmapCard(dailyListenMs: Map<String, Long>) {
                                     .height(13.dp)
                                     .clip(RoundedCornerShape(4.dp))
                                     .background(heatmapColor(listenedMs, maxMs))
+                                    .clickable { selectedDate = date }
                             )
                         }
                     }

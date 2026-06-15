@@ -104,6 +104,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRICO_PLUGIN_ENABLED_IDS = stringPreferencesKey("lyrico_plugin_enabled_ids")
         val KEY_IGNORE_SPL_METADATA_LINES = booleanPreferencesKey("ignore_spl_metadata_lines")
         val KEY_LYRIC_OFFSET_OVERRIDES = stringPreferencesKey("lyric_offset_overrides")
+        val KEY_PLAYER_LYRIC_TEXT_ALIGN = intPreferencesKey("player_lyric_text_align")
         val KEY_LYRIC_PAGE_TRANSLATION = booleanPreferencesKey("lyric_page_translation")
         val KEY_LYRIC_PAGE_KEEP_SCREEN_ON = booleanPreferencesKey("lyric_page_keep_screen_on")
         val KEY_MINI_PLAYER_LYRIC_TRANSLATION = booleanPreferencesKey("mini_player_lyric_translation")
@@ -290,6 +291,9 @@ class SettingsManager(private val context: Context) {
         const val DESKTOP_LYRIC_STATUS_ALIGN_LEFT = 0
         const val DESKTOP_LYRIC_STATUS_ALIGN_CENTER = 1
         const val DESKTOP_LYRIC_STATUS_ALIGN_RIGHT = 2
+        const val PLAYER_LYRIC_ALIGN_LEFT = 0
+        const val PLAYER_LYRIC_ALIGN_CENTER = 1
+        const val PLAYER_LYRIC_ALIGN_RIGHT = 2
         const val DESKTOP_LYRIC_STATUS_VERTICAL_TOP = 0
         const val DESKTOP_LYRIC_STATUS_VERTICAL_CENTER = 1
         const val DESKTOP_LYRIC_STATUS_VERTICAL_BOTTOM = 2
@@ -467,6 +471,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_IGNORE_SPL_METADATA_LINES] ?: false }
     val lyricOffsetOverrides: Flow<Map<String, Long>> =
         context.dataStore.data.map { parseLyricOffsetOverrides(it[KEY_LYRIC_OFFSET_OVERRIDES]) }
+    val playerLyricTextAlign: Flow<Int> =
+        context.dataStore.data.map { (it[KEY_PLAYER_LYRIC_TEXT_ALIGN] ?: PLAYER_LYRIC_ALIGN_LEFT).coerceIn(0, 2) }
     val lyricPageTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PAGE_TRANSLATION] ?: true }
     val lyricPageKeepScreenOn: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_LYRIC_PAGE_KEEP_SCREEN_ON] ?: false }
@@ -859,6 +865,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setDesktopLyricStatusBarTextAlign(align: Int) {
         context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN] = align.coerceIn(0, 2) }
+    }
+
+    suspend fun setPlayerLyricTextAlign(align: Int) {
+        context.dataStore.edit { it[KEY_PLAYER_LYRIC_TEXT_ALIGN] = align.coerceIn(0, 2) }
     }
 
     suspend fun setDesktopLyricStatusBarVerticalAlign(align: Int) {

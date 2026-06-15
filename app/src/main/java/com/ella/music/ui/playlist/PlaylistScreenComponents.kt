@@ -29,6 +29,7 @@ import com.ella.music.R
 import com.ella.music.ui.components.DoubleTapScrollOverlay
 import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.EllaSmallTopAppBar
+import com.ella.music.ui.components.QueueListIcon
 import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.ellaPageBackground
@@ -103,10 +104,8 @@ internal fun PlaylistScreenTopBar(
                         )
                     }
                     IconButton(onClick = onAddSelectedToQueueClick) {
-                        Icon(
-                            imageVector = MiuixIcons.Regular.Download,
-                            contentDescription = stringResource(R.string.common_add_to_queue),
-                            tint = MiuixTheme.colorScheme.primary,
+                        QueueListIcon(
+                            color = MiuixTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                     }

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.ella.music.R
 import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.EllaSmallTopAppBar
+import com.ella.music.ui.components.ScanRefreshIconButton
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -37,7 +38,6 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Locale
 
@@ -123,14 +123,12 @@ fun ScanSettingsScreen(
                 }
             },
             actions = {
-                IconButton(onClick = { if (!isScanning) mainViewModel.scanMusic() }) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Refresh,
-                        contentDescription = stringResource(R.string.folder_full_scan),
-                        tint = MiuixTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                ScanRefreshIconButton(
+                    enabled = !isScanning,
+                    onScan = { mainViewModel.scanMusic() },
+                    onDeepRescan = { mainViewModel.fullRescanMusic() },
+                    contentDescription = stringResource(R.string.folder_full_scan)
+                )
                 IconButton(onClick = { folderPicker.launch(null) }) {
                     Icon(
                         imageVector = MiuixIcons.Regular.Add,
@@ -186,9 +184,9 @@ fun ScanSettingsScreen(
                     onRemove = { folderPath ->
                         pendingRemoveScanFolder = folderPath
                     },
-                    onScan = {
-                        if (!isScanning) mainViewModel.scanMusic()
-                    }
+                    scanEnabled = !isScanning,
+                    onScan = { mainViewModel.scanMusic() },
+                    onDeepRescan = { mainViewModel.fullRescanMusic() }
                 )
             }
 
@@ -204,7 +202,9 @@ fun ScanSettingsScreen(
                     UsbFoldersCard(
                         usbFolderUris = usbFolderUris,
                         onRemove = { uri -> pendingRemoveUsbUri = uri },
-                        onScan = { if (!isScanning) mainViewModel.scanMusic() }
+                        scanEnabled = !isScanning,
+                        onScan = { mainViewModel.scanMusic() },
+                        onDeepRescan = { mainViewModel.fullRescanMusic() }
                     )
                 }
             }

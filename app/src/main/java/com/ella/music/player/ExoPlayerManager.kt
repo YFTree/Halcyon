@@ -207,6 +207,18 @@ class ExoPlayerManager(private val context: Context) {
                 updateCurrentSong()
             }
 
+            override fun onPositionDiscontinuity(
+                oldPosition: Player.PositionInfo,
+                newPosition: Player.PositionInfo,
+                reason: Int
+            ) {
+                _currentPosition.value = newPosition.positionMs.coerceAtLeast(0L)
+                _duration.value = mediaController?.duration?.coerceAtLeast(0) ?: 0L
+                if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                    updateCurrentSong()
+                }
+            }
+
             override fun onEvents(player: Player, events: Player.Events) {
                 if (
                     events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ||

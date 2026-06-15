@@ -204,6 +204,7 @@ fun PlayerScreen(
     val showLyricPronunciation by playerViewModel.showLyricPronunciation.collectAsState()
     val lyricPageKeepScreenOn = playerSettings.lyricPageKeepScreenOn
     val lyricPerspectiveEffect = playerSettings.lyricPerspectiveEffect
+    val playerLyricTextAlign = playerSettings.playerLyricTextAlign
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val sleepTimerEndRealtimeMs by playerViewModel.sleepTimerEndRealtimeMs.collectAsState()
     val stopAfterCurrentEnabled by playerViewModel.stopAfterCurrentEnabled.collectAsState()
@@ -445,6 +446,7 @@ fun PlayerScreen(
                         effectiveLyricFontPath = effectiveLyricFontPath,
                         lyricFontWeight = lyricFontWeight,
                         lyricFontScale = lyricFontScale,
+                        lyricTextAlign = playerLyricTextAlign,
                         playerTapSeekEnabled = playerTapSeekEnabled,
                         playerShowTotalDuration = playerShowTotalDuration,
                         menuExpanded = uiState.menuExpanded,
@@ -508,6 +510,7 @@ fun PlayerScreen(
                         lyricFontWeight = lyricFontWeight,
                         lyricFontScale = lyricFontScale,
                         lyricPerspectiveEffect = lyricPerspectiveEffect,
+                        lyricTextAlign = playerLyricTextAlign,
                         lyricPalette = lyricPalette,
                         isPlaying = isPlaying,
                         playerBackgroundEnabled = playerBackgroundEnabled,
@@ -583,6 +586,7 @@ fun PlayerScreen(
                 fontPath = effectiveLyricFontPath,
                 fontWeight = lyricFontWeight,
                 fontScale = lyricFontScale,
+                lyricTextAlign = playerLyricTextAlign,
                 showTotalDuration = playerShowTotalDuration,
                 queueExpanded = uiState.queueExpanded,
                 playlist = playlist,

@@ -114,6 +114,8 @@ internal fun FloatingBottomControls(
     var queueSongsToAdd by remember { mutableStateOf<List<Song>?>(null) }
     var queueSongsForNewPlaylist by remember { mutableStateOf<List<Song>?>(null) }
     val playlist by playerViewModel.playlist.collectAsState()
+    val shuffleEnabled by playerViewModel.shuffleEnabled.collectAsState()
+    val repeatMode by playerViewModel.repeatMode.collectAsState()
     val userPlaylists by mainViewModel.playlists.collectAsState()
     val currentSongId = currentSong?.id
     val effectiveMode = if (showMiniPlayer && canCompact) bottomDockMode else BottomDockMode.Expanded
@@ -249,6 +251,9 @@ internal fun FloatingBottomControls(
             com.ella.music.ui.player.PlayerQueueMenu(
                 playlist = playlist,
                 currentSongId = currentSongId,
+                shuffleEnabled = shuffleEnabled,
+                repeatMode = repeatMode,
+                onCyclePlaybackMode = { playerViewModel.cyclePlaybackMode() },
                 onSongClick = { index ->
                     queueSheetExpanded = false
                     playerViewModel.playQueueIndex(index)

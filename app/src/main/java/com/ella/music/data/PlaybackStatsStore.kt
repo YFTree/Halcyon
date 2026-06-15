@@ -134,7 +134,6 @@ class PlaybackStatsStore private constructor(context: Context) {
             )
         ) + _history.value)
             .distinctBy { "${it.songId}:${it.playedAt}" }
-            .take(MAX_HISTORY_ITEMS)
         _history.value = updated
         saveHistory(updated)
     }
@@ -308,7 +307,6 @@ class PlaybackStatsStore private constructor(context: Context) {
             )
         }.filter { it.playedAt > 0L }
             .sortedByDescending { it.playedAt }
-            .take(MAX_HISTORY_ITEMS)
 
     private fun JSONObject.toDailyStatsMap(): Map<String, Long> {
         val parsed = mutableMapOf<String, Long>()
@@ -373,7 +371,6 @@ class PlaybackStatsStore private constructor(context: Context) {
         val sortedHistory = history
             .distinctBy { "${it.songId}:${it.playedAt}" }
             .sortedByDescending { it.playedAt }
-            .take(MAX_HISTORY_ITEMS)
 
         _stats.value = stats
         _history.value = sortedHistory
@@ -433,7 +430,6 @@ class PlaybackStatsStore private constructor(context: Context) {
     )
 
     companion object {
-        private const val MAX_HISTORY_ITEMS = 200
         private const val DEFAULT_SOLIN_SESSION_PLAYED_MS = 60_000L
 
         @Volatile

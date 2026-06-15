@@ -98,6 +98,7 @@ import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SongSelectionActionRow
+import com.ella.music.ui.components.ScanRefreshIconButton
 import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.TagEditorOption
@@ -402,18 +403,11 @@ fun LibraryScreen(
                 navigationIcon = {
                     if (!selectionMode) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = {
-                                    if (!isScanning) mainViewModel.scanMusic()
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.Regular.Refresh,
-                                    contentDescription = stringResource(R.string.library_refresh),
-                                    tint = MiuixTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                            ScanRefreshIconButton(
+                                enabled = !isScanning,
+                                onScan = { mainViewModel.scanMusic() },
+                                onDeepRescan = { mainViewModel.fullRescanMusic() }
+                            )
                             if (songs.isNotEmpty()) {
                                 IconButton(onClick = { ratingFilterExpanded = !ratingFilterExpanded }) {
                                     Text(

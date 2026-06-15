@@ -100,6 +100,7 @@ class MusicScanner(private val context: Context) {
                 if (!file.exists()) continue
 
                 val rawTrackNumber = cursor.getInt(trackCol)
+                val dateModified = maxOf(cursor.getLong(dateModifiedCol) * 1000L, file.lastModified())
                 items += MediaStoreAudioItem(
                     id = cursor.getLong(idCol),
                     title = cursor.getString(titleCol).orEmpty(),
@@ -112,7 +113,7 @@ class MusicScanner(private val context: Context) {
                     fileSize = cursor.getLong(sizeCol),
                     mimeType = cursor.getString(mimeCol).orEmpty(),
                     dateAdded = cursor.getLong(dateAddedCol) * 1000L,
-                    dateModified = cursor.getLong(dateModifiedCol) * 1000L,
+                    dateModified = dateModified,
                     trackNumber = rawTrackNumber.normalizedTrackNumber(),
                     discNumber = rawTrackNumber.normalizedDiscNumber()
                 )
@@ -308,15 +309,14 @@ class MusicScanner(private val context: Context) {
                 val size = cursor.getLong(sizeCol)
                 val mime = cursor.getString(mimeCol) ?: ""
                 val dateAdded = cursor.getLong(dateAddedCol) * 1000L
-                val dateModified = cursor.getLong(dateModifiedCol) * 1000L
-                val rawTrackNumber = cursor.getInt(trackCol)
-                var trackNumber = rawTrackNumber.normalizedTrackNumber()
-                var discNumber = rawTrackNumber.normalizedDiscNumber()
-
                 if (path.isEmpty()) continue
                 if (!path.isAllowedByFolderFilters(normalizedIncludeFolders, normalizedExcludeFolders)) continue
                 val file = File(path)
                 if (!file.exists()) continue
+                val rawTrackNumber = cursor.getInt(trackCol)
+                var trackNumber = rawTrackNumber.normalizedTrackNumber()
+                var discNumber = rawTrackNumber.normalizedDiscNumber()
+                val dateModified = maxOf(cursor.getLong(dateModifiedCol) * 1000L, file.lastModified())
 
                 val shouldDeepRead = deepMetadata ||
                     isMissingTag(title, file.name) ||

@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import com.ella.music.R
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
@@ -147,20 +148,39 @@ internal fun rememberBluetoothOutputName(): String? {
     val context = LocalContext.current
     return remember {
         val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        audioManager
-            ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-            ?.firstOrNull { device ->
-                device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                    device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                    device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                    device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
-                    device.type == AudioDeviceInfo.TYPE_BLE_BROADCAST
-            }
-            ?.productName
-            ?.toString()
-            ?.takeIf { it.isNotBlank() }
+        val devices = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS).orEmpty()
+        val bluetooth = devices.firstOrNull { device ->
+            device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                device.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                device.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+                device.type == AudioDeviceInfo.TYPE_BLE_BROADCAST
+        }
+        val headphones = devices.firstOrNull { device ->
+            device.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                device.type == AudioDeviceInfo.TYPE_WIRED_HEADSET
+        }
+        val usb = devices.firstOrNull { device ->
+            device.type == AudioDeviceInfo.TYPE_USB_DEVICE ||
+                device.type == AudioDeviceInfo.TYPE_USB_HEADSET
+        }
+        val speaker = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+        when {
+            bluetooth != null -> bluetooth.outputDisplayName(context, R.string.player_output_bluetooth)
+            headphones != null -> headphones.outputDisplayName(context, R.string.player_output_headphones)
+            usb != null -> usb.outputDisplayName(context, R.string.player_output_usb_audio)
+            speaker != null -> context.getString(R.string.player_output_speaker)
+            else -> null
+        }
     }
 }
+
+private fun AudioDeviceInfo.outputDisplayName(context: Context, fallbackRes: Int): String =
+    productName
+        ?.toString()
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?: context.getString(fallbackRes)
 
 internal fun AudioInfo.isHiResLogoTrack(): Boolean {
     val summary = audioQualitySummary(this)

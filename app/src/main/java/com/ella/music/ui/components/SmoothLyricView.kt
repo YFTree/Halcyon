@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ella.music.R
+import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.LyricLine
 import io.github.proify.lyricon.lyric.view.RawsLyricView
 import top.yukonga.miuix.kmp.basic.Text
@@ -47,6 +48,7 @@ fun SmoothLyricView(
     autoScrollResumeEnabled: Boolean = true,
     userScrollEnabled: Boolean = true,
     lineGapDp: Float? = null,
+    lyricTextAlign: Int = SettingsManager.PLAYER_LYRIC_ALIGN_LEFT,
     onLineClick: (LyricLine) -> Unit = {},
     onLineDoubleClick: () -> Unit = {},
     onLineLongClick: (LyricLine) -> Unit = {}
@@ -65,6 +67,16 @@ fun SmoothLyricView(
     val density = LocalDensity.current
     val lyriconSong = remember(songId, songTitle, songArtist, lyrics) {
         lyrics.toLyriconSong(songId, songTitle, songArtist)
+    }
+    val forcedTextAlignment = remember(lyrics, lyricTextAlign) {
+        if (lyrics.hasProtectedLyricAlignment()) {
+            -1
+        } else {
+            lyricTextAlign.coerceIn(
+                SettingsManager.PLAYER_LYRIC_ALIGN_LEFT,
+                SettingsManager.PLAYER_LYRIC_ALIGN_RIGHT
+            )
+        }
     }
     val lyricTypeface = remember(fontPath, fontWeight, italic) {
         loadAndroidTypeface(fontPath, fontWeight.weight, italic = italic, boldFallback = true)
@@ -131,6 +143,7 @@ fun SmoothLyricView(
             view.setAutoScrollResumeEnabled(autoScrollResumeEnabled)
             view.setUserScrollEnabled(userScrollEnabled)
             view.setLineGapDp(lineGapDp ?: -1f)
+            view.setForcedTextAlignment(forcedTextAlignment)
             view.updateAnchorOffset(view.height * anchorOffsetRatio)
             view.setTopContentPadding(with(density) { topContentPadding.toPx() })
             view.updateDisplayTranslation(showTranslation, showPronunciation)
@@ -151,3 +164,14 @@ fun SmoothLyricView(
         }
     )
 }
+
+private fun List<LyricLine>.hasProtectedLyricAlignment(): Boolean =
+    any { line ->
+        line.isTtml ||
+            line.agent.isDuetAgent() ||
+            !line.backgroundText.isNullOrBlank() ||
+            line.backgroundWords.isNotEmpty()
+    }
+
+private fun String?.isDuetAgent(): Boolean =
+    equals("v1", ignoreCase = true) || equals("v2", ignoreCase = true)

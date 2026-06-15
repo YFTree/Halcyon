@@ -24,6 +24,11 @@
     <string name="album_count">%d album</string>
     <string name="duration_format" formatted="false">%02d:%02d</string>
     <string name="no_lyrics">Tidak ada lirik</string>
+    <string name="settings_player_lyric_text_align">Player lyric alignment</string>
+    <string name="player_output_bluetooth">Bluetooth device</string>
+    <string name="player_output_headphones">Headphones</string>
+    <string name="player_output_usb_audio">USB audio</string>
+    <string name="player_output_speaker">Speaker</string>
     <string name="now_playing">Sedang diputar</string>
     <string name="play_all">Putar semua</string>
     <string name="album_play_all">Putar semua</string>
@@ -939,6 +944,7 @@
     <string name="analytics_heatmap_low">Rendah</string>
     <string name="analytics_heatmap_high">Tinggi</string>
     <string name="analytics_heatmap_today">Hari ini %1$s</string>
+    <string name="analytics_heatmap_selected">%1$s listened for %2$s</string>
     <string name="analytics_view_all_records">Lihat semua %1$d catatan</string>
     <string name="analytics_history_empty">Item yang baru diputar akan muncul di sini setelah Anda memulai pemutaran</string>
     <string name="analytics_times_count">%1$d putaran</string>
