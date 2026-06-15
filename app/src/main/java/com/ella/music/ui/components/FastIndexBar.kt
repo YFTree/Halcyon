@@ -304,6 +304,8 @@ private fun ScrollIndicator(
     var hasScrollActivity by remember(totalCount, visibleCount) { mutableStateOf(false) }
     val thumbAlpha by animateFloatAsState(targetValue = if (visible) 1f else 0f, label = "scrollThumbAlpha")
     val currentOnDragToIndex by rememberUpdatedState(onDragToIndex)
+    val currentMaxFirst by rememberUpdatedState(maxFirst)
+    val currentTrackHeightPx by rememberUpdatedState(trackHeightPx)
     val scrollSignature = remember(firstVisibleIndex, firstVisibleOffset) {
         firstVisibleIndex to firstVisibleOffset
     }
@@ -324,7 +326,7 @@ private fun ScrollIndicator(
             .fillMaxHeight()
             .padding(start = 16.dp, end = 2.dp, top = 28.dp, bottom = 28.dp)
             .onSizeChanged { trackHeightPx = it.height.coerceAtLeast(1) }
-            .pointerInput(totalCount, visibleCount, maxFirst, trackHeightPx) {
+            .pointerInput(Unit) {
                 if (currentOnDragToIndex == null) return@pointerInput
                 coroutineScope {
                     val targetIndices = Channel<Int>(Channel.CONFLATED)
@@ -338,10 +340,13 @@ private fun ScrollIndicator(
                             var lastIndex = -1
                             var lastDispatchTimeMs = 0L
 
-                            fun calculateIndex(y: Float): Int =
-                                ((y.coerceIn(0f, trackHeightPx.toFloat()) / trackHeightPx.toFloat()) * maxFirst)
+                            fun calculateIndex(y: Float): Int {
+                                val safeTrackHeightPx = currentTrackHeightPx.coerceAtLeast(1)
+                                val safeMaxFirst = currentMaxFirst.coerceAtLeast(1)
+                                return ((y.coerceIn(0f, safeTrackHeightPx.toFloat()) / safeTrackHeightPx.toFloat()) * safeMaxFirst)
                                     .roundToInt()
-                                    .coerceIn(0, maxFirst)
+                                    .coerceIn(0, safeMaxFirst)
+                            }
 
                             fun dispatch(y: Float, force: Boolean = false) {
                                 val targetIndex = calculateIndex(y)

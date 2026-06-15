@@ -21,12 +21,12 @@ internal fun List<FolderTreeEntry>.sortedForFolderList(
     pinnedPath: String? = null
 ): List<FolderTreeEntry> {
     val sorted = when (mode) {
-        FolderListSortMode.Name -> sortedBy { it.name.lowercase(Locale.ROOT) }
-        FolderListSortMode.SongCount -> sortedWith(compareByDescending<FolderTreeEntry> { it.songCount }.thenBy { it.name.lowercase(Locale.ROOT) })
-        FolderListSortMode.Duration -> sortedWith(compareByDescending<FolderTreeEntry> { it.duration }.thenBy { it.name.lowercase(Locale.ROOT) })
-        FolderListSortMode.AlbumCount -> sortedWith(compareByDescending<FolderTreeEntry> { it.albumCount }.thenBy { it.name.lowercase(Locale.ROOT) })
-        FolderListSortMode.DateModified -> sortedWith(compareByDescending<FolderTreeEntry> { it.dateModified }.thenBy { it.name.lowercase(Locale.ROOT) })
-        FolderListSortMode.DateModifiedAsc -> sortedWith(compareBy<FolderTreeEntry> { it.dateModified }.thenBy { it.name.lowercase(Locale.ROOT) })
+        FolderListSortMode.Name -> sortedBy { it.name.musicSortKey() }
+        FolderListSortMode.SongCount -> sortedWith(compareByDescending<FolderTreeEntry> { it.songCount }.thenBy { it.name.musicSortKey() })
+        FolderListSortMode.Duration -> sortedWith(compareByDescending<FolderTreeEntry> { it.duration }.thenBy { it.name.musicSortKey() })
+        FolderListSortMode.AlbumCount -> sortedWith(compareByDescending<FolderTreeEntry> { it.albumCount }.thenBy { it.name.musicSortKey() })
+        FolderListSortMode.DateModified -> sortedWith(compareByDescending<FolderTreeEntry> { it.dateModified }.thenBy { it.name.musicSortKey() })
+        FolderListSortMode.DateModifiedAsc -> sortedWith(compareBy<FolderTreeEntry> { it.dateModified }.thenBy { it.name.musicSortKey() })
     }
     if (pinnedPath.isNullOrBlank()) return sorted
     val pinned = sorted.firstOrNull { it.path.equals(pinnedPath, ignoreCase = true) } ?: return sorted
