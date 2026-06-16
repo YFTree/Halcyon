@@ -842,8 +842,6 @@
     <string name="settings_tag_ignore_case_summary">Объедините теги, которые различаются только регистром букв, например LiSA и LISA.</string>
     <string name="settings_mini_player_lyrics">Показать тексты песен в мини-плеере</string>
     <string name="settings_mini_player_lyrics_summary">Показывать текущий текст в мини-плеере во время игры; отключите его, чтобы показать название песни и исполнителя</string>
-    <string name="settings_ignore_spl_metadata_lines">Игнорировать теги заголовков SPL</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">Пропускайте строки заголовков Salt Player, такие как [kana:], [trans:] и [roma:] при чтении текстов LRC/ELRC. По умолчанию отключено, чтобы не влиять на обычные файлы ELRC.</string>
     <string name="settings_lyric_source_priority">Приоритет источника текста</string>
     <string name="settings_lyric_source_priority_summary">Откройте его, затем нажмите и удерживайте элемент и перетащите его, чтобы изменить порядок загрузки.</string>
     <string name="settings_lyric_source_embedded_ttml">Тексты песен TTML встроены</string>

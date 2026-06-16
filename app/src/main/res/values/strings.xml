@@ -926,8 +926,6 @@
     <string name="settings_tag_ignore_case_summary">开启后 LiSA 与 LISA 等大小写不同的标签会合并显示</string>
     <string name="settings_mini_player_lyrics">迷你播放条显示歌词</string>
     <string name="settings_mini_player_lyrics_summary">播放时在迷你播放条显示当前歌词；关闭后显示歌曲标题和歌手</string>
-    <string name="settings_ignore_spl_metadata_lines">忽略 SPL 头部标签</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">开启后读取 LRC/ELRC 时跳过 [kana:]、[trans:]、[roma:] 等 Salt Player 头部行；默认关闭以避免影响普通 ELRC</string>
     <string name="settings_lyric_source_priority">歌词来源优先级</string>
     <string name="settings_lyric_source_priority_summary">打开后长按条目拖动调整读取顺序</string>
     <string name="settings_lyric_source_embedded_ttml">TTML Lyrics 内嵌</string>

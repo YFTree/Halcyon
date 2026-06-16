@@ -844,8 +844,6 @@
     <string name="settings_tag_ignore_case_summary">Fusionner les tags qui ne diffèrent que par la casse, comme LiSA et LISA</string>
     <string name="settings_mini_player_lyrics">Afficher les paroles dans le mini-lecteur</string>
     <string name="settings_mini_player_lyrics_summary">Afficher la parole actuelle dans le mini-lecteur pendant la lecture ; désactivez pour afficher le titre et l’artiste</string>
-    <string name="settings_ignore_spl_metadata_lines">Ignorer les en-têtes SPL</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">Ignorer les lignes d’en-tête Salt Player comme [kana:], [trans:] et [roma:] lors de la lecture LRC/ELRC. Désactivé par défaut pour éviter d’affecter les fichiers ELRC ordinaires.</string>
     <string name="settings_lyric_source_priority">Priorité des sources de paroles</string>
     <string name="settings_lyric_source_priority_summary">Ouvrez-la, puis faites un appui long et glissez un élément pour ajuster l’ordre de chargement</string>
     <string name="settings_lyric_source_embedded_ttml">Paroles TTML intégrées</string>

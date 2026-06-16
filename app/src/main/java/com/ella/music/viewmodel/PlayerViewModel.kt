@@ -165,7 +165,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         initAudioFocusMode()
         initReplayGain()
         initLyricSourceMode()
-        initLyricParsingOptions()
         initLyricLineBlacklist()
         initLyricOffsetOverrides()
         initBluetoothAutoPlay()
@@ -480,20 +479,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     playerManager.setReplayGainVolume(volume)
                 }
-        }
-    }
-
-    private fun initLyricParsingOptions() {
-        viewModelScope.launch {
-            var initialized = false
-            settingsManager.ignoreSplMetadataLines.distinctUntilChanged().collect {
-                if (!initialized) {
-                    initialized = true
-                    return@collect
-                }
-                _preferTtmlLyrics.value = null
-                currentSong.value?.let { song -> reloadLyrics(song, force = true) }
-            }
         }
     }
 

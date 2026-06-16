@@ -34,6 +34,7 @@ import io.github.proify.lyricon.lyric.model.Song
 import io.github.proify.lyricon.lyric.model.interfaces.IRichLyricLine
 import io.github.proify.lyricon.lyric.model.interfaces.ILyricWord
 import android.view.Choreographer
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
 import kotlin.math.PI
 import kotlin.math.abs
@@ -154,6 +155,7 @@ class RawsLyricView @JvmOverloads constructor(
     private var currentStyleConfig: RichLyricLineConfig? = null
     private var songName: String? = null
     private var songArtist: String? = null
+    private var pronunciationWordsByBegin: Map<Long, List<LyricWord>> = emptyMap()
     private var enableAnim = true
     private var topContentPadding = 0f
 
@@ -192,12 +194,12 @@ class RawsLyricView @JvmOverloads constructor(
 
     private val popPathUp = PathInterpolator(0.25f, 0.1f, 0.25f, 1.0f)
     private val popPathDown = PathInterpolator(0.25f, 0.0f, 1.0f, 0.2f)
-    private val lineScales = mutableMapOf<Int, Float>()
-    private val popAnimators = mutableMapOf<Int, ValueAnimator>()
+    private val lineScales = ConcurrentHashMap<Int, Float>()
+    private val popAnimators = ConcurrentHashMap<Int, ValueAnimator>()
     private var previousIndex = -1
 
     private var totalHeight = 0f
-    private val lineAlphas = mutableMapOf<Int, Float>()
+    private val lineAlphas = ConcurrentHashMap<Int, Float>()
     private data class LineEntry(
         val yTop: Float,
         val preH: Float,
@@ -213,6 +215,7 @@ class RawsLyricView @JvmOverloads constructor(
         val transText: String?,
         val romaText: String?,
         val words: List<LyricWord>?,
+        val pronunciationWords: List<LyricWord>?,
         val secondaryWords: List<LyricWord>?,
         val secondaryStart: Long?,
         val secondaryEnd: Long?,
@@ -413,6 +416,13 @@ class RawsLyricView @JvmOverloads constructor(
         if (this.displayTranslation == displayTranslation && this.displayRoma == displayRoma) return
         this.displayTranslation = displayTranslation
         this.displayRoma = displayRoma
+        rebuildEntries()
+        invalidate()
+    }
+
+    fun setPronunciationWordsByBegin(wordsByBegin: Map<Long, List<LyricWord>>) {
+        if (pronunciationWordsByBegin == wordsByBegin) return
+        pronunciationWordsByBegin = wordsByBegin
         rebuildEntries()
         invalidate()
     }
@@ -623,7 +633,8 @@ class RawsLyricView @JvmOverloads constructor(
         for (line in lyrics) {
             val mainText = line.text ?: continue
             val preText = if (pronunciationAboveMainEnabled && displayRoma && !line.roma.isNullOrBlank()) line.roma else null
-            val preH = preText?.let { measureTransHeight(it) + transGapPx } ?: 0f
+            val pronunciationWords = preText?.let { pronunciationWordsByBegin[line.begin]?.takeIf { words -> words.isNotEmpty() } }
+            val preH = preText?.let { max(measureTransHeight(it), measureWordsHeight(pronunciationWords, transPaint)) + transGapPx } ?: 0f
             val mainH = max(measureMainHeight(mainText), measureWordsHeight(line.words, mainPaint))
             val secondaryBlock = line.secondary?.splitSecondaryBlock()
             val secondaryText = secondaryBlock?.first?.takeIf { it.isNotBlank() }
@@ -668,6 +679,7 @@ class RawsLyricView @JvmOverloads constructor(
                     transText = transText,
                     romaText = romaText,
                     words = line.words,
+                    pronunciationWords = pronunciationWords,
                     secondaryWords = line.secondaryWords,
                     secondaryStart = secondaryStart,
                     secondaryEnd = secondaryEnd,
@@ -796,7 +808,7 @@ class RawsLyricView @JvmOverloads constructor(
 
     private fun findCurrentLine(posMs: Long): Int {
         if (lyrics.isEmpty()) return -1
-        for (i in lyrics.indices) {
+        for (i in lyrics.indices.reversed()) {
             val line = lyrics[i]
             if (posMs >= line.begin && posMs <= line.end) return i
 
@@ -974,13 +986,18 @@ class RawsLyricView @JvmOverloads constructor(
     }
 
     private fun postFrame() {
-        val needFrame = (playbackActive && continuousFrameUpdatesEnabled && lyrics.any { it.words?.isNotEmpty() == true || it.secondaryWords?.isNotEmpty() == true }) ||
+        val alphaSnapshot = if (lineAlphaAnimationsEnabled) lineAlphas.toMap() else emptyMap()
+        val needFrame = (playbackActive && continuousFrameUpdatesEnabled && lyrics.any {
+            it.words?.isNotEmpty() == true ||
+                it.secondaryWords?.isNotEmpty() == true ||
+                pronunciationWordsByBegin[it.begin]?.isNotEmpty() == true
+        }) ||
                 (playbackActive && singleLineMarqueeEnabled && entries.isNotEmpty()) ||
                 (autoScrollResumeEnabled && isUserScrolling) ||
                 !scroller.isFinished ||
                 popAnimators.isNotEmpty() ||
                 isInterludeActive() ||
-                (lineAlphaAnimationsEnabled && lineAlphas.any { (index, alpha) -> abs(alpha - calculateTargetAlpha(index)) > 0.005f })
+                (lineAlphaAnimationsEnabled && alphaSnapshot.any { (index, alpha) -> abs(alpha - calculateTargetAlpha(index)) > 0.005f })
         if (needFrame && !framePosted) {
             framePosted = true
             choreographer.postFrameCallback(frameCb)
@@ -1108,7 +1125,22 @@ class RawsLyricView @JvmOverloads constructor(
         if (entry.preText != null) {
             val preBaseline = contentTop + transGapPx + (-transPaint.fontMetrics.ascent)
             val pPaint = if (isCurrent) hlTransPaint else dimTransPaint
-            drawTextAligned(canvas, entry.preText, pPaint, textStartX, preBaseline, entry.alignedRight, entry.centered, farBlur)
+            if (!singleLineMarqueeEnabled && !entry.pronunciationWords.isNullOrEmpty() && isCurrent) {
+                drawKaraokeWords(
+                    canvas = canvas,
+                    entry = entry,
+                    lineIndex = index,
+                    startX = textStartX,
+                    baseline = preBaseline,
+                    alignedRight = entry.alignedRight,
+                    centered = entry.centered,
+                    useSecondary = true,
+                    wordsOverride = entry.pronunciationWords,
+                    textOverride = entry.preText
+                )
+            } else {
+                drawTextAligned(canvas, entry.preText, pPaint, textStartX, preBaseline, entry.alignedRight, entry.centered, farBlur)
+            }
         }
         val mainTopY = contentTop + entry.preH
         val mainBottomY = mainTopY + entry.mainH
@@ -1318,7 +1350,13 @@ class RawsLyricView @JvmOverloads constructor(
         val viewH = height.toFloat()
         val ds = dotSizePx
         val dg = dotSpacingPx
-        val startX = paddingLeft.toFloat() + ds * 0.45f
+        val dotGroupWidth = ds * 3f + dg * 2f
+        val availableWidth = (width - paddingLeft - paddingRight).toFloat().coerceAtLeast(dotGroupWidth)
+        val startX = when {
+            prevEntry.alignedRight -> width - paddingRight.toFloat() - dotGroupWidth
+            prevEntry.centered -> paddingLeft.toFloat() + (availableWidth - dotGroupWidth) / 2f
+            else -> paddingLeft.toFloat() + ds * 0.45f
+        }
         val expandOffset = getInterludeExpandOffset()
         if (expandOffset < ds) return
         val prevBottom = prevEntry.yTop + prevEntry.totalH - scrollY
@@ -1392,14 +1430,16 @@ class RawsLyricView @JvmOverloads constructor(
         baseline: Float,
         alignedRight: Boolean,
         centered: Boolean,
-        useSecondary: Boolean = false
+        useSecondary: Boolean = false,
+        wordsOverride: List<LyricWord>? = null,
+        textOverride: String? = null
     ) {
-        val words = (if (useSecondary) entry.secondaryWords else entry.words) ?: return
+        val words = wordsOverride ?: (if (useSecondary) entry.secondaryWords else entry.words) ?: return
         val elapsed = SystemClock.elapsedRealtime() - lastPositionWallTime
         val pos = if (playbackActive && lastPositionWallTime > 0 && elapsed in 0..2000) currentPosMs + elapsed else currentPosMs
         val karaokePos = pos + KARAOKE_WORD_OFFSET_MS
         if (alignedRight) {
-            drawAlignedKaraokeWords(canvas, entry, words, startX, baseline, karaokePos, useSecondary)
+            drawAlignedKaraokeWords(canvas, entry, words, startX, baseline, karaokePos, useSecondary, textOverride)
             return
         }
         val availW = (width - paddingLeft - paddingRight).toFloat()
@@ -1449,7 +1489,7 @@ class RawsLyricView @JvmOverloads constructor(
             canvas.drawText(info.text, info.drawX(), info.y, inactivePaint)
         }
 
-        val sweepFraction = calculateSweepFraction(entry, karaokePos, words)
+        val sweepFraction = calculateSweepFraction(entry, karaokePos, words, activePaint)
         if (sweepFraction > 0f) {
             val totalW = wordInfos.sumOf { it.w.toDouble() }.toFloat()
             if (totalW <= 0f) { canvas.restore(); return }
@@ -1559,10 +1599,11 @@ class RawsLyricView @JvmOverloads constructor(
         baseline: Float,
         karaokePos: Long,
         useSecondary: Boolean,
+        textOverride: String? = null,
     ) {
         val activePaint = if (useSecondary) hlTransPaint else hlPaint
         val inactivePaint = if (useSecondary) dimTransPaint else dimPaint
-        val text = buildKaraokeDisplayText(entry, words, useSecondary)
+        val text = buildKaraokeDisplayText(entry, words, useSecondary, textOverride)
         if (text.isBlank()) return
         val availW = width - paddingLeft - paddingRight
         if (availW <= 0) return
@@ -1789,7 +1830,9 @@ class RawsLyricView @JvmOverloads constructor(
         entry: LineEntry,
         words: List<LyricWord>,
         useSecondary: Boolean,
+        textOverride: String? = null,
     ): String {
+        if (!textOverride.isNullOrBlank()) return textOverride
         val primaryText = if (useSecondary) entry.secondaryText else entry.mainText
         if (!primaryText.isNullOrBlank()) return primaryText
         return words.joinToString(separator = "") { it.text.orEmpty() }
@@ -1870,18 +1913,18 @@ class RawsLyricView @JvmOverloads constructor(
         canvas.restore()
     }
 
-    private fun calculateSweepFraction(entry: LineEntry, pos: Long, words: List<LyricWord>): Float {
+    private fun calculateSweepFraction(entry: LineEntry, pos: Long, words: List<LyricWord>, measurePaint: TextPaint): Float {
         if (words.isEmpty()) return 0f
         if (pos < entry.begin) return 0f
         if (pos >= entry.end) return 1f
 
         var totalW = 0f
-        for (word in words) totalW += hlPaint.measureText(word.text ?: "")
+        for (word in words) totalW += measurePaint.measureText(word.text ?: "")
         if (totalW <= 0f) return 0f
 
         var cumW = 0f
         for (word in words) {
-            val wordW = hlPaint.measureText(word.text ?: "")
+            val wordW = measurePaint.measureText(word.text ?: "")
             if (pos < word.begin) {
                 return cumW / totalW
             }

@@ -14,7 +14,6 @@ import kotlin.math.abs
 internal object EllaLyricsParser {
     private val lrcTimePattern = Regex("""\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,6}))?]""")
     private val lrcMetaPattern = Regex("""\[(ti|ar|al|by|offset|re|ve):\s*(.*)]""", RegexOption.IGNORE_CASE)
-    private val splMetadataPattern = Regex("""\[(ti|ar|al|by|offset|kana|trans|roma):\s*.*]""", RegexOption.IGNORE_CASE)
     private val timedWordMarkerPattern = Regex("""<([^>]+)>|\[([^\]]+)]""")
     private val backgroundLinePattern = Regex("""^\[bg:\s*(.*)]$""", RegexOption.IGNORE_CASE)
     private val lyricifySyllablePattern = Regex("""(.*?)\((\d+),(\d+)\)""")
@@ -22,21 +21,15 @@ internal object EllaLyricsParser {
     private val timestampOnlyPattern = Regex("""\d+(?::\d{1,2}){1,2}(?:[.:]\d{1,6})?""")
     private val unknownTtmlAgentIdPattern = Regex("""v\d+|agent\d+""", RegexOption.IGNORE_CASE)
 
-    fun parse(
-        content: String,
-        ignoreSplMetadataLines: Boolean = false
-    ): LrcParser.LrcResult {
+    fun parse(content: String): LrcParser.LrcResult {
         parseTtml(content)?.let { return it }
         if (lyricifySyllablePattern.containsMatchIn(content)) {
             parseLyricify(content)?.let { return it }
         }
-        return parseLrc(content, ignoreSplMetadataLines)
+        return parseLrc(content)
     }
 
-    private fun parseLrc(
-        content: String,
-        ignoreSplMetadataLines: Boolean
-    ): LrcParser.LrcResult {
+    private fun parseLrc(content: String): LrcParser.LrcResult {
         val lines = mutableListOf<LyricLine>()
         var title: String? = null
         var artist: String? = null
@@ -61,11 +54,6 @@ internal object EllaLyricsParser {
                 companionTargetIndexes = emptyList()
                 return@forEach
             }
-            if (ignoreSplMetadataLines && isSplMetadataLine(line)) {
-                companionTargetIndexes = emptyList()
-                return@forEach
-            }
-
             parseTimestampOnlyLine(line)?.let { endMs ->
                 lines.applyLineEnd(companionTargetIndexes, endMs)
                 companionTargetIndexes = emptyList()
@@ -886,9 +874,6 @@ internal object EllaLyricsParser {
             .toString()
             .replace(Regex("""[ \t\r\n]+"""), " ")
             .trim()
-
-    fun isSplMetadataLine(line: String): Boolean =
-        splMetadataPattern.matches(line.trim())
 
     fun isPlaceholderOnlyLine(line: String): Boolean =
         line.cleanLyricText()

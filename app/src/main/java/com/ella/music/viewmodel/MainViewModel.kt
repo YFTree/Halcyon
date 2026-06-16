@@ -169,6 +169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // cover decoding aren't starved by this disk I/O. Search still works before
             // this completes: the snapshot is built lazily per song on demand.
             delay(2000)
+            repository.preloadSongRatings(currentSongs)
             repository.preloadLibrarySearchSnapshot(currentSongs)
         }
     }

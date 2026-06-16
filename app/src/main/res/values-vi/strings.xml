@@ -844,8 +844,6 @@
     <string name="settings_tag_ignore_case_summary">Hợp nhất các thẻ chỉ khác nhau theo kiểu chữ cái, chẳng hạn như LiSA và LISA</string>
     <string name="settings_mini_player_lyrics">Hiển thị lời bài hát trong trình phát mini</string>
     <string name="settings_mini_player_lyrics_summary">Hiển thị lời bài hát hiện tại trong trình phát mini khi chơi; tắt nó đi để hiển thị tên bài hát và nghệ sĩ</string>
-    <string name="settings_ignore_spl_metadata_lines">Bỏ qua thẻ tiêu đề SPL</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">Bỏ qua các dòng tiêu đề của Salt Player như [kana:], [trans:] và [roma:] khi đọc lời bài hát LRC/ELRC. Tắt theo mặc định để tránh ảnh hưởng đến các file ELRC thông thường.</string>
     <string name="settings_lyric_source_priority">Ưu tiên nguồn lời bài hát</string>
     <string name="settings_lyric_source_priority_summary">Mở nó, sau đó nhấn và kéo một mục để điều chỉnh thứ tự tải</string>
     <string name="settings_lyric_source_embedded_ttml">Lời bài hát TTML được nhúng</string>

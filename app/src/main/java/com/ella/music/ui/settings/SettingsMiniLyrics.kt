@@ -24,7 +24,6 @@ internal fun SettingsMiniLyricsControls() {
     val miniPlayerRightButton by settingsManager.miniPlayerRightButton.collectAsState(initial = 0)
     val miniPlayerLyricsEnabled by settingsManager.miniPlayerLyricsEnabled.collectAsState(initial = true)
     val lyricSourcePriority by settingsManager.lyricSourcePriority.collectAsState(initial = SettingsManager.DEFAULT_LYRIC_SOURCE_PRIORITY)
-    val ignoreSplMetadataLines by settingsManager.ignoreSplMetadataLines.collectAsState(initial = false)
 
     val statusLyricSecondaryLabels = listOf(
         stringResource(R.string.settings_status_secondary_off),
@@ -81,15 +80,6 @@ internal fun SettingsMiniLyricsControls() {
         selectedIndex = miniPlayerRightButton.coerceIn(0, 1),
         onSelectedIndexChange = { index ->
             scope.launch { settingsManager.setMiniPlayerRightButton(index) }
-        }
-    )
-
-    SwitchPreference(
-        title = stringResource(R.string.settings_ignore_spl_metadata_lines),
-        summary = stringResource(R.string.settings_ignore_spl_metadata_lines_summary),
-        checked = ignoreSplMetadataLines,
-        onCheckedChange = { enabled ->
-            scope.launch { settingsManager.setIgnoreSplMetadataLines(enabled) }
         }
     )
 

@@ -102,7 +102,6 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_SOURCE_MODE = intPreferencesKey("lyric_source_mode")
         val KEY_LYRIC_SOURCE_PRIORITY = stringPreferencesKey("lyric_source_priority")
         val KEY_LYRICO_PLUGIN_ENABLED_IDS = stringPreferencesKey("lyrico_plugin_enabled_ids")
-        val KEY_IGNORE_SPL_METADATA_LINES = booleanPreferencesKey("ignore_spl_metadata_lines")
         val KEY_LYRIC_LINE_BLACKLIST = stringPreferencesKey("lyric_line_blacklist")
         val KEY_LYRIC_OFFSET_OVERRIDES = stringPreferencesKey("lyric_offset_overrides")
         val KEY_PLAYER_LYRIC_TEXT_ALIGN = intPreferencesKey("player_lyric_text_align")
@@ -471,8 +470,6 @@ class SettingsManager(private val context: Context) {
         }
     val lyricoPluginEnabledIds: Flow<Set<String>> =
         context.dataStore.data.map { LyricoPluginManager.normalizeEnabledIds(it[KEY_LYRICO_PLUGIN_ENABLED_IDS]) }
-    val ignoreSplMetadataLines: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_IGNORE_SPL_METADATA_LINES] ?: false }
     val lyricLineBlacklist: Flow<List<String>> =
         context.dataStore.data.map { parseLyricLineBlacklist(it[KEY_LYRIC_LINE_BLACKLIST]) }
     val lyricOffsetOverrides: Flow<Map<String, Long>> =
@@ -1010,10 +1007,6 @@ class SettingsManager(private val context: Context) {
             if (enabled) current += pluginId else current -= pluginId
             prefs[KEY_LYRICO_PLUGIN_ENABLED_IDS] = current.joinToString(",")
         }
-    }
-
-    suspend fun setIgnoreSplMetadataLines(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_IGNORE_SPL_METADATA_LINES] = enabled }
     }
 
     suspend fun setLyricOffsetOverride(songKey: String, offsetMs: Long) {
@@ -1753,7 +1746,6 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_LYRIC_GETTER_ENABLED)
             setBoolean(KEY_REPLAYGAIN_ENABLED)
             setBoolean(KEY_AUDIO_FOCUS_DISABLED)
-            setBoolean(KEY_IGNORE_SPL_METADATA_LINES)
             setBoolean(KEY_LYRIC_PAGE_TRANSLATION)
             setBoolean(KEY_LYRIC_PAGE_KEEP_SCREEN_ON)
             setBoolean(KEY_LYRIC_FONT_ITALIC)

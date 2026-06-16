@@ -90,7 +90,7 @@ internal fun List<LyricLine>.toLyriconSong(
     ).normalize()
 }
 
-private fun List<LyricWord>.toLyriconWords(): List<LyriconWord> =
+internal fun List<LyricWord>.toLyriconWords(): List<LyriconWord> =
     mapNotNull { word ->
         if (word.text.isBlank() || word.endMs <= word.startMs) return@mapNotNull null
         LyriconWord(

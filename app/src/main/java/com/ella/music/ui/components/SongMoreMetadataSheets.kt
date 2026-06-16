@@ -432,13 +432,13 @@ private val standardLyricTagKeys = listOf(
 private fun AudioTagInfo?.standardEmbeddedLyrics(): String {
     if (this == null) return ""
     customTags.firstMatchingValue(standardLyricTagKeys)?.let { return it }
-    return lyrics.orEmpty().takeUnless { it.looksLikeTtmlLyrics() }.orEmpty()
+    return lyrics.orEmpty()
 }
 
 private fun AudioTagInfo?.ttmlEmbeddedLyrics(): String {
     if (this == null) return ""
     customTags.firstMatchingValue(ttmlLyricTagKeys)?.let { return it }
-    return lyrics.orEmpty().takeIf { it.looksLikeTtmlLyrics() }.orEmpty()
+    return ""
 }
 
 private fun AudioTagInfo?.ttmlEmbeddedLyricTagKey(): String? =
@@ -453,9 +453,6 @@ private fun Map<String, List<String>>.firstMatchingValue(keys: Iterable<String>)
 
 private fun String.isTtmlLyricTag(): Boolean =
     ttmlLyricTagKeys.any { equals(it, ignoreCase = true) }
-
-private fun String.looksLikeTtmlLyrics(): Boolean =
-    contains("<tt", ignoreCase = true) && contains("</tt", ignoreCase = true)
 
 @Composable
 private fun MetadataField(

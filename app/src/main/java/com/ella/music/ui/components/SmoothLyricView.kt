@@ -68,6 +68,12 @@ fun SmoothLyricView(
     val lyriconSong = remember(songId, songTitle, songArtist, lyrics) {
         lyrics.toLyriconSong(songId, songTitle, songArtist)
     }
+    val pronunciationWordsByBegin = remember(lyrics) {
+        lyrics.mapNotNull { line ->
+            val words = line.pronunciationWords.toLyriconWords()
+            if (words.isEmpty()) null else line.timeMs to words
+        }.toMap()
+    }
     val forcedTextAlignment = remember(lyrics, lyricTextAlign) {
         if (lyrics.hasProtectedLyricAlignment()) {
             -1
@@ -128,6 +134,7 @@ fun SmoothLyricView(
             }
         },
         update = { view ->
+            view.setPronunciationWordsByBegin(pronunciationWordsByBegin)
             if (view.tag !== lyriconSong) {
                 view.song = lyriconSong
                 view.tag = lyriconSong

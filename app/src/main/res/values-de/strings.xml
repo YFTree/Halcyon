@@ -844,8 +844,6 @@
     <string name="settings_tag_ignore_case_summary">Tags zusammenführen, die sich nur durch Groß-/Kleinschreibung unterscheiden, etwa LiSA und LISA</string>
     <string name="settings_mini_player_lyrics">Liedtext im Miniplayer anzeigen</string>
     <string name="settings_mini_player_lyrics_summary">Während der Wiedergabe die aktuelle Liedtextzeile im Miniplayer anzeigen; deaktivieren, um Titel und Künstler anzuzeigen</string>
-    <string name="settings_ignore_spl_metadata_lines">SPL-Kopfzeilen ignorieren</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">Salt-Player-Kopfzeilen wie [kana:], [trans:] und [roma:] beim Lesen von LRC/ELRC überspringen. Standardmäßig deaktiviert, damit normale ELRC-Dateien nicht beeinflusst werden.</string>
     <string name="settings_lyric_source_priority">Priorität der Liedtextquellen</string>
     <string name="settings_lyric_source_priority_summary">Öffnen, dann ein Element lange drücken und ziehen, um die Ladereihenfolge anzupassen</string>
     <string name="settings_lyric_source_embedded_ttml">Eingebettete TTML-Liedtexte</string>

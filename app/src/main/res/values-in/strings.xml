@@ -844,8 +844,6 @@
     <string name="settings_tag_ignore_case_summary">Gabungkan tag yang hanya berbeda dalam huruf besar kecil, seperti LiSA dan LISA</string>
     <string name="settings_mini_player_lyrics">Tampilkan lirik di mini pemutar</string>
     <string name="settings_mini_player_lyrics_summary">Tampilkan lirik saat ini di mini pemutar saat memutar; nonaktifkan untuk menampilkan judul lagu dan artis</string>
-    <string name="settings_ignore_spl_metadata_lines">Abaikan tag header SPL</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">Lewati baris header Salt Player seperti [kana:], [trans:], dan [roma:] saat membaca lirik LRC/ELRC. Mati secara default untuk menghindari pengaruh pada berkas ELRC biasa.</string>
     <string name="settings_lyric_source_priority">Prioritas sumber lirik</string>
     <string name="settings_lyric_source_priority_summary">Buka, lalu tekan lama dan seret item untuk menyesuaikan urutan pemuatan</string>
     <string name="settings_lyric_source_embedded_ttml">TTML Lirik tertanam</string>

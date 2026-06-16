@@ -17,40 +17,6 @@ object NameSplitConfigStore {
     var tagIgnoreCase: Boolean = false
 }
 
-// Symbol separators may sit directly against names ("A/B", "A,B").
-private val defaultArtistSymbolSeparators = listOf(
-    "/",
-    "&",
-    "、",
-    ";",
-    "；",
-    ",",
-    "，",
-    "\\+",
-    "×"
-)
-
-// Word separators only count when surrounded by whitespace, so they never split
-// mid-word (e.g. "Smithwick" must not break on "with", "Defeat" not on "feat").
-private val defaultArtistWordSeparators = listOf(
-    "feat\\.?",
-    "ft\\.?",
-    "with",
-    "x"
-)
-
-private val defaultGenreSymbolSeparators = listOf(
-    "/",
-    "\\|",
-    "、",
-    ";",
-    "；",
-    ",",
-    "，"
-)
-
-private val defaultGenreWordSeparators = emptyList<String>()
-
 // Compiled separator regexes are reused across calls; building them per call was a
 // hot spot when grouping the whole library (artist/genre/composer/lyricist screens).
 private val separatorRegexCache = java.util.concurrent.ConcurrentHashMap<String, Regex>()
@@ -59,8 +25,8 @@ private val protectedNameRegexCache = java.util.concurrent.ConcurrentHashMap<Str
 fun splitArtistNames(value: String): List<String> {
     return splitNames(
         value = value,
-        symbolSeparatorPatterns = defaultArtistSymbolSeparators,
-        wordSeparatorPatterns = defaultArtistWordSeparators,
+        symbolSeparatorPatterns = emptyList(),
+        wordSeparatorPatterns = emptyList(),
         customSeparators = NameSplitConfigStore.artistCustomSeparators,
         protectedNames = NameSplitConfigStore.artistProtectedNames,
         unknownValues = setOf("<unknown>")
@@ -70,8 +36,8 @@ fun splitArtistNames(value: String): List<String> {
 fun splitGenreNames(value: String): List<String> {
     return splitNames(
         value = value,
-        symbolSeparatorPatterns = defaultGenreSymbolSeparators,
-        wordSeparatorPatterns = defaultGenreWordSeparators,
+        symbolSeparatorPatterns = emptyList(),
+        wordSeparatorPatterns = emptyList(),
         customSeparators = NameSplitConfigStore.genreCustomSeparators,
         protectedNames = NameSplitConfigStore.genreProtectedNames,
         unknownValues = setOf("<unknown>")

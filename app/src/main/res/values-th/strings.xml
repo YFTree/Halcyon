@@ -844,8 +844,6 @@
     <string name="settings_tag_ignore_case_summary">รวมแท็กที่ต่างกันเฉพาะตัวพิมพ์เล็ก-ใหญ่ เช่น LiSA และ LISA</string>
     <string name="settings_mini_player_lyrics">แสดงเนื้อเพลงในมินิเพลย์เยอร์</string>
     <string name="settings_mini_player_lyrics_summary">แสดงเนื้อเพลงปัจจุบันในมินิเพลย์เยอร์ขณะเล่น ปิดเพื่อแสดงชื่อเพลงและศิลปิน</string>
-    <string name="settings_ignore_spl_metadata_lines">ละเว้นแท็กส่วนหัว SPL</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">ข้ามบรรทัดส่วนหัว Salt Player เช่น [kana:], [trans:] และ [roma:] ขณะอ่านเนื้อเพลง LRC/ELRC ปิดเป็นค่าเริ่มต้นเพื่อหลีกเลี่ยงผลกระทบต่อไฟล์ ELRC ปกติ</string>
     <string name="settings_lyric_source_priority">ลำดับความสำคัญแหล่งเนื้อเพลง</string>
     <string name="settings_lyric_source_priority_summary">เปิดแล้วกดค้างลากเพื่อปรับลำดับการโหลด</string>
     <string name="settings_lyric_source_embedded_ttml">TTML Lyrics ในตัว</string>

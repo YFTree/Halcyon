@@ -18,12 +18,9 @@ object LrcParser {
         val offset: Long = 0L
     )
 
-    fun parse(
-        lrcContent: String,
-        ignoreSplMetadataLines: Boolean = false
-    ): LrcResult = EllaLyricsParser.parse(lrcContent, ignoreSplMetadataLines)
+    fun parse(lrcContent: String): LrcResult = EllaLyricsParser.parse(lrcContent)
 
-    private val lyricExtensions = listOf("lrc", "ttml", "elrc", "spl")
+    private val lyricExtensions = listOf("lrc", "ttml", "elrc")
 
     fun findLrcFile(songPath: String): String? {
         val baseName = songPath.substringBeforeLast('.')

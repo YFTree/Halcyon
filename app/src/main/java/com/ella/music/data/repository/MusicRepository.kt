@@ -176,11 +176,11 @@ class MusicRepository(private val context: Context) {
     private val _scanSummaryEvents = MutableSharedFlow<MusicScanSummary>(extraBufferCapacity = 1)
     val scanSummaryEvents: SharedFlow<MusicScanSummary> = _scanSummaryEvents.asSharedFlow()
 
-    private val lyricsCache = mutableMapOf<String, List<LyricLine>>()
-    private val lyricFormatAvailabilityCache = mutableMapOf<String, LyricFormatAvailability>()
-    private val audioInfoCache = mutableMapOf<Long, AudioInfo>()
-    private val tagInfoCache = mutableMapOf<String, SongTagInfo>()
-    private val replayGainCache = mutableMapOf<Long, Float?>()
+    private val lyricsCache = ConcurrentHashMap<String, List<LyricLine>>()
+    private val lyricFormatAvailabilityCache = ConcurrentHashMap<String, LyricFormatAvailability>()
+    private val audioInfoCache = ConcurrentHashMap<Long, AudioInfo>()
+    private val tagInfoCache = ConcurrentHashMap<String, SongTagInfo>()
+    private val replayGainCache = ConcurrentHashMap<Long, Float?>()
     private val coverArtCache = object : LruCache<String, ByteArray>(8 * 1024) {
         override fun sizeOf(key: String, value: ByteArray): Int = value.size / 1024
     }
@@ -607,8 +607,7 @@ class MusicRepository(private val context: Context) {
     ): List<LyricLine> = withContext(Dispatchers.IO) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
         val sourcePriority = settingsManager.lyricSourcePriority.first()
-        val ignoreSplMetadataLines = settingsManager.ignoreSplMetadataLines.first()
-        val cacheKey = "${song.id}:$safeMode:$sourcePriority:spl=$ignoreSplMetadataLines"
+        val cacheKey = "${song.id}:$safeMode:$sourcePriority"
         lyricsCache[cacheKey]?.let { return@withContext it }
 
         Log.d("MusicRepo", "Loading lyrics for: ${song.title} path=${song.path}")
@@ -622,7 +621,7 @@ class MusicRepository(private val context: Context) {
 
         val effectivePath = song.effectiveLocalPathForMetadata()
         for (sourceId in orderedLyricSourceIds(sourcePriority, safeMode)) {
-            loadLyricsBySourceId(song, effectivePath, sourceId, ignoreSplMetadataLines)?.let { lyrics ->
+            loadLyricsBySourceId(song, effectivePath, sourceId)?.let { lyrics ->
                 lyricsCache[cacheKey] = lyrics
                 return@withContext lyrics
             }
@@ -651,18 +650,17 @@ class MusicRepository(private val context: Context) {
     private fun loadLyricsBySourceId(
         song: Song,
         effectivePath: String,
-        sourceId: String,
-        ignoreSplMetadataLines: Boolean
+        sourceId: String
     ): List<LyricLine>? {
         return when (sourceId) {
             SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML ->
-                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true, ignoreSplMetadataLines)
+                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true)
             SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN ->
-                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false, ignoreSplMetadataLines)
+                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false)
             SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML ->
-                loadExternalLyricsByFormat(song, effectivePath, preferTtml = true, ignoreSplMetadataLines)
+                loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
             SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN ->
-                loadExternalLyricsByFormat(song, effectivePath, preferTtml = false, ignoreSplMetadataLines)
+                loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
             else -> null
         }
     }
@@ -670,14 +668,10 @@ class MusicRepository(private val context: Context) {
     private fun loadExternalLyricsByFormat(
         song: Song,
         effectivePath: String,
-        preferTtml: Boolean,
-        ignoreSplMetadataLines: Boolean
+        preferTtml: Boolean
     ): List<LyricLine>? {
         val content = findExternalLyricContentByFormat(effectivePath, preferTtml) ?: return null
-        val parsed = LrcParser.parse(
-            content,
-            ignoreSplMetadataLines = ignoreSplMetadataLines
-        )
+        val parsed = LrcParser.parse(content)
         val lyrics = parsed.lyrics.takeIf { it.isNotEmpty() } ?: return null
         return lyrics.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
             .also { Log.d("MusicRepo", "External lyric format ${if (preferTtml) "TTML" else "LRC/ELRC"} parsed: ${lyrics.size} lines for ${song.title}") }
@@ -686,22 +680,20 @@ class MusicRepository(private val context: Context) {
     private fun loadEmbeddedLyricsByFormat(
         song: Song,
         effectivePath: String,
-        preferTtml: Boolean,
-        ignoreSplMetadataLines: Boolean
+        preferTtml: Boolean
     ): List<LyricLine>? {
         val embedded = audioTagRepository.readTagsBlocking(effectivePath)
             ?.embeddedLyricsContent(preferTtml = preferTtml)
             ?: return null
-        val parsed = parseEmbeddedLyrics(song, embedded, ignoreSplMetadataLines) ?: return null
+        val parsed = parseEmbeddedLyrics(song, embedded) ?: return null
         return parsed.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
     }
 
     private fun parseEmbeddedLyrics(
         song: Song,
-        embedded: String,
-        ignoreSplMetadataLines: Boolean
+        embedded: String
     ): List<LyricLine>? {
-        val parsed = LrcParser.parse(embedded, ignoreSplMetadataLines = ignoreSplMetadataLines)
+        val parsed = LrcParser.parse(embedded)
         if (parsed.lyrics.isNotEmpty()) {
             Log.d("MusicRepo", "Embedded lyrics parsed: ${parsed.lyrics.size} lines for ${song.title}")
             return parsed.lyrics
@@ -712,7 +704,6 @@ class MusicRepository(private val context: Context) {
         var timeOffset = 0L
         embedded.lines().forEach { line ->
             val trimmed = line.trim()
-            if (ignoreSplMetadataLines && EllaLyricsParser.isSplMetadataLine(trimmed)) return@forEach
             if (trimmed.isNotEmpty() && !EllaLyricsParser.isPlaceholderOnlyLine(trimmed)) {
                 result.add(LyricLine(timeMs = timeOffset, text = trimmed, words = emptyList()))
                 timeOffset += 3000L
@@ -724,31 +715,28 @@ class MusicRepository(private val context: Context) {
     suspend fun reloadLyrics(song: Song, sourceMode: Int): List<LyricLine> = withContext(Dispatchers.IO) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
         val sourcePriority = settingsManager.lyricSourcePriority.first()
-        val ignoreSplMetadataLines = settingsManager.ignoreSplMetadataLines.first()
-        lyricsCache.remove("${song.id}:$safeMode:$sourcePriority:spl=$ignoreSplMetadataLines")
-        lyricFormatAvailabilityCache.keys.removeAll { it.startsWith("${song.id}:availability:") }
+        lyricsCache.remove("${song.id}:$safeMode:$sourcePriority")
+        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith("${song.id}:availability:") }
         getLyrics(song, safeMode)
     }
 
     suspend fun getLyricFormatAvailability(song: Song): LyricFormatAvailability = withContext(Dispatchers.IO) {
-        val ignoreSplMetadataLines = settingsManager.ignoreSplMetadataLines.first()
-        val cacheKey = "${song.id}:availability:spl=$ignoreSplMetadataLines"
+        val cacheKey = "${song.id}:availability"
         lyricFormatAvailabilityCache[cacheKey]?.let { return@withContext it }
         val effectivePath = song.effectiveLocalPathForMetadata()
-        val ttml = loadExternalLyricsByFormat(song, effectivePath, preferTtml = true, ignoreSplMetadataLines)
-            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true, ignoreSplMetadataLines)
-        val plain = loadExternalLyricsByFormat(song, effectivePath, preferTtml = false, ignoreSplMetadataLines)
-            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false, ignoreSplMetadataLines)
+        val ttml = loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
+            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true)
+        val plain = loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
+            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false)
         LyricFormatAvailability(hasTtml = !ttml.isNullOrEmpty(), hasPlain = !plain.isNullOrEmpty())
             .also { lyricFormatAvailabilityCache[cacheKey] = it }
     }
 
     suspend fun reloadLyricsByFormat(song: Song, preferTtml: Boolean): List<LyricLine> = withContext(Dispatchers.IO) {
         val sourcePriority = settingsManager.lyricSourcePriority.first()
-        val ignoreSplMetadataLines = settingsManager.ignoreSplMetadataLines.first()
-        val cacheKey = "${song.id}:format:$preferTtml:$sourcePriority:spl=$ignoreSplMetadataLines"
+        val cacheKey = "${song.id}:format:$preferTtml:$sourcePriority"
         lyricsCache.remove(cacheKey)
-        lyricFormatAvailabilityCache.keys.removeAll { it.startsWith("${song.id}:availability:") }
+        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith("${song.id}:availability:") }
         val effectivePath = song.effectiveLocalPathForMetadata()
         val lyrics = orderedLyricSourceIds(sourcePriority, SettingsManager.LYRIC_SOURCE_AUTO)
             .filter { id ->
@@ -758,7 +746,7 @@ class MusicRepository(private val context: Context) {
                     id == SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN || id == SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN
                 }
             }
-            .firstNotNullOfOrNull { sourceId -> loadLyricsBySourceId(song, effectivePath, sourceId, ignoreSplMetadataLines) }
+            .firstNotNullOfOrNull { sourceId -> loadLyricsBySourceId(song, effectivePath, sourceId) }
             ?: emptyList()
         lyricsCache[cacheKey] = lyrics
         lyrics
@@ -948,6 +936,10 @@ class MusicRepository(private val context: Context) {
 
     fun getSongRating(song: Song): Int {
         return getSongTagInfo(song).rating
+    }
+
+    suspend fun preloadSongRatings(songs: List<Song>) = withContext(Dispatchers.IO) {
+        songs.forEach { song -> getSongTagInfo(song) }
     }
 
     suspend fun writeSongRating(song: Song, rating: Int): Result<Song?> = withContext(Dispatchers.IO) {
@@ -1498,11 +1490,17 @@ class MusicRepository(private val context: Context) {
         coverDataStates.clear()
     }
 
+    private fun <K, V> ConcurrentHashMap<K, V>.removeKeysMatching(predicate: (K) -> Boolean) {
+        keys.toList().forEach { key ->
+            if (predicate(key)) remove(key)
+        }
+    }
+
     fun clearMetadataCache(song: Song) {
-        lyricsCache.keys.removeAll { it.startsWith("${song.id}:") }
-        lyricFormatAvailabilityCache.keys.removeAll { it.startsWith("${song.id}:") }
+        lyricsCache.removeKeysMatching { it.startsWith("${song.id}:") }
+        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith("${song.id}:") }
         audioInfoCache.remove(song.id)
-        tagInfoCache.keys.removeAll { it.startsWith("${song.id}:") }
+        tagInfoCache.removeKeysMatching { it.startsWith("${song.id}:") }
         replayGainCache.remove(song.id)
         ensureSearchSnapshotLoaded()
         searchTextCache.keys.removeAll { it == song.searchSnapshotKey() || it.startsWith("${song.id}|") }
@@ -1878,8 +1876,6 @@ class MusicRepository(private val context: Context) {
                 "TTMLLYRICS",
                 "TTMLLYRIC",
                 "TTML",
-                "SPL LYRICS",
-                "SPLLYRICS",
                 "SYNCEDLYRICS",
                 "UNSYNCEDLYRICS",
                 "UNSYNCED LYRICS",
@@ -1889,7 +1885,7 @@ class MusicRepository(private val context: Context) {
                 "LYRIC"
             )
         } else {
-            listOf("SPL LYRICS", "SPLLYRICS", "SYNCEDLYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS", "LYRICS", "USLT", "SYLT", "LYRIC")
+            listOf("SYNCEDLYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS", "LYRICS", "USLT", "SYLT", "LYRIC")
         }
         names.forEach { target ->
             customTags.firstMatchingTagValue(target)?.takeIf { it.looksLikeTtmlLyrics() == preferTtml }?.let { return it }
@@ -1911,7 +1907,7 @@ class MusicRepository(private val context: Context) {
         contains("<tt", ignoreCase = true) && contains("</tt", ignoreCase = true)
 
     private fun findExternalLyricContentByFormat(songPath: String, preferTtml: Boolean): String? {
-        val extensions = if (preferTtml) listOf("ttml") else listOf("lrc", "elrc", "spl")
+        val extensions = if (preferTtml) listOf("ttml") else listOf("lrc", "elrc")
         val baseName = songPath.substringBeforeLast('.')
         extensions.forEach { ext ->
             readTextIfExists("$baseName.$ext")?.let { return it }

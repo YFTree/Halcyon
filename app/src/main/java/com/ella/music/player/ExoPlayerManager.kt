@@ -1039,8 +1039,7 @@ class ExoPlayerManager(private val context: Context) {
                 duration.takeIf { it > 0L }?.let(::setDurationMs)
                 if (artworkData != null) {
                     setArtworkData(artworkData, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-                }
-                if (includeArtworkUri) {
+                } else if (includeArtworkUri) {
                     artworkUriForMediaCenter()?.let(::setArtworkUri)
                 }
             }

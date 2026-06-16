@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -28,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +42,12 @@ import androidx.media3.common.Player
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.playlistIdentityKey
+import com.ella.music.data.repository.CoverUsage
+import com.ella.music.data.repository.MusicRepository
+import com.ella.music.ui.components.ArtworkUsage
+import com.ella.music.ui.components.DefaultAlbumCover
+import com.ella.music.ui.components.SafeCoverImage
+import com.ella.music.ui.components.rememberSongArtworkState
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -225,10 +234,8 @@ internal fun PlayerQueueMenu(
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            AlbumArtView(
+                            QueueAlbumArtView(
                                 song = queueSong,
-                                embeddedCover = null,
-                                cornerRadius = 10.dp,
                                 modifier = Modifier.size(40.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
@@ -290,6 +297,46 @@ internal fun PlayerQueueMenu(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun QueueAlbumArtView(
+    song: Song,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val repository = remember(context) { MusicRepository.getInstance(context) }
+    val albumArtUri = remember(song.albumId) {
+        if (song.albumId > 0L) android.net.Uri.parse("content://media/external/audio/albumart/${song.albumId}") else null
+    }
+    val artworkState = rememberSongArtworkState(
+        song = song,
+        albumArtUri = albumArtUri,
+        loadCoverArt = { target -> repository.getCoverArtBitmap(target, 512, CoverUsage.ListThumbnail) },
+        usage = ArtworkUsage.ListThumbnail
+    )
+    val model = artworkState.model
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (model == null) MiuixTheme.colorScheme.surfaceContainer else Color.Transparent),
+        contentAlignment = Alignment.Center
+    ) {
+        if (model != null) {
+            SafeCoverImage(
+                model = model,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(10.dp)),
+                contentScale = ContentScale.Crop,
+                sizePx = 512,
+                showDefaultPlaceholder = false
+            )
+        } else {
+            DefaultAlbumCover(modifier = Modifier.fillMaxSize())
         }
     }
 }

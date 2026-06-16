@@ -8,6 +8,7 @@ import com.ella.music.data.AppLogStore
 import com.ella.music.data.AppLogType
 import com.ella.music.data.AppNetworkLoggingInterceptor
 import okhttp3.Credentials
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,6 +26,7 @@ import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLHandshakeException
 import javax.xml.parsers.DocumentBuilderFactory
@@ -73,7 +75,7 @@ object WebDavClient {
     private fun requireContext(): Context =
         appContext ?: throw IllegalStateException("WebDavClient.initContext() must be called before using WebDavClient")
 
-    private val listCache = mutableMapOf<String, List<WebDavItem>>()
+    private val listCache = ConcurrentHashMap<String, List<WebDavItem>>()
     private val xmlMediaType = "application/xml; charset=utf-8".toMediaType()
     private val secureRandom = SecureRandom()
     private val httpClient = OkHttpClient.Builder()
@@ -169,6 +171,8 @@ object WebDavClient {
     fun clearListCache() {
         listCache.clear()
     }
+
+    fun normalizeFileUrl(url: String): String = normalizeRequestUrl(url)
 
     fun uploadFile(url: String, config: WebDavConfig, data: ByteArray, contentType: String = "application/json") {
         val ctx = requireContext()
@@ -554,7 +558,7 @@ object WebDavClient {
 
     private fun resolveHref(baseUrl: String, href: String): String {
         return runCatching {
-            URI(baseUrl).resolve(href).toString()
+            normalizeRequestUrl(URI(baseUrl).resolve(href).toString())
         }.getOrElse { href }
     }
 
@@ -568,7 +572,20 @@ object WebDavClient {
         require(trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
             "WebDAV URL must start with http:// or https://"
         }
-        return trimmed
+        trimmed.toHttpUrlOrNull()?.let { return it.toString() }
+        return runCatching {
+            val uri = URI(trimmed.replace(" ", "%20"))
+            val normalized = URI(
+                uri.scheme,
+                uri.userInfo,
+                uri.host,
+                uri.port,
+                uri.path.orEmpty(),
+                uri.query,
+                uri.fragment
+            ).toASCIIString()
+            normalized.toHttpUrlOrNull()?.toString() ?: normalized
+        }.getOrDefault(trimmed)
     }
 
     fun displayUrl(url: String): String {

@@ -844,8 +844,6 @@
     <string name="settings_tag_ignore_case_summary">有効にすると LiSA と LISA のように大文字小文字が異なるタグが統合表示されます</string>
     <string name="settings_mini_player_lyrics">ミニプレーヤーに歌詞を表示</string>
     <string name="settings_mini_player_lyrics_summary">再生時にミニプレーヤーに現在の歌詞を表示。オフでは曲タイトルとアーティストを表示</string>
-    <string name="settings_ignore_spl_metadata_lines">SPL ヘッダータグを無視</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">LRC/ELRC 読み込み時に [kana:]、[trans:]、[roma:] などの Salt Player ヘッダー行をスキップ。通常の ELRC への影響を避けるため既定ではオフ</string>
     <string name="settings_lyric_source_priority">歌詞ソースの優先順位</string>
     <string name="settings_lyric_source_priority_summary">有効にすると長押しでドラッグして読み込み順序を調整</string>
     <string name="settings_lyric_source_embedded_ttml">TTML Lyrics 内蔵</string>

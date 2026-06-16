@@ -842,8 +842,6 @@
     <string name="settings_tag_ignore_case_summary">LiSA ve LISA gibi yalnızca harf büyüklüğüne göre farklılık gösteren etiketleri birleştirme</string>
     <string name="settings_mini_player_lyrics">Şarkı sözlerini mini oynatıcıda göster</string>
     <string name="settings_mini_player_lyrics_summary">Çalma sırasında mini oynatıcıda mevcut şarkıyı gösterin; şarkı adını ve sanatçıyı göstermek için devre dışı bırakın</string>
-    <string name="settings_ignore_spl_metadata_lines">SPL başlık etiketlerini yoksay</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">LRC/ELRC şarkı sözlerini okurken [kana:], [trans:] ve [roma:] gibi Salt Player başlık satırlarını atlayın. Normal ELRC dosyalarını etkilememek için varsayılan olarak kapalıdır.</string>
     <string name="settings_lyric_source_priority">Şarkı sözü kaynağı önceliği</string>
     <string name="settings_lyric_source_priority_summary">Açın, ardından yükleme sırasını ayarlamak için bir öğeye uzun basın ve sürükleyin</string>
     <string name="settings_lyric_source_embedded_ttml">Gömülü TTML Şarkı Sözleri</string>

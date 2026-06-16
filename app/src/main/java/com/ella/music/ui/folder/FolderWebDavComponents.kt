@@ -169,6 +169,7 @@ internal fun WebDavTextField(
 internal fun WebDavItem.toRemoteSong(): Song {
     val title = name.substringBeforeLast('.', name)
     val stableId = kotlin.math.abs(url.hashCode().toLong()).takeIf { it != 0L } ?: 1L
+    val playbackUrl = runCatching { com.ella.music.data.webdav.WebDavClient.normalizeFileUrl(url) }.getOrDefault(url)
     return Song(
         id = stableId,
         title = title,
@@ -176,7 +177,7 @@ internal fun WebDavItem.toRemoteSong(): Song {
         album = "",
         albumId = 0L,
         duration = 0L,
-        path = url,
+        path = playbackUrl,
         fileName = name,
         fileSize = size,
         mimeType = mimeType.substringBefore(';').trim().lowercase(Locale.ROOT)

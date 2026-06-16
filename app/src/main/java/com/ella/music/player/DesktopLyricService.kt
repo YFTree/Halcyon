@@ -33,6 +33,7 @@ import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
 import com.ella.music.ui.components.buildLyriconRichLineConfig
 import com.ella.music.ui.components.loadAndroidTypeface
+import com.ella.music.ui.components.toLyriconWords
 import com.ella.music.ui.components.toLyriconSong
 import com.google.common.util.concurrent.FutureCallback
 import com.google.common.util.concurrent.Futures
@@ -955,8 +956,13 @@ class DesktopLyricService : Service() {
         }
 
         private fun updateSong(force: Boolean) {
-            val key = "${currentLine.timeMs}|${currentLine.endMs}|${currentLine.text}|${currentLine.translation}|${currentLine.pronunciation}|${currentLine.backgroundText}|${currentLine.agent}|${currentLine.isTtml}|$statusBarMode|$statusBarSecondaryMode|$statusBarSecondaryOpacity|$statusBarMergeSecondary|$statusBarTextAlign|$statusBarVerticalAlign"
+            val pronunciationWordsByBegin = currentLine.pronunciationWords.toLyriconWords()
+                .takeIf { it.isNotEmpty() }
+                ?.let { mapOf(currentLine.timeMs to it) }
+                ?: emptyMap()
+            val key = "${currentLine.timeMs}|${currentLine.endMs}|${currentLine.text}|${currentLine.translation}|${currentLine.pronunciation}|${currentLine.pronunciationWords.hashCode()}|${currentLine.backgroundText}|${currentLine.agent}|${currentLine.isTtml}|$statusBarMode|$statusBarSecondaryMode|$statusBarSecondaryOpacity|$statusBarMergeSecondary|$statusBarTextAlign|$statusBarVerticalAlign"
             if (!force && key == songKey) {
+                lyricView.setPronunciationWordsByBegin(pronunciationWordsByBegin)
                 lyricView.setPosition(currentPositionMs)
                 return
             }
@@ -966,6 +972,7 @@ class DesktopLyricService : Service() {
                 songTitle = "Halcyon",
                 songArtist = ""
             )
+            lyricView.setPronunciationWordsByBegin(pronunciationWordsByBegin)
             lyricView.song = currentSong
             lyricView.tag = currentSong
             songKey = key

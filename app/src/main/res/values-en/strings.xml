@@ -876,8 +876,6 @@
     <string name="settings_tag_ignore_case_summary">Merge tags that differ only by letter case, such as LiSA and LISA</string>
     <string name="settings_mini_player_lyrics">Show lyrics in mini player</string>
     <string name="settings_mini_player_lyrics_summary">Show the current lyric in the mini player while playing; disable it to show the song title and artist</string>
-    <string name="settings_ignore_spl_metadata_lines">Ignore SPL header tags</string>
-    <string name="settings_ignore_spl_metadata_lines_summary">Skip Salt Player header lines such as [kana:], [trans:], and [roma:] when reading LRC/ELRC lyrics. Off by default to avoid affecting regular ELRC files.</string>
     <string name="settings_lyric_source_priority">Lyric source priority</string>
     <string name="settings_lyric_source_priority_summary">Open it, then long press and drag an item to adjust the loading order</string>
     <string name="settings_lyric_source_embedded_ttml">TTML Lyrics embedded</string>

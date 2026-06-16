@@ -93,13 +93,11 @@ fun LibrarySearchScreen(
             trimmedQuery.isBlank() && !duplicatesOnlyActive -> emptyList()
             trimmedQuery.isBlank() -> songSearchSource
                 .asSequence()
-                .take(80)
                 .map { SongSearchResult(it) }
                 .toList()
             else -> songSearchSource
                 .asSequence()
                 .filter { it.matchesFullTagSearch(trimmedQuery) }
-                .take(80)
                 .map { SongSearchResult(it) }
                 .toList()
         }
@@ -124,7 +122,6 @@ fun LibrarySearchScreen(
         if (filter == SearchFilter.Lyrics) {
             val current = mutableListOf<SongSearchResult>()
             for (song in songSearchSource) {
-                if (current.size >= 80) break
                 val snippet = mainViewModel.repository
                     .getLyrics(song, lyricSourceMode)
                     .firstMatchingLyricSnippet(trimmedQuery)
@@ -144,7 +141,6 @@ fun LibrarySearchScreen(
             .filterSongsBySearchSnapshot(remainingSongs, trimmedQuery)
             .asSequence()
             .filter { it.searchIdentityKey() !in seenKeys }
-            .take(80 - current.size)
             .toList()
         snapshotMatches.forEach { song ->
             current += SongSearchResult(song = song)
@@ -152,7 +148,6 @@ fun LibrarySearchScreen(
         }
         if (snapshotMatches.isNotEmpty()) value = current.toList()
         for (song in remainingSongs) {
-            if (current.size >= 80) break
             if (song.searchIdentityKey() in seenKeys) continue
             val snippet = mainViewModel.repository
                 .getLyrics(song, lyricSourceMode)
