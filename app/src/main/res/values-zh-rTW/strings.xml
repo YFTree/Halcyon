@@ -1363,7 +1363,7 @@
     <string name="equalizer_section_eq">等化器</string>
     <string name="equalizer_unavailable">目前裝置暫不支援音效，或開始播放後再來調整。</string>
     <string name="equalizer_virtualizer">環繞音效</string>
-    <string name="settings_audio_equalizer_summary">等化器、重低音增強、環繞音效</string>
+    <string name="settings_audio_equalizer_summary">等化器</string>
     <string name="settings_font_screen_title">字型</string>
     <string name="settings_font_settings">字型設定</string>
     <string name="settings_font_system_empty">找不到可用的系統字型</string>

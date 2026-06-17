@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
@@ -29,6 +30,7 @@ internal fun LyricsPlayerHeader(
     onArtist: () -> Unit,
     onToggleFavorite: () -> Unit,
     onShowMenu: () -> Unit,
+    fontFamily: FontFamily? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -51,6 +53,7 @@ internal fun LyricsPlayerHeader(
             artistAlpha = 0.72f,
             showArtistWithAnnotation = true,
             contentColor = LocalPlayerContentColor.current,
+            fontFamily = fontFamily,
             onArtistClick = onArtist,
             modifier = Modifier
                 .weight(1f)
@@ -76,6 +79,7 @@ internal fun LyricsPlayerMenuSheet(
     preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
     fontScale: Float,
+    secondaryFontScale: Float,
     onDismiss: () -> Unit,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
@@ -83,6 +87,7 @@ internal fun LyricsPlayerMenuSheet(
     onLyricSourceMode: (Int) -> Unit,
     onLyricFormatPreference: (Boolean) -> Unit,
     onFontScale: (Float) -> Unit,
+    onSecondaryFontScale: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (!show) return
@@ -100,12 +105,14 @@ internal fun LyricsPlayerMenuSheet(
             preferTtmlLyrics = preferTtmlLyrics,
             lyricSourceMode = lyricSourceMode,
             fontScale = fontScale,
+            secondaryFontScale = secondaryFontScale,
             onTogglePronunciation = onTogglePronunciation,
             onToggleTranslation = onToggleTranslation,
             onToggleKeepScreenOn = onToggleKeepScreenOn,
             onLyricSourceMode = onLyricSourceMode,
             onLyricFormatPreference = onLyricFormatPreference,
             onFontScale = onFontScale,
+            onSecondaryFontScale = onSecondaryFontScale,
             modifier = modifier
         )
     }

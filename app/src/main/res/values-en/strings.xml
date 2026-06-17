@@ -1026,6 +1026,7 @@
     <string name="player_disable_playback_keep_screen_on">Disable player always-on</string>
     <string name="player_enable_playback_keep_screen_on">Enable player always-on</string>
     <string name="player_lyric_font_size">Lyric font size</string>
+    <string name="player_lyric_secondary_font_size">Translation/Romanization size</string>
     <string name="player_lyric_source">Lyric source</string>
     <string name="player_lyric_format">Lyric format</string>
     <string name="player_lyric_format_ttml">TTML</string>
@@ -1411,7 +1412,7 @@
     <string name="equalizer_section_eq">Equalizer</string>
     <string name="equalizer_unavailable">Audio effects are not supported on this device, or start playback and then adjust.</string>
     <string name="equalizer_virtualizer">Surround Sound</string>
-    <string name="settings_audio_equalizer_summary">Equalizer, bass boost, surround sound</string>
+    <string name="settings_audio_equalizer_summary">Equalizer</string>
     <string name="settings_font_screen_title">Font</string>
     <string name="settings_font_settings">Font settings</string>
     <string name="settings_font_system_empty">No system fonts found</string>

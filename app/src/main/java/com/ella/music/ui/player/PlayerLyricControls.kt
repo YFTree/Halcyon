@@ -63,12 +63,14 @@ internal fun LyricActionMenu(
     preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
     fontScale: Float,
+    secondaryFontScale: Float,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
     onToggleKeepScreenOn: () -> Unit,
     onLyricSourceMode: (Int) -> Unit,
     onLyricFormatPreference: (Boolean) -> Unit,
     onFontScale: (Float) -> Unit,
+    onSecondaryFontScale: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -103,6 +105,23 @@ internal fun LyricActionMenu(
             steps = 11,
             label = "${(fontScale.coerceIn(0.75f, 1.30f) * 100f).toInt()}%",
             onValueChange = onFontScale,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(82.dp)
+        )
+        Text(
+            text = stringResource(R.string.player_lyric_secondary_font_size),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+        )
+        DottedValueSlider(
+            value = secondaryFontScale.coerceIn(0.70f, 1.50f),
+            valueRange = 0.70f..1.50f,
+            steps = 15,
+            label = "${(secondaryFontScale.coerceIn(0.70f, 1.50f) * 100f).toInt()}%",
+            onValueChange = onSecondaryFontScale,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(82.dp)

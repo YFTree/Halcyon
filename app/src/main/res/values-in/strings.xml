@@ -1363,7 +1363,7 @@
     <string name="equalizer_section_eq">Ekualiser</string>
     <string name="equalizer_unavailable">Efek audio tidak didukung di perangkat ini, atau mulai pemutaran lalu sesuaikan.</string>
     <string name="equalizer_virtualizer">Suara Surround</string>
-    <string name="settings_audio_equalizer_summary">Ekualiser, penguat bass, suara surround</string>
+    <string name="settings_audio_equalizer_summary">Ekualiser</string>
     <string name="settings_font_screen_title">Font</string>
     <string name="settings_font_settings">Pengaturan font</string>
     <string name="settings_font_system_empty">Tidak ada font sistem yang ditemukan</string>

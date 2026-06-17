@@ -1363,7 +1363,7 @@
     <string name="equalizer_section_eq">イコライザー</string>
     <string name="equalizer_unavailable">このデバイスは音響効果に対応していないか、再生を開始してから調整してください。</string>
     <string name="equalizer_virtualizer">サラウンド</string>
-    <string name="settings_audio_equalizer_summary">イコライザー、低音増強、サラウンド</string>
+    <string name="settings_audio_equalizer_summary">イコライザー</string>
     <string name="settings_font_screen_title">フォント</string>
     <string name="settings_font_settings">フォント設定</string>
     <string name="settings_font_system_empty">利用可能なシステムフォントが見つかりません</string>

@@ -17,6 +17,7 @@ internal data class PlayerLyricFontState(
     val fontPath: String,
     val fontWeight: FontWeight,
     val fontScale: Float,
+    val secondaryFontScale: Float,
     val shareTypeface: Typeface?
 )
 
@@ -28,6 +29,7 @@ internal fun rememberPlayerLyricFontState(
     val lyricFontPath by settingsManager.lyricFontPath.collectAsState(initial = "")
     val lyricFontWeightValue by settingsManager.lyricFontWeight.collectAsState(initial = 800)
     val lyricFontScaleValue by settingsManager.lyricFontScale.collectAsState(initial = 100)
+    val lyricSecondaryFontScaleValue by settingsManager.lyricSecondaryFontScale.collectAsState(initial = 100)
     val lyricShareUseLyricFont by settingsManager.lyricShareUseLyricFont.collectAsState(initial = false)
     val bundledDefaultLyricFontPath = remember(context) { ensureBundledMiSansSemiboldPath(context) }
     val preferBundledLyricFontByDefault = remember { !isXiaomiFamilyPlayerDevice() }
@@ -66,6 +68,7 @@ internal fun rememberPlayerLyricFontState(
         FontWeight(effectiveLyricFontWeightValue.coerceIn(100, 900))
     }
     val lyricFontScale = remember(lyricFontScaleValue) { lyricFontScaleValue.coerceIn(75, 130) / 100f }
+    val lyricSecondaryFontScale = remember(lyricSecondaryFontScaleValue) { lyricSecondaryFontScaleValue.coerceIn(70, 150) / 100f }
     val lyricShareTypeface = remember(lyricShareUseLyricFont, effectiveLyricFontPath, effectiveLyricFontWeightValue) {
         if (lyricShareUseLyricFont) {
             effectiveLyricFontPath.toPlayerLyricTypeface(effectiveLyricFontWeightValue)
@@ -79,6 +82,7 @@ internal fun rememberPlayerLyricFontState(
         fontPath = effectiveLyricFontPath,
         fontWeight = lyricFontWeight,
         fontScale = lyricFontScale,
+        secondaryFontScale = lyricSecondaryFontScale,
         shareTypeface = lyricShareTypeface
     )
 }

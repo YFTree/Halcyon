@@ -55,6 +55,7 @@ internal fun LandscapeLyricsOverlay(
     fontPath: String,
     fontWeight: FontWeight,
     fontScale: Float,
+    secondaryFontScale: Float,
     lyricTextAlign: Int,
     showTotalDuration: Boolean,
     palette: PlayerPalette,
@@ -127,6 +128,7 @@ internal fun LandscapeLyricsOverlay(
                 LandscapeSongTitle(
                     song = song,
                     annotation = annotation,
+                    fontFamily = fontFamily,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -166,6 +168,7 @@ internal fun LandscapeLyricsOverlay(
                     showTranslation = showTranslation,
                     showPronunciation = showPronunciation,
                     fontScale = fontScale,
+                    secondaryFontScale = secondaryFontScale,
                     fontPath = fontPath,
                     fontWeight = fontWeight,
                     lyricTextAlign = lyricTextAlign,

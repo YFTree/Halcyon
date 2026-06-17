@@ -307,7 +307,9 @@ private fun ListeningTimelineRow(
     val canPlaySong = remember(song) { song?.isPlayableCalendarSong() == true }
     val coverBitmap by produceState<Bitmap?>(initialValue = null, song?.id, entry.entry.playedAt) {
         value = withContext(Dispatchers.IO) {
-            song?.takeIf { canPlaySong }?.let(mainViewModel::getCoverArtBitmap)
+            runCatching {
+                song?.takeIf { canPlaySong }?.let(mainViewModel::getCoverArtBitmap)
+            }.getOrNull()
         }
     }
     val audioInfo by produceState<AudioInfo?>(initialValue = null, song?.id) {

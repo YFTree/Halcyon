@@ -318,10 +318,12 @@ internal fun AnalyticsSongCover(
 ) {
     val coverBitmap by produceState<Bitmap?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
         value = withContext(Dispatchers.IO) {
-            song?.let { s ->
-                if (coverSize > 128) mainViewModel.getAlbumCoverArtBitmap(s)
-                else mainViewModel.getCoverArtBitmap(s)
-            }
+            runCatching {
+                song?.let { s ->
+                    if (coverSize > 128) mainViewModel.getAlbumCoverArtBitmap(s)
+                    else mainViewModel.getCoverArtBitmap(s)
+                }
+            }.getOrNull()
         }
     }
     Box(

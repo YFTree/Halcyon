@@ -44,7 +44,8 @@ import java.util.Locale
 @Composable
 fun ScanSettingsScreen(
     mainViewModel: MainViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showBackButton: Boolean = true
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -113,13 +114,15 @@ fun ScanSettingsScreen(
             title = stringResource(R.string.folder_scan_settings),
             color = ellaPageBackground(),
             navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = stringResource(R.string.common_back),
-                        tint = MiuixTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp)
-                    )
+                if (showBackButton) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Back,
+                            contentDescription = stringResource(R.string.common_back),
+                            tint = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             },
             actions = {

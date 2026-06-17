@@ -52,6 +52,7 @@ internal fun LyricsPlayerPage(
     fontWeight: FontWeight,
     italic: Boolean,
     fontScale: Float,
+    secondaryFontScale: Float,
     perspectiveEffect: Boolean,
     lyricTextAlign: Int,
     palette: PlayerPalette,
@@ -76,6 +77,7 @@ internal fun LyricsPlayerPage(
     onToggleKeepScreenOn: () -> Unit,
     onToggleFavorite: () -> Unit,
     onFontScale: (Float) -> Unit,
+    onSecondaryFontScale: (Float) -> Unit,
     onLyricSourceMode: (Int) -> Unit,
     onLyricFormatPreference: (Boolean) -> Unit,
     onArtist: () -> Unit,
@@ -154,6 +156,7 @@ internal fun LyricsPlayerPage(
                 onArtist = onArtist,
                 onToggleFavorite = onToggleFavorite,
                 onShowMenu = { lyricMenuExpanded = true },
+                fontFamily = fontFamily,
                 modifier = Modifier.padding(top = 28.dp)
             )
 
@@ -177,6 +180,7 @@ internal fun LyricsPlayerPage(
                     fontWeight = fontWeight,
                     italic = italic,
                     lyricTextAlign = lyricTextAlign,
+                    secondaryFontScale = secondaryFontScale,
                     contentColor = palette.onBackground,
                     // Keep far lines sharp over a busy custom wallpaper so they stay readable.
                     nonCurrentLineBlurEnabled = !useCustomPlayerBackground,
@@ -211,6 +215,7 @@ internal fun LyricsPlayerPage(
             preferTtmlLyrics = preferTtmlLyrics,
             lyricSourceMode = lyricSourceMode,
             fontScale = fontScale,
+            secondaryFontScale = secondaryFontScale,
             onDismiss = { lyricMenuExpanded = false },
             onTogglePronunciation = {
                 lyricMenuExpanded = false
@@ -233,6 +238,7 @@ internal fun LyricsPlayerPage(
                 onLyricFormatPreference(preferTtml)
             },
             onFontScale = onFontScale,
+            onSecondaryFontScale = onSecondaryFontScale,
             modifier = Modifier.fillMaxWidth()
         )
     }

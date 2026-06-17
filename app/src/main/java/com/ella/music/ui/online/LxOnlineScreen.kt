@@ -9,6 +9,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +42,7 @@ import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.lx.LxOnlineService
 import com.ella.music.data.lx.LxOnlineSong
+import com.ella.music.data.lx.LxSearchPlatform
 import com.ella.music.data.model.Song
 import com.ella.music.data.remote.EmbyService
 import com.ella.music.data.remote.NavidromeService
@@ -48,6 +51,7 @@ import com.ella.music.data.remote.RemoteMusicSourceConfig
 import com.ella.music.data.remote.RemoteOnlineSong
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
+import com.ella.music.ui.components.EllaMiuixChip
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.LxOnlineViewModel
 import com.ella.music.viewmodel.MainViewModel
@@ -140,7 +144,7 @@ fun LxOnlineScreen(
         state.isBusy = true
         runCatching {
             if (selectedProvider == RemoteMusicProvider.Lx) {
-                state.results = service.search(state.searchQuery, selectedSource)
+                state.results = service.search(state.searchQuery, selectedSource, platform = state.searchPlatform)
                 remoteResults = emptyList()
                 state.message = if (state.results.isEmpty()) context.getString(R.string.lx_online_no_songs_found)
                 else context.getString(R.string.lx_online_songs_found, state.results.size)
@@ -263,6 +267,29 @@ fun LxOnlineScreen(
                 placeholder = stringResource(R.string.lx_online_search_placeholder),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
             )
+
+            if (selectedProvider == RemoteMusicProvider.Lx) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    LxSearchPlatform.entries.forEach { platform ->
+                        EllaMiuixChip(
+                            text = platform.displayName,
+                            selected = state.searchPlatform == platform,
+                            onClick = {
+                                if (state.searchPlatform != platform) {
+                                    state.searchPlatform = platform
+                                    state.clearResults(platform.displayName)
+                                    remoteResults = emptyList()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
 
             Button(
                 enabled = !state.isBusy && state.searchQuery.isNotBlank() && remoteConfigured,

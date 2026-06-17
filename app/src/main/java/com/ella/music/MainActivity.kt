@@ -455,9 +455,7 @@ fun EllaApp(
 
     LaunchedEffect(currentProcessingIntent.value) {
         val activity = context as? Activity
-        val shortcutAction = currentProcessingIntent.value?.getStringExtra(EXTRA_SHORTCUT_ACTION)
-            ?: currentProcessingIntent.value?.getStringExtra(EXTRA_SHORTCUT_ACTION_NEW)
-            .orEmpty()
+        val shortcutAction = currentProcessingIntent.value?.resolveShortcutAction().orEmpty()
         when (shortcutAction) {
             SHORTCUT_ACTION_PLAY -> {
                 when {
@@ -490,8 +488,10 @@ fun EllaApp(
         if (shortcutRoute.isNotBlank()) {
             runCatching {
                 navController.navigate(shortcutRoute) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = false
+                    }
                     launchSingleTop = true
-                    restoreState = true
                 }
             }
         }
@@ -723,6 +723,11 @@ fun EllaApp(
             icon = MiuixIcons.Regular.Playlist
         ),
         SettingsManager.BOTTOM_DOCK_ITEM_FOLDER to BottomDockTab(
+            route = Screen.MetadataCategory.createRoute("folder", fromDock = true),
+            label = stringResource(R.string.category_folder),
+            icon = MiuixIcons.Regular.Folder
+        ),
+        SettingsManager.BOTTOM_DOCK_ITEM_FOLDER_TREE to BottomDockTab(
             route = Screen.Folder.createRoute(fromDock = true),
             label = stringResource(R.string.category_folder_tree),
             icon = MiuixIcons.Regular.Folder
@@ -748,22 +753,22 @@ fun EllaApp(
             icon = MiuixIcons.Regular.Settings
         ),
         SettingsManager.BOTTOM_DOCK_ITEM_YEAR to BottomDockTab(
-            route = Screen.MetadataCategory.createRoute("year"),
+            route = Screen.MetadataCategory.createRoute("year", fromDock = true),
             label = stringResource(R.string.category_year),
             icon = MiuixIcons.Regular.Album
         ),
         SettingsManager.BOTTOM_DOCK_ITEM_GENRE to BottomDockTab(
-            route = Screen.MetadataCategory.createRoute("genre"),
+            route = Screen.MetadataCategory.createRoute("genre", fromDock = true),
             label = stringResource(R.string.category_genre),
             icon = MiuixIcons.Regular.Music
         ),
         SettingsManager.BOTTOM_DOCK_ITEM_COMPOSER to BottomDockTab(
-            route = Screen.MetadataCategory.createRoute("composer"),
+            route = Screen.MetadataCategory.createRoute("composer", fromDock = true),
             label = stringResource(R.string.category_composer),
             icon = MiuixIcons.Regular.ContactsCircle
         ),
         SettingsManager.BOTTOM_DOCK_ITEM_LYRICIST to BottomDockTab(
-            route = Screen.MetadataCategory.createRoute("lyricist"),
+            route = Screen.MetadataCategory.createRoute("lyricist", fromDock = true),
             label = stringResource(R.string.category_lyricist),
             icon = MiuixIcons.Regular.ContactsCircle
         ),
@@ -899,10 +904,9 @@ fun EllaApp(
                         if (!currentRoute.matchesRoute(route)) {
                             navController.navigate(route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                                    saveState = false
                                 }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         }
                     },
@@ -912,10 +916,9 @@ fun EllaApp(
                         if (!currentRoute.matchesRoute(route)) {
                             navController.navigate(route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                                    saveState = false
                                 }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         }
                     },

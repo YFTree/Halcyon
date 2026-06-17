@@ -45,6 +45,7 @@ fun SettingsScreen(
     onNavigateToBackupSettings: () -> Unit,
     onNavigateToLogs: () -> Unit,
     onBack: () -> Unit = {},
+    showBackButton: Boolean = true,
     mainViewModel: MainViewModel? = null,
     playerViewModel: PlayerViewModel? = null
 ) {
@@ -63,11 +64,13 @@ fun SettingsScreen(
             color = pageBackground,
             centeredTitle = true,
             navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = MiuixIcons.Regular.Back,
-                        contentDescription = stringResource(R.string.common_back)
-                    )
+                if (showBackButton) {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Regular.Back,
+                            contentDescription = stringResource(R.string.common_back)
+                        )
+                    }
                 }
             }
         )

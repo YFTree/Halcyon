@@ -1350,7 +1350,7 @@
     <string name="equalizer_section_eq">Эквалайзер</string>
     <string name="equalizer_unavailable">Аудиоэффекты не поддерживаются на этом устройстве, или начните воспроизведение и затем настройте.</string>
     <string name="equalizer_virtualizer">Объёмный звук</string>
-    <string name="settings_audio_equalizer_summary">Эквалайзер, усиление баса, объёмный звук</string>
+    <string name="settings_audio_equalizer_summary">Эквалайзер</string>
     <string name="settings_font_screen_title">Шрифт</string>
     <string name="settings_font_settings">Настройки шрифта</string>
     <string name="settings_font_system_empty">Системные шрифты не найдены</string>

@@ -1363,7 +1363,7 @@
     <string name="equalizer_section_eq">이퀄라이저</string>
     <string name="equalizer_unavailable">이 기기는 음향 효과를 지원하지 않거나, 재생을 시작한 후 조절하세요.</string>
     <string name="equalizer_virtualizer">서라운드</string>
-    <string name="settings_audio_equalizer_summary">이퀄라이저, 베이스 부스트, 서라운드</string>
+    <string name="settings_audio_equalizer_summary">이퀄라이저</string>
     <string name="settings_font_screen_title">글꼴</string>
     <string name="settings_font_settings">글꼴 설정</string>
     <string name="settings_font_system_empty">사용 가능한 시스템 글꼴이 없습니다</string>

@@ -199,6 +199,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_FONT_PATH = stringPreferencesKey("lyric_font_path")
         val KEY_LYRIC_FONT_WEIGHT = intPreferencesKey("lyric_font_weight")
         val KEY_LYRIC_FONT_SCALE = intPreferencesKey("lyric_font_scale")
+        val KEY_LYRIC_SECONDARY_FONT_SCALE = intPreferencesKey("lyric_secondary_font_scale")
         val KEY_LYRIC_FONT_ITALIC = booleanPreferencesKey("lyric_font_italic")
         val KEY_LYRIC_FONT_APPLY_TO_PAGE = booleanPreferencesKey("lyric_font_apply_to_page")
         val KEY_LYRIC_PERSPECTIVE_EFFECT = booleanPreferencesKey("lyric_perspective_effect")
@@ -287,6 +288,7 @@ class SettingsManager(private val context: Context) {
         const val BOTTOM_DOCK_ITEM_SEARCH = "search"
         const val BOTTOM_DOCK_ITEM_PLAYLISTS = "playlists"
         const val BOTTOM_DOCK_ITEM_FOLDER = "folder"
+        const val BOTTOM_DOCK_ITEM_FOLDER_TREE = "folder_tree"
         const val BOTTOM_DOCK_ITEM_ARTIST = "artist"
         const val BOTTOM_DOCK_ITEM_ALBUM = "album"
         const val BOTTOM_DOCK_ITEM_SCAN_SETTINGS = "scan_settings"
@@ -356,6 +358,7 @@ class SettingsManager(private val context: Context) {
             BOTTOM_DOCK_ITEM_SEARCH,
             BOTTOM_DOCK_ITEM_PLAYLISTS,
             BOTTOM_DOCK_ITEM_FOLDER,
+            BOTTOM_DOCK_ITEM_FOLDER_TREE,
             BOTTOM_DOCK_ITEM_ARTIST,
             BOTTOM_DOCK_ITEM_ALBUM,
             BOTTOM_DOCK_ITEM_SCAN_SETTINGS,
@@ -694,6 +697,7 @@ class SettingsManager(private val context: Context) {
     val lyricFontPath: Flow<String> = context.dataStore.data.map { it[KEY_LYRIC_FONT_PATH] ?: "" }
     val lyricFontWeight: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_WEIGHT] ?: 800 }
     val lyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_FONT_SCALE] ?: 100 }
+    val lyricSecondaryFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_SECONDARY_FONT_SCALE] ?: 100 }
     val lyricFontItalic: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_ITALIC] ?: false }
     val lyricFontApplyToPage: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_APPLY_TO_PAGE] ?: true }
     val lyricShareUseLyricFont: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_SHARE_USE_LYRIC_FONT] ?: false }
@@ -1530,6 +1534,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_LYRIC_FONT_SCALE] = scale.coerceIn(75, 130) }
     }
 
+    suspend fun setLyricSecondaryFontScale(scale: Int) {
+        context.dataStore.edit { it[KEY_LYRIC_SECONDARY_FONT_SCALE] = scale.coerceIn(70, 150) }
+    }
+
     suspend fun setLyricFontItalic(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRIC_FONT_ITALIC] = enabled }
     }
@@ -1848,6 +1856,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_DECODER_MODE)
             setInt(KEY_LYRIC_FONT_WEIGHT)
             setInt(KEY_LYRIC_FONT_SCALE)
+            setInt(KEY_LYRIC_SECONDARY_FONT_SCALE)
             setInt(KEY_SORT_LIBRARY_SONG)
             setInt(KEY_SORT_ALBUM_LIST)
             setInt(KEY_SORT_ARTIST_LIST)

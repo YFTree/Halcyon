@@ -69,6 +69,7 @@ internal fun CoverPageContent(
     effectiveLyricFontPath: String,
     lyricFontWeight: FontWeight,
     lyricFontScale: Float,
+    lyricSecondaryFontScale: Float,
     lyricTextAlign: Int,
     playerTapSeekEnabled: Boolean,
     playerShowTotalDuration: Boolean,
@@ -177,6 +178,7 @@ internal fun CoverPageContent(
         fontPath = effectiveLyricFontPath,
         fontWeight = lyricFontWeight,
         fontScale = lyricFontScale,
+        secondaryFontScale = lyricSecondaryFontScale,
         lyricTextAlign = lyricTextAlign,
         playerTapSeekEnabled = playerTapSeekEnabled,
         playerShowTotalDuration = playerShowTotalDuration,
@@ -421,6 +423,7 @@ internal fun LyricsPageContent(
     effectiveLyricFontPath: String,
     lyricFontWeight: FontWeight,
     lyricFontScale: Float,
+    lyricSecondaryFontScale: Float,
     lyricPerspectiveEffect: Boolean,
     lyricTextAlign: Int,
     lyricPalette: PlayerPalette,
@@ -464,6 +467,7 @@ internal fun LyricsPageContent(
         fontWeight = lyricFontWeight,
         italic = false,
         fontScale = lyricFontScale,
+        secondaryFontScale = lyricSecondaryFontScale,
         perspectiveEffect = lyricPerspectiveEffect,
         lyricTextAlign = lyricTextAlign,
         palette = lyricPalette,
@@ -495,6 +499,9 @@ internal fun LyricsPageContent(
         onToggleFavorite = { playerViewModel.toggleCurrentSongFavorite() },
         onFontScale = { scale ->
             scope.launch { settingsManager.setLyricFontScale((scale * 100f).toInt()) }
+        },
+        onSecondaryFontScale = { scale ->
+            scope.launch { settingsManager.setLyricSecondaryFontScale((scale * 100f).toInt()) }
         },
         onLyricSourceMode = { mode ->
             playerViewModel.setLyricSourceMode(mode)

@@ -919,7 +919,7 @@ internal object EllaLyricsParser {
         cleanLyricText().takeIf { !it.isIgnorableLyricText() }
 
     private fun String.isIgnorableLyricText(): Boolean =
-        isBlank() || isMusicSymbolOnly() || isPlaceholderOnlyLine(this)
+        isBlank() || isMusicSymbolOnly() || isPlaceholderOnlyLine(this) || lrcGenericMetaPattern.matches(cleanLyricText())
 
     private fun String.splitAppleTranslation(): Pair<String?, String?> {
         val text = cleanLyricText()

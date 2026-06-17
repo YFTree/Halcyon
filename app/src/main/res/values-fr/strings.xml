@@ -1363,7 +1363,7 @@
     <string name="equalizer_section_eq">Égaliseur</string>
     <string name="equalizer_unavailable">Les effets audio ne sont pas pris en charge sur cet appareil, ou lancez la lecture puis réglez-les.</string>
     <string name="equalizer_virtualizer">Son surround</string>
-    <string name="settings_audio_equalizer_summary">Égaliseur, amplification des basses, son surround</string>
+    <string name="settings_audio_equalizer_summary">Égaliseur</string>
     <string name="settings_font_screen_title">Police</string>
     <string name="settings_font_settings">Paramètres de police</string>
     <string name="settings_font_system_empty">Aucune police système trouvée</string>

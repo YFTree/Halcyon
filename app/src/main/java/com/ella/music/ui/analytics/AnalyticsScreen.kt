@@ -82,6 +82,7 @@ import java.util.Locale
 fun AnalyticsScreen(
     mainViewModel: MainViewModel,
     onBack: () -> Unit,
+    showBackButton: Boolean = true,
     onNavigateToHistory: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -118,13 +119,17 @@ fun AnalyticsScreen(
                 .padding(horizontal = 4.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = MiuixIcons.Regular.Back,
-                    contentDescription = stringResource(R.string.common_back),
-                    tint = MiuixTheme.colorScheme.onBackground,
-                    modifier = Modifier.size(24.dp)
-                )
+            if (showBackButton) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = MiuixIcons.Regular.Back,
+                        contentDescription = stringResource(R.string.common_back),
+                        tint = MiuixTheme.colorScheme.onBackground,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.width(8.dp))
             }
             Text(
                 text = stringResource(R.string.analytics_title),

@@ -167,6 +167,7 @@ fun PlayerScreen(
     val effectiveLyricFontPath = lyricFontState.fontPath
     val lyricFontWeight = lyricFontState.fontWeight
     val lyricFontScale = lyricFontState.fontScale
+    val lyricSecondaryFontScale = lyricFontState.secondaryFontScale
     val lyricShareTypeface = lyricFontState.shareTypeface
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
@@ -452,6 +453,7 @@ fun PlayerScreen(
                         effectiveLyricFontPath = effectiveLyricFontPath,
                         lyricFontWeight = lyricFontWeight,
                         lyricFontScale = lyricFontScale,
+                        lyricSecondaryFontScale = lyricSecondaryFontScale,
                         lyricTextAlign = playerLyricTextAlign,
                         playerTapSeekEnabled = playerTapSeekEnabled,
                         playerShowTotalDuration = playerShowTotalDuration,
@@ -526,6 +528,7 @@ fun PlayerScreen(
                         effectiveLyricFontPath = effectiveLyricFontPath,
                         lyricFontWeight = lyricFontWeight,
                         lyricFontScale = lyricFontScale,
+                        lyricSecondaryFontScale = lyricSecondaryFontScale,
                         lyricPerspectiveEffect = lyricPerspectiveEffect,
                         lyricTextAlign = playerLyricTextAlign,
                         lyricPalette = lyricPalette,
@@ -604,6 +607,7 @@ fun PlayerScreen(
                 fontPath = effectiveLyricFontPath,
                 fontWeight = lyricFontWeight,
                 fontScale = lyricFontScale,
+                secondaryFontScale = lyricSecondaryFontScale,
                 lyricTextAlign = playerLyricTextAlign,
                 showTotalDuration = playerShowTotalDuration,
                 queueExpanded = uiState.queueExpanded,

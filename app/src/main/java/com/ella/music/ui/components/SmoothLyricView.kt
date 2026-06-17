@@ -41,6 +41,7 @@ fun SmoothLyricView(
     contentColor: Color = Color.White,
     primaryTextSizeSp: Float = 28f,
     secondaryTextSizeSp: Float = 15f,
+    secondaryFontScale: Float = 1f,
     anchorOffsetRatio: Float = -0.12f,
     topContentPadding: Dp = 0.dp,
     nonCurrentLineBlurDistance: Int = 2,
@@ -108,12 +109,13 @@ fun SmoothLyricView(
         secondaryTypeface,
         primaryTextSizeSp,
         secondaryTextSizeSp,
+        secondaryFontScale,
         contentArgb,
         syllableGlowColor
     ) {
         buildLyriconRichLineConfig(
             primaryTextSizePx = with(density) { (primaryTextSizeSp.sp * fontScale).toPx() },
-            secondaryTextSizePx = with(density) { (secondaryTextSizeSp.sp * fontScale).toPx() },
+            secondaryTextSizePx = with(density) { (secondaryTextSizeSp.sp * fontScale * secondaryFontScale).toPx() },
             primaryTypeface = lyricTypeface,
             secondaryTypeface = secondaryTypeface,
             primaryTextColor = contentArgb,

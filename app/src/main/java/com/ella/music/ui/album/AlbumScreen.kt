@@ -71,7 +71,6 @@ import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -127,7 +126,7 @@ fun AlbumScreen(
     }
     val scope = rememberCoroutineScope()
     var scrollToTopRequest by remember { mutableStateOf(0) }
-    var gridCoversEnabled by remember { mutableStateOf(false) }
+    val gridCoversEnabled = true
     val albumDurations = remember(songs) {
         LibraryAlbumAggregator.durationsByAlbumIdentity(songs)
     }
@@ -263,11 +262,6 @@ fun AlbumScreen(
         selectedAlbumIds = selectedAlbumIds.filterTo(mutableSetOf()) { it in visibleIds }
         if (rangeAnchorAlbumId !in visibleIds) rangeAnchorAlbumId = selectedAlbumIds.firstOrNull()
         if (rangeTargetAlbumId !in visibleIds) rangeTargetAlbumId = null
-    }
-
-    LaunchedEffect(Unit) {
-        delay(220L)
-        gridCoversEnabled = true
     }
 
     Column(

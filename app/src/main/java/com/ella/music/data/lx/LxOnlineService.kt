@@ -21,6 +21,14 @@ data class LxOnlineSong(
     val coverUrl: String = ""
 )
 
+enum class LxSearchPlatform(
+    val source: String,
+    val displayName: String
+) {
+    Kuwo("kw", "酷我"),
+    Netease("wy", "网易云")
+}
+
 class LxOnlineService(private val context: Context) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
@@ -56,9 +64,17 @@ class LxOnlineService(private val context: Context) {
     suspend fun search(
         keyword: String,
         sourceConfig: LxSourceConfig?,
-        page: Int = 1
+        page: Int = 1,
+        platform: LxSearchPlatform = LxSearchPlatform.Kuwo
     ): List<LxOnlineSong> = withContext(Dispatchers.IO) {
         if (sourceConfig == null) error(context.getString(R.string.lx_service_select_source_first))
+        when (platform) {
+            LxSearchPlatform.Kuwo -> searchKuwo(keyword, page)
+            LxSearchPlatform.Netease -> searchNetease(keyword, page)
+        }
+    }
+
+    private fun searchKuwo(keyword: String, page: Int): List<LxOnlineSong> {
         val encoded = URLEncoder.encode(keyword.trim(), "UTF-8")
         val url = "http://search.kuwo.cn/r.s?client=kt&all=$encoded&pn=${(page - 1).coerceAtLeast(0)}&rn=30" +
             "&uid=794762570&ver=kwplayer_ar_9.2.2.1&vipver=1&show_copyright_off=1&newver=1" +
@@ -67,11 +83,11 @@ class LxOnlineService(private val context: Context) {
             .url(url)
             .header("User-Agent", USER_AGENT)
             .build()
-        client.newCall(request).execute().use { response ->
+        return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error(context.getString(R.string.lx_service_search_failed_http, response.code))
             val body = response.body?.string().orEmpty()
             val root = JSONObject(body)
-            val list = root.optJSONArray("abslist") ?: return@withContext emptyList()
+            val list = root.optJSONArray("abslist") ?: return@use emptyList()
             List(list.length()) { index ->
                 val item = list.getJSONObject(index)
                 val mid = item.optString("MUSICRID").removePrefix("MUSIC_").ifBlank { item.optString("DC_TARGETID") }
@@ -105,6 +121,60 @@ class LxOnlineService(private val context: Context) {
         }
     }
 
+    private fun searchNetease(keyword: String, page: Int): List<LxOnlineSong> {
+        val encoded = URLEncoder.encode(keyword.trim(), "UTF-8")
+        val offset = (page - 1).coerceAtLeast(0) * 30
+        val url = "https://music.163.com/api/search/get/web?csrf_token=&hlpretag=&hlposttag=&s=$encoded&type=1&offset=$offset&total=true&limit=30"
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", USER_AGENT)
+            .header("Referer", "https://music.163.com/")
+            .build()
+        return client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) error(context.getString(R.string.lx_service_search_failed_http, response.code))
+            val root = JSONObject(response.body?.string().orEmpty())
+            val songs = root.optJSONObject("result")?.optJSONArray("songs") ?: return@use emptyList()
+            List(songs.length()) { index ->
+                val item = songs.getJSONObject(index)
+                val idValue = item.optLong("id", 0L).takeIf { it > 0L }?.toString().orEmpty()
+                val title = decodeHtml(item.optString("name"))
+                val artists = item.optJSONArray("artists")
+                val artist = if (artists != null) {
+                    List(artists.length()) { artistIndex ->
+                        decodeHtml(artists.optJSONObject(artistIndex)?.optString("name").orEmpty())
+                    }.filter { it.isNotBlank() }.joinToString("、")
+                } else {
+                    ""
+                }
+                val album = item.optJSONObject("album")
+                val albumName = decodeHtml(album?.optString("name").orEmpty())
+                val coverUrl = album?.optString("picUrl").orEmpty()
+                val durationMs = item.optLong("duration", 0L)
+                val id = "lx_wy_$idValue".hashCode().toLong()
+                LxOnlineSong(
+                    song = Song(
+                        id = id,
+                        title = title,
+                        artist = artist,
+                        album = albumName,
+                        albumId = 0L,
+                        duration = durationMs,
+                        path = "",
+                        fileName = "$title-$artist.mp3",
+                        mimeType = "audio/mpeg",
+                        coverUrl = coverUrl,
+                        onlineSource = "wy",
+                        onlineId = idValue
+                    ),
+                    source = "wy",
+                    songmid = idValue,
+                    quality = "128k",
+                    coverUrl = coverUrl
+                )
+            }.filter { it.songmid.isNotBlank() && it.song.title.isNotBlank() }
+        }
+    }
+
     suspend fun resolvePlayableSong(item: LxOnlineSong, sourceScript: String = ""): Song = withContext(Dispatchers.IO) {
         runCatching { resolveByImportedSource(item, sourceScript) }
             .getOrNull()
@@ -114,6 +184,11 @@ class LxOnlineService(private val context: Context) {
                 .takeIf { it.length in 2..5 }
                 ?: if (item.quality.startsWith("flac")) "flac" else "mp3"
             return@withContext item.song.copy(path = playableUrl, fileName = "${item.song.title}.$extension")
+        }
+
+        if (item.source == LxSearchPlatform.Netease.source) {
+            val url = "https://music.163.com/song/media/outer/url?id=${item.songmid}.mp3"
+            return@withContext item.song.copy(path = url, fileName = "${item.song.title}.mp3")
         }
 
         val format = when (item.quality) {

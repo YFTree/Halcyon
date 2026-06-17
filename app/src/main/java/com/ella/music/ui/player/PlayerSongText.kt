@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 internal fun LandscapeSongTitle(
     song: Song?,
     annotation: String,
+    fontFamily: FontFamily? = null,
     modifier: Modifier = Modifier
 ) {
     PlayerSongMetaText(
@@ -49,6 +51,7 @@ internal fun LandscapeSongTitle(
         artistAlpha = 0.50f,
         fallbackTitle = stringResource(R.string.app_name),
         contentColor = LocalPlayerContentColor.current,
+        fontFamily = fontFamily,
         modifier = modifier.padding(end = 16.dp)
     )
 }
@@ -65,6 +68,7 @@ internal fun PlayerSongMetaText(
     showArtistWithAnnotation: Boolean = false,
     contentColor: Color = Color.White,
     textAlign: TextAlign = TextAlign.Start,
+    fontFamily: FontFamily? = null,
     onArtistClick: (() -> Unit)? = null,
     onAlbumClick: (() -> Unit)? = null
 ) {
@@ -87,6 +91,7 @@ internal fun PlayerSongMetaText(
             fontWeight = FontWeight.ExtraBold,
             color = contentColor.copy(alpha = 0.96f),
             textAlign = textAlign,
+            fontFamily = fontFamily,
             modifier = Modifier.fillMaxWidth()
         )
         if (annotation.isNotBlank()) {
@@ -96,6 +101,7 @@ internal fun PlayerSongMetaText(
                 fontWeight = FontWeight.Bold,
                 color = contentColor.copy(alpha = (artistAlpha + 0.16f).coerceAtMost(0.82f)),
                 textAlign = textAlign,
+                fontFamily = fontFamily,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -106,6 +112,7 @@ internal fun PlayerSongMetaText(
                 fontWeight = FontWeight.Bold,
                 color = contentColor.copy(alpha = artistAlpha),
                 textAlign = textAlign,
+                fontFamily = fontFamily,
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(clickableMetaModifier(artist.isNotBlank(), onArtistClick))
@@ -121,6 +128,7 @@ internal fun PlayerSongTitleText(
     fontWeight: FontWeight,
     color: Color,
     textAlign: TextAlign = TextAlign.Start,
+    fontFamily: FontFamily? = null,
     modifier: Modifier = Modifier
 ) {
     Text(
@@ -128,6 +136,7 @@ internal fun PlayerSongTitleText(
         fontSize = fontSize,
         fontWeight = fontWeight,
         color = color,
+        fontFamily = fontFamily,
         maxLines = 1,
         softWrap = false,
         overflow = TextOverflow.Clip,
@@ -143,6 +152,7 @@ internal fun PlayerMarqueeText(
     fontWeight: FontWeight,
     color: Color,
     textAlign: TextAlign = TextAlign.Start,
+    fontFamily: FontFamily? = null,
     modifier: Modifier = Modifier
 ) {
     LyriconStyleMarqueeText(
@@ -150,6 +160,7 @@ internal fun PlayerMarqueeText(
         style = TextStyle(
             fontSize = fontSize,
             fontWeight = fontWeight,
+            fontFamily = fontFamily,
             color = color
         ),
         enabled = true,

@@ -1363,7 +1363,7 @@
     <string name="equalizer_section_eq">Bộ chỉnh âm</string>
     <string name="equalizer_unavailable">Thiết bị này không hỗ trợ hiệu ứng âm thanh, hoặc hãy bắt đầu phát rồi điều chỉnh.</string>
     <string name="equalizer_virtualizer">Âm thanh vòm</string>
-    <string name="settings_audio_equalizer_summary">Bộ chỉnh âm, tăng cường âm trầm, âm thanh vòm</string>
+    <string name="settings_audio_equalizer_summary">Bộ chỉnh âm</string>
     <string name="settings_font_screen_title">Phông chữ</string>
     <string name="settings_font_settings">Cài đặt phông chữ</string>
     <string name="settings_font_system_empty">Không tìm thấy phông chữ hệ thống</string>

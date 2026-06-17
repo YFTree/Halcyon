@@ -89,8 +89,12 @@ sealed class Screen(val route: String) {
         fun createRoute(fromDock: Boolean = false) = "$baseRoute?fromDock=$fromDock"
     }
     data object ScanSettings : Screen("scan_settings")
-    data object MetadataCategory : Screen("category/{type}") {
-        fun createRoute(type: String) = "category/${java.net.URLEncoder.encode(type, "UTF-8")}"
+    data object MetadataCategory : Screen("category/{type}?fromDock={fromDock}") {
+        const val baseRoute = "category"
+        fun createRoute(type: String, fromDock: Boolean = false): String {
+            val route = "$baseRoute/${java.net.URLEncoder.encode(type, "UTF-8")}"
+            return if (fromDock) "$route?fromDock=true" else route
+        }
     }
     data object MetadataCategoryDetail : Screen("category/{type}/{name}") {
         fun createRoute(type: String, name: String) =
@@ -164,10 +168,9 @@ fun AppNavigation(
         fun navigateTopLevel(route: String) {
             navController.navigate(route) {
                 popUpTo(navController.graph.findStartDestination().id) {
-                    saveState = true
+                    saveState = false
                 }
                 launchSingleTop = true
-                restoreState = true
             }
         }
 
@@ -304,7 +307,7 @@ fun AppNavigation(
             FolderScreen(
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
-                showBackButton = !(fromDock && isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_FOLDER)),
+                showBackButton = !(fromDock && isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_FOLDER_TREE)),
                 onBack = { navController.popBackStack() },
                 onNavigateToPlayer = onNavigateToPlayer,
                 onNavigateToLibraryAnalysis = { navController.navigate(Screen.LibraryAnalysis.route) },
@@ -318,22 +321,28 @@ fun AppNavigation(
         composable(Screen.ScanSettings.route) {
             ScanSettingsScreen(
                 mainViewModel = mainViewModel,
+                showBackButton = !isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_SCAN_SETTINGS),
                 onBack = { navController.popBackStack() }
             )
         }
 
         composable(
             route = Screen.MetadataCategory.route,
-            arguments = listOf(navArgument("type") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("type") { type = NavType.StringType },
+                navArgument("fromDock") { type = NavType.BoolType; defaultValue = false }
+            )
         ) { backStackEntry ->
             val type = java.net.URLDecoder.decode(
                 backStackEntry.arguments?.getString("type").orEmpty(),
                 "UTF-8"
             )
+            val fromDock = backStackEntry.arguments?.getBoolean("fromDock") == true
             MetadataCategoryScreen(
                 type = type,
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel,
+                showBackButton = !(fromDock && type.bottomDockItemIdForMetadataCategory() in bottomDockItems),
                 onBack = { navController.popBackStack() },
                 onCategoryClick = { name ->
                     navController.navigate(Screen.MetadataCategoryDetail.createRoute(type, name))
@@ -482,6 +491,7 @@ fun AppNavigation(
                 onNavigateToBackupSettings = { navController.navigate(Screen.BackupSettings.route) },
                 onNavigateToLogs = { navController.navigate(Screen.Logs.route) },
                 onBack = { navController.popBackStack() },
+                showBackButton = !isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_SETTINGS),
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel
             )
@@ -603,6 +613,7 @@ fun AppNavigation(
             AnalyticsScreen(
                 mainViewModel = mainViewModel,
                 onBack = { navController.popBackStack() },
+                showBackButton = !isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_ANALYTICS),
                 onNavigateToHistory = { navController.navigate(Screen.PlaybackHistory.route) }
             )
         }
@@ -651,4 +662,13 @@ fun AppNavigation(
         }
 
     }
+}
+
+private fun String.bottomDockItemIdForMetadataCategory(): String? = when (this) {
+    "folder" -> SettingsManager.BOTTOM_DOCK_ITEM_FOLDER
+    "year" -> SettingsManager.BOTTOM_DOCK_ITEM_YEAR
+    "genre" -> SettingsManager.BOTTOM_DOCK_ITEM_GENRE
+    "composer" -> SettingsManager.BOTTOM_DOCK_ITEM_COMPOSER
+    "lyricist" -> SettingsManager.BOTTOM_DOCK_ITEM_LYRICIST
+    else -> null
 }

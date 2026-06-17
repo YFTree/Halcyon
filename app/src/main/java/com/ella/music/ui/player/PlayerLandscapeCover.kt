@@ -70,6 +70,7 @@ internal fun LandscapeCoverPlayerPage(
     fontPath: String,
     fontWeight: FontWeight,
     fontScale: Float,
+    secondaryFontScale: Float,
     lyricTextAlign: Int,
     showTotalDuration: Boolean,
     playerTapSeekEnabled: Boolean,
@@ -179,6 +180,7 @@ internal fun LandscapeCoverPlayerPage(
                             artistAlpha = 0.56f,
                             showArtistWithAnnotation = true,
                             contentColor = palette.onBackground,
+                            fontFamily = fontFamily,
                             onArtistClick = onArtist,
                             modifier = Modifier.weight(1f)
                         )
@@ -202,6 +204,7 @@ internal fun LandscapeCoverPlayerPage(
                             artistAlpha = 0.62f,
                             showArtistWithAnnotation = true,
                             contentColor = palette.onBackground,
+                            fontFamily = fontFamily,
                             onArtistClick = onArtist,
                             modifier = Modifier.weight(1f)
                         )
@@ -325,6 +328,7 @@ internal fun LandscapeCoverPlayerPage(
                         showTranslation = showTranslation,
                         showPronunciation = showPronunciation,
                         fontScale = fontScale,
+                        secondaryFontScale = secondaryFontScale,
                         fontPath = fontPath,
                         fontWeight = fontWeight,
                         lyricTextAlign = lyricTextAlign,

@@ -521,7 +521,7 @@
     <string name="desktop_lyric_pin_top">快速置顶</string>
     <string name="settings_current_value">当前：%1$s</string>
     <string name="settings_audio_screen_title">音频</string>
-    <string name="settings_audio_equalizer_summary">均衡器、低音增强、环绕声</string>
+    <string name="settings_audio_equalizer_summary">均衡器</string>
     <string name="equalizer_screen_title">均衡器</string>
     <string name="equalizer_section_eq">均衡器</string>
     <string name="equalizer_section_effects">音效</string>
@@ -1076,6 +1076,7 @@
     <string name="player_disable_playback_keep_screen_on">关闭播放页常亮</string>
     <string name="player_enable_playback_keep_screen_on">开启播放页常亮</string>
     <string name="player_lyric_font_size">歌词字号</string>
+    <string name="player_lyric_secondary_font_size">翻译/罗马音字号</string>
     <string name="player_lyric_source">歌词来源</string>
     <string name="player_lyric_format">歌词格式</string>
     <string name="player_lyric_format_ttml">TTML</string>

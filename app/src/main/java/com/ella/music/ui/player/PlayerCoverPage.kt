@@ -81,6 +81,7 @@ internal fun CoverPlayerPage(
     fontPath: String,
     fontWeight: FontWeight,
     fontScale: Float,
+    secondaryFontScale: Float,
     lyricTextAlign: Int,
     playerTapSeekEnabled: Boolean,
     playerShowTotalDuration: Boolean,
@@ -247,6 +248,7 @@ internal fun CoverPlayerPage(
                 fontPath = fontPath,
                 fontWeight = fontWeight,
                 fontScale = fontScale,
+                secondaryFontScale = secondaryFontScale,
                 lyricTextAlign = lyricTextAlign,
                 showTotalDuration = playerShowTotalDuration,
                 playerTapSeekEnabled = playerTapSeekEnabled,
@@ -357,6 +359,7 @@ internal fun CoverPlayerPage(
                                 artistAlpha = 0.54f,
                                 showArtistWithAnnotation = true,
                                 contentColor = pagePalette.onBackground,
+                                fontFamily = fontFamily,
                                 onArtistClick = onArtist,
                                 modifier = Modifier
                                     .weight(1f)
@@ -386,6 +389,7 @@ internal fun CoverPlayerPage(
                                 fontPath = fontPath,
                                 fontWeight = fontWeight,
                                 fontScale = fontScale,
+                                secondaryFontScale = secondaryFontScale,
                                 lyricTextAlign = lyricTextAlign,
                                 compact = compactWindow,
                                 contentColor = pagePalette.onBackground,
@@ -498,6 +502,7 @@ internal fun CoverPlayerPage(
                                 artistAlpha = 0.62f,
                                 showArtistWithAnnotation = true,
                                 contentColor = pagePalette.onBackground,
+                                fontFamily = fontFamily,
                                 onArtistClick = onArtist,
                                 modifier = Modifier.weight(1f)
                             )
@@ -524,6 +529,7 @@ internal fun CoverPlayerPage(
                                 fontPath = fontPath,
                                 fontWeight = fontWeight,
                                 fontScale = fontScale,
+                                secondaryFontScale = secondaryFontScale,
                                 lyricTextAlign = lyricTextAlign,
                                 compact = compactWindow,
                                 contentColor = pagePalette.onBackground,

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -40,10 +39,8 @@ import com.ella.music.ui.components.EllaSmallTopAppBar
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.VerticalSlider
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -65,10 +62,6 @@ fun EqualizerScreen(onBack: () -> Unit) {
     val eqEnabled by settingsManager.eqEnabled.collectAsState(initial = false)
     val eqPreset by settingsManager.eqPreset.collectAsState(initial = AudioEffectSettings.PRESET_CUSTOM)
     val bandLevels by settingsManager.eqBandLevelsMb.collectAsState(initial = emptyList())
-    val bassBoostEnabled by settingsManager.bassBoostEnabled.collectAsState(initial = false)
-    val bassBoostStrength by settingsManager.bassBoostStrength.collectAsState(initial = 0)
-    val virtualizerEnabled by settingsManager.virtualizerEnabled.collectAsState(initial = false)
-    val virtualizerStrength by settingsManager.virtualizerStrength.collectAsState(initial = 0)
 
     val accent = MiuixTheme.colorScheme.primary
 
@@ -191,51 +184,6 @@ fun EqualizerScreen(onBack: () -> Unit) {
                     }
             )
 
-            if (caps.bassBoostSupported || caps.virtualizerSupported) {
-                SmallTitle(text = stringResource(R.string.equalizer_section_effects))
-                SettingsCardGroup {
-                    Column {
-                        if (caps.bassBoostSupported) {
-                            EffectStrengthRow(
-                                title = stringResource(R.string.equalizer_bass_boost),
-                                enabled = bassBoostEnabled,
-                                strength = bassBoostStrength,
-                                strengthAdjustable = caps.bassBoostStrengthAdjustable,
-                                accent = accent,
-                                onEnabledChange = { enabled ->
-                                    scope.launch {
-                                        // Turning the effect on with 0 strength is inaudible; seed a default.
-                                        if (enabled && bassBoostStrength <= 0) {
-                                            settingsManager.setBassBoostStrength(DEFAULT_EFFECT_STRENGTH)
-                                        }
-                                        settingsManager.setBassBoostEnabled(enabled)
-                                    }
-                                },
-                                onStrengthChange = { scope.launch { settingsManager.setBassBoostStrength(it) } }
-                            )
-                        }
-                        if (caps.virtualizerSupported) {
-                            EffectStrengthRow(
-                                title = stringResource(R.string.equalizer_virtualizer),
-                                enabled = virtualizerEnabled,
-                                strength = virtualizerStrength,
-                                strengthAdjustable = caps.virtualizerStrengthAdjustable,
-                                accent = accent,
-                                onEnabledChange = { enabled ->
-                                    scope.launch {
-                                        if (enabled && virtualizerStrength <= 0) {
-                                            settingsManager.setVirtualizerStrength(DEFAULT_EFFECT_STRENGTH)
-                                        }
-                                        settingsManager.setVirtualizerEnabled(enabled)
-                                    }
-                                },
-                                onStrengthChange = { scope.launch { settingsManager.setVirtualizerStrength(it) } }
-                            )
-                        }
-                    }
-                }
-            }
-
             Spacer(modifier = Modifier.height(160.dp))
         }
     }
@@ -278,51 +226,6 @@ private fun EqBandColumn(
         )
     }
 }
-
-@Composable
-private fun EffectStrengthRow(
-    title: String,
-    enabled: Boolean,
-    strength: Int,
-    strengthAdjustable: Boolean,
-    accent: Color,
-    onEnabledChange: (Boolean) -> Unit,
-    onStrengthChange: (Int) -> Unit
-) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                fontSize = 15.sp,
-                color = MiuixTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            // Only meaningful when the device exposes variable strength.
-            if (strengthAdjustable) {
-                Text(
-                    text = "${(strength * 100 / AudioEffectSettings.STRENGTH_MAX)}%",
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-            }
-            Switch(checked = enabled, onCheckedChange = onEnabledChange)
-        }
-        if (strengthAdjustable) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Slider(
-                value = strength.toFloat() / AudioEffectSettings.STRENGTH_MAX,
-                onValueChange = { onStrengthChange((it.coerceIn(0f, 1f) * AudioEffectSettings.STRENGTH_MAX).roundToInt()) },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    }
-}
-
-private const val DEFAULT_EFFECT_STRENGTH = 600
 
 private fun List<Int>.toDisplayBandLevels(caps: com.ella.music.player.EqualizerCapabilities): List<Int> {
     if (size == caps.displayBandCount) return this

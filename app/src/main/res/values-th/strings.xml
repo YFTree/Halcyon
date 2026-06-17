@@ -1363,7 +1363,7 @@
     <string name="equalizer_section_eq">อีควอไลเซอร์</string>
     <string name="equalizer_unavailable">อุปกรณ์นี้ไม่รองรับเอฟเฟกต์เสียง หรือเริ่มเล่นก่อนแล้วจึงปรับ</string>
     <string name="equalizer_virtualizer">เสียงรอบทิศทาง</string>
-    <string name="settings_audio_equalizer_summary">อีควอไลเซอร์ เพิ่มเสียงเบส เสียงรอบทิศทาง</string>
+    <string name="settings_audio_equalizer_summary">อีควอไลเซอร์</string>
     <string name="settings_font_screen_title">แบบอักษร</string>
     <string name="settings_font_settings">ตั้งค่าแบบอักษร</string>
     <string name="settings_font_system_empty">ไม่พบแบบอักษรของระบบ</string>
