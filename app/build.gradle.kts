@@ -1,7 +1,13 @@
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import com.android.build.api.artifact.SingleArtifact
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.androidApplication)
@@ -10,7 +16,75 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
-    val appVersionName = "1.1.96"
+val appVersionName = "1.1.96"
+
+fun variantChannelMarker(variantName: String): String =
+    when (variantName.lowercase(Locale.US)) {
+        "debug" -> "d"
+        "fastrelease" -> "f"
+        "release" -> "r"
+        else -> variantName.firstOrNull()?.lowercaseChar()?.toString() ?: "x"
+    }
+
+abstract class CopyRenamedApksTask : DefaultTask() {
+    @get:InputDirectory
+    abstract val apkDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @get:Input
+    abstract val versionName: Property<String>
+
+    @get:Input
+    abstract val variantName: Property<String>
+
+    @get:Input
+    abstract val channelMarker: Property<String>
+
+    @TaskAction
+    fun copyApks() {
+        val sourceDir = apkDir.get().asFile
+        val targetDir = outputDir.get().asFile
+        targetDir.mkdirs()
+
+        val knownAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+        val marker = channelMarker.get()
+        val variant = variantName.get()
+        val version = versionName.get()
+        sourceDir.walkTopDown()
+            .filter { it.isFile && it.extension.equals("apk", ignoreCase = true) }
+            .forEach { apk ->
+                val lowerName = apk.name.lowercase(Locale.US)
+                val abi = knownAbis.firstOrNull { lowerName.contains(it.lowercase(Locale.US)) }
+                    ?: "universal"
+                val hash = apk.shortContentHash()
+                val target = targetDir.resolve(
+                    "Halcyon-$version-$marker-$hash-$abi-$variant.APK"
+                )
+                val oldNamePrefix = "Halcyon-$version-"
+                val oldNameSuffix = "-$abi-$variant.APK"
+                targetDir.listFiles()
+                    ?.filter { it.isFile && it.name.startsWith(oldNamePrefix) && it.name.endsWith(oldNameSuffix) && it != target }
+                    ?.forEach { it.delete() }
+                apk.copyTo(target, overwrite = true)
+                logger.lifecycle("Renamed APK copied to: ${target.absolutePath}")
+            }
+    }
+
+    private fun java.io.File.shortContentHash(): String {
+        val digest = MessageDigest.getInstance("SHA-1")
+        inputStream().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }.take(6)
+    }
+}
 
 android {
     namespace = "com.ella.music"
@@ -35,9 +109,6 @@ android {
         targetSdk = 37
         versionCode = 26
         versionName = appVersionName
-
-        val buildTime = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date())
-        buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
     }
 
     splits {
@@ -117,32 +188,12 @@ androidComponents {
         val apkDirProvider = variant.artifacts.get(SingleArtifact.APK)
         val outputDirProvider = layout.buildDirectory.dir("outputs/renamed-apk/$variantName")
 
-        val renameTask = tasks.register("copy${variantNameCapitalized}RenamedApks") {
-            inputs.dir(apkDirProvider)
-            outputs.dir(outputDirProvider)
-
-            doLast {
-                val apkDir = apkDirProvider.get().asFile
-                val outputDir = outputDirProvider.get().asFile
-                outputDir.mkdirs()
-
-                val knownAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-
-                apkDir.walkTopDown()
-                    .filter { it.isFile && it.extension.equals("apk", ignoreCase = true) }
-                    .forEach { apk ->
-                        val lowerName = apk.name.lowercase(Locale.US)
-                        val abi = knownAbis.firstOrNull { lowerName.contains(it.lowercase(Locale.US)) }
-                            ?: "universal"
-
-                        val target = outputDir.resolve(
-                            "Halcyon-$appVersionName-$abi-$variantName.APK"
-                        )
-
-                        apk.copyTo(target, overwrite = true)
-                        logger.lifecycle("Renamed APK copied to: ${target.absolutePath}")
-                    }
-            }
+        val renameTask = tasks.register<CopyRenamedApksTask>("copy${variantNameCapitalized}RenamedApks") {
+            apkDir.set(apkDirProvider)
+            outputDir.set(outputDirProvider)
+            versionName.set(appVersionName)
+            this.variantName.set(variantName)
+            channelMarker.set(variantChannelMarker(variantName))
         }
 
         tasks.matching { it.name == "assemble$variantNameCapitalized" }

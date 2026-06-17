@@ -216,7 +216,6 @@ object AppLogStore {
             appendLine("Halcyon diagnostic info")
             appendLine("Generated: ${formatTime(System.currentTimeMillis())}")
             appendLine("App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-            appendLine("Build time: ${BuildConfig.BUILD_TIME}")
             appendLine("Package: ${appContext.packageName}")
             appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})")
             appendLine("Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
