@@ -261,7 +261,6 @@ class ExoPlayerManager(private val context: Context) {
             }
         }
         mediaController?.addListener(playerListener!!)
-        mediaController?.volume = replayGainVolume
 
         val pending = pendingPlaylist
         if (pending != null) {

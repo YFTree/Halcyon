@@ -143,16 +143,16 @@ class MusicScanner(private val context: Context) {
 
         val shouldDeepRead = deepMetadata ||
             isMissingTag(title, file.name) ||
-            isMissingTag(artist) ||
-            isMissingTag(album) ||
+            isMissingArtistTag(artist) ||
+            isMissingAlbumTag(album) ||
             duration <= 0
 
         val tagInfo = if (shouldDeepRead) readTagsBlocking(item.path) else null
 
         if (tagInfo != null) {
             if (isMissingTag(title, file.name)) title = tagInfo.title.orEmpty()
-            if (isMissingTag(artist)) artist = tagInfo.artist.orEmpty()
-            if (isMissingTag(album)) album = tagInfo.album.orEmpty()
+            if (isMissingArtistTag(artist)) artist = tagInfo.artist.orEmpty()
+            if (isMissingAlbumTag(album)) album = tagInfo.album.orEmpty()
             albumArtist = tagInfo.albumArtist.orEmpty()
             genre = tagInfo.genre.orEmpty()
             year = tagInfo.year.orEmpty().normalizeYear()
@@ -178,8 +178,8 @@ class MusicScanner(private val context: Context) {
         if (file.extension.lowercase() in setOf("wav", "wave")) {
             WavMetadataReader.read(file)?.let { wavInfo ->
                 if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
-                if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
-                if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                if (isMissingArtistTag(artist)) artist = wavInfo.artist.orEmpty()
+                if (isMissingAlbumTag(album)) album = wavInfo.album.orEmpty()
                 if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
                 if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
                 if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
@@ -191,8 +191,8 @@ class MusicScanner(private val context: Context) {
         } else if (shouldDeepRead || deepMetadata) {
             WavMetadataReader.read(file)?.let { wavInfo ->
                 if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
-                if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
-                if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                if (isMissingArtistTag(artist)) artist = wavInfo.artist.orEmpty()
+                if (isMissingAlbumTag(album)) album = wavInfo.album.orEmpty()
                 if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
                 if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
                 if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
@@ -203,13 +203,13 @@ class MusicScanner(private val context: Context) {
             }
         }
 
-        if (shouldDeepRead && (isMissingTag(title, file.name) || isMissingTag(artist) || isMissingTag(album) || duration <= 0)) {
+        if (shouldDeepRead && (isMissingTag(title, file.name) || isMissingArtistTag(artist) || isMissingAlbumTag(album) || duration <= 0)) {
             try {
                 val retriever = MediaMetadataRetriever()
                 retriever.setDataSource(item.path)
                 if (isMissingTag(title, file.name)) title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: ""
-                if (isMissingTag(artist)) artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
-                if (isMissingTag(album)) album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""
+                if (isMissingArtistTag(artist)) artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
+                if (isMissingAlbumTag(album)) album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""
                 if (duration <= 0) duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
                 retriever.release()
             } catch (e: Exception) {
@@ -218,8 +218,8 @@ class MusicScanner(private val context: Context) {
         }
 
         if (isMissingTag(title, file.name)) title = item.fileName.substringBeforeLast('.')
-        if (isMissingTag(artist)) artist = "Unknown"
-        if (isMissingTag(album)) album = "Unknown"
+        if (isMissingArtistTag(artist)) artist = "Unknown Artist"
+        if (isMissingAlbumTag(album)) album = "Unknown Album"
 
         if (duration <= 0 || duration < minDurationMs) return@withContext null
 
@@ -320,16 +320,16 @@ class MusicScanner(private val context: Context) {
 
                 val shouldDeepRead = deepMetadata ||
                     isMissingTag(title, file.name) ||
-                    isMissingTag(artist) ||
-                    isMissingTag(album) ||
+                    isMissingArtistTag(artist) ||
+                    isMissingAlbumTag(album) ||
                     duration <= 0
 
                 val tagInfo = if (shouldDeepRead) readTagsBlocking(path) else null
 
                 if (tagInfo != null) {
                     if (isMissingTag(title, file.name)) title = tagInfo.title.orEmpty()
-                    if (isMissingTag(artist)) artist = tagInfo.artist.orEmpty()
-                    if (isMissingTag(album)) album = tagInfo.album.orEmpty()
+                    if (isMissingArtistTag(artist)) artist = tagInfo.artist.orEmpty()
+                    if (isMissingAlbumTag(album)) album = tagInfo.album.orEmpty()
                     albumArtist = tagInfo.albumArtist.orEmpty()
                     genre = tagInfo.genre.orEmpty()
                     year = tagInfo.year.orEmpty().normalizeYear()
@@ -355,8 +355,8 @@ class MusicScanner(private val context: Context) {
                 if (file.extension.lowercase() in setOf("wav", "wave")) {
                     WavMetadataReader.read(file)?.let { wavInfo ->
                         if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
-                        if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
-                        if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                        if (isMissingArtistTag(artist)) artist = wavInfo.artist.orEmpty()
+                        if (isMissingAlbumTag(album)) album = wavInfo.album.orEmpty()
                         if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
                         if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
                         if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
@@ -368,8 +368,8 @@ class MusicScanner(private val context: Context) {
                 } else if (shouldDeepRead || deepMetadata) {
                     WavMetadataReader.read(file)?.let { wavInfo ->
                         if (isMissingTag(title, file.name)) title = wavInfo.title.orEmpty()
-                        if (isMissingTag(artist)) artist = wavInfo.artist.orEmpty()
-                        if (isMissingTag(album)) album = wavInfo.album.orEmpty()
+                        if (isMissingArtistTag(artist)) artist = wavInfo.artist.orEmpty()
+                        if (isMissingAlbumTag(album)) album = wavInfo.album.orEmpty()
                         if (albumArtist.isBlank()) albumArtist = wavInfo.albumArtist.orEmpty()
                         if (genre.isBlank()) genre = wavInfo.genre.orEmpty()
                         if (year.isBlank()) year = wavInfo.year.orEmpty().normalizeYear()
@@ -380,13 +380,13 @@ class MusicScanner(private val context: Context) {
                     }
                 }
 
-                if (shouldDeepRead && (isMissingTag(title, file.name) || isMissingTag(artist) || isMissingTag(album) || duration <= 0)) {
+                if (shouldDeepRead && (isMissingTag(title, file.name) || isMissingArtistTag(artist) || isMissingAlbumTag(album) || duration <= 0)) {
                     try {
                         val retriever = MediaMetadataRetriever()
                         retriever.setDataSource(path)
                         if (isMissingTag(title, file.name)) title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE) ?: ""
-                        if (isMissingTag(artist)) artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
-                        if (isMissingTag(album)) album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""
+                        if (isMissingArtistTag(artist)) artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST) ?: ""
+                        if (isMissingAlbumTag(album)) album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM) ?: ""
                         if (duration <= 0) duration = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
                         retriever.release()
                     } catch (e: Exception) {
@@ -395,8 +395,8 @@ class MusicScanner(private val context: Context) {
                 }
 
                 if (isMissingTag(title, file.name)) title = fileName.substringBeforeLast('.')
-                if (isMissingTag(artist)) artist = "Unknown"
-                if (isMissingTag(album)) album = "Unknown"
+                if (isMissingArtistTag(artist)) artist = "Unknown Artist"
+                if (isMissingAlbumTag(album)) album = "Unknown Album"
 
                 if (duration > 0 && duration >= minDurationMs) {
                     songs.add(
@@ -536,9 +536,9 @@ class MusicScanner(private val context: Context) {
                         }
                     }
 
-                    if (title.isBlank()) title = name.substringBeforeLast('.')
-                    if (artist.isBlank()) artist = "Unknown"
-                    if (album.isBlank()) album = "Unknown"
+                    title = title.cleanTagText().ifBlank { name.substringBeforeLast('.') }
+                    artist = LibraryNormalizer.cleanedArtistText(artist).ifBlank { "Unknown Artist" }
+                    album = LibraryNormalizer.cleanedAlbumText(album).ifBlank { "Unknown Album" }
 
                     if (duration > 0 && duration >= minDurationMs) {
                         val stableId = kotlin.math.abs(songUri.hashCode().toLong()).takeIf { it != 0L } ?: 1L
@@ -599,8 +599,8 @@ class MusicScanner(private val context: Context) {
             while (cursor.moveToNext()) {
                 albums.add(Album(
                     cursor.getLong(0),
-                    cursor.getString(1) ?: "Unknown",
-                    cursor.getString(2) ?: "Unknown",
+                    LibraryNormalizer.cleanedAlbumText(cursor.getString(1)).ifBlank { "Unknown Album" },
+                    LibraryNormalizer.cleanedArtistText(cursor.getString(2)).ifBlank { "Unknown Artist" },
                     cursor.getInt(3),
                     cursor.getInt(4).takeIf { it > 0 }?.toString() ?: ""
                 ))
@@ -678,8 +678,8 @@ class MusicScanner(private val context: Context) {
         return SongTagInfo(
             title = tagInfo.title.orEmpty().cleanTagText(),
             artist = tagInfo.artist.orEmpty().cleanTagText(),
-            album = tagInfo.album.orEmpty().cleanTagText(),
-            albumArtist = tagInfo.albumArtist.orEmpty().cleanTagText(),
+            album = LibraryNormalizer.cleanedAlbumText(tagInfo.album),
+            albumArtist = LibraryNormalizer.cleanedArtistText(tagInfo.albumArtist),
             genre = tagInfo.genre.orEmpty().cleanTagText(),
             year = tagInfo.year.orEmpty().cleanTagText(),
             composer = tagInfo.composer.orEmpty().cleanTagText(),
@@ -706,6 +706,14 @@ class MusicScanner(private val context: Context) {
 
     private fun isMissingTag(value: String?, fileName: String? = null): Boolean {
         return LibraryNormalizer.isMissingTag(value, fileName)
+    }
+
+    private fun isMissingArtistTag(value: String?): Boolean {
+        return LibraryNormalizer.isMissingArtistTag(value)
+    }
+
+    private fun isMissingAlbumTag(value: String?, fileName: String? = null): Boolean {
+        return LibraryNormalizer.isMissingAlbumTag(value, fileName)
     }
 
     private fun readTagsBlocking(path: String): AudioTagInfo? =

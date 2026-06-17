@@ -8,18 +8,20 @@ import org.junit.Test
 
 class LibraryAlbumAggregatorTest {
     @Test
-    fun unknownAlbumNameIsPreserved() {
+    fun literalUnknownAlbumNameIsPreserved() {
         val albums = LibraryAlbumAggregator.toAlbums(
             listOf(
-                song(id = 1, album = "unknown", albumArtist = "unknown artist"),
-                song(id = 2, album = "unknown", albumArtist = "unknown artist")
+                song(id = 1, album = "unknown", albumArtist = "ReoNa"),
+                song(id = 2, album = "Unknown Album", albumArtist = "Unknown Artist")
             )
         )
 
-        assertEquals(1, albums.size)
-        assertEquals("unknown", albums.first().name)
-        assertEquals("unknown artist", albums.first().artist)
-        assertEquals(2, albums.first().songCount)
+        assertEquals(2, albums.size)
+        val byName = albums.associateBy { it.name }
+        assertEquals("ReoNa", byName.getValue("unknown").artist)
+        assertEquals(1, byName.getValue("unknown").songCount)
+        assertEquals("", byName.getValue("Unknown Album").artist)
+        assertEquals(1, byName.getValue("Unknown Album").songCount)
     }
 
     @Test

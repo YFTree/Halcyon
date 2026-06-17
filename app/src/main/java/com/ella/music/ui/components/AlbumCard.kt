@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.LibraryNormalizer
 import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
 import top.yukonga.miuix.kmp.basic.Icon
@@ -50,7 +52,15 @@ fun AlbumCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val resolvedSummary = summary ?: "${album.artist} · ${context.getString(R.string.song_count, album.songCount)}"
+    val displayName = remember(album.name, context) {
+        album.name.takeUnless(LibraryNormalizer::isGeneratedUnknownAlbumPlaceholder)
+            ?: context.getString(R.string.player_unknown_album)
+    }
+    val displayArtist = remember(album.artist, context) {
+        album.artist.takeUnless(LibraryNormalizer::isGeneratedUnknownArtistPlaceholder)
+            ?: context.getString(R.string.player_unknown_artist)
+    }
+    val resolvedSummary = summary ?: "$displayArtist · ${context.getString(R.string.song_count, album.songCount)}"
     val coverState = rememberSongArtworkState(
         song = representativeSong,
         albumArtUri = albumArtUri,
@@ -79,7 +89,7 @@ fun AlbumCard(
             if (coverModel != null) {
                 SafeCoverImage(
                     model = coverModel,
-                    contentDescription = album.name,
+                    contentDescription = displayName,
                     modifier = Modifier.matchParentSize(),
                     contentScale = ContentScale.Crop,
                     sizePx = 384,
@@ -112,7 +122,7 @@ fun AlbumCard(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = album.name,
+                text = displayName,
                 fontSize = 14.sp,
                 color = MiuixTheme.colorScheme.onSurface,
                 maxLines = 1,

@@ -2,6 +2,7 @@ package com.ella.music.ui.artist
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -31,11 +32,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.data.model.Album
+import com.ella.music.data.model.Song
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.ui.components.AppleStylePlayButton
+import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SafeCoverImage
 import com.ella.music.ui.components.ellaPageBackground
+import com.ella.music.ui.components.rememberSongArtworkState
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -227,9 +231,19 @@ internal fun ArtistAlbumRow(
     album: Album,
     duration: Long,
     albumArtUri: Uri?,
+    representativeSong: Song?,
+    loadCoverArt: ((Song) -> Bitmap?)?,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val coverState = rememberSongArtworkState(
+        song = representativeSong,
+        albumArtUri = albumArtUri,
+        loadCoverArt = loadCoverArt,
+        usage = ArtworkUsage.ArtistImage,
+        showDefaultWhenMissing = false
+    )
+    val coverModel = coverState.model
     val summary = buildList {
         add(context.getString(R.string.artist_album_song_summary_detail, album.songCount))
         add(duration.formatArtistDetailDuration())
@@ -251,9 +265,9 @@ internal fun ArtistAlbumRow(
                 .background(MiuixTheme.colorScheme.surfaceContainer),
             contentAlignment = Alignment.Center
         ) {
-            if (albumArtUri != null) {
+            if (coverModel != null) {
                 SafeCoverImage(
-                    model = albumArtUri,
+                    model = coverModel,
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,

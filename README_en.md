@@ -90,7 +90,7 @@ It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, 
 - Includes an MCP server built with the official Kotlin SDK, Ktor CIO, and Streamable HTTP, allowing MCP hosts such as Claude Desktop to control Halcyon playback.
 - Enable it from Settings → MCP server, then connect to `http://<device-ip>:8384/mcp`.
 - Available tools: `play_song`, `search_music`, `get_now_playing`, `skip_next`, `skip_previous`, `toggle_play_pause`, `toggle_shuffle`, `seek_to`, `get_queue`, and `get_library_stats`.
-- Available read-only resources: `ella://playback/current` and `ella://library/stats`.
+- Available read-only resources: `halcyon://playback/current` and `halcyon://library/stats`.
 - The MCP server runs as an Android Foreground Service and stops when the setting is turned off.
 
 ---

@@ -22,28 +22,24 @@ internal object EllaLyricsParser {
     private val timestampOnlyPattern = Regex("""\d+(?::\d{1,2}){1,2}(?:[.:]\d{1,6})?""")
     private val unknownTtmlAgentIdPattern = Regex("""v\d+|agent\d+""", RegexOption.IGNORE_CASE)
 
-    fun parse(content: String): LrcParser.LrcResult {
+    fun parse(content: String, ignoreHeaderTags: Boolean = false): LrcParser.LrcResult {
         parseTtml(content)?.let { return it }
         if (lyricifySyllablePattern.containsMatchIn(content)) {
             parseLyricify(content)?.let { return it }
         }
-        return parseLrc(content)
+        return parseLrc(content, ignoreHeaderTags)
     }
 
-    private fun parseLrc(content: String): LrcParser.LrcResult {
+    private fun parseLrc(content: String, ignoreHeaderTags: Boolean = false): LrcParser.LrcResult {
         val lines = mutableListOf<LyricLine>()
         var title: String? = null
         var artist: String? = null
         var album: String? = null
         var offset = 0L
-        var companionTargetIndexes = emptyList<Int>()
 
         content.lines().forEach { raw ->
             val line = raw.trim()
-            if (line.isBlank()) {
-                companionTargetIndexes = emptyList()
-                return@forEach
-            }
+            if (line.isBlank()) return@forEach
 
             lrcMetaPattern.matchEntire(line)?.let { match ->
                 when (match.groupValues[1].lowercase()) {
@@ -52,72 +48,32 @@ internal object EllaLyricsParser {
                     "al" -> album = match.groupValues[2].trim()
                     "offset" -> offset = match.groupValues[2].trim().toLongOrNull() ?: 0L
                 }
-                companionTargetIndexes = emptyList()
                 return@forEach
             }
-            parseTimestampOnlyLine(line)?.let { endMs ->
-                lines.applyLineEnd(companionTargetIndexes, endMs)
-                companionTargetIndexes = emptyList()
+            val withoutTimes = lrcTimePattern.replace(line, "").trim()
+            val hasTimestamps = withoutTimes != line.trim()
+            if (hasTimestamps && isPlaceholderOnlyLine(withoutTimes)) {
                 return@forEach
             }
-            if (isIgnorableRawLyricLine(line)) {
+            if (hasTimestamps && withoutTimes.isBlank()) {
                 return@forEach
             }
+            if (lrcGenericMetaPattern.matches(line)) {
+                return@forEach
+            }
+            if (ignoreHeaderTags && isHeaderTagLine(line)) return@forEach
 
-            val parsed = parseLrcLine(line)
-            if (parsed.isNotEmpty()) {
-                val firstIndex = lines.size
-                lines += parsed
-                companionTargetIndexes = (firstIndex until lines.size).toList()
-            } else if (!lines.appendUntimedTranslation(companionTargetIndexes, line)) {
-                companionTargetIndexes = emptyList()
-            }
+            lines += parseLrcLine(line)
         }
 
         return LrcParser.LrcResult(
             lyrics = mergeCompanionLines(lines)
-                .filterNot { it.isSynchronizedCreditLine() }
                 .shiftedBy(-offset),
             title = title,
             artist = artist,
             album = album,
             offset = offset
         )
-    }
-
-    private fun parseTimestampOnlyLine(line: String): Long? {
-        val times = lrcTimePattern.findAll(line).toList()
-        if (times.isEmpty()) return null
-        var cursor = 0
-        times.forEach { match ->
-            if (line.substring(cursor, match.range.first).isNotBlank()) return null
-            cursor = match.range.last + 1
-        }
-        if (line.substring(cursor).isNotBlank()) return null
-        return parseLrcTime(times.last().groupValues)
-    }
-
-    private fun MutableList<LyricLine>.applyLineEnd(indexes: List<Int>, endMs: Long) {
-        indexes.forEach { index ->
-            val line = getOrNull(index) ?: return@forEach
-            if (endMs > line.timeMs) {
-                this[index] = line.copy(endMs = line.endMs ?: endMs)
-            }
-        }
-    }
-
-    private fun MutableList<LyricLine>.appendUntimedTranslation(indexes: List<Int>, rawLine: String): Boolean {
-        if (indexes.isEmpty()) return false
-        val (_, content) = rawLine.extractLrcAgent()
-        val text = content.cleanLyricText()
-        if (text.isIgnorableLyricText()) return false
-        indexes.forEach { index ->
-            val line = getOrNull(index) ?: return@forEach
-            this[index] = line.copy(
-                translation = line.translation.mergeLyricCompanionText(text)
-            )
-        }
-        return true
     }
 
     private fun String?.mergeLyricCompanionText(text: String?): String? =
@@ -876,8 +832,7 @@ internal object EllaLyricsParser {
             .replace(",</span><span", ",</span> <span")
 
     private fun String.cleanLyricText(): String =
-        Html.fromHtml(this, Html.FROM_HTML_MODE_LEGACY)
-            .toString()
+        decodeHtmlCompat()
             .replace(Regex("""[ \t\r\n]+"""), " ")
             .trim()
 
@@ -898,6 +853,15 @@ internal object EllaLyricsParser {
             )
     }
 
+    fun isHeaderTagLine(line: String): Boolean {
+        val trimmed = line.trim()
+        val withoutTimes = lrcTimePattern.replace(trimmed, "").trim()
+        val content = withoutTimes.takeIf { it.isNotBlank() } ?: trimmed
+        return content.startsWith("[kana:", ignoreCase = true) ||
+            content.startsWith("[trans:", ignoreCase = true) ||
+            content.startsWith("[roma:", ignoreCase = true)
+    }
+
     private fun String.cleanTimedLyricText(): String =
         replace(timedWordMarkerPattern) { match ->
             val time = match.groupValues.getOrNull(1).orEmpty()
@@ -907,16 +871,13 @@ internal object EllaLyricsParser {
         }.cleanLyricText()
 
     private fun String.cleanTimedLyricSegment(): String =
-        Html.fromHtml(
-            replace(timedWordMarkerPattern) { match ->
+        replace(timedWordMarkerPattern) { match ->
                 val time = match.groupValues.getOrNull(1).orEmpty()
                     .ifBlank { match.groupValues.getOrNull(2).orEmpty() }
                     .trim()
                 if (time.isTimestampLike()) "" else match.value
-            },
-            Html.FROM_HTML_MODE_LEGACY
-        )
-            .toString()
+            }
+            .decodeHtmlCompat()
             .replace(Regex("""[ \t\r\n]+"""), " ")
 
     private fun String.takeUsefulText(): String? =
@@ -940,6 +901,10 @@ internal object EllaLyricsParser {
 
     private fun String.withoutFormattingWhitespace(): String =
         if (isBlank() && any { it == '\n' || it == '\r' || it == '\t' }) "" else this
+
+    private fun String.decodeHtmlCompat(): String =
+        runCatching { Html.fromHtml(this, Html.FROM_HTML_MODE_LEGACY).toString() }
+            .getOrElse { this }
 
     private fun List<LyricWord>.joinLyricText(): String {
         val raw = joinToString("") { it.text }.cleanLyricText()
@@ -1004,47 +969,6 @@ internal object EllaLyricsParser {
         (text.cleanLyricText().length * 150L).coerceIn(180L, 2_200L)
 
     private fun String.isUsefulMainText(): Boolean = isNotBlank() && !isMusicSymbolOnly()
-
-    private fun LyricLine.isSynchronizedCreditLine(): Boolean {
-        if (isTtml || backgroundText?.isNotBlank() == true) return false
-        val primary = text.cleanLyricText()
-        val secondary = translation?.cleanLyricText().orEmpty()
-        if (secondary.looksLikeCreditText()) return true
-        if (!primary.looksLikeCreditText()) return false
-        return secondary.isBlank()
-    }
-
-    private fun String.looksLikeCreditText(): Boolean {
-        val normalized = cleanLyricText()
-            .replace('：', ':')
-            .trim()
-        if (normalized.isBlank()) return false
-        val compact = normalized.replace(Regex("""\s+"""), " ")
-        val lower = compact.lowercase()
-        return lower.startsWith("lyrics by:") ||
-            lower.startsWith("lyric by:") ||
-            lower.startsWith("written by:") ||
-            lower.startsWith("writer:") ||
-            lower.startsWith("composer:") ||
-            lower.startsWith("composed by:") ||
-            lower.startsWith("produced by:") ||
-            lower.startsWith("producer:") ||
-            lower.startsWith("arranged by:") ||
-            lower.startsWith("arranger:") ||
-            lower.startsWith("music by:") ||
-            lower.startsWith("vocal:") ||
-            lower.startsWith("vocals:") ||
-            lower.startsWith("作词:") ||
-            lower.startsWith("作曲:") ||
-            lower.startsWith("编曲:") ||
-            lower.startsWith("制作人:") ||
-            lower.startsWith("制作:") ||
-            lower.startsWith("原唱:") ||
-            lower.startsWith("演唱:") ||
-            lower.startsWith("词:") ||
-            lower.startsWith("曲:") ||
-            lower.contains("享有本翻译作品的著作权")
-    }
 
     private fun String.isMusicSymbolOnly(): Boolean {
         val content = trim()

@@ -181,6 +181,9 @@ fun ArtistScreen(
     val albumDurations = remember(songs) {
         LibraryAlbumAggregator.durationsByAlbumIdentity(songs)
     }
+    val representativeSongsByAlbumId = remember(songs) {
+        LibraryAlbumAggregator.representativeSongsByAlbumIdentity(songs)
+    }
     val sortedParticipatedAlbums = remember(participatedAlbums, albumSortMode, albumDurations) {
         participatedAlbums.sortedForArtistAlbumDetail(albumSortMode, albumDurations)
     }
@@ -462,6 +465,8 @@ fun ArtistScreen(
                             album = album,
                             duration = albumDurations[album.id] ?: 0L,
                             albumArtUri = albumArtUri,
+                            representativeSong = representativeSongsByAlbumId[album.id],
+                            loadCoverArt = mainViewModel::getLargeCoverArtBitmap,
                             onClick = { onAlbumClick(album.id) }
                         )
                     }
@@ -489,6 +494,8 @@ fun ArtistScreen(
                             album = album,
                             duration = albumDurations[album.id] ?: 0L,
                             albumArtUri = albumArtUri,
+                            representativeSong = representativeSongsByAlbumId[album.id],
+                            loadCoverArt = mainViewModel::getLargeCoverArtBitmap,
                             onClick = { onAlbumClick(album.id) }
                         )
                     }

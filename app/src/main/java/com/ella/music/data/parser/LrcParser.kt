@@ -18,7 +18,7 @@ object LrcParser {
         val offset: Long = 0L
     )
 
-    fun parse(lrcContent: String): LrcResult = EllaLyricsParser.parse(lrcContent)
+    fun parse(lrcContent: String, ignoreHeaderTags: Boolean = false): LrcResult = EllaLyricsParser.parse(lrcContent, ignoreHeaderTags)
 
     private val lyricExtensions = listOf("lrc", "ttml", "elrc")
 

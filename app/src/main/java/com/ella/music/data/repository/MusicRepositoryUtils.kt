@@ -191,11 +191,20 @@ internal fun String.extractYearInt(): Int? =
 internal fun String?.usableTagText(): String =
     LibraryNormalizer.cleanedTagText(this)
 
+internal fun String?.usableArtistText(): String =
+    LibraryNormalizer.cleanedArtistText(this)
+
+internal fun String?.usableAlbumText(): String =
+    LibraryNormalizer.cleanedAlbumText(this)
+
 internal fun String?.isUsableTagText(): Boolean =
     usableTagText().isNotBlank()
 
+internal fun String?.isUsableArtistText(): Boolean =
+    usableArtistText().isNotBlank()
+
 internal fun String?.isUsableAlbumText(): Boolean =
-    usableTagText().isNotBlank()
+    usableAlbumText().isNotBlank()
 
 internal fun String.looksLikeLastFolderName(path: String): Boolean =
     LibraryNormalizer.looksLikeLastFolderName(this, path)

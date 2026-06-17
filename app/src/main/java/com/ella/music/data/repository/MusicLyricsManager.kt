@@ -135,16 +135,16 @@ internal class MusicLyricsManager(
             SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN ->
                 loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false, ignoreHeaderTags = ignoreHeaderTags)
             SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML ->
-                loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
+                loadExternalLyricsByFormat(song, effectivePath, preferTtml = true, ignoreHeaderTags = ignoreHeaderTags)
             SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN ->
-                loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
+                loadExternalLyricsByFormat(song, effectivePath, preferTtml = false, ignoreHeaderTags = ignoreHeaderTags)
             else -> null
         }
     }
 
-    private fun loadExternalLyricsByFormat(song: Song, effectivePath: String, preferTtml: Boolean): List<LyricLine>? {
+    private fun loadExternalLyricsByFormat(song: Song, effectivePath: String, preferTtml: Boolean, ignoreHeaderTags: Boolean = false): List<LyricLine>? {
         val content = findExternalLyricContentByFormat(effectivePath, preferTtml) ?: return null
-        val parsed = LrcParser.parse(content)
+        val parsed = LrcParser.parse(content, ignoreHeaderTags)
         val lyrics = parsed.lyrics.takeIf { it.isNotEmpty() } ?: return null
         return lyrics.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
             .also { Log.d("MusicRepo", "External lyric format ${if (preferTtml) "TTML" else "LRC/ELRC"} parsed: ${lyrics.size} lines for ${song.title}") }
@@ -160,7 +160,7 @@ internal class MusicLyricsManager(
     }
 
     private fun parseEmbeddedLyrics(song: Song, embedded: String, ignoreHeaderTags: Boolean): List<LyricLine>? {
-        val parsed = LrcParser.parse(embedded)
+        val parsed = LrcParser.parse(embedded, ignoreHeaderTags)
         if (parsed.lyrics.isNotEmpty()) {
             Log.d("MusicRepo", "Embedded lyrics parsed: ${parsed.lyrics.size} lines for ${song.title}")
             return parsed.lyrics

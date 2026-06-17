@@ -8,7 +8,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.ella.music.data.SettingsManager
-import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.shiftedBy
 import com.ella.music.data.repository.MusicRepository
@@ -18,8 +17,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import java.util.Locale
 
 internal class OPlusLyricHandler(
     private val settingsManager: SettingsManager,
@@ -31,6 +28,7 @@ internal class OPlusLyricHandler(
         private const val TAG = "PlaybackService"
         private const val TIMING_TAG = "EllaPlaybackTiming"
         const val OPLUS_LYRIC_INFO_KEY = "lyricInfo"
+        const val OPLUS_RAW_LYRIC_KEY = OPlusLyricPayload.RAW_LYRIC_INFO_KEY
     }
 
     private var oplusLyricInfoJob: Job? = null
@@ -249,12 +247,16 @@ internal class OPlusLyricHandler(
 
         val extras = Bundle(currentItem.mediaMetadata.extras ?: Bundle.EMPTY)
         val currentJson = extras.getString(OPLUS_LYRIC_INFO_KEY)
+        val rawLyric = lyricInfoJson?.let { OPlusLyricPayload.rawLyric(it) }
+        val currentRawLyric = extras.getString(OPLUS_RAW_LYRIC_KEY)
         if (lyricInfoJson.isNullOrBlank()) {
-            if (!extras.containsKey(OPLUS_LYRIC_INFO_KEY)) return
+            if (!extras.containsKey(OPLUS_LYRIC_INFO_KEY) && !extras.containsKey(OPLUS_RAW_LYRIC_KEY)) return
             extras.remove(OPLUS_LYRIC_INFO_KEY)
+            extras.remove(OPLUS_RAW_LYRIC_KEY)
         } else {
-            if (currentJson == lyricInfoJson) return
+            if (currentJson == lyricInfoJson && currentRawLyric == rawLyric) return
             extras.putString(OPLUS_LYRIC_INFO_KEY, lyricInfoJson)
+            rawLyric?.let { extras.putString(OPLUS_RAW_LYRIC_KEY, it) }
         }
 
         val updatedMetadata = currentItem.mediaMetadata.buildUpon()
@@ -277,8 +279,12 @@ internal class OPlusLyricHandler(
         val mediaItem = player.getMediaItemAt(index)
         if (!mediaItem.matchesSong(song)) return
         val extras = Bundle(mediaItem.mediaMetadata.extras ?: Bundle.EMPTY)
-        if (extras.getString(OPLUS_LYRIC_INFO_KEY) == lyricInfoJson) return
+        val rawLyric = OPlusLyricPayload.rawLyric(lyricInfoJson)
+        if (extras.getString(OPLUS_LYRIC_INFO_KEY) == lyricInfoJson &&
+            extras.getString(OPLUS_RAW_LYRIC_KEY) == rawLyric
+        ) return
         extras.putString(OPLUS_LYRIC_INFO_KEY, lyricInfoJson)
+        rawLyric?.let { extras.putString(OPLUS_RAW_LYRIC_KEY, it) }
 
         val updatedItem = mediaItem.buildUpon()
             .setMediaMetadata(
@@ -317,88 +323,11 @@ internal class OPlusLyricHandler(
         val offsetMs = settingsManager.lyricOffsetOverrides.first()[song.oplusLyricOffsetKey()] ?: 0L
         return musicRepository.getLyrics(song, sourceMode)
             .shiftedBy(offsetMs)
-            .toOplusLyricInfoJson(song)
-    }
-
-    private fun List<LyricLine>.toOplusLyricInfoJson(song: Song): String? {
-        val lrc = toOplusLrc().takeIf { it.isNotBlank() } ?: return null
-        return JSONObject()
-            .put("songName", song.title)
-            .put("artist", song.artist)
-            .put("songId", song.oplusLyricSongId())
-            .put("lyric", lrc)
-            .toString()
+            .let { lyrics -> OPlusLyricPayload.build(song, lyrics) }
     }
 
     private fun String.matchesOplusLyricSong(song: Song): Boolean {
-        return runCatching {
-            val json = JSONObject(this)
-            val songId = json.optString("songId").takeIf { it.isNotBlank() }
-            when {
-                songId != null -> songId == song.oplusLyricSongId()
-                else -> {
-                    val songName = json.optString("songName")
-                    val artist = json.optString("artist")
-                    songName == song.title && artist == song.artist
-                }
-            }
-        }.getOrDefault(false)
-    }
-
-    private fun List<LyricLine>.toOplusLrc(): String {
-        return mapNotNull { line ->
-            val primaryText = listOf(line.text, line.translation.orEmpty())
-                .mapNotNull { it.toOplusLrcTextOrNull() }
-                .distinct()
-                .joinToString(" / ")
-                .takeIf { it.isNotBlank() }
-                ?: return@mapNotNull null
-            line.timeMs.coerceAtLeast(0L) to primaryText
-        }
-            .sortedBy { it.first }
-            .joinToString("\n") { (timeMs, text) ->
-                "${timeMs.toOplusLrcTimestamp()}$text"
-            }
-    }
-
-    private fun String.toOplusLrcTextOrNull(): String? {
-        return lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .joinToString(" ")
-            .stripInlineOplusLrcTimestamps()
-            .takeIf { it.isNotBlank() }
-    }
-
-    private fun String.stripInlineOplusLrcTimestamps(): String {
-        fun String.isOplusTimestampMarker(): Boolean {
-            return matches(Regex("""\d{1,3}:\d{1,2}(?:[.:]\d{1,6})?"""))
-        }
-
-        return replace(Regex("""\[([^\]]+)]|<([^>]+)>""")) { match ->
-            val marker = match.groupValues.getOrNull(1).orEmpty()
-                .ifBlank { match.groupValues.getOrNull(2).orEmpty() }
-                .trim()
-                .replace(',', '.')
-            if (marker.isOplusTimestampMarker()) "" else match.value
-        }
-            .replace(Regex("""[ \t\r\n]+"""), " ")
-            .trim()
-    }
-
-    private fun Long.toOplusLrcTimestamp(): String {
-        val safeMs = coerceAtLeast(0L)
-        val minutes = safeMs / 60_000L
-        val seconds = (safeMs % 60_000L) / 1_000L
-        val centiseconds = (safeMs % 1_000L) / 10L
-        return "[%02d:%02d.%02d]".format(Locale.US, minutes, seconds, centiseconds)
-    }
-
-    private fun Song.oplusLyricSongId(): String = when {
-        onlineSource.isNotBlank() && onlineId.isNotBlank() -> "$onlineSource:$onlineId"
-        id > 0L -> id.toString()
-        path.isNotBlank() -> path
-        else -> "$title|$artist|$album"
+        return OPlusLyricPayload.matchesSong(this, song)
     }
 
     private fun Song.oplusLyricOffsetKey(): String {

@@ -73,18 +73,18 @@ object LibraryAlbumAggregator {
 
         fun toAlbum(unknownAlbumName: String, preferAlbumArtist: Boolean): Album {
             val artist = if (preferAlbumArtist) {
-                first.albumArtist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty()
+                first.albumArtist.takeIf(LibraryNormalizer::isUsableArtistText).orEmpty()
             } else {
-                first.artist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty()
+                first.artist.takeIf(LibraryNormalizer::isUsableArtistText).orEmpty()
             }
             return Album(
                 id = albumId,
-                name = first.album.takeIf(LibraryNormalizer::isUsableTagText) ?: unknownAlbumName,
+                name = first.album.takeIf(LibraryNormalizer::isUsableAlbumText) ?: unknownAlbumName,
                 artist = artist,
                 songCount = count,
                 year = minYear,
                 artAlbumId = first.albumId,
-                albumArtist = first.albumArtist.takeIf(LibraryNormalizer::isUsableTagText).orEmpty()
+                albumArtist = first.albumArtist.takeIf(LibraryNormalizer::isUsableArtistText).orEmpty()
             )
         }
     }

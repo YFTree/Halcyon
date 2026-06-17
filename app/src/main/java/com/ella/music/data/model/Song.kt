@@ -33,11 +33,8 @@ data class Song(
 }
 
 fun Song.albumIdentityId(): Long {
-    val albumName = album.trim().ifBlank { "Unknown Album" }
-    val albumOwner = albumArtist
-        .trim()
-        .takeIf { LibraryNormalizer.isUsableTagText(it) }
-        ?: ""
+    val albumName = LibraryNormalizer.cleanedAlbumText(album).ifBlank { "Unknown Album" }
+    val albumOwner = LibraryNormalizer.cleanedArtistText(albumArtist)
     val key = "${albumName.normalizedAlbumIdentityPart()}|${albumOwner.normalizedAlbumIdentityPart()}"
     var hash = -0x340d631b7bdddcdbL
     key.forEach { char ->

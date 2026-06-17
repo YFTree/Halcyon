@@ -2,7 +2,6 @@ package com.ella.music.player
 
 import android.media.audiofx.BassBoost
 import android.media.audiofx.Equalizer
-import android.media.audiofx.PresetReverb
 import android.media.audiofx.Virtualizer
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,11 +40,6 @@ data class AudioEffectSettings(
         const val REVERB_PRESET_PLATE = 6
     }
 }
-
-data class ReverbAuxEffectInfo(
-    val effectId: Int,
-    val sendLevel: Float
-)
 
 /**
  * Static capabilities of the device's audio-effect hardware for the bound session, published so
@@ -104,7 +98,7 @@ const val FIXED_EQ_BAND_COUNT = 10
 val FIXED_EQ_CENTER_FREQS_HZ = listOf(31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000)
 
 /**
- * Owns the [Equalizer], [BassBoost], [Virtualizer], and [PresetReverb] effects for playback.
+ * Owns the [Equalizer], [BassBoost], and [Virtualizer] effects for playback.
  * Created and driven by [PlaybackService] so effects stay alive for the whole playback
  * lifetime (independent of any UI). The settings UI communicates only through persisted
  * [AudioEffectSettings] and reads [AudioEffectState] for rendering.
@@ -114,7 +108,6 @@ class AudioEffectController {
     private var equalizer: Equalizer? = null
     private var bassBoost: BassBoost? = null
     private var virtualizer: Virtualizer? = null
-    private var presetReverb: PresetReverb? = null
     private var boundSessionId: Int = -1
     private var lastSettings: AudioEffectSettings = AudioEffectSettings()
 
@@ -130,9 +123,6 @@ class AudioEffectController {
             .getOrNull()
         bassBoost = runCatching { BassBoost(0, sessionId) }.getOrNull()
         virtualizer = runCatching { Virtualizer(0, sessionId) }.getOrNull()
-        presetReverb = runCatching { PresetReverb(0, 0) }
-            .onFailure { Log.w(TAG, "PresetReverb unavailable", it) }
-            .getOrNull()
 
         AudioEffectState.publish(captureCapabilities())
         apply(lastSettings)
@@ -144,14 +134,6 @@ class AudioEffectController {
         applyEqualizer(settings)
         applyBassBoost(settings)
         applyVirtualizer(settings)
-        applyPresetReverb(settings)
-    }
-
-    fun reverbAuxEffectInfo(): ReverbAuxEffectInfo? {
-        val effect = presetReverb ?: return null
-        val config = reverbPresetConfig(lastSettings.reverbPreset) ?: return null
-        val effectId = runCatching { effect.id }.getOrDefault(0)
-        return effectId.takeIf { it > 0 }?.let { ReverbAuxEffectInfo(it, config.sendLevel) }
     }
 
     private fun applyEqualizer(settings: AudioEffectSettings) {
@@ -192,24 +174,11 @@ class AudioEffectController {
         }
     }
 
-    private fun applyPresetReverb(settings: AudioEffectSettings) {
-        val effect = presetReverb ?: return
-        val config = reverbPresetConfig(settings.reverbPreset)
-        runCatching {
-            if (config == null) {
-                effect.enabled = false
-            } else {
-                effect.preset = config.androidPreset.toShort()
-                effect.enabled = true
-            }
-        }
-    }
-
     private fun captureCapabilities(): EqualizerCapabilities {
         val eq = equalizer ?: return EqualizerCapabilities.Unsupported.copy(
             bassBoostSupported = bassBoost != null,
             virtualizerSupported = virtualizer != null,
-            reverbSupported = presetReverb != null,
+            reverbSupported = false,
             bassBoostStrengthAdjustable = runCatching { bassBoost?.strengthSupported == true }.getOrDefault(false),
             virtualizerStrengthAdjustable = runCatching { virtualizer?.strengthSupported == true }.getOrDefault(false)
         )
@@ -247,7 +216,7 @@ class AudioEffectController {
                 presetBandLevelsMb = presetLevels,
                 bassBoostSupported = bassBoost != null,
                 virtualizerSupported = virtualizer != null,
-                reverbSupported = presetReverb != null,
+                reverbSupported = false,
                 bassBoostStrengthAdjustable = runCatching { bassBoost?.strengthSupported == true }.getOrDefault(false),
                 virtualizerStrengthAdjustable = runCatching { virtualizer?.strengthSupported == true }.getOrDefault(false)
             )
@@ -258,11 +227,9 @@ class AudioEffectController {
         runCatching { equalizer?.release() }
         runCatching { bassBoost?.release() }
         runCatching { virtualizer?.release() }
-        runCatching { presetReverb?.release() }
         equalizer = null
         bassBoost = null
         virtualizer = null
-        presetReverb = null
         boundSessionId = -1
     }
 
@@ -270,30 +237,6 @@ class AudioEffectController {
         const val TAG = "AudioEffectController"
     }
 }
-
-private data class ReverbPresetConfig(
-    val androidPreset: Int,
-    val sendLevel: Float
-)
-
-private fun reverbPresetConfig(preset: Int): ReverbPresetConfig? =
-    when (preset) {
-        AudioEffectSettings.REVERB_PRESET_STUDIO ->
-            ReverbPresetConfig(PresetReverb.PRESET_SMALLROOM.toInt(), 0.18f)
-        AudioEffectSettings.REVERB_PRESET_SMALL_ROOM ->
-            ReverbPresetConfig(PresetReverb.PRESET_SMALLROOM.toInt(), 0.35f)
-        AudioEffectSettings.REVERB_PRESET_MEDIUM_ROOM ->
-            ReverbPresetConfig(PresetReverb.PRESET_MEDIUMROOM.toInt(), 0.42f)
-        AudioEffectSettings.REVERB_PRESET_LARGE_ROOM ->
-            ReverbPresetConfig(PresetReverb.PRESET_LARGEROOM.toInt(), 0.48f)
-        AudioEffectSettings.REVERB_PRESET_HALL ->
-            ReverbPresetConfig(PresetReverb.PRESET_MEDIUMHALL.toInt(), 0.56f)
-        AudioEffectSettings.REVERB_PRESET_CHURCH ->
-            ReverbPresetConfig(PresetReverb.PRESET_LARGEHALL.toInt(), 0.72f)
-        AudioEffectSettings.REVERB_PRESET_PLATE ->
-            ReverbPresetConfig(PresetReverb.PRESET_PLATE.toInt(), 0.46f)
-        else -> null
-    }
 
 private fun nearestDisplayBandIndex(freqHz: Int): Int {
     if (freqHz <= 0) return 0

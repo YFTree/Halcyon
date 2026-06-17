@@ -163,92 +163,92 @@ fun SettingsScreen(
                         }
                     }
                 }
-            }
+            } else {
+                SmallTitle(text = stringResource(R.string.settings_customize))
 
-            SmallTitle(text = stringResource(R.string.settings_customize))
-
-            SettingsCardGroup {
-                Column {
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_appearance_home),
-                        summary = stringResource(R.string.settings_appearance_home_summary),
-                        onClick = onNavigateToAppearanceSettings
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_lyrics),
-                        summary = stringResource(R.string.settings_lyrics_summary),
-                        onClick = onNavigateToLyricSettings
-                    )
+                SettingsCardGroup {
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_appearance_home),
+                            summary = stringResource(R.string.settings_appearance_home_summary),
+                            onClick = onNavigateToAppearanceSettings
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_lyrics),
+                            summary = stringResource(R.string.settings_lyrics_summary),
+                            onClick = onNavigateToLyricSettings
+                        )
+                    }
                 }
-            }
 
-            SmallTitle(text = stringResource(R.string.settings_music_playback))
+                SmallTitle(text = stringResource(R.string.settings_music_playback))
 
-            SettingsCardGroup {
-                Column {
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_audio),
-                        summary = stringResource(R.string.settings_audio_summary),
-                        onClick = onNavigateToAudioSettings
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_library_scan),
-                        summary = stringResource(R.string.settings_library_scan_summary),
-                        onClick = onNavigateToLibrarySettings
-                    )
+                SettingsCardGroup {
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_audio),
+                            summary = stringResource(R.string.settings_audio_summary),
+                            onClick = onNavigateToAudioSettings
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_library_scan),
+                            summary = stringResource(R.string.settings_library_scan_summary),
+                            onClick = onNavigateToLibrarySettings
+                        )
+                    }
                 }
-            }
 
-            SmallTitle(text = stringResource(R.string.settings_services))
+                SmallTitle(text = stringResource(R.string.settings_services))
 
-            SettingsCardGroup {
-                Column {
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_integrations),
-                        summary = stringResource(R.string.settings_integrations_summary),
-                        onClick = onNavigateToIntegrationSettings
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_backup),
-                        summary = stringResource(R.string.settings_backup_summary),
-                        onClick = onNavigateToBackupSettings
-                    )
+                SettingsCardGroup {
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_integrations),
+                            summary = stringResource(R.string.settings_integrations_summary),
+                            onClick = onNavigateToIntegrationSettings
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_backup),
+                            summary = stringResource(R.string.settings_backup_summary),
+                            onClick = onNavigateToBackupSettings
+                        )
+                    }
                 }
-            }
 
-            SmallTitle(text = stringResource(R.string.settings_maintenance))
+                SmallTitle(text = stringResource(R.string.settings_maintenance))
 
-            SettingsCardGroup {
-                Column {
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_clear_online_cache),
-                        summary = stringResource(R.string.settings_clear_online_cache_summary),
-                        onClick = {
-                            scope.launch {
-                                mainViewModel?.clearOnlineMetadataCache()
-                                playerViewModel?.clearOnlineMetadataCache()
-                                Toast.makeText(context, context.getString(R.string.settings_clear_online_cache_done), Toast.LENGTH_SHORT).show()
+                SettingsCardGroup {
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_clear_online_cache),
+                            summary = stringResource(R.string.settings_clear_online_cache_summary),
+                            onClick = {
+                                scope.launch {
+                                    mainViewModel?.clearOnlineMetadataCache()
+                                    playerViewModel?.clearOnlineMetadataCache()
+                                    Toast.makeText(context, context.getString(R.string.settings_clear_online_cache_done), Toast.LENGTH_SHORT).show()
+                                }
                             }
-                        }
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_clear_library_snapshot_cache),
-                        summary = stringResource(R.string.settings_clear_library_snapshot_cache_summary),
-                        onClick = {
-                            mainViewModel?.clearLibrarySnapshotCache()
-                            Toast.makeText(context, context.getString(R.string.settings_clear_library_snapshot_cache_done), Toast.LENGTH_SHORT).show()
-                        }
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_logs),
-                        summary = stringResource(R.string.settings_logs_summary),
-                        onClick = onNavigateToLogs
-                    )
-                    ArrowPreference(
-                        title = stringResource(R.string.about),
-                        summary = "${context.getString(R.string.app_name)} v${BuildConfig.VERSION_NAME}",
-                        onClick = onNavigateToAbout
-                    )
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_clear_library_snapshot_cache),
+                            summary = stringResource(R.string.settings_clear_library_snapshot_cache_summary),
+                            onClick = {
+                                mainViewModel?.clearLibrarySnapshotCache()
+                                Toast.makeText(context, context.getString(R.string.settings_clear_library_snapshot_cache_done), Toast.LENGTH_SHORT).show()
+                            }
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_logs),
+                            summary = stringResource(R.string.settings_logs_summary),
+                            onClick = onNavigateToLogs
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.about),
+                            summary = "${context.getString(R.string.app_name)} v${BuildConfig.VERSION_NAME}",
+                            onClick = onNavigateToAbout
+                        )
+                    }
                 }
             }
 

@@ -18,7 +18,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
-import androidx.media3.common.AuxEffectInfo
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
@@ -218,26 +217,22 @@ class PlaybackService : MediaLibraryService() {
         player.repeatMode = Player.REPEAT_MODE_ALL
         PlaybackAudioSession.update(player.audioSessionId)
         audioEffectController.bind(player.audioSessionId)
-        player.applyReverbAuxEffect()
         serviceScope.launch {
             PlaybackAudioSession.audioSessionId.collect { sessionId ->
                 if (sessionId > 0) {
                     audioEffectController.bind(sessionId)
-                    player.applyReverbAuxEffect()
                 }
             }
         }
         serviceScope.launch {
             settingsManager.audioEffectSettings.collect { settings ->
                 audioEffectController.apply(settings)
-                player.applyReverbAuxEffect()
             }
         }
         player.addListener(object : Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
                 PlaybackAudioSession.update(audioSessionId)
                 audioEffectController.bind(audioSessionId)
-                player.applyReverbAuxEffect()
                 if (player.isPlaying) openAudioEffectSession(audioSessionId)
             }
 
@@ -246,7 +241,6 @@ class PlaybackService : MediaLibraryService() {
                     // Retry attaching effects now that the audio track is live: some ROMs
                     // (e.g. ColorOS/OxygenOS) reject Equalizer creation before playback starts.
                     audioEffectController.bind(player.audioSessionId)
-                    player.applyReverbAuxEffect()
                     openAudioEffectSession(player.audioSessionId)
                 } else {
                     closeAudioEffectSession()
@@ -275,7 +269,6 @@ class PlaybackService : MediaLibraryService() {
                     Player.STATE_READY -> {
                         Log.d(TIMING_TAG, "player state READY mediaId=${player.currentMediaItem?.mediaId}")
                         audioEffectController.bind(player.audioSessionId)
-                        player.applyReverbAuxEffect()
                         oplusLyricHandler.scheduleOplusLyricInfoRefreshBurst(player)
                     }
                     Player.STATE_ENDED -> Log.d(TIMING_TAG, "player state ENDED mediaId=${player.currentMediaItem?.mediaId}")
@@ -386,16 +379,6 @@ class PlaybackService : MediaLibraryService() {
             putExtra(AudioEffect.EXTRA_PACKAGE_NAME, packageName)
         })
         openedAudioEffectSessionId = -1
-    }
-
-    @OptIn(UnstableApi::class)
-    private fun ExoPlayer.applyReverbAuxEffect() {
-        val info = audioEffectController.reverbAuxEffectInfo()
-        if (info == null) {
-            clearAuxEffectInfo()
-        } else {
-            setAuxEffectInfo(AuxEffectInfo(info.effectId, info.sendLevel))
-        }
     }
 
     fun handleNotificationCustomAction(action: String): Boolean {

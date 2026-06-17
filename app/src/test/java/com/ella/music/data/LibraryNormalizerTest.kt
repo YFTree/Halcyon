@@ -18,6 +18,21 @@ class LibraryNormalizerTest {
     }
 
     @Test
+    fun generatedUnknownAlbumAndArtistPlaceholdersAreMissingForLibraryGrouping() {
+        assertEquals("unknown", LibraryNormalizer.cleanedAlbumText("unknown"))
+        assertEquals("", LibraryNormalizer.cleanedAlbumText("Unknown Album"))
+        assertEquals("", LibraryNormalizer.cleanedAlbumText("未知专辑"))
+        assertFalse(LibraryNormalizer.isMissingAlbumTag("Unknown"))
+        assertTrue(LibraryNormalizer.isMissingAlbumTag("Unknown Album"))
+
+        assertEquals("Unknown", LibraryNormalizer.cleanedArtistText("Unknown"))
+        assertEquals("", LibraryNormalizer.cleanedArtistText("Unknown Artist"))
+        assertEquals("", LibraryNormalizer.cleanedArtistText("未知歌手"))
+        assertFalse(LibraryNormalizer.isMissingArtistTag("Unknown"))
+        assertTrue(LibraryNormalizer.isMissingArtistTag("Unknown Artist"))
+    }
+
+    @Test
     fun systemUnknownPlaceholderIsMissing() {
         assertEquals("", LibraryNormalizer.cleanedTagText("<unknown>"))
         assertTrue(LibraryNormalizer.isMissingTag("<unknown>"))

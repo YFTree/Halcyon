@@ -28,7 +28,6 @@ import java.io.File
 import java.util.Locale
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "ella_settings")
-private val DEFAULT_LYRIC_LINE_BLACKLIST = listOf("[kana:", "[trans:", "[roma:")
 
 data class LxSourceConfig(
     val id: String,
@@ -2081,8 +2080,7 @@ class SettingsManager(private val context: Context) {
     }
 
     private fun parseLyricLineBlacklist(raw: String?): List<String> =
-        (DEFAULT_LYRIC_LINE_BLACKLIST + normalizeLyricLineBlacklist(raw.orEmpty().lineSequence()))
-            .distinct()
+        normalizeLyricLineBlacklist(raw.orEmpty().lineSequence())
 
     private fun normalizeLyricLineBlacklist(lines: Sequence<String>): List<String> =
         lines

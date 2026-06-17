@@ -47,9 +47,22 @@ object AudioTagReader {
                 // 处理属性 Map
                 val props = metadata.propertyMap
 
+                val propsByNormalizedKey = props.entries.groupBy { (key, _) ->
+                    key.normalizedTagName()
+                }
+
+                fun valuesFor(key: String): List<String>? {
+                    props[key]?.takeIf { it.isNotEmpty() }?.let { return it.toList() }
+                    return propsByNormalizedKey[key.normalizedTagName()]
+                        ?.asSequence()
+                        ?.flatMap { it.value.asSequence() }
+                        ?.toList()
+                        ?.takeIf { it.isNotEmpty() }
+                }
+
                 fun firstOf(vararg keys: String): String? {
                     for (key in keys) {
-                        val arr = props[key]
+                        val arr = valuesFor(key)
                         if (!arr.isNullOrEmpty()) {
                             val value = arr[0].trim()
                             if (value.isNotEmpty()) return value
@@ -60,7 +73,7 @@ object AudioTagReader {
 
                 fun joinedOf(separator: String, vararg keys: String): String? {
                     for (key in keys) {
-                        val arr = props[key]
+                        val arr = valuesFor(key)
                         if (!arr.isNullOrEmpty()) {
                             val filtered = arr.map { it.trim() }.filter { it.isNotEmpty() }
                             if (filtered.isNotEmpty()) {
@@ -94,6 +107,7 @@ object AudioTagReader {
                     "ALBUM ARTIST",
                     "TPE2",            // ID3v2
                     "aART",            // MP4
+                    "AART",
                     "ALBUMARTISTSORT"
                 )
 
@@ -178,12 +192,12 @@ object AudioTagReader {
                     .toList()
 
                 return@withContext AudioTagData(
-                    title = joinedOf(multiValueSeparator, "TITLE"),
-                    artist = joinedOf(multiValueSeparator, "ARTIST"),
-                    album = joinedOf(multiValueSeparator, "ALBUM"),
+                    title = joinedOf(multiValueSeparator, "TITLE", "TIT2", "©nam"),
+                    artist = joinedOf(multiValueSeparator, "ARTIST", "TPE1", "©ART", "©art"),
+                    album = joinedOf(multiValueSeparator, "ALBUM", "TALB", "©alb"),
                     genre = joinedOf(multiValueSeparator, "GENRE", "TCON")
                         ?: joinedOf(multiValueSeparator, "STYLE", "SUBGENRE", "MOOD"),
-                    date = joinedOf(multiValueSeparator, "DATE", "YEAR"),
+                    date = joinedOf(multiValueSeparator, "DATE", "YEAR", "TDRC", "TYER", "©day"),
                     language = joinedOf(multiValueSeparator, "LANGUAGE", "TLAN"),
                     trackNumber = firstIntOf("TRACKNUMBER", "TRACK", "TRCK")?.toString(),
 
@@ -233,3 +247,6 @@ object AudioTagReader {
         }
     }
 }
+
+private fun String.normalizedTagName(): String =
+    uppercase().filter { it.isLetterOrDigit() }

@@ -323,7 +323,8 @@ class MusicRepository(private val context: Context) {
                 cachedInfo.key != currentInfo.key ||
                 cachedInfo.path != currentInfo.path ||
                 cachedInfo.fileSize != currentInfo.fileSize ||
-                cachedInfo.dateModified != currentInfo.dateModified
+                cachedInfo.dateModified != currentInfo.dateModified ||
+                cached.needsMetadataPlaceholderRefresh()
 
             if (needsUpdate) {
                 val scanned = runCatching {
@@ -1219,17 +1220,17 @@ class MusicRepository(private val context: Context) {
         val wavMetadata = runCatching { WavMetadataReader.read(metadataPath) }
             .getOrNull()
 
-        val mergedArtist = tagInfo?.artist.takeIf { it.isUsableTagText() }
-            ?: wavMetadata?.artist.takeIf { it.isUsableTagText() }
-            ?: artist.takeIf { it.isUsableTagText() }
+        val mergedArtist = tagInfo?.artist.takeIf { it.isUsableArtistText() }
+            ?: wavMetadata?.artist.takeIf { it.isUsableArtistText() }
+            ?: artist.takeIf { it.isUsableArtistText() }
             ?: "Unknown Artist"
         val mergedAlbum = tagInfo?.album.takeIf { it.isUsableAlbumText() }
             ?: wavMetadata?.album.takeIf { it.isUsableAlbumText() }
             ?: album.takeIf { it.isUsableAlbumText() && !it.looksLikeLastFolderName(path) }
             ?: "Unknown Album"
-        val mergedAlbumArtist = tagInfo?.albumArtist.takeIf { it.isUsableTagText() }
-            ?: wavMetadata?.albumArtist.takeIf { it.isUsableTagText() }
-            ?: albumArtist.takeIf { it.isUsableTagText() }
+        val mergedAlbumArtist = tagInfo?.albumArtist.takeIf { it.isUsableArtistText() }
+            ?: wavMetadata?.albumArtist.takeIf { it.isUsableArtistText() }
+            ?: albumArtist.takeIf { it.isUsableArtistText() }
             ?: ""
 
         return copy(
@@ -1250,14 +1251,14 @@ class MusicRepository(private val context: Context) {
     }
 
     private fun Song.withFinalLibraryFallbacks(): Song {
-        val fallbackArtist = artist.takeIf { it.isUsableTagText() } ?: "Unknown Artist"
+        val fallbackArtist = artist.takeIf { it.isUsableArtistText() } ?: "Unknown Artist"
         val fallbackAlbum = album.takeIf { it.isUsableAlbumText() && !it.looksLikeLastFolderName(path) }
             ?: "Unknown Album"
         return copy(
             title = title.takeIf { it.isUsableTagText() } ?: fileName.substringBeforeLast('.').ifBlank { path.substringAfterLast('/') },
             artist = fallbackArtist,
             album = fallbackAlbum,
-            albumArtist = albumArtist.takeIf { it.isUsableTagText() }.orEmpty()
+            albumArtist = albumArtist.takeIf { it.isUsableArtistText() }.orEmpty()
         )
     }
 
@@ -1272,6 +1273,11 @@ class MusicRepository(private val context: Context) {
             lyricist == other.lyricist &&
             trackNumber == other.trackNumber &&
             discNumber == other.discNumber
+
+    private fun Song.needsMetadataPlaceholderRefresh(): Boolean =
+        LibraryNormalizer.isGeneratedUnknownArtistPlaceholder(artist) ||
+            LibraryNormalizer.isGeneratedUnknownAlbumPlaceholder(album) ||
+            (album.isUsableAlbumText() && album.looksLikeLastFolderName(path))
 
     private suspend fun scanEditedFile(song: Song) = suspendCoroutine<Unit> { continuation ->
         val path = song.path.takeIf { it.isNotBlank() }
@@ -1327,14 +1333,14 @@ class MusicRepository(private val context: Context) {
                         cursor.getString(1)?.usableTagText().orEmpty().ifBlank { song.title }
                     }
                 },
-                artist = tagInfo.artist.usableTagText().ifBlank {
-                    wavInfo?.artist.usableTagText().ifBlank {
-                        cursor.getString(2)?.usableTagText().orEmpty().ifBlank { song.artist }
+                artist = tagInfo.artist.usableArtistText().ifBlank {
+                    wavInfo?.artist.usableArtistText().ifBlank {
+                        cursor.getString(2)?.usableArtistText().orEmpty().ifBlank { song.artist }
                     }
                 },
-                album = tagInfo.album.usableTagText().ifBlank {
-                    wavInfo?.album.usableTagText().ifBlank {
-                        cursor.getString(3)?.usableTagText().orEmpty().ifBlank { song.album }
+                album = tagInfo.album.usableAlbumText().ifBlank {
+                    wavInfo?.album.usableAlbumText().ifBlank {
+                        cursor.getString(3)?.usableAlbumText().orEmpty().ifBlank { song.album }
                     }
                 },
                 albumId = cursor.getLong(4),
@@ -1350,7 +1356,9 @@ class MusicRepository(private val context: Context) {
                     ?: cursor.getInt(12).let { if (it > 1000) it % 1000 else it },
                 discNumber = wavInfo?.discNumber
                     ?: cursor.getInt(12).let { if (it >= 1000) it / 1000 else song.discNumber },
-                albumArtist = tagInfo.albumArtist.ifBlank { wavInfo?.albumArtist.orEmpty().ifBlank { song.albumArtist } },
+                albumArtist = tagInfo.albumArtist.usableArtistText().ifBlank {
+                    wavInfo?.albumArtist.usableArtistText().ifBlank { song.albumArtist }
+                },
                 genre = tagInfo.genre.ifBlank { wavInfo?.genre.orEmpty().ifBlank { song.genre } },
                 year = tagInfo.year.ifBlank { wavInfo?.year.orEmpty().ifBlank { song.year } },
                 composer = tagInfo.composer.ifBlank { wavInfo?.composer.orEmpty().ifBlank { song.composer } },
@@ -1360,7 +1368,7 @@ class MusicRepository(private val context: Context) {
                 onlineId = song.onlineId,
                 onlineLyrics = song.onlineLyrics,
                 onlineLyricTranslation = song.onlineLyricTranslation
-            )
+            ).withFinalLibraryFallbacks()
         }
     }
 
@@ -1491,11 +1499,22 @@ class MusicRepository(private val context: Context) {
         return LibraryNormalizer.cleanedTagText(this)
     }
 
+    private fun String?.usableArtistText(): String {
+        return LibraryNormalizer.cleanedArtistText(this)
+    }
+
+    private fun String?.usableAlbumText(): String {
+        return LibraryNormalizer.cleanedAlbumText(this)
+    }
+
     private fun String?.isUsableTagText(): Boolean =
         usableTagText().isNotBlank()
 
+    private fun String?.isUsableArtistText(): Boolean =
+        usableArtistText().isNotBlank()
+
     private fun String?.isUsableAlbumText(): Boolean {
-        return usableTagText().isNotBlank()
+        return usableAlbumText().isNotBlank()
     }
 
     private fun String.looksLikeLastFolderName(path: String): Boolean {
