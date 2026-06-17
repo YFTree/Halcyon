@@ -127,6 +127,7 @@ class PlaylistStore private constructor(context: Context) {
         val trimmed = name.trim()
         if (trimmed.isBlank()) return@withContext null
         synchronized(lock) {
+            if (playlists.value.hasPlaylistNamed(trimmed)) return@synchronized null
             val now = System.currentTimeMillis()
             val playlist = UserPlaylist(
                 id = "playlist-${UUID.randomUUID()}",
@@ -141,16 +142,18 @@ class PlaylistStore private constructor(context: Context) {
         }
     }
 
-    suspend fun renamePlaylist(id: String, newName: String) = withContext(Dispatchers.IO) {
+    suspend fun renamePlaylist(id: String, newName: String): Boolean = withContext(Dispatchers.IO) {
         val trimmed = newName.trim()
-        if (id == FAVORITES_PLAYLIST_ID || trimmed.isBlank()) return@withContext
+        if (id == FAVORITES_PLAYLIST_ID || trimmed.isBlank()) return@withContext false
         synchronized(lock) {
+            if (playlists.value.hasPlaylistNamed(trimmed, exceptId = id)) return@synchronized false
             val now = System.currentTimeMillis()
             val next = playlists.value.map { playlist ->
                 if (playlist.id == id) playlist.copy(name = trimmed, updatedAt = now) else playlist
             }
             _playlists.value = next
             saveLocked(next)
+            true
         }
     }
 
@@ -609,6 +612,14 @@ class PlaylistStore private constructor(context: Context) {
             file.writeText(root.toString())
         }.onFailure {
             Log.w(TAG, "Failed to save playlists", it)
+        }
+    }
+
+    private fun List<UserPlaylist>.hasPlaylistNamed(name: String, exceptId: String? = null): Boolean {
+        val normalized = name.trim()
+        if (normalized.isBlank()) return false
+        return any { playlist ->
+            playlist.id != exceptId && playlist.name.trim().equals(normalized, ignoreCase = true)
         }
     }
 

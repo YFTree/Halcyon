@@ -95,6 +95,7 @@ import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.SortDropdownMenu
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.FloatingSelectionControls
 import com.ella.music.ui.components.rememberSongArtworkState
 import com.ella.music.ui.components.rememberSongDeleteRequester
@@ -791,12 +792,10 @@ fun ArtistScreen(
             ArtistCreatePlaylistSheet(
                 onDismiss = { createPlaylistSong = null },
                 onCreate = { name ->
-                    mainViewModel.createPlaylist(name) { playlist ->
-                        if (playlist != null) {
-                            mainViewModel.addSongsToPlaylist(playlist.id, listOf(song))
-                        }
+                    mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
+                        mainViewModel.addSongsToPlaylist(playlist.id, listOf(song))
+                        createPlaylistSong = null
                     }
-                    createPlaylistSong = null
                 }
             )
         }
@@ -833,11 +832,11 @@ fun ArtistScreen(
             ArtistCreatePlaylistSheet(
                 onDismiss = { createPlaylistSongs = null },
                 onCreate = { name ->
-                    mainViewModel.createPlaylist(name) { playlist ->
-                        if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                    mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
+                        mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                        createPlaylistSongs = null
+                        finishSelectionMode()
                     }
-                    createPlaylistSongs = null
-                    finishSelectionMode()
                 }
             )
         }

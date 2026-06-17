@@ -53,6 +53,7 @@ import com.ella.music.ui.components.rememberSongDeleteRequester
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SongSelectionActionRow
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.requestPinnedEllaShortcut
 import com.ella.music.ui.components.shareLocalSongs
@@ -894,11 +895,11 @@ fun LibrarySearchScreen(
         CreatePlaylistDialog(
             onDismiss = { createPlaylistSongs = null },
             onCreate = { playlistName ->
-                mainViewModel.createPlaylist(playlistName) { playlist ->
-                    if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                mainViewModel.createPlaylistOrShowDuplicateToast(context, playlistName) { playlist ->
+                    mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                    createPlaylistSongs = null
+                    finishSelectionMode()
                 }
-                createPlaylistSongs = null
-                finishSelectionMode()
             }
         )
     }

@@ -56,17 +56,15 @@ internal fun SongMorePlaylistActionSheets(
         CreatePlaylistAndAddSheet(
             onDismiss = { onCreatePlaylistSongChange(null) },
             onCreate = { name ->
-                mainViewModel.createPlaylist(name) { playlist ->
-                    if (playlist != null) {
-                        mainViewModel.addSongsToPlaylist(playlist.id, listOf(song))
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.player_added_to_playlist_named, playlist.name),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
+                    mainViewModel.addSongsToPlaylist(playlist.id, listOf(song))
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.player_added_to_playlist_named, playlist.name),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    onCreatePlaylistSongChange(null)
                 }
-                onCreatePlaylistSongChange(null)
             }
         )
     }

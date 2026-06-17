@@ -46,6 +46,7 @@ import com.ella.music.R
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.playlistIdentityKey
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Text
@@ -105,9 +106,10 @@ internal fun LandscapeCoverPlaybackOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val coverItems = remember(playlist, song?.id) {
+    val songKey = remember(song) { song?.playlistIdentityKey() }
+    val coverItems = remember(playlist, songKey) {
         val source = playlist.takeIf { it.isNotEmpty() } ?: listOfNotNull(song)
-        val centerIndex = source.indexOfFirst { it.id == song?.id }.takeIf { it >= 0 } ?: 0
+        val centerIndex = source.indexOfFirst { it.playlistIdentityKey() == songKey }.takeIf { it >= 0 } ?: 0
         listOf(-3, -2, -1, 0, 1, 2, 3)
             .mapNotNull { offset -> source.getOrNull(centerIndex + offset)?.let { offset to it } }
             .ifEmpty { listOfNotNull(song?.let { 0 to it }) }
@@ -115,8 +117,8 @@ internal fun LandscapeCoverPlaybackOverlay(
     val swipeThresholdPx = with(LocalDensity.current) { 92.dp.toPx() }
     val swipeScope = rememberCoroutineScope()
     val dragOffset = remember { Animatable(0f) }
-    var coverControlsVisible by remember(song?.id) { mutableStateOf(false) }
-    var coverControlsInteraction by remember(song?.id) { mutableStateOf(0) }
+    var coverControlsVisible by remember(songKey) { mutableStateOf(false) }
+    var coverControlsInteraction by remember(songKey) { mutableStateOf(0) }
     LaunchedEffect(coverControlsVisible, coverControlsInteraction) {
         if (coverControlsVisible) {
             delay(2_000L)

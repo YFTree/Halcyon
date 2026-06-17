@@ -187,13 +187,6 @@ private fun AboutContent(
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
             )
-            Text(
-                modifier = Modifier.fillMaxWidth(),
-                color = colorScheme.onSurfaceVariantSummary.copy(alpha = 0.7f),
-                text = stringResource(R.string.about_build_time, BuildConfig.BUILD_TIME),
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-            )
         }
 
         LazyColumn(

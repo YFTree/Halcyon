@@ -22,6 +22,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SafeCoverImage
 import kotlin.math.abs
@@ -141,9 +142,10 @@ internal fun LandscapeCoverStack(
                 },
                 contentAlignment = Alignment.Center
             ) {
+                val isCurrentSongItem = itemSong.playlistIdentityKey() == currentSong?.playlistIdentityKey()
                 LandscapeCoverReflection(
                     song = itemSong,
-                    embeddedCover = embeddedCover.takeIf { isCenter && itemSong.id == currentSong?.id },
+                    embeddedCover = embeddedCover.takeIf { isCenter && isCurrentSongItem },
                     cornerRadius = if (isCenter) 14.dp else 10.dp,
                     alpha = if (isCenter) 0.34f else 0.18f
                 )
@@ -164,7 +166,7 @@ internal fun LandscapeCoverStack(
                     } else {
                         LandscapeStackCoverImage(
                             song = itemSong,
-                            embeddedCover = embeddedCover.takeIf { isCenter && itemSong.id == currentSong?.id },
+                            embeddedCover = embeddedCover.takeIf { isCenter && isCurrentSongItem },
                             modifier = Modifier.fillMaxSize()
                         )
                     }

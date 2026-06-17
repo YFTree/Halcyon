@@ -65,6 +65,19 @@ fun EqualizerScreen(
     val eqEnabled by settingsManager.eqEnabled.collectAsState(initial = false)
     val eqPreset by settingsManager.eqPreset.collectAsState(initial = AudioEffectSettings.PRESET_CUSTOM)
     val bandLevels by settingsManager.eqBandLevelsMb.collectAsState(initial = emptyList())
+    val reverbPreset by settingsManager.reverbPreset.collectAsState(initial = AudioEffectSettings.REVERB_PRESET_OFF)
+    val reverbPresetValues = remember {
+        listOf(
+            AudioEffectSettings.REVERB_PRESET_OFF,
+            AudioEffectSettings.REVERB_PRESET_STUDIO,
+            AudioEffectSettings.REVERB_PRESET_SMALL_ROOM,
+            AudioEffectSettings.REVERB_PRESET_MEDIUM_ROOM,
+            AudioEffectSettings.REVERB_PRESET_LARGE_ROOM,
+            AudioEffectSettings.REVERB_PRESET_HALL,
+            AudioEffectSettings.REVERB_PRESET_CHURCH,
+            AudioEffectSettings.REVERB_PRESET_PLATE
+        )
+    }
 
     val accent = MiuixTheme.colorScheme.primary
 
@@ -98,7 +111,7 @@ fun EqualizerScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             val caps = capabilities
-            if (caps == null || !caps.supported) {
+            if (caps == null) {
                 SettingsCardGroup(highlight = highlightKey == "equalizer_unavailable") {
                     Text(
                         text = stringResource(R.string.equalizer_unavailable),
@@ -111,81 +124,115 @@ fun EqualizerScreen(
                 return@Column
             }
 
-            SmallTitle(text = stringResource(R.string.equalizer_section_eq))
-            SettingsCardGroup(highlight = highlightKey == "equalizer") {
-                Column {
-                    SwitchPreference(
-                        title = stringResource(R.string.equalizer_master),
-                        summary = stringResource(R.string.equalizer_band_count, caps.displayBandCount),
-                        checked = eqEnabled,
-                        onCheckedChange = { scope.launch { settingsManager.setEqEnabled(it) } }
-                    )
-
-                    val presetItems = buildList {
-                        add(DropdownItem(title = stringResource(R.string.equalizer_preset_custom)))
-                        caps.presetNames.forEach { add(DropdownItem(title = it)) }
-                    }
-                    val selectedPresetIndex = if (eqPreset in caps.presetNames.indices) eqPreset + 1 else 0
-                    WindowSpinnerPreference(
-                        title = stringResource(R.string.equalizer_preset),
-                        items = presetItems,
-                        selectedIndex = selectedPresetIndex,
-                        onSelectedIndexChange = { index ->
-                            scope.launch {
-                                if (index <= 0) {
-                                    settingsManager.setEqPreset(AudioEffectSettings.PRESET_CUSTOM)
-                                } else {
-                                    val presetIndex = index - 1
-                                    val levels = caps.presetBandLevelsMb.getOrNull(presetIndex)
-                                        ?: List(caps.displayBandCount) { 0 }
-                                    settingsManager.setEqPresetWithBands(presetIndex, levels.toDisplayBandLevels(caps))
-                                }
-                            }
-                        }
+            if (!caps.supported) {
+                SettingsCardGroup(highlight = highlightKey == "equalizer_unavailable") {
+                    Text(
+                        text = stringResource(R.string.equalizer_unavailable),
+                        fontSize = 13.sp,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.padding(18.dp)
                     )
                 }
-            }
+                if (!caps.reverbSupported) {
+                    Spacer(modifier = Modifier.height(160.dp))
+                    return@Column
+                }
+            } else {
+                SmallTitle(text = stringResource(R.string.equalizer_section_eq))
+                SettingsCardGroup(highlight = highlightKey == "equalizer") {
+                    Column {
+                        SwitchPreference(
+                            title = stringResource(R.string.equalizer_master),
+                            summary = stringResource(R.string.equalizer_band_count, caps.displayBandCount),
+                            checked = eqEnabled,
+                            onCheckedChange = { scope.launch { settingsManager.setEqEnabled(it) } }
+                        )
 
-            SettingsCardGroup(highlight = highlightKey == "equalizer_bands") {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    for (band in 0 until caps.displayBandCount) {
-                        val levelMb = bandLevels.getOrElse(band) { 0 }
-                        val freqHz = caps.displayCenterFreqsHz.getOrElse(band) { 0 }
-                        EqBandColumn(
-                            freqLabel = formatFreq(freqHz),
-                            gainLabel = formatGainDb(levelMb),
-                            levelMb = levelMb,
-                            minMb = caps.minLevelMb,
-                            maxMb = caps.maxLevelMb,
-                            onLevelChange = { newLevel ->
-                                val updated = MutableList(caps.displayBandCount) { idx -> bandLevels.getOrElse(idx) { 0 } }
-                                updated[band] = newLevel.coerceIn(caps.minLevelMb, caps.maxLevelMb)
-                                scope.launch { settingsManager.setEqBandLevelsMb(updated) }
-                            },
-                            modifier = Modifier.weight(1f)
+                        val presetItems = buildList {
+                            add(DropdownItem(title = stringResource(R.string.equalizer_preset_custom)))
+                            caps.presetNames.forEach { add(DropdownItem(title = it)) }
+                        }
+                        val selectedPresetIndex = if (eqPreset in caps.presetNames.indices) eqPreset + 1 else 0
+                        WindowSpinnerPreference(
+                            title = stringResource(R.string.equalizer_preset),
+                            items = presetItems,
+                            selectedIndex = selectedPresetIndex,
+                            onSelectedIndexChange = { index ->
+                                scope.launch {
+                                    if (index <= 0) {
+                                        settingsManager.setEqPreset(AudioEffectSettings.PRESET_CUSTOM)
+                                    } else {
+                                        val presetIndex = index - 1
+                                        val levels = caps.presetBandLevelsMb.getOrNull(presetIndex)
+                                            ?: List(caps.displayBandCount) { 0 }
+                                        settingsManager.setEqPresetWithBands(presetIndex, levels.toDisplayBandLevels(caps))
+                                    }
+                                }
+                            }
                         )
                     }
                 }
-            }
 
-            Text(
-                text = stringResource(R.string.equalizer_reset),
-                color = accent,
-                fontSize = 14.sp,
-                modifier = Modifier
-                    .align(Alignment.End)
-                    .padding(end = 8.dp, top = 2.dp, bottom = 6.dp)
-                    .pointerInput(Unit) {
-                        detectTapGestures {
-                            scope.launch { settingsManager.setEqBandLevelsMb(List(caps.displayBandCount) { 0 }) }
+                SettingsCardGroup(highlight = highlightKey == "equalizer_bands") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        for (band in 0 until caps.displayBandCount) {
+                            val levelMb = bandLevels.getOrElse(band) { 0 }
+                            val freqHz = caps.displayCenterFreqsHz.getOrElse(band) { 0 }
+                            EqBandColumn(
+                                freqLabel = formatFreq(freqHz),
+                                gainLabel = formatGainDb(levelMb),
+                                levelMb = levelMb,
+                                minMb = caps.minLevelMb,
+                                maxMb = caps.maxLevelMb,
+                                onLevelChange = { newLevel ->
+                                    val updated = MutableList(caps.displayBandCount) { idx -> bandLevels.getOrElse(idx) { 0 } }
+                                    updated[band] = newLevel.coerceIn(caps.minLevelMb, caps.maxLevelMb)
+                                    scope.launch { settingsManager.setEqBandLevelsMb(updated) }
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
-            )
+                }
+
+                Text(
+                    text = stringResource(R.string.equalizer_reset),
+                    color = accent,
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(end = 8.dp, top = 2.dp, bottom = 6.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures {
+                                scope.launch { settingsManager.setEqBandLevelsMb(List(caps.displayBandCount) { 0 }) }
+                            }
+                        }
+                )
+            }
+
+            if (caps.reverbSupported) {
+                SmallTitle(text = stringResource(R.string.equalizer_section_effects))
+                SettingsCardGroup(highlight = highlightKey == "equalizer_reverb") {
+                    val reverbItems = reverbPresetValues.map { preset ->
+                        DropdownItem(title = stringResource(reverbPresetLabelRes(preset)))
+                    }
+                    val selectedReverbPresetIndex = reverbPresetValues.indexOf(reverbPreset).takeIf { it >= 0 } ?: 0
+                    WindowSpinnerPreference(
+                        title = stringResource(R.string.equalizer_reverb),
+                        items = reverbItems,
+                        selectedIndex = selectedReverbPresetIndex,
+                        onSelectedIndexChange = { index ->
+                            val preset = reverbPresetValues.getOrElse(index) { AudioEffectSettings.REVERB_PRESET_OFF }
+                            scope.launch { settingsManager.setReverbPreset(preset) }
+                        }
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(160.dp))
         }
@@ -262,3 +309,15 @@ private fun formatGainDb(levelMb: Int): String {
     val db = levelMb / 100f
     return "%.1f".format(db)
 }
+
+private fun reverbPresetLabelRes(preset: Int): Int =
+    when (preset) {
+        AudioEffectSettings.REVERB_PRESET_STUDIO -> R.string.equalizer_reverb_studio
+        AudioEffectSettings.REVERB_PRESET_SMALL_ROOM -> R.string.equalizer_reverb_small_room
+        AudioEffectSettings.REVERB_PRESET_MEDIUM_ROOM -> R.string.equalizer_reverb_medium_room
+        AudioEffectSettings.REVERB_PRESET_LARGE_ROOM -> R.string.equalizer_reverb_large_room
+        AudioEffectSettings.REVERB_PRESET_HALL -> R.string.equalizer_reverb_hall
+        AudioEffectSettings.REVERB_PRESET_CHURCH -> R.string.equalizer_reverb_church
+        AudioEffectSettings.REVERB_PRESET_PLATE -> R.string.equalizer_reverb_plate
+        else -> R.string.equalizer_reverb_off
+    }

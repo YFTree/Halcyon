@@ -12,7 +12,7 @@ import top.yukonga.miuix.kmp.window.WindowBottomSheet
 internal fun PlayerQueueSheet(
     show: Boolean,
     playlist: List<Song>,
-    currentSongId: Long?,
+    currentSongKey: String?,
     shuffleEnabled: Boolean,
     repeatMode: Int,
     onCyclePlaybackMode: () -> Unit,
@@ -33,7 +33,7 @@ internal fun PlayerQueueSheet(
     ) {
         PlayerQueueMenu(
             playlist = playlist,
-            currentSongId = currentSongId,
+            currentSongKey = currentSongKey,
             shuffleEnabled = shuffleEnabled,
             repeatMode = repeatMode,
             onCyclePlaybackMode = onCyclePlaybackMode,

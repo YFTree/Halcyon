@@ -355,8 +355,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playlistCoordinator.createPlaylist(name, onCreated)
     }
 
-    fun renamePlaylist(id: String, newName: String) {
-        playlistCoordinator.renamePlaylist(id, newName)
+    fun renamePlaylist(id: String, newName: String, onRenamed: (Boolean) -> Unit = {}) {
+        playlistCoordinator.renamePlaylist(id, newName, onRenamed)
     }
 
     fun deletePlaylist(id: String) {

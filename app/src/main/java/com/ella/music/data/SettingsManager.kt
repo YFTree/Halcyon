@@ -28,6 +28,7 @@ import java.io.File
 import java.util.Locale
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "ella_settings")
+private val DEFAULT_LYRIC_LINE_BLACKLIST = listOf("[kana:", "[trans:", "[roma:")
 
 data class LxSourceConfig(
     val id: String,
@@ -135,6 +136,7 @@ class SettingsManager(private val context: Context) {
         val KEY_BASS_BOOST_STRENGTH = intPreferencesKey("audio_bass_boost_strength")
         val KEY_VIRTUALIZER_ENABLED = booleanPreferencesKey("audio_virtualizer_enabled")
         val KEY_VIRTUALIZER_STRENGTH = intPreferencesKey("audio_virtualizer_strength")
+        val KEY_REVERB_PRESET = intPreferencesKey("audio_reverb_preset")
         val KEY_DYNAMIC_COVER_ENABLED = booleanPreferencesKey("dynamic_cover_enabled")
         val KEY_STARTUP_POSTER_ENABLED = booleanPreferencesKey("startup_poster_enabled")
         val KEY_STARTUP_POSTER_URI = stringPreferencesKey("startup_poster_uri")
@@ -562,23 +564,27 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_VIRTUALIZER_ENABLED] ?: false }
     val virtualizerStrength: Flow<Int> =
         context.dataStore.data.map { it[KEY_VIRTUALIZER_STRENGTH] ?: 0 }
+    val reverbPreset: Flow<Int> =
+        context.dataStore.data.map { normalizeReverbPreset(it[KEY_REVERB_PRESET] ?: AudioEffectSettings.REVERB_PRESET_OFF) }
 
     /** Combined audio-effect snapshot consumed by PlaybackService's AudioEffectController. */
     val audioEffectSettings: Flow<AudioEffectSettings> = combine(
-        eqEnabled,
-        eqPreset,
-        eqBandLevelsMb,
+        combine(eqEnabled, eqPreset, eqBandLevelsMb) { enabled, preset, bands ->
+            Triple(enabled, preset, bands)
+        },
         combine(bassBoostEnabled, bassBoostStrength) { enabled, strength -> enabled to strength },
-        combine(virtualizerEnabled, virtualizerStrength) { enabled, strength -> enabled to strength }
-    ) { enabled, preset, bands, bass, virt ->
+        combine(virtualizerEnabled, virtualizerStrength) { enabled, strength -> enabled to strength },
+        reverbPreset
+    ) { eq, bass, virt, reverb ->
         AudioEffectSettings(
-            eqEnabled = enabled,
-            eqPreset = preset,
-            eqBandLevelsMb = bands,
+            eqEnabled = eq.first,
+            eqPreset = eq.second,
+            eqBandLevelsMb = eq.third,
             bassBoostEnabled = bass.first,
             bassBoostStrength = bass.second,
             virtualizerEnabled = virt.first,
-            virtualizerStrength = virt.second
+            virtualizerStrength = virt.second,
+            reverbPreset = reverb
         )
     }
     val dynamicCoverEnabled: Flow<Boolean> =
@@ -1164,6 +1170,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_VIRTUALIZER_STRENGTH] = strength.coerceIn(0, AudioEffectSettings.STRENGTH_MAX) }
     }
 
+    suspend fun setReverbPreset(preset: Int) {
+        context.dataStore.edit { it[KEY_REVERB_PRESET] = normalizeReverbPreset(preset) }
+    }
+
     private fun parseEqBands(raw: String?): List<Int> {
         if (raw.isNullOrBlank()) return List(FIXED_EQ_BAND_COUNT) { 0 }
         return raw.split(',').mapNotNull { it.trim().toIntOrNull() }.normalizedEqBands()
@@ -1171,6 +1181,19 @@ class SettingsManager(private val context: Context) {
 
     private fun List<Int>.normalizedEqBands(): List<Int> =
         List(FIXED_EQ_BAND_COUNT) { index -> getOrElse(index) { 0 } }
+
+    private fun normalizeReverbPreset(preset: Int): Int =
+        when (preset) {
+            AudioEffectSettings.REVERB_PRESET_OFF,
+            AudioEffectSettings.REVERB_PRESET_STUDIO,
+            AudioEffectSettings.REVERB_PRESET_SMALL_ROOM,
+            AudioEffectSettings.REVERB_PRESET_MEDIUM_ROOM,
+            AudioEffectSettings.REVERB_PRESET_LARGE_ROOM,
+            AudioEffectSettings.REVERB_PRESET_HALL,
+            AudioEffectSettings.REVERB_PRESET_CHURCH,
+            AudioEffectSettings.REVERB_PRESET_PLATE -> preset
+            else -> AudioEffectSettings.REVERB_PRESET_OFF
+        }
 
     suspend fun setDynamicCoverEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_DYNAMIC_COVER_ENABLED] = enabled }
@@ -1719,6 +1742,9 @@ class SettingsManager(private val context: Context) {
             val now = System.currentTimeMillis()
             val current = prefs[KEY_FOLDER_PLAYLISTS].orEmpty().toFolderPlaylists()
             val existing = playlistId?.let { id -> current.firstOrNull { it.id == id } }
+            if (current.any { it.id != existing?.id && it.name.trim().equals(safeName, ignoreCase = true) }) {
+                return@edit
+            }
             val nextItem = FolderPlaylist(
                 id = existing?.id ?: "folder-playlist-$now",
                 name = safeName,
@@ -1904,6 +1930,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_EQ_PRESET)
             setInt(KEY_BASS_BOOST_STRENGTH)
             setInt(KEY_VIRTUALIZER_STRENGTH)
+            setInt(KEY_REVERB_PRESET)
             setInt(KEY_MIN_DURATION)
             setInt(KEY_SHUFFLE_MODE)
             setInt(KEY_PREVIOUS_BUTTON_ACTION)
@@ -2129,7 +2156,8 @@ class SettingsManager(private val context: Context) {
     }
 
     private fun parseLyricLineBlacklist(raw: String?): List<String> =
-        normalizeLyricLineBlacklist(raw.orEmpty().lineSequence())
+        (DEFAULT_LYRIC_LINE_BLACKLIST + normalizeLyricLineBlacklist(raw.orEmpty().lineSequence()))
+            .distinct()
 
     private fun normalizeLyricLineBlacklist(lines: Sequence<String>): List<String> =
         lines

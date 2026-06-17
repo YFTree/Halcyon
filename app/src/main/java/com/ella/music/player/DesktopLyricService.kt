@@ -41,9 +41,12 @@ import com.google.common.util.concurrent.ListenableFuture
 import io.github.proify.lyricon.lyric.view.RawsLyricView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 class DesktopLyricService : Service() {
@@ -86,7 +89,8 @@ class DesktopLyricService : Service() {
     private var savedX = Int.MIN_VALUE
     private var savedY = Int.MIN_VALUE
     private val settingsManager by lazy { SettingsManager.getInstance(this) }
-    private val serviceScope = CoroutineScope(Dispatchers.IO)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var settingsLoadJob: Job? = null
     private val hideControlsRunnable = Runnable { hideControls() }
     private val panelBackground by lazy {
         GradientDrawable().apply {
@@ -100,7 +104,7 @@ class DesktopLyricService : Service() {
         super.onCreate()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        loadSettingsFromStore()
+        loadSettingsFromStoreAsync(applyToExistingView = true)
         controllerFuture = MediaController.Builder(
             this,
             SessionToken(this, ComponentName(this, PlaybackService::class.java))
@@ -149,6 +153,7 @@ class DesktopLyricService : Service() {
     }
 
     override fun onDestroy() {
+        settingsLoadJob?.cancel()
         rootView?.removeCallbacks(hideControlsRunnable)
         rootView?.let { runCatching { windowManager.removeView(it) } }
         controllerFuture?.let { MediaController.releaseFuture(it) }
@@ -159,6 +164,7 @@ class DesktopLyricService : Service() {
         playPauseButton = null
         layoutParams = null
         controller = null
+        serviceScope.cancel()
         super.onDestroy()
     }
 
@@ -579,36 +585,77 @@ class DesktopLyricService : Service() {
         return anchoredX + dp(statusBarXOffsetDp.coerceIn(-640, 640))
     }
 
-    private fun loadSettingsFromStore() {
-        runBlocking(Dispatchers.IO) {
-            locked = settingsManager.desktopLyricLocked.first()
-            statusBarMode = settingsManager.desktopLyricStatusBarMode.first()
-            desktopLyricWidthPercent = settingsManager.desktopLyricWidth.first()
-            statusBarTopOffsetDp = settingsManager.desktopLyricStatusBarTopOffset.first()
-            statusBarPosition = settingsManager.desktopLyricStatusBarPosition.first()
-            statusBarWidthPercent = settingsManager.desktopLyricStatusBarWidth.first()
-            statusBarXOffsetDp = settingsManager.desktopLyricStatusBarXOffset.first()
-            statusBarTextAlign = settingsManager.desktopLyricStatusBarTextAlign.first()
-            statusBarVerticalAlign = settingsManager.desktopLyricStatusBarVerticalAlign.first()
-            statusBarSecondaryMode = settingsManager.desktopLyricStatusBarSecondary.first()
-            statusBarSecondaryOpacity = settingsManager.desktopLyricStatusBarSecondaryOpacity.first()
-            statusBarMergeSecondary = settingsManager.desktopLyricStatusBarMergeSecondary.first()
-            fontScale = settingsManager.desktopLyricFontScale.first().coerceIn(80, 220) / 100f
-            translationScale = settingsManager.desktopLyricTranslationScale.first().coerceIn(80, 220) / 100f
-            opacityPercent = settingsManager.desktopLyricOpacity.first().coerceIn(35, 100)
-            lyricTextColor = settingsManager.desktopLyricTextColor.first()
-            lyricFontPath = settingsManager.lyricFontPath.first()
-            lyricFontWeight = settingsManager.lyricFontWeight.first().coerceIn(100, 900)
-            lyricFontItalic = settingsManager.lyricFontItalic.first()
-            savedX = settingsManager.desktopLyricX.first()
-            savedY = settingsManager.desktopLyricY.first()
+    private fun loadSettingsFromStoreAsync(applyToExistingView: Boolean) {
+        settingsLoadJob?.cancel()
+        settingsLoadJob = serviceScope.launch {
+            val settings = readSettingsFromStore()
+            withContext(Dispatchers.Main.immediate) {
+                val oldStatusBarMode = statusBarMode
+                val oldStatusBarSecondaryMode = statusBarSecondaryMode
+                applySettingsSnapshot(settings)
+                if (applyToExistingView) {
+                    applyCurrentSettingsAfterLoad(oldStatusBarMode, oldStatusBarSecondaryMode)
+                }
+            }
         }
     }
 
+    private suspend fun readSettingsFromStore(): DesktopLyricSettingsSnapshot = DesktopLyricSettingsSnapshot(
+        locked = settingsManager.desktopLyricLocked.first(),
+        statusBarMode = settingsManager.desktopLyricStatusBarMode.first(),
+        desktopLyricWidthPercent = settingsManager.desktopLyricWidth.first(),
+        statusBarTopOffsetDp = settingsManager.desktopLyricStatusBarTopOffset.first(),
+        statusBarPosition = settingsManager.desktopLyricStatusBarPosition.first(),
+        statusBarWidthPercent = settingsManager.desktopLyricStatusBarWidth.first(),
+        statusBarXOffsetDp = settingsManager.desktopLyricStatusBarXOffset.first(),
+        statusBarTextAlign = settingsManager.desktopLyricStatusBarTextAlign.first(),
+        statusBarVerticalAlign = settingsManager.desktopLyricStatusBarVerticalAlign.first(),
+        statusBarSecondaryMode = settingsManager.desktopLyricStatusBarSecondary.first(),
+        statusBarSecondaryOpacity = settingsManager.desktopLyricStatusBarSecondaryOpacity.first(),
+        statusBarMergeSecondary = settingsManager.desktopLyricStatusBarMergeSecondary.first(),
+        fontScale = settingsManager.desktopLyricFontScale.first().coerceIn(80, 220) / 100f,
+        translationScale = settingsManager.desktopLyricTranslationScale.first().coerceIn(80, 220) / 100f,
+        opacityPercent = settingsManager.desktopLyricOpacity.first().coerceIn(35, 100),
+        lyricTextColor = settingsManager.desktopLyricTextColor.first(),
+        lyricFontPath = settingsManager.lyricFontPath.first(),
+        lyricFontWeight = settingsManager.lyricFontWeight.first().coerceIn(100, 900),
+        lyricFontItalic = settingsManager.lyricFontItalic.first(),
+        savedX = settingsManager.desktopLyricX.first(),
+        savedY = settingsManager.desktopLyricY.first()
+    )
+
+    private fun applySettingsSnapshot(settings: DesktopLyricSettingsSnapshot) {
+        locked = settings.locked
+        statusBarMode = settings.statusBarMode
+        desktopLyricWidthPercent = settings.desktopLyricWidthPercent
+        statusBarTopOffsetDp = settings.statusBarTopOffsetDp
+        statusBarPosition = settings.statusBarPosition
+        statusBarWidthPercent = settings.statusBarWidthPercent
+        statusBarXOffsetDp = settings.statusBarXOffsetDp
+        statusBarTextAlign = settings.statusBarTextAlign
+        statusBarVerticalAlign = settings.statusBarVerticalAlign
+        statusBarSecondaryMode = settings.statusBarSecondaryMode
+        statusBarSecondaryOpacity = settings.statusBarSecondaryOpacity
+        statusBarMergeSecondary = settings.statusBarMergeSecondary
+        fontScale = settings.fontScale
+        translationScale = settings.translationScale
+        opacityPercent = settings.opacityPercent
+        lyricTextColor = settings.lyricTextColor
+        lyricFontPath = settings.lyricFontPath
+        lyricFontWeight = settings.lyricFontWeight
+        lyricFontItalic = settings.lyricFontItalic
+        savedX = settings.savedX
+        savedY = settings.savedY
+    }
+
     private fun applySettingsFromStore() {
-        val oldStatusBarMode = statusBarMode
-        val oldStatusBarSecondaryMode = statusBarSecondaryMode
-        loadSettingsFromStore()
+        loadSettingsFromStoreAsync(applyToExistingView = true)
+    }
+
+    private fun applyCurrentSettingsAfterLoad(
+        oldStatusBarMode: Boolean,
+        oldStatusBarSecondaryMode: Int
+    ) {
         if ((oldStatusBarMode != statusBarMode || (statusBarMode && oldStatusBarSecondaryMode != statusBarSecondaryMode)) && rootView != null) {
             rootView?.let { runCatching { windowManager.removeView(it) } }
             rootView = null
@@ -719,6 +766,30 @@ class DesktopLyricService : Service() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun isTabletDevice(): Boolean = resources.configuration.smallestScreenWidthDp >= 600
+
+    private data class DesktopLyricSettingsSnapshot(
+        val locked: Boolean,
+        val statusBarMode: Boolean,
+        val desktopLyricWidthPercent: Int,
+        val statusBarTopOffsetDp: Int,
+        val statusBarPosition: Int,
+        val statusBarWidthPercent: Int,
+        val statusBarXOffsetDp: Int,
+        val statusBarTextAlign: Int,
+        val statusBarVerticalAlign: Int,
+        val statusBarSecondaryMode: Int,
+        val statusBarSecondaryOpacity: Int,
+        val statusBarMergeSecondary: Boolean,
+        val fontScale: Float,
+        val translationScale: Float,
+        val opacityPercent: Int,
+        val lyricTextColor: Int,
+        val lyricFontPath: String,
+        val lyricFontWeight: Int,
+        val lyricFontItalic: Boolean,
+        val savedX: Int,
+        val savedY: Int
+    )
 
     private class DesktopSmoothLyricView(context: Context) : FrameLayout(context) {
         var windowTouchHandler: ((View, MotionEvent) -> Boolean)? = null

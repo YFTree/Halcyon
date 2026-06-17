@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -309,12 +310,16 @@ private fun HomeTile(
     tileColor: Color = MiuixTheme.colorScheme.primary,
     modifier: Modifier = Modifier
 ) {
-    val background = tileColor.copy(alpha = if (MiuixTheme.colorScheme.background.luminance() < 0.5f) 0.28f else 0.18f)
+    val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    val background = tileColor
+        .copy(alpha = if (isDark) 0.30f else 0.24f)
+        .compositeOver(cardColor)
+    val contentColor = if (background.luminance() < 0.42f) Color.White else Color(0xFF15151A)
     Column(
         modifier = modifier
             .height(96.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Brush.linearGradient(listOf(background, cardColor)))
+            .background(background)
             .combinedClickable(onClick = onClick, onLongClick = onPinClick)
             .padding(14.dp),
         verticalArrangement = Arrangement.SpaceBetween
@@ -324,7 +329,7 @@ private fun HomeTile(
                 text = title,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (tileColor.luminance() < 0.35f) Color.White else MiuixTheme.colorScheme.onSurface,
+                color = contentColor,
                 maxLines = 1,
                 modifier = Modifier.weight(1f)
             )
@@ -333,7 +338,7 @@ private fun HomeTile(
                     text = "+",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    color = contentColor.copy(alpha = 0.72f),
                     modifier = Modifier
                         .clip(CircleShape)
                         .clickable(onClick = onPinClick)
@@ -344,7 +349,7 @@ private fun HomeTile(
         Text(
             text = subtitle,
             fontSize = 12.sp,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            color = contentColor.copy(alpha = 0.68f),
             maxLines = 1
         )
     }

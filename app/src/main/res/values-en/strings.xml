@@ -468,6 +468,7 @@
     <string name="folder_playlist_selected_count">%1$d folders selected</string>
     <string name="folder_playlist_empty_songs">No songs in these folders yet</string>
     <string name="folder_playlist_save_failed">Enter a name and select at least one folder</string>
+    <string name="playlist_name_exists">Playlist name already exists</string>
     <string name="folder_playlist_delete_title">Delete folder playlist</string>
     <string name="folder_playlist_delete_message">Delete \"%1$s\"? Music files will not be deleted.</string>
     <string name="folder_show_folder">Show folder</string>
@@ -1424,6 +1425,15 @@
     <string name="equalizer_preset">Preset</string>
     <string name="equalizer_preset_custom">Custom</string>
     <string name="equalizer_reset">Reset</string>
+    <string name="equalizer_reverb">Reverb</string>
+    <string name="equalizer_reverb_off">Off</string>
+    <string name="equalizer_reverb_studio">Studio</string>
+    <string name="equalizer_reverb_small_room">Small room</string>
+    <string name="equalizer_reverb_medium_room">Medium room</string>
+    <string name="equalizer_reverb_large_room">Large room</string>
+    <string name="equalizer_reverb_hall">Hall</string>
+    <string name="equalizer_reverb_church">Church</string>
+    <string name="equalizer_reverb_plate">Plate</string>
     <string name="equalizer_screen_title">Equalizer</string>
     <string name="equalizer_section_effects">Effects</string>
     <string name="equalizer_section_eq">Equalizer</string>

@@ -105,6 +105,7 @@ import com.ella.music.ui.components.SortDropdownMenu
 import com.ella.music.ui.components.TagEditorOption
 import com.ella.music.ui.components.TagEditorOptionKind
 import com.ella.music.ui.components.buildTagEditorOptions
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.launchTagEditorOption
 import com.ella.music.ui.components.openSongSpectrumWithAspectPro
@@ -655,9 +656,10 @@ fun LibraryScreen(
             val listState = rememberLazyListState()
             var fastScrollJob by remember { mutableStateOf<Job?>(null) }
             var handledLocateRequest by remember { mutableStateOf(locateCurrentSongRequest) }
-            val currentSongIndex = remember(sortedSongs, currentSong?.id) {
-                val id = currentSong?.id ?: return@remember -1
-                sortedSongs.indexOfFirst { it.id == id }
+            val currentSongKey = remember(currentSong) { currentSong?.playlistIdentityKey() }
+            val currentSongIndex = remember(sortedSongs, currentSongKey) {
+                currentSongKey ?: return@remember -1
+                sortedSongs.indexOfFirst { it.playlistIdentityKey() == currentSongKey }
             }
             val showLocateCurrentSongButton by remember(currentSongIndex, selectionMode) {
                 derivedStateOf {
@@ -748,7 +750,7 @@ fun LibraryScreen(
                     ) {
                         itemsIndexed(
                             items = sortedSongs,
-                            key = { _, song -> song.id }
+                            key = { _, song -> song.playlistIdentityKey() }
                         ) { index, song ->
                             val selected = song.id in selectedIds
                             val albumArtUri = remember(listCoversEnabled, song.albumId) {
@@ -759,7 +761,7 @@ fun LibraryScreen(
 
                             SongItem(
                                 song = song,
-                                isCurrent = currentSong?.id == song.id,
+                                isCurrent = song.playlistIdentityKey() == currentSongKey,
                                 albumArtUri = albumArtUri,
                                 loadCoverArt = mainViewModel::getCoverArtBitmap,
                                 loadAudioInfo = mainViewModel::getAudioInfo,
@@ -908,18 +910,16 @@ fun LibraryScreen(
                 songCount = songsToAdd.size,
                 onDismiss = { createPlaylistSongs = null },
                 onCreate = { name ->
-                    mainViewModel.createPlaylist(name) { playlist ->
-                        if (playlist != null) {
-                            mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
-                            Toast.makeText(
-                                context,
-                                context.getString(R.string.player_added_to_playlist_named, playlist.name),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            finishSelectionMode()
-                        }
+                    mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
+                        mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.player_added_to_playlist_named, playlist.name),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        createPlaylistSongs = null
+                        finishSelectionMode()
                     }
-                    createPlaylistSongs = null
                 }
             )
         }

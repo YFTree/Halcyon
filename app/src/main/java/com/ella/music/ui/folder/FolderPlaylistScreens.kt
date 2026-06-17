@@ -163,6 +163,14 @@ fun FolderPlaylistsScreen(
         onDismiss = { showEditor = false },
         onSave = { target, name, folders ->
             scope.launch {
+                val safeName = name.trim()
+                val nameExists = playlists.any { playlist ->
+                    playlist.id != target?.id && playlist.name.trim().equals(safeName, ignoreCase = true)
+                }
+                if (nameExists) {
+                    Toast.makeText(context, R.string.playlist_name_exists, Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
                 val saved = mainViewModel.settingsManager.upsertFolderPlaylist(target?.id, name, folders)
                 if (saved == null) {
                     Toast.makeText(context, R.string.folder_playlist_save_failed, Toast.LENGTH_SHORT).show()

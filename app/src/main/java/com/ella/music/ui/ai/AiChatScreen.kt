@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.ella.music.R
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.ConfirmDangerDialog
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -141,8 +142,7 @@ fun AiChatScreen(
     fun createPlaylistFromSongs(songs: List<Song>, playlistName: String = "") {
         if (songs.isEmpty()) return
         val name = playlistName.ifBlank { context.getString(R.string.ai_chat_playlist_name) }
-        mainViewModel.createPlaylist(name) { playlist ->
-            if (playlist == null) return@createPlaylist
+        mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
             mainViewModel.addSongsToPlaylist(playlist.id, songs, appendToEnd = true)
             Toast.makeText(
                 context,

@@ -38,9 +38,9 @@ internal class MainViewModelPlaylistCoordinator(
         }
     }
 
-    fun renamePlaylist(id: String, newName: String) {
+    fun renamePlaylist(id: String, newName: String, onRenamed: (Boolean) -> Unit = {}) {
         scope.launch {
-            playlistStore.renamePlaylist(id, newName)
+            onRenamed(playlistStore.renamePlaylist(id, newName))
         }
     }
 

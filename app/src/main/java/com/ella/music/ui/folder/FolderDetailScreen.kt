@@ -81,6 +81,7 @@ import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.SortDropdownMenu
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.toFastIndexSection
 import com.ella.music.ui.components.wallpaperContentOverlayColor
@@ -752,14 +753,12 @@ fun FolderDetailScreen(
                 songCount = songsToAdd.size,
                 onDismiss = { createPlaylistSongs = null },
                 onCreate = { name ->
-                    mainViewModel.createPlaylist(name) { playlist ->
-                        if (playlist != null) {
-                            mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
-                            Toast.makeText(context, context.getString(R.string.player_added_to_playlist_named, playlist.name), Toast.LENGTH_SHORT).show()
-                            clearSelection()
-                        }
+                    mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
+                        mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                        Toast.makeText(context, context.getString(R.string.player_added_to_playlist_named, playlist.name), Toast.LENGTH_SHORT).show()
+                        createPlaylistSongs = null
+                        clearSelection()
                     }
-                    createPlaylistSongs = null
                 }
             )
         }

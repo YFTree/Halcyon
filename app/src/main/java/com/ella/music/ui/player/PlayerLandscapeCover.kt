@@ -44,6 +44,7 @@ import com.ella.music.R
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.ui.components.SmoothLyricView
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
@@ -295,7 +296,7 @@ internal fun LandscapeCoverPlayerPage(
                     palette = palette,
                     queueExpanded = queueExpanded,
                     playlist = playlist,
-                    currentSongId = song?.id,
+                    currentSongKey = song?.playlistIdentityKey(),
                     onCyclePlaybackMode = onCyclePlaybackMode,
                     onPrevious = onPrevious,
                     onPlayPause = onPlayPause,

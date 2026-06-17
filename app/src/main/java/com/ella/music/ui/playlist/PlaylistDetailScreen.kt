@@ -52,6 +52,7 @@ import com.ella.music.ui.components.LocateCurrentSongFloatingButton
 import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.ui.components.toFastIndexSection
 import com.ella.music.viewmodel.MainViewModel
@@ -643,18 +644,16 @@ fun PlaylistDetailScreen(
                 CreatePlaylistAndAddSheet(
                     onDismiss = { createPlaylistSongs = null },
                     onCreate = { name ->
-                        mainViewModel.createPlaylist(name) { targetPlaylist ->
-                            if (targetPlaylist != null) {
-                                mainViewModel.addSongsToPlaylist(targetPlaylist.id, songsToAdd)
-                                Toast.makeText(
-                                    context,
-                                    context.getString(R.string.player_added_to_playlist_named, targetPlaylist.name),
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                                finishSelectionMode()
-                            }
+                        mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { targetPlaylist ->
+                            mainViewModel.addSongsToPlaylist(targetPlaylist.id, songsToAdd)
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.player_added_to_playlist_named, targetPlaylist.name),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            createPlaylistSongs = null
+                            finishSelectionMode()
                         }
-                        createPlaylistSongs = null
                     }
                 )
             }

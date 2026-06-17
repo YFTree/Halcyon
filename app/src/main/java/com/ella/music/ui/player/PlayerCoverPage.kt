@@ -41,6 +41,7 @@ import com.ella.music.R
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 
@@ -425,7 +426,7 @@ internal fun CoverPlayerPage(
                             palette = pagePalette,
                             queueExpanded = queueExpanded,
                             playlist = playlist,
-                            currentSongId = song?.id,
+                            currentSongKey = song?.playlistIdentityKey(),
                             onCyclePlaybackMode = onCyclePlaybackMode,
                             onPrevious = onPrevious,
                             onPlayPause = onPlayPause,
@@ -576,7 +577,7 @@ internal fun CoverPlayerPage(
                             palette = pagePalette,
                             queueExpanded = queueExpanded,
                             playlist = playlist,
-                            currentSongId = song?.id,
+                            currentSongKey = song?.playlistIdentityKey(),
                             onCyclePlaybackMode = onCyclePlaybackMode,
                             onPrevious = onPrevious,
                             onPlayPause = onPlayPause,

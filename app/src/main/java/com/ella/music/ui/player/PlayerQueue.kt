@@ -88,7 +88,7 @@ private fun buildQueueEntries(items: List<Song>): List<QueueEntry> {
 @Composable
 internal fun PlayerQueueMenu(
     playlist: List<Song>,
-    currentSongId: Long?,
+    currentSongKey: String?,
     shuffleEnabled: Boolean,
     repeatMode: Int,
     onCyclePlaybackMode: () -> Unit,
@@ -104,8 +104,8 @@ internal fun PlayerQueueMenu(
     var manualPlaylist by remember(playlist) { mutableStateOf(buildQueueEntries(playlist)) }
     var pendingMoveStart by remember(playlist) { mutableStateOf<Int?>(null) }
     var pendingMoveTarget by remember(playlist) { mutableStateOf<Int?>(null) }
-    val currentIndex = remember(manualPlaylist, currentSongId) {
-        manualPlaylist.indexOfFirst { it.song.id == currentSongId }
+    val currentIndex = remember(manualPlaylist, currentSongKey) {
+        manualPlaylist.indexOfFirst { it.song.playlistIdentityKey() == currentSongKey }
     }
     LaunchedEffect(currentIndex) {
         if (currentIndex >= 0) {
@@ -228,6 +228,7 @@ internal fun PlayerQueueMenu(
                             }
                         )
                         val queueSong = item.song
+                        val isCurrentSong = queueSong.playlistIdentityKey() == currentSongKey
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -237,7 +238,7 @@ internal fun PlayerQueueMenu(
                                 .background(
                                     when {
                                         isDragging -> MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                        queueSong.id == currentSongId -> MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                        isCurrentSong -> MiuixTheme.colorScheme.primary.copy(alpha = 0.12f)
                                         else -> Color.Transparent
                                     }
                                 )
@@ -254,8 +255,8 @@ internal fun PlayerQueueMenu(
                                 Text(
                                     text = queueSong.title,
                                     fontSize = 13.sp,
-                                    fontWeight = if (queueSong.id == currentSongId) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (queueSong.id == currentSongId) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                                    fontWeight = if (isCurrentSong) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isCurrentSong) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

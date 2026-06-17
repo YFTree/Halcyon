@@ -54,6 +54,7 @@ import com.ella.music.ui.components.AlbumCard
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.CreatePlaylistAndAddSheet
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.EllaMiuixMenuItem
 import com.ella.music.ui.components.rememberSongDeleteRequester
 import com.ella.music.ui.components.requestPinnedEllaShortcut
@@ -588,11 +589,11 @@ fun AlbumScreen(
         CreatePlaylistAndAddSheet(
             onDismiss = { createPlaylistSongs = null },
             onCreate = { playlistName ->
-                mainViewModel.createPlaylist(playlistName) { playlist ->
-                    if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                mainViewModel.createPlaylistOrShowDuplicateToast(context, playlistName) { playlist ->
+                    mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                    createPlaylistSongs = null
+                    finishSelectionMode()
                 }
-                createPlaylistSongs = null
-                finishSelectionMode()
             }
         )
     }

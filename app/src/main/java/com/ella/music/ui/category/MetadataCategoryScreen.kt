@@ -79,6 +79,7 @@ import com.ella.music.viewmodel.PlayerViewModel
 import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.CreatePlaylistAndAddSheet
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.rememberSongDeleteRequester
 import com.ella.music.ui.components.shareLocalSongs
 import com.ella.music.ui.components.DoubleTapScrollOverlay
@@ -541,10 +542,10 @@ fun MetadataCategoryScreen(
         CreatePlaylistAndAddSheet(
             onDismiss = { createPlaylistSongs = null },
             onCreate = { name ->
-                mainViewModel.createPlaylist(name) { playlist ->
-                    if (playlist != null) mainViewModel.addSongsToPlaylist(playlist.id, songs)
+                mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
+                    mainViewModel.addSongsToPlaylist(playlist.id, songs)
+                    createPlaylistSongs = null
                 }
-                createPlaylistSongs = null
             }
         )
     }

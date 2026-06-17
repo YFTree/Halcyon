@@ -216,7 +216,7 @@ internal fun PlayerTransportControls(
     palette: PlayerPalette,
     queueExpanded: Boolean,
     playlist: List<Song>,
-    currentSongId: Long?,
+    currentSongKey: String?,
     onCyclePlaybackMode: () -> Unit,
     onPrevious: () -> Unit,
     onPlayPause: () -> Unit,
@@ -281,7 +281,7 @@ internal fun PlayerTransportControls(
             PlayerQueueSheet(
                 show = queueExpanded,
                 playlist = playlist,
-                currentSongId = currentSongId,
+                currentSongKey = currentSongKey,
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
                 onCyclePlaybackMode = onCyclePlaybackMode,

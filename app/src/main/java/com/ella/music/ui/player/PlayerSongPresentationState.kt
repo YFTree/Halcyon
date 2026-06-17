@@ -11,6 +11,7 @@ import com.ella.music.data.decodeNeteaseKey
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
+import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.ui.components.CoverLoadLimiter
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -35,14 +36,15 @@ internal fun rememberPlayerSongPresentationState(
     playerLight: Boolean = false
 ): PlayerSongPresentationState {
     val paletteDefault = if (playerLight) PlayerPalette.LightDefault else PlayerPalette.Default
-    val embeddedCover by produceState<Bitmap?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
+    val songKey = remember(song) { song?.presentationIdentityKey() }
+    val embeddedCover by produceState<Bitmap?>(initialValue = null, songKey) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 CoverLoadLimiter.run { song?.takeIf { it.coverUrl.isBlank() }?.let(playerViewModel::getCoverArtBitmap) }
             }.getOrNull()
         }
     }
-    val paletteBitmap by produceState<Bitmap?>(initialValue = null, song?.id, song?.albumId, song?.coverUrl, song?.dateModified, song?.fileSize, embeddedCover) {
+    val paletteBitmap by produceState<Bitmap?>(initialValue = null, songKey, embeddedCover) {
         value = withContext(Dispatchers.IO) {
             embeddedCover ?: song?.let { loadPaletteCoverBitmap(context, it) }
         }
@@ -53,10 +55,10 @@ internal fun rememberPlayerSongPresentationState(
     val lyricPalette by produceState(initialValue = paletteDefault, paletteBitmap, playerLight) {
         value = withContext(Dispatchers.Default) { PlayerPalette.fromLyricBackground(paletteBitmap, playerLight) }
     }
-    val audioInfo by produceState<AudioInfo?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
+    val audioInfo by produceState<AudioInfo?>(initialValue = null, songKey) {
         value = withContext(Dispatchers.IO) { song?.let(playerViewModel::getAudioInfo) }
     }
-    val tagInfo by produceState<SongTagInfo?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
+    val tagInfo by produceState<SongTagInfo?>(initialValue = null, songKey) {
         value = withContext(Dispatchers.IO) { song?.let(playerViewModel::getSongTagInfo) }
     }
     val neteaseInfo = remember(tagInfo?.neteaseKey) { decodeNeteaseKey(tagInfo?.neteaseKey.orEmpty()) }
@@ -81,3 +83,17 @@ internal fun rememberPlayerSongPresentationState(
         neteaseInfo = neteaseInfo
     )
 }
+
+private fun Song.presentationIdentityKey(): String =
+    listOf(
+        playlistIdentityKey(),
+        id,
+        albumId,
+        coverUrl,
+        dateModified,
+        fileSize,
+        title,
+        artist,
+        album,
+        duration
+    ).joinToString("|")

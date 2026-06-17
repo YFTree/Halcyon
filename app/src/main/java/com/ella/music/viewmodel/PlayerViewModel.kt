@@ -13,6 +13,7 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.data.model.shiftedBy
+import com.ella.music.data.parser.EllaLyricsParser
 import com.ella.music.data.repository.CoverUsage
 import com.ella.music.data.repository.MusicRepository
 import com.ella.music.player.DesktopLyricBridge
@@ -894,7 +895,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun LyricLine.withoutBlacklistedParts(rules: List<LyricBlacklistRule>): LyricLine? {
-        fun blocked(text: String?): Boolean = rules.any { it.matches(text) }
+        fun blocked(text: String?): Boolean =
+            text?.let {
+                EllaLyricsParser.isIgnorableRawLyricLine(it) || EllaLyricsParser.isPlaceholderOnlyLine(it)
+            } == true || rules.any { it.matches(text) }
         val textBlocked = blocked(text)
         val translationBlocked = blocked(translation)
         val pronunciationBlocked = blocked(pronunciation)
@@ -1223,7 +1227,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val current = currentSong.value ?: return
         viewModelScope.launch {
             val updated = updatedFromLibrary
-                ?.takeIf { it.id == current.id || it.path == current.path }
+                ?.takeIf { it.lyricIdentityKey() == current.lyricIdentityKey() }
                 ?: repository.refreshSongAfterExternalEdit(current)
                 ?: current
             repository.clearMetadataCache(current)

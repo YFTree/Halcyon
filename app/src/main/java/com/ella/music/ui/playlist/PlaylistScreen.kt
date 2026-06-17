@@ -53,6 +53,7 @@ import com.ella.music.ui.components.FloatingSelectionControls
 import com.ella.music.ui.components.LazyListScrollIndicator
 import com.ella.music.ui.components.SideIndexListEndPadding
 import com.ella.music.ui.components.SortDropdownItem
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.requestPinnedEllaShortcut
 import com.ella.music.ui.components.shareLocalSongs
 import com.ella.music.ui.components.ellaPageBackground
@@ -646,8 +647,14 @@ fun PlaylistScreen(
         CreatePlaylistDialog(
             onDismiss = { showCreateDialog = false },
             onCreate = { name ->
-                mainViewModel.createPlaylist(name)
-                showCreateDialog = false
+                if (name.isBlank()) return@CreatePlaylistDialog
+                mainViewModel.createPlaylist(name) { playlist ->
+                    if (playlist == null) {
+                        Toast.makeText(context, R.string.playlist_name_exists, Toast.LENGTH_SHORT).show()
+                    } else {
+                        showCreateDialog = false
+                    }
+                }
             }
         )
     }
@@ -799,8 +806,14 @@ fun PlaylistScreen(
         CreatePlaylistDialog(
             onDismiss = { playlistToRename = null },
             onCreate = { newName ->
-                mainViewModel.renamePlaylist(playlist.id, newName)
-                playlistToRename = null
+                if (newName.isBlank()) return@CreatePlaylistDialog
+                mainViewModel.renamePlaylist(playlist.id, newName) { renamed ->
+                    if (renamed) {
+                        playlistToRename = null
+                    } else {
+                        Toast.makeText(context, R.string.playlist_name_exists, Toast.LENGTH_SHORT).show()
+                    }
+                }
             },
             initialName = playlist.name,
             title = stringResource(R.string.common_rename),
@@ -841,10 +854,10 @@ fun PlaylistScreen(
         CreatePlaylistAndAddSheet(
             onDismiss = { createPlaylistSongs = null },
             onCreate = { playlistName ->
-                mainViewModel.createPlaylist(playlistName) { created ->
-                    if (created != null) mainViewModel.addSongsToPlaylist(created.id, songsToAdd)
+                mainViewModel.createPlaylistOrShowDuplicateToast(context, playlistName) { created ->
+                    mainViewModel.addSongsToPlaylist(created.id, songsToAdd)
+                    createPlaylistSongs = null
                 }
-                createPlaylistSongs = null
             }
         )
     }

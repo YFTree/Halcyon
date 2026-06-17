@@ -10,6 +10,7 @@ import com.ella.music.data.model.Song
 import com.ella.music.data.model.UserPlaylist
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.CreatePlaylistAndAddSheet
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.viewmodel.MainViewModel
 import top.yukonga.miuix.kmp.window.WindowBottomSheet
 
@@ -89,17 +90,15 @@ internal fun PlayerPlaylistSheets(
         CreatePlaylistAndAddSheet(
             onDismiss = { onCreatePlaylistSongChange(null) },
             onCreate = { name ->
-                mainViewModel.createPlaylist(name) { playlist ->
-                    if (playlist != null) {
-                        mainViewModel.addSongsToPlaylist(playlist.id, listOf(currentSong))
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.player_added_to_playlist_named, playlist.name),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
+                    mainViewModel.addSongsToPlaylist(playlist.id, listOf(currentSong))
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.player_added_to_playlist_named, playlist.name),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    onCreatePlaylistSongChange(null)
                 }
-                onCreatePlaylistSongChange(null)
             }
         )
     }
@@ -108,17 +107,15 @@ internal fun PlayerPlaylistSheets(
         CreatePlaylistAndAddSheet(
             onDismiss = { onCreatePlaylistSongsChange(null) },
             onCreate = { name ->
-                mainViewModel.createPlaylist(name) { playlist ->
-                    if (playlist != null) {
-                        mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.player_added_to_playlist_named, playlist.name),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { playlist ->
+                    mainViewModel.addSongsToPlaylist(playlist.id, songsToAdd)
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.player_added_to_playlist_named, playlist.name),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    onCreatePlaylistSongsChange(null)
                 }
-                onCreatePlaylistSongsChange(null)
             }
         )
     }

@@ -184,10 +184,10 @@ class MusicRepository(private val context: Context) {
 
     private val lyricsCache = ConcurrentHashMap<String, List<LyricLine>>()
     private val lyricFormatAvailabilityCache = ConcurrentHashMap<String, LyricFormatAvailability>()
-    private val audioInfoCache = ConcurrentHashMap<Long, AudioInfo>()
+    private val audioInfoCache = ConcurrentHashMap<String, AudioInfo>()
     private val tagInfoCache = ConcurrentHashMap<String, SongTagInfo>()
-    private val replayGainCache = ConcurrentHashMap<Long, Float>()
-    private val replayGainMissingCache = ConcurrentHashMap.newKeySet<Long>()
+    private val replayGainCache = ConcurrentHashMap<String, Float>()
+    private val replayGainMissingCache = ConcurrentHashMap.newKeySet<String>()
     private val coverArtCache = object : LruCache<String, ByteArray>(8 * 1024) {
         override fun sizeOf(key: String, value: ByteArray): Int = value.size / 1024
     }
@@ -621,7 +621,7 @@ class MusicRepository(private val context: Context) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
         val sourcePriority = settingsManager.lyricSourcePriority.first()
         val ignoreHeaderTags = settingsManager.ignoreLyricHeaderTags.first()
-        val cacheKey = "${song.id}:$safeMode:$sourcePriority:$ignoreHeaderTags"
+        val cacheKey = "${song.metadataCacheKey()}:lyrics:$safeMode:$sourcePriority:$ignoreHeaderTags"
         lyricsCache[cacheKey]?.let { return@withContext it }
 
         Log.d("MusicRepo", "Loading lyrics for: ${song.title} path=${song.path}")
@@ -731,14 +731,14 @@ class MusicRepository(private val context: Context) {
 
     suspend fun reloadLyrics(song: Song, sourceMode: Int): List<LyricLine> = withContext(Dispatchers.IO) {
         val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
-        val sourcePriority = settingsManager.lyricSourcePriority.first()
-        lyricsCache.removeKeysMatching { it.startsWith("${song.id}:$safeMode:$sourcePriority:") }
-        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith("${song.id}:availability:") }
+        val metadataPrefix = "${song.metadataCachePrefix()}:"
+        lyricsCache.removeKeysMatching { it.startsWith(metadataPrefix) }
+        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith(metadataPrefix) }
         getLyrics(song, safeMode)
     }
 
     suspend fun getLyricFormatAvailability(song: Song): LyricFormatAvailability = withContext(Dispatchers.IO) {
-        val cacheKey = "${song.id}:availability"
+        val cacheKey = "${song.metadataCacheKey()}:availability"
         lyricFormatAvailabilityCache[cacheKey]?.let { return@withContext it }
         val effectivePath = song.effectiveLocalPathForMetadata()
         val ignoreHeaderTags = settingsManager.ignoreLyricHeaderTags.first()
@@ -753,9 +753,9 @@ class MusicRepository(private val context: Context) {
     suspend fun reloadLyricsByFormat(song: Song, preferTtml: Boolean): List<LyricLine> = withContext(Dispatchers.IO) {
         val sourcePriority = settingsManager.lyricSourcePriority.first()
         val ignoreHeaderTags = settingsManager.ignoreLyricHeaderTags.first()
-        val cacheKey = "${song.id}:format:$preferTtml:$sourcePriority:$ignoreHeaderTags"
+        val cacheKey = "${song.metadataCacheKey()}:format:$preferTtml:$sourcePriority:$ignoreHeaderTags"
         lyricsCache.remove(cacheKey)
-        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith("${song.id}:availability:") }
+        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith("${song.metadataCachePrefix()}:") }
         val effectivePath = song.effectiveLocalPathForMetadata()
         val lyrics = orderedLyricSourceIds(sourcePriority, SettingsManager.LYRIC_SOURCE_AUTO)
             .filter { id ->
@@ -799,21 +799,23 @@ class MusicRepository(private val context: Context) {
     }
 
     fun getReplayGain(song: Song): Float? {
-        replayGainCache[song.id]?.let { return it }
-        if (replayGainMissingCache.contains(song.id)) return null
+        val cacheKey = song.metadataCacheKey()
+        replayGainCache[cacheKey]?.let { return it }
+        if (replayGainMissingCache.contains(cacheKey)) return null
         val gain = scanner.extractReplayGain(song.effectiveLocalPathForMetadata())
         if (gain == null) {
-            replayGainCache.remove(song.id)
-            replayGainMissingCache.add(song.id)
+            replayGainCache.remove(cacheKey)
+            replayGainMissingCache.add(cacheKey)
         } else {
-            replayGainCache[song.id] = gain
-            replayGainMissingCache.remove(song.id)
+            replayGainCache[cacheKey] = gain
+            replayGainMissingCache.remove(cacheKey)
         }
         return gain
     }
 
     fun getAudioInfo(song: Song): AudioInfo {
-        audioInfoCache[song.id]?.let { return it }
+        val cacheKey = song.metadataCacheKey()
+        audioInfoCache[cacheKey]?.let { return it }
         val replayGainDb = getReplayGain(song)
         val metadataPath = song.effectiveLocalPathForMetadata()
         val wavMetadata = WavMetadataReader.read(metadataPath)
@@ -828,7 +830,7 @@ class MusicRepository(private val context: Context) {
                 channels = quality.channels.takeIf { it > 0 } ?: wavMetadata?.channels ?: 0,
                 replayGainDb = replayGainDb
             )
-            audioInfoCache[song.id] = info
+            audioInfoCache[cacheKey] = info
             return info
         }
         wavMetadata?.takeIf { it.hasQuality }?.let { quality ->
@@ -840,7 +842,7 @@ class MusicRepository(private val context: Context) {
                 channels = quality.channels,
                 replayGainDb = replayGainDb
             )
-            audioInfoCache[song.id] = info
+            audioInfoCache[cacheKey] = info
             return info
         }
         val info = runCatching {
@@ -879,12 +881,12 @@ class MusicRepository(private val context: Context) {
             Log.w("MusicRepo", "Failed to read audio info for ${song.path}", it)
             AudioInfo(format = song.audioFormatLabel(null), replayGainDb = replayGainDb)
         }
-        audioInfoCache[song.id] = info
+        audioInfoCache[cacheKey] = info
         return info
     }
 
     fun getSongTagInfo(song: Song): SongTagInfo {
-        val cacheKey = "${song.id}:${song.dateModified}:${song.fileSize}"
+        val cacheKey = song.metadataCacheKey()
         tagInfoCache[cacheKey]?.let { return it }
         val info = runCatching {
             audioTagRepository.readTagsBlocking(song.effectiveLocalPathForMetadata())?.toSongTagInfo() ?: SongTagInfo()
@@ -1551,12 +1553,13 @@ class MusicRepository(private val context: Context) {
     }
 
     fun clearMetadataCache(song: Song) {
-        lyricsCache.removeKeysMatching { it.startsWith("${song.id}:") }
-        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith("${song.id}:") }
-        audioInfoCache.remove(song.id)
-        tagInfoCache.removeKeysMatching { it.startsWith("${song.id}:") }
-        replayGainCache.remove(song.id)
-        replayGainMissingCache.remove(song.id)
+        val metadataPrefix = "${song.metadataCachePrefix()}:"
+        lyricsCache.removeKeysMatching { it.startsWith(metadataPrefix) || it.startsWith("${song.id}:") }
+        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith(metadataPrefix) || it.startsWith("${song.id}:") }
+        audioInfoCache.removeKeysMatching { it.startsWith(metadataPrefix) }
+        tagInfoCache.removeKeysMatching { it.startsWith(metadataPrefix) || it.startsWith("${song.id}:") }
+        replayGainCache.removeKeysMatching { it.startsWith(metadataPrefix) }
+        replayGainMissingCache.removeIf { it.startsWith(metadataPrefix) }
         ensureRatingSnapshotLoaded()
         ratingSnapshotCache.keys.removeAll { it == song.searchSnapshotKey() || it.startsWith("${song.id}|") }
         ratingSnapshotDirty = true
@@ -1923,6 +1926,18 @@ class MusicRepository(private val context: Context) {
 
     private fun Song.coverDataCacheKey(): String =
         "${coverCacheKey()}:$dateModified:$fileSize"
+
+    private fun Song.metadataCachePrefix(): String {
+        val source = when {
+            path.isNotBlank() -> "path:$path"
+            onlineSource.isNotBlank() || onlineId.isNotBlank() -> "online:$onlineSource:$onlineId:$path"
+            else -> "media:$id:$title:$artist:$album:$duration"
+        }
+        return source.sha256()
+    }
+
+    private fun Song.metadataCacheKey(): String =
+        "${metadataCachePrefix()}:$dateModified:$fileSize"
 
     private fun Song.searchSnapshotKey(): String =
         "${id}|${path.sha256()}"

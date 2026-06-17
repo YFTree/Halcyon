@@ -51,6 +51,7 @@ import com.ella.music.data.BottomBarGlassEffect
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.FAVORITES_PLAYLIST_ID
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.CompactMiniPlayer
 import com.ella.music.ui.components.CreatePlaylistAndAddSheet
@@ -58,6 +59,7 @@ import com.ella.music.ui.components.GlassPill
 import com.ella.music.ui.components.LiquidGlassBottomBar
 import com.ella.music.ui.components.LiquidGlassBottomBarItem
 import com.ella.music.ui.components.MiniPlayer
+import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.simpleLuminance
 import com.ella.music.ui.navigation.Screen
 import com.ella.music.viewmodel.MainViewModel
@@ -117,7 +119,7 @@ internal fun FloatingBottomControls(
     val shuffleEnabled by playerViewModel.shuffleEnabled.collectAsState()
     val repeatMode by playerViewModel.repeatMode.collectAsState()
     val userPlaylists by mainViewModel.playlists.collectAsState()
-    val currentSongId = currentSong?.id
+    val currentSongKey = currentSong?.playlistIdentityKey()
     val effectiveMode = if (showMiniPlayer && canCompact) bottomDockMode else BottomDockMode.Expanded
     AnimatedContent(
         targetState = effectiveMode,
@@ -250,7 +252,7 @@ internal fun FloatingBottomControls(
         ) {
             com.ella.music.ui.player.PlayerQueueMenu(
                 playlist = playlist,
-                currentSongId = currentSongId,
+                currentSongKey = currentSongKey,
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
                 onCyclePlaybackMode = { playerViewModel.cyclePlaybackMode() },
@@ -309,17 +311,15 @@ internal fun FloatingBottomControls(
         CreatePlaylistAndAddSheet(
             onDismiss = { queueSongsForNewPlaylist = null },
             onCreate = { name ->
-                mainViewModel.createPlaylist(name) { target ->
-                    if (target != null) {
-                        mainViewModel.addSongsToPlaylist(target.id, songsToAdd)
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.player_added_to_playlist_named, target.name),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                mainViewModel.createPlaylistOrShowDuplicateToast(context, name) { target ->
+                    mainViewModel.addSongsToPlaylist(target.id, songsToAdd)
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.player_added_to_playlist_named, target.name),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    queueSongsForNewPlaylist = null
                 }
-                queueSongsForNewPlaylist = null
             }
         )
     }

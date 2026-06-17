@@ -170,11 +170,12 @@ fun PlayerScreen(
     val lyricSecondaryFontScale = lyricFontState.secondaryFontScale
     val lyricShareTypeface = lyricFontState.shareTypeface
     val currentSong by playerViewModel.currentSong.collectAsState()
+    val currentSongKey = remember(currentSong) { currentSong?.playlistIdentityKey() }
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val currentPosition = rememberThrottledPlayerPosition(
         positionFlow = playerViewModel.currentPosition,
         isPlaying = isPlaying,
-        anchorKey = currentSong?.id,
+        anchorKey = currentSongKey,
         livePositionProvider = playerViewModel::livePositionMs
     )
     val duration by playerViewModel.duration.collectAsState()

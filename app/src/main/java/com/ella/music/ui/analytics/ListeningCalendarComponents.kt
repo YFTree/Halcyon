@@ -36,6 +36,7 @@ import com.ella.music.R
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
+import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -144,7 +145,8 @@ internal fun ListeningDayDetailSection(
 
     val representativeSong = day.representativeSong
     val playableSongs = remember(day.entries) { day.entries.mapNotNull { it.song } }
-    val coverBitmap by produceState<Bitmap?>(initialValue = null, representativeSong?.id, day.dateKey) {
+    val representativeSongKey = remember(representativeSong) { representativeSong?.listeningIdentityKey() }
+    val coverBitmap by produceState<Bitmap?>(initialValue = null, representativeSongKey, day.dateKey) {
         value = withContext(Dispatchers.IO) {
             representativeSong?.let(mainViewModel::getAlbumCoverArtBitmap)
         }
@@ -305,14 +307,15 @@ private fun ListeningTimelineRow(
 ) {
     val song = entry.song
     val canPlaySong = remember(song) { song?.isPlayableCalendarSong() == true }
-    val coverBitmap by produceState<Bitmap?>(initialValue = null, song?.id, entry.entry.playedAt) {
+    val songKey = remember(song) { song?.listeningIdentityKey() }
+    val coverBitmap by produceState<Bitmap?>(initialValue = null, songKey, entry.entry.playedAt) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 song?.takeIf { canPlaySong }?.let(mainViewModel::getCoverArtBitmap)
             }.getOrNull()
         }
     }
-    val audioInfo by produceState<AudioInfo?>(initialValue = null, song?.id) {
+    val audioInfo by produceState<AudioInfo?>(initialValue = null, songKey) {
         value = withContext(Dispatchers.IO) {
             song?.takeIf { canPlaySong }?.let(mainViewModel::getAudioInfo)
         }
@@ -449,3 +452,17 @@ private fun Song.isPlayableCalendarSong(): Boolean {
     if (path.startsWith("content://", ignoreCase = true)) return true
     return path.isNotBlank() && File(path).exists()
 }
+
+private fun Song.listeningIdentityKey(): String =
+    listOf(
+        playlistIdentityKey(),
+        id,
+        albumId,
+        coverUrl,
+        dateModified,
+        fileSize,
+        title,
+        artist,
+        album,
+        duration
+    ).joinToString("|")

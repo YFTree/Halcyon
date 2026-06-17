@@ -60,6 +60,9 @@ internal object EllaLyricsParser {
                 companionTargetIndexes = emptyList()
                 return@forEach
             }
+            if (isIgnorableRawLyricLine(line)) {
+                return@forEach
+            }
 
             val parsed = parseLrcLine(line)
             if (parsed.isNotEmpty()) {
@@ -879,7 +882,7 @@ internal object EllaLyricsParser {
             .trim()
 
     fun isPlaceholderOnlyLine(line: String): Boolean =
-        line.cleanLyricText()
+        lrcTimePattern.replace(line.cleanLyricText(), "")
             .replace(Regex("""\s+"""), "")
             .let { it == "//" || it == "／／" }
 
@@ -888,6 +891,7 @@ internal object EllaLyricsParser {
         if (trimmed.isBlank()) return true
         if (lrcGenericMetaPattern.matches(trimmed)) return true
         val withoutTimes = lrcTimePattern.replace(trimmed, "").trim()
+        if (isPlaceholderOnlyLine(trimmed)) return true
         return withoutTimes != trimmed && (
             withoutTimes.isBlank() ||
                 isPlaceholderOnlyLine(withoutTimes)
