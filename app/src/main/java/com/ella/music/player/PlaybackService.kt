@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
+import androidx.media3.common.AuxEffectInfo
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
@@ -225,19 +226,26 @@ class PlaybackService : MediaLibraryService() {
         player.repeatMode = Player.REPEAT_MODE_ALL
         PlaybackAudioSession.update(player.audioSessionId)
         audioEffectController.bind(player.audioSessionId)
+        player.applyReverbAuxEffect()
         serviceScope.launch {
             PlaybackAudioSession.audioSessionId.collect { sessionId ->
-                if (sessionId > 0) audioEffectController.bind(sessionId)
+                if (sessionId > 0) {
+                    audioEffectController.bind(sessionId)
+                    player.applyReverbAuxEffect()
+                }
             }
         }
         serviceScope.launch {
             settingsManager.audioEffectSettings.collect { settings ->
                 audioEffectController.apply(settings)
+                player.applyReverbAuxEffect()
             }
         }
         player.addListener(object : Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
                 PlaybackAudioSession.update(audioSessionId)
+                audioEffectController.bind(audioSessionId)
+                player.applyReverbAuxEffect()
                 if (player.isPlaying) openAudioEffectSession(audioSessionId)
             }
 
@@ -246,6 +254,7 @@ class PlaybackService : MediaLibraryService() {
                     // Retry attaching effects now that the audio track is live: some ROMs
                     // (e.g. ColorOS/OxygenOS) reject Equalizer creation before playback starts.
                     audioEffectController.bind(player.audioSessionId)
+                    player.applyReverbAuxEffect()
                     openAudioEffectSession(player.audioSessionId)
                 } else {
                     closeAudioEffectSession()
@@ -275,6 +284,7 @@ class PlaybackService : MediaLibraryService() {
                         Log.d(TIMING_TAG, "player state READY mediaId=${player.currentMediaItem?.mediaId}")
                         // Audio track exists once READY; retry effect attach for ROMs that reject it earlier.
                         audioEffectController.bind(player.audioSessionId)
+                        player.applyReverbAuxEffect()
                         scheduleOplusLyricInfoRefreshBurst(player)
                     }
                     Player.STATE_ENDED -> Log.d(TIMING_TAG, "player state ENDED mediaId=${player.currentMediaItem?.mediaId}")
@@ -385,6 +395,16 @@ class PlaybackService : MediaLibraryService() {
             putExtra(AudioEffect.EXTRA_PACKAGE_NAME, packageName)
         })
         openedAudioEffectSessionId = -1
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun ExoPlayer.applyReverbAuxEffect() {
+        val info = audioEffectController.reverbAuxEffectInfo()
+        if (info == null) {
+            clearAuxEffectInfo()
+        } else {
+            setAuxEffectInfo(AuxEffectInfo(info.effectId, info.sendLevel))
+        }
     }
 
     fun handleNotificationCustomAction(action: String): Boolean {
@@ -701,9 +721,10 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun MediaItem.matchesSong(song: Song): Boolean {
-        if (song.id > 0L && mediaId == song.id.toString()) return true
         val itemSong = toSongFromMediaItemExtras()
         if (itemSong != null) return itemSong.isSamePlaybackIdentity(song)
+        if (song.path.isNotBlank() && localConfiguration?.uri?.toString().orEmpty() == song.path) return true
+        if (song.id > 0L && mediaId == song.id.toString()) return true
         return localConfiguration?.uri?.toString().orEmpty() == song.path
     }
 
@@ -1167,17 +1188,10 @@ class PlaybackService : MediaLibraryService() {
             } else {
                 Math.floorMod(index + offset, mediaItemCount)
             }
-            reopenQueueAt(targetIndex)
+            seekToDefaultPosition(targetIndex)
+            play()
             onExternalPlaybackChanged()
             return true
-        }
-
-        private fun reopenQueueAt(targetIndex: Int) {
-            val items = (0 until mediaItemCount).map { getMediaItemAt(it) }
-            if (items.isEmpty()) return
-            setMediaItems(items, targetIndex.coerceIn(items.indices), 0L)
-            prepare()
-            play()
         }
     }
 
