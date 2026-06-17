@@ -888,11 +888,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun List<LyricLine>.filterBlacklistedLyricLines(): List<LyricLine> {
-        val rules = lyricBlacklistRules
-        if (isEmpty() || rules.isEmpty()) return this
-        return mapNotNull { line -> line.withoutBlacklistedParts(rules) }
-    }
+    private fun List<LyricLine>.filterBlacklistedLyricLines(): List<LyricLine> =
+        filterBlacklistedLyricLines(lyricBlacklistRules)
 
     private fun LyricLine.withoutBlacklistedParts(rules: List<LyricBlacklistRule>): LyricLine? {
         fun blocked(text: String?): Boolean =
@@ -942,7 +939,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun List<LyricLine>.preparedForDisplay(): List<LyricLine> =
-        filterBlacklistedLyricLines().withImplicitLineEndTimes()
+        preparedForDisplay(lyricBlacklistRules)
 
     private fun List<LyricLine>.withImplicitLineEndTimes(): List<LyricLine> {
         if (isEmpty()) return this
@@ -960,16 +957,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 line
             }
-        }
-    }
-
-    private class LyricBlacklistRule(rawRule: String) {
-        private val raw = rawRule.trim()
-        private val regex = runCatching { Regex(raw, RegexOption.IGNORE_CASE) }.getOrNull()
-
-        fun matches(text: String?): Boolean {
-            if (raw.isEmpty() || text.isNullOrBlank()) return false
-            return regex?.containsMatchIn(text) ?: text.contains(raw, ignoreCase = true)
         }
     }
 

@@ -412,6 +412,50 @@ class SettingsManager(private val context: Context) {
     private fun String.safePreferenceSuffix(): String =
         lowercase().replace(Regex("[^a-z0-9_]+"), "_").trim('_').ifBlank { "unknown" }
 
+    private val desktopLyricSettings = DesktopLyricSettings(context.dataStore)
+
+    val desktopLyricEnabled get() = desktopLyricSettings.desktopLyricEnabled
+    val desktopLyricHideWhenPaused get() = desktopLyricSettings.desktopLyricHideWhenPaused
+    val desktopLyricStatusBarMode get() = desktopLyricSettings.desktopLyricStatusBarMode
+    val desktopLyricWidth get() = desktopLyricSettings.desktopLyricWidth
+    val desktopLyricStatusBarTopOffset get() = desktopLyricSettings.desktopLyricStatusBarTopOffset
+    val desktopLyricStatusBarPosition get() = desktopLyricSettings.desktopLyricStatusBarPosition
+    val desktopLyricStatusBarWidth get() = desktopLyricSettings.desktopLyricStatusBarWidth
+    val desktopLyricStatusBarXOffset get() = desktopLyricSettings.desktopLyricStatusBarXOffset
+    val desktopLyricStatusBarTextAlign get() = desktopLyricSettings.desktopLyricStatusBarTextAlign
+    val desktopLyricStatusBarVerticalAlign get() = desktopLyricSettings.desktopLyricStatusBarVerticalAlign
+    val desktopLyricStatusBarSecondary get() = desktopLyricSettings.desktopLyricStatusBarSecondary
+    val desktopLyricStatusBarSecondaryOpacity get() = desktopLyricSettings.desktopLyricStatusBarSecondaryOpacity
+    val desktopLyricStatusBarMergeSecondary get() = desktopLyricSettings.desktopLyricStatusBarMergeSecondary
+    val desktopLyricLocked get() = desktopLyricSettings.desktopLyricLocked
+    val desktopLyricFontScale get() = desktopLyricSettings.desktopLyricFontScale
+    val desktopLyricTranslationScale get() = desktopLyricSettings.desktopLyricTranslationScale
+    val desktopLyricOpacity get() = desktopLyricSettings.desktopLyricOpacity
+    val desktopLyricTextColor get() = desktopLyricSettings.desktopLyricTextColor
+    val desktopLyricX get() = desktopLyricSettings.desktopLyricX
+    val desktopLyricY get() = desktopLyricSettings.desktopLyricY
+
+    suspend fun setDesktopLyricEnabled(enabled: Boolean) = desktopLyricSettings.setDesktopLyricEnabled(enabled)
+    suspend fun setDesktopLyricHideWhenPaused(enabled: Boolean) = desktopLyricSettings.setDesktopLyricHideWhenPaused(enabled)
+    suspend fun setDesktopLyricStatusBarMode(enabled: Boolean) = desktopLyricSettings.setDesktopLyricStatusBarMode(enabled)
+    suspend fun setDesktopLyricWidth(widthPercent: Int) = desktopLyricSettings.setDesktopLyricWidth(widthPercent)
+    suspend fun setDesktopLyricStatusBarTopOffset(offsetDp: Int) = desktopLyricSettings.setDesktopLyricStatusBarTopOffset(offsetDp)
+    suspend fun setDesktopLyricStatusBarPosition(position: Int) = desktopLyricSettings.setDesktopLyricStatusBarPosition(position)
+    suspend fun setDesktopLyricStatusBarWidth(widthPercent: Int) = desktopLyricSettings.setDesktopLyricStatusBarWidth(widthPercent)
+    suspend fun setDesktopLyricStatusBarXOffset(offsetDp: Int) = desktopLyricSettings.setDesktopLyricStatusBarXOffset(offsetDp)
+    suspend fun setDesktopLyricStatusBarTextAlign(align: Int) = desktopLyricSettings.setDesktopLyricStatusBarTextAlign(align)
+    suspend fun setDesktopLyricStatusBarVerticalAlign(align: Int) = desktopLyricSettings.setDesktopLyricStatusBarVerticalAlign(align)
+    suspend fun setDesktopLyricStatusBarSecondary(mode: Int) = desktopLyricSettings.setDesktopLyricStatusBarSecondary(mode)
+    suspend fun setDesktopLyricStatusBarSecondaryOpacity(opacity: Int) = desktopLyricSettings.setDesktopLyricStatusBarSecondaryOpacity(opacity)
+    suspend fun setDesktopLyricStatusBarMergeSecondary(enabled: Boolean) = desktopLyricSettings.setDesktopLyricStatusBarMergeSecondary(enabled)
+    suspend fun setDesktopLyricLocked(locked: Boolean) = desktopLyricSettings.setDesktopLyricLocked(locked)
+    suspend fun setDesktopLyricFontScale(scale: Int) = desktopLyricSettings.setDesktopLyricFontScale(scale)
+    suspend fun setDesktopLyricTranslationScale(scale: Int) = desktopLyricSettings.setDesktopLyricTranslationScale(scale)
+    suspend fun setDesktopLyricOpacity(opacity: Int) = desktopLyricSettings.setDesktopLyricOpacity(opacity)
+    suspend fun setDesktopLyricTextColor(color: Int) = desktopLyricSettings.setDesktopLyricTextColor(color)
+    suspend fun setDesktopLyricPosition(x: Int, y: Int) = desktopLyricSettings.setDesktopLyricPosition(x, y)
+    suspend fun resetDesktopLyricPosition() = desktopLyricSettings.resetDesktopLyricPosition()
+
     val lyriconEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_ENABLED] ?: false }
     val lyriconTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_TRANSLATION] ?: true }
     val lyriconPronunciation: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRICON_PRONUNCIATION] ?: false }
@@ -445,39 +489,6 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_SAMSUNG_FLOATING_LYRIC_TRANSLATION] ?: false }
     val statusBarAllowPhonetic: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_STATUS_BAR_ALLOW_PHONETIC] ?: false }
-    val desktopLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_ENABLED] ?: false }
-    val desktopLyricHideWhenPaused: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED] ?: true }
-    val desktopLyricStatusBarMode: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MODE] ?: false }
-    val desktopLyricWidth: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_WIDTH] ?: 72).coerceIn(40, 100) }
-    val desktopLyricStatusBarTopOffset: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_TOP_OFFSET] ?: 16).coerceIn(0, 120) }
-    val desktopLyricStatusBarPosition: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_POSITION] ?: DESKTOP_LYRIC_STATUS_POSITION_CENTER).coerceIn(0, 2) }
-    val desktopLyricStatusBarWidth: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_WIDTH] ?: 72).coerceIn(40, 100) }
-    val desktopLyricStatusBarXOffset: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_X_OFFSET] ?: 0).coerceIn(-640, 640) }
-    val desktopLyricStatusBarTextAlign: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN] ?: DESKTOP_LYRIC_STATUS_ALIGN_LEFT).coerceIn(0, 2) }
-    val desktopLyricStatusBarVerticalAlign: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN] ?: DESKTOP_LYRIC_STATUS_VERTICAL_TOP).coerceIn(0, 2) }
-    val desktopLyricStatusBarSecondary: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY] ?: DESKTOP_LYRIC_STATUS_SECONDARY_OFF).coerceIn(0, 2) }
-    val desktopLyricStatusBarSecondaryOpacity: Flow<Int> =
-        context.dataStore.data.map { (it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY_OPACITY] ?: 67).coerceIn(20, 100) }
-    val desktopLyricStatusBarMergeSecondary: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MERGE_SECONDARY] ?: false }
-    val desktopLyricLocked: Flow<Boolean> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_LOCKED] ?: false }
-    val desktopLyricFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_FONT_SCALE] ?: 100 }
-    val desktopLyricTranslationScale: Flow<Int> =
-        context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_TRANSLATION_SCALE] ?: 90 }
-    val desktopLyricOpacity: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_OPACITY] ?: 100 }
-    val desktopLyricTextColor: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_TEXT_COLOR] ?: -1 }
-    val desktopLyricX: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_X] ?: Int.MIN_VALUE }
-    val desktopLyricY: Flow<Int> = context.dataStore.data.map { it[KEY_DESKTOP_LYRIC_Y] ?: Int.MIN_VALUE }
     val superLyricEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_SUPER_LYRIC_ENABLED] ?: false }
     val superLyricTranslation: Flow<Boolean> = context.dataStore.data.map { it[KEY_SUPER_LYRIC_TRANSLATION] ?: true }
     val superLyricPronunciation: Flow<Boolean> = context.dataStore.data.map { it[KEY_SUPER_LYRIC_PRONUNCIATION] ?: false }
@@ -880,42 +891,6 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_STATUS_BAR_ALLOW_PHONETIC] = enabled }
     }
 
-    suspend fun setDesktopLyricEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_ENABLED] = enabled }
-    }
-
-    suspend fun setDesktopLyricHideWhenPaused(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_HIDE_WHEN_PAUSED] = enabled }
-    }
-
-    suspend fun setDesktopLyricStatusBarMode(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MODE] = enabled }
-    }
-
-    suspend fun setDesktopLyricWidth(widthPercent: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_WIDTH] = widthPercent.coerceIn(40, 100) }
-    }
-
-    suspend fun setDesktopLyricStatusBarTopOffset(offsetDp: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_TOP_OFFSET] = offsetDp.coerceIn(0, 120) }
-    }
-
-    suspend fun setDesktopLyricStatusBarPosition(position: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_POSITION] = position.coerceIn(0, 2) }
-    }
-
-    suspend fun setDesktopLyricStatusBarWidth(widthPercent: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_WIDTH] = widthPercent.coerceIn(40, 100) }
-    }
-
-    suspend fun setDesktopLyricStatusBarXOffset(offsetDp: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_X_OFFSET] = offsetDp.coerceIn(-640, 640) }
-    }
-
-    suspend fun setDesktopLyricStatusBarTextAlign(align: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_TEXT_ALIGN] = align.coerceIn(0, 2) }
-    }
-
     suspend fun setPlayerLyricTextAlign(align: Int) {
         context.dataStore.edit { it[KEY_PLAYER_LYRIC_TEXT_ALIGN] = align.coerceIn(0, 2) }
     }
@@ -933,56 +908,6 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setIgnoreLyricHeaderTags(enabled: Boolean) {
         context.dataStore.edit { it[KEY_IGNORE_LYRIC_HEADER_TAGS] = enabled }
-    }
-
-    suspend fun setDesktopLyricStatusBarVerticalAlign(align: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_VERTICAL_ALIGN] = align.coerceIn(0, 2) }
-    }
-
-    suspend fun setDesktopLyricStatusBarSecondary(mode: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY] = mode.coerceIn(0, 2) }
-    }
-
-    suspend fun setDesktopLyricStatusBarSecondaryOpacity(opacity: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_SECONDARY_OPACITY] = opacity.coerceIn(20, 100) }
-    }
-
-    suspend fun setDesktopLyricStatusBarMergeSecondary(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_STATUS_BAR_MERGE_SECONDARY] = enabled }
-    }
-
-    suspend fun setDesktopLyricLocked(locked: Boolean) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_LOCKED] = locked }
-    }
-
-    suspend fun setDesktopLyricFontScale(scale: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_FONT_SCALE] = scale.coerceIn(80, 220) }
-    }
-
-    suspend fun setDesktopLyricTranslationScale(scale: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_TRANSLATION_SCALE] = scale.coerceIn(80, 220) }
-    }
-
-    suspend fun setDesktopLyricOpacity(opacity: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_OPACITY] = opacity.coerceIn(35, 100) }
-    }
-
-    suspend fun setDesktopLyricTextColor(color: Int) {
-        context.dataStore.edit { it[KEY_DESKTOP_LYRIC_TEXT_COLOR] = color }
-    }
-
-    suspend fun setDesktopLyricPosition(x: Int, y: Int) {
-        context.dataStore.edit {
-            it[KEY_DESKTOP_LYRIC_X] = x
-            it[KEY_DESKTOP_LYRIC_Y] = y
-        }
-    }
-
-    suspend fun resetDesktopLyricPosition() {
-        context.dataStore.edit {
-            it.remove(KEY_DESKTOP_LYRIC_X)
-            it.remove(KEY_DESKTOP_LYRIC_Y)
-        }
     }
 
     suspend fun setSuperLyricEnabled(enabled: Boolean) {

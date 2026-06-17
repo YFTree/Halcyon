@@ -90,29 +90,6 @@ data class MusicScanSummary(
     val fullRescan: Boolean = false
 )
 
-private data class RatingSnapshotEntry(
-    val rating: Int,
-    val dateModified: Long,
-    val fileSize: Long
-)
-
-private sealed class CoverDataState {
-    data object Found : CoverDataState()
-    data object Missing : CoverDataState()
-    data class Error(val message: String?) : CoverDataState()
-}
-
-private val embeddedArtworkThumbnailExtensions = setOf(
-    "m4a",
-    "mp4",
-    "alac",
-    "flac",
-    "wav",
-    "wave",
-    "aif",
-    "aiff"
-)
-
 private val LOCAL_AUDIO_EXTENSIONS = setOf(
     "mp3",
     "flac",
@@ -195,35 +172,20 @@ class MusicRepository(private val context: Context) {
         _isScanning.value = false
     }
 
-    private val lyricsCache = ConcurrentHashMap<String, List<LyricLine>>()
-    private val lyricFormatAvailabilityCache = ConcurrentHashMap<String, LyricFormatAvailability>()
+    private val remoteAudioCacheDir = File(context.cacheDir, "webdav_audio")
+    private val remoteMetadataHeaderCacheDir = File(context.cacheDir, "webdav_metadata_headers")
+    private val lyricsManager = MusicLyricsManager(context, settingsManager, audioTagRepository, httpClient, remoteAudioCacheDir, remoteMetadataHeaderCacheDir)
+    private val coverArtManager = MusicCoverArtManager(context, audioTagRepository, settingsManager, httpClient, remoteAudioCacheDir, remoteMetadataHeaderCacheDir)
+    private val snapshotManager = MusicSnapshotManager(
+        File(context.filesDir, "library_search_snapshot.json"),
+        File(context.filesDir, "library_rating_snapshot.json")
+    ) { song -> song.searchableTagValues(getSongTagInfo(song)).joinToString(separator = "\n").lowercase() }
+
     private val audioInfoCache = ConcurrentHashMap<String, AudioInfo>()
     private val tagInfoCache = ConcurrentHashMap<String, SongTagInfo>()
     private val replayGainCache = ConcurrentHashMap<String, Float>()
     private val replayGainMissingCache = ConcurrentHashMap.newKeySet<String>()
-    private val coverArtCache = object : LruCache<String, ByteArray>(8 * 1024) {
-        override fun sizeOf(key: String, value: ByteArray): Int = value.size / 1024
-    }
-    private val coverBitmapCache = object : LruCache<String, Bitmap>(16 * 1024) {
-        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
-    }
-    private val coverArtLock = Any()
-    private val coverDataStates = ConcurrentHashMap<String, CoverDataState>()
     private val libraryCacheFile = File(context.filesDir, "music_library_cache.json")
-    private val librarySearchSnapshotFile = File(context.filesDir, "library_search_snapshot.json")
-    private val libraryRatingSnapshotFile = File(context.filesDir, "library_rating_snapshot.json")
-    private val searchTextCache = ConcurrentHashMap<String, String>()
-    private val ratingSnapshotCache = ConcurrentHashMap<String, RatingSnapshotEntry>()
-    @Volatile
-    private var searchSnapshotLoaded = false
-    @Volatile
-    private var searchSnapshotDirty = false
-    @Volatile
-    private var ratingSnapshotLoaded = false
-    @Volatile
-    private var ratingSnapshotDirty = false
-    private val remoteAudioCacheDir = File(context.cacheDir, "webdav_audio")
-    private val remoteMetadataHeaderCacheDir = File(context.cacheDir, "webdav_metadata_headers")
 
     suspend fun scanMusic(
         minDurationMs: Long = 0,
@@ -594,186 +556,13 @@ class MusicRepository(private val context: Context) {
     suspend fun getLyrics(
         song: Song,
         sourceMode: Int = SettingsManager.LYRIC_SOURCE_AUTO
-    ): List<LyricLine> = withContext(Dispatchers.IO) {
-        val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
-        val sourcePriority = settingsManager.lyricSourcePriority.first()
-        val ignoreHeaderTags = settingsManager.ignoreLyricHeaderTags.first()
-        val cacheKey = "${song.metadataCacheKey()}:lyrics:$safeMode:$sourcePriority:$ignoreHeaderTags"
-        lyricsCache[cacheKey]?.let { return@withContext it }
+    ): List<LyricLine> = lyricsManager.getLyrics(song, sourceMode)
 
-        Log.d("MusicRepo", "Loading lyrics for: ${song.title} path=${song.path}")
+    suspend fun reloadLyrics(song: Song, sourceMode: Int): List<LyricLine> = lyricsManager.reloadLyrics(song, sourceMode)
 
-        if (safeMode == SettingsManager.LYRIC_SOURCE_AUTO) {
-            fetchOnlineLyrics(song)?.let { onlineLyrics ->
-                lyricsCache[cacheKey] = onlineLyrics
-                return@withContext onlineLyrics
-            }
-        }
+    suspend fun getLyricFormatAvailability(song: Song): LyricFormatAvailability = lyricsManager.getLyricFormatAvailability(song)
 
-        val effectivePath = song.effectiveLocalPathForMetadata()
-        for (sourceId in orderedLyricSourceIds(sourcePriority, safeMode)) {
-            loadLyricsBySourceId(song, effectivePath, sourceId, ignoreHeaderTags)?.let { lyrics ->
-                lyricsCache[cacheKey] = lyrics
-                return@withContext lyrics
-            }
-        }
-
-        Log.d("MusicRepo", "No lyrics found for ${song.title}")
-        lyricsCache[cacheKey] = emptyList()
-        emptyList()
-    }
-
-    private fun orderedLyricSourceIds(priority: String, sourceMode: Int): List<String> {
-        val ordered = SettingsManager.normalizeLyricSourcePriority(priority).split(',')
-        return when (sourceMode) {
-            SettingsManager.LYRIC_SOURCE_EXTERNAL -> ordered.filter {
-                it == SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML ||
-                    it == SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN
-            }
-            SettingsManager.LYRIC_SOURCE_EMBEDDED -> ordered.filter {
-                it == SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML ||
-                    it == SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN
-            }
-            else -> ordered
-        }
-    }
-
-    private fun loadLyricsBySourceId(
-        song: Song,
-        effectivePath: String,
-        sourceId: String,
-        ignoreHeaderTags: Boolean
-    ): List<LyricLine>? {
-        return when (sourceId) {
-            SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML ->
-                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true, ignoreHeaderTags = ignoreHeaderTags)
-            SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN ->
-                loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false, ignoreHeaderTags = ignoreHeaderTags)
-            SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML ->
-                loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
-            SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN ->
-                loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
-            else -> null
-        }
-    }
-
-    private fun loadExternalLyricsByFormat(
-        song: Song,
-        effectivePath: String,
-        preferTtml: Boolean
-    ): List<LyricLine>? {
-        val content = findExternalLyricContentByFormat(effectivePath, preferTtml) ?: return null
-        val parsed = LrcParser.parse(content)
-        val lyrics = parsed.lyrics.takeIf { it.isNotEmpty() } ?: return null
-        return lyrics.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
-            .also { Log.d("MusicRepo", "External lyric format ${if (preferTtml) "TTML" else "LRC/ELRC"} parsed: ${lyrics.size} lines for ${song.title}") }
-    }
-
-    private fun loadEmbeddedLyricsByFormat(
-        song: Song,
-        effectivePath: String,
-        preferTtml: Boolean,
-        ignoreHeaderTags: Boolean
-    ): List<LyricLine>? {
-        val embedded = audioTagRepository.readTagsBlocking(effectivePath)
-            ?.embeddedLyricsContent(preferTtml = preferTtml)
-            ?: return null
-        val parsed = parseEmbeddedLyrics(song, embedded, ignoreHeaderTags) ?: return null
-        return parsed.takeIf { lines -> lines.any { it.isTtml } == preferTtml }
-    }
-
-    private fun parseEmbeddedLyrics(
-        song: Song,
-        embedded: String,
-        ignoreHeaderTags: Boolean
-    ): List<LyricLine>? {
-        val parsed = LrcParser.parse(embedded)
-        if (parsed.lyrics.isNotEmpty()) {
-            Log.d("MusicRepo", "Embedded lyrics parsed: ${parsed.lyrics.size} lines for ${song.title}")
-            return parsed.lyrics
-        }
-
-        Log.d("MusicRepo", "Embedded lyrics not synchronized format, using plain text")
-        val result = mutableListOf<LyricLine>()
-        var timeOffset = 0L
-        embedded.lines().forEach { line ->
-            val trimmed = line.trim()
-            if (trimmed.isNotEmpty() && (!ignoreHeaderTags || !EllaLyricsParser.isIgnorableRawLyricLine(trimmed))) {
-                result.add(LyricLine(timeMs = timeOffset, text = trimmed, words = emptyList()))
-                timeOffset += 3000L
-            }
-        }
-        return result.takeIf { it.isNotEmpty() }
-    }
-
-    suspend fun reloadLyrics(song: Song, sourceMode: Int): List<LyricLine> = withContext(Dispatchers.IO) {
-        val safeMode = sourceMode.coerceIn(SettingsManager.LYRIC_SOURCE_AUTO, SettingsManager.LYRIC_SOURCE_EMBEDDED)
-        val metadataPrefix = "${song.metadataCachePrefix()}:"
-        lyricsCache.removeKeysMatching { it.startsWith(metadataPrefix) }
-        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith(metadataPrefix) }
-        getLyrics(song, safeMode)
-    }
-
-    suspend fun getLyricFormatAvailability(song: Song): LyricFormatAvailability = withContext(Dispatchers.IO) {
-        val cacheKey = "${song.metadataCacheKey()}:availability"
-        lyricFormatAvailabilityCache[cacheKey]?.let { return@withContext it }
-        val effectivePath = song.effectiveLocalPathForMetadata()
-        val ignoreHeaderTags = settingsManager.ignoreLyricHeaderTags.first()
-        val ttml = loadExternalLyricsByFormat(song, effectivePath, preferTtml = true)
-            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = true, ignoreHeaderTags = ignoreHeaderTags)
-        val plain = loadExternalLyricsByFormat(song, effectivePath, preferTtml = false)
-            ?: loadEmbeddedLyricsByFormat(song, effectivePath, preferTtml = false, ignoreHeaderTags = ignoreHeaderTags)
-        LyricFormatAvailability(hasTtml = !ttml.isNullOrEmpty(), hasPlain = !plain.isNullOrEmpty())
-            .also { lyricFormatAvailabilityCache[cacheKey] = it }
-    }
-
-    suspend fun reloadLyricsByFormat(song: Song, preferTtml: Boolean): List<LyricLine> = withContext(Dispatchers.IO) {
-        val sourcePriority = settingsManager.lyricSourcePriority.first()
-        val ignoreHeaderTags = settingsManager.ignoreLyricHeaderTags.first()
-        val cacheKey = "${song.metadataCacheKey()}:format:$preferTtml:$sourcePriority:$ignoreHeaderTags"
-        lyricsCache.remove(cacheKey)
-        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith("${song.metadataCachePrefix()}:") }
-        val effectivePath = song.effectiveLocalPathForMetadata()
-        val lyrics = orderedLyricSourceIds(sourcePriority, SettingsManager.LYRIC_SOURCE_AUTO)
-            .filter { id ->
-                if (preferTtml) {
-                    id == SettingsManager.LYRIC_SOURCE_EMBEDDED_TTML || id == SettingsManager.LYRIC_SOURCE_EXTERNAL_TTML
-                } else {
-                    id == SettingsManager.LYRIC_SOURCE_EMBEDDED_PLAIN || id == SettingsManager.LYRIC_SOURCE_EXTERNAL_PLAIN
-                }
-            }
-            .firstNotNullOfOrNull { sourceId -> loadLyricsBySourceId(song, effectivePath, sourceId, ignoreHeaderTags) }
-            ?: emptyList()
-        lyricsCache[cacheKey] = lyrics
-        lyrics
-    }
-
-    private fun fetchOnlineLyrics(song: Song): List<LyricLine>? {
-        if (song.onlineSource != "kw" || song.onlineId.isBlank()) return null
-        val request = Request.Builder()
-            .url("https://www.kuwo.cn/newh5/singles/songinfoandlrc?musicId=${song.onlineId}")
-            .header("User-Agent", "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 Halcyon/1.0")
-            .build()
-        return runCatching {
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@use null
-                val root = JSONObject(response.body?.string().orEmpty())
-                val list = root.optJSONObject("data")?.optJSONArray("lrclist") ?: return@use null
-                val rawLines = List(list.length()) { index ->
-                    val item = list.getJSONObject(index)
-                    val timeMs = ((item.optString("time").toDoubleOrNull() ?: 0.0) * 1000).toLong()
-                    LyricLine(
-                        timeMs = timeMs,
-                        text = item.optString("lineLyric").trim()
-                    )
-                }.filter { it.text.isNotBlank() }
-                rawLines.takeIf { it.isNotEmpty() }
-            }
-        }.getOrElse {
-            Log.w("MusicRepo", "Failed to fetch online lyrics for ${song.title}", it)
-            null
-        }
-    }
+    suspend fun reloadLyricsByFormat(song: Song, preferTtml: Boolean): List<LyricLine> = lyricsManager.reloadLyricsByFormat(song, preferTtml)
 
     fun getReplayGain(song: Song): Float? {
         val cacheKey = song.metadataCacheKey()
@@ -875,92 +664,27 @@ class MusicRepository(private val context: Context) {
         return info
     }
 
-    suspend fun songMatchesSearchSnapshot(song: Song, query: String): Boolean = withContext(Dispatchers.IO) {
-        val normalizedQuery = query.trim().lowercase()
-        if (normalizedQuery.isBlank()) return@withContext false
-        getSongSearchText(song).contains(normalizedQuery)
-    }
+    suspend fun songMatchesSearchSnapshot(song: Song, query: String): Boolean =
+        snapshotManager.songMatchesSearchSnapshot(song, query)
 
-    suspend fun filterSongsBySearchSnapshot(songs: List<Song>, query: String): List<Song> = withContext(Dispatchers.IO) {
-        val normalizedQuery = query.trim().lowercase()
-        if (normalizedQuery.isBlank()) return@withContext songs
-        ensureSearchSnapshotLoaded()
-        var changed = false
-        val matches = songs.filter { song ->
-            val key = song.searchSnapshotKey()
-            val text = searchTextCache[key] ?: buildSongSearchText(song).also {
-                searchTextCache[key] = it
-                changed = true
-            }
-            text.contains(normalizedQuery)
-        }
-        if (changed) searchSnapshotDirty = true
-        matches
-    }
+    suspend fun filterSongsBySearchSnapshot(songs: List<Song>, query: String): List<Song> =
+        snapshotManager.filterSongsBySearchSnapshot(songs, query)
 
-    suspend fun getSongSearchText(song: Song): String = withContext(Dispatchers.IO) {
-        ensureSearchSnapshotLoaded()
-        val key = song.searchSnapshotKey()
-        searchTextCache[key]?.let { return@withContext it }
-        val text = buildSongSearchText(song)
-        searchTextCache[key] = text
-        searchSnapshotDirty = true
-        text
-    }
+    suspend fun getSongSearchText(song: Song): String =
+        snapshotManager.getSongSearchText(song)
 
-    suspend fun preloadLibrarySearchSnapshot(songs: List<Song>) = withContext(Dispatchers.IO) {
-        if (songs.isEmpty()) return@withContext
-        ensureSearchSnapshotLoaded()
-        var changed = false
-        songs.forEach { song ->
-            val key = song.searchSnapshotKey()
-            if (!searchTextCache.containsKey(key)) {
-                searchTextCache[key] = buildSongSearchText(song)
-                changed = true
-            }
-        }
-        if (changed) {
-            searchSnapshotDirty = true
-        }
-        if (searchSnapshotDirty) {
-            saveSearchSnapshot()
-        }
-    }
-
-    private fun buildSongSearchText(song: Song): String =
-        song.searchableTagValues(getSongTagInfo(song))
-            .joinToString(separator = "\n")
-            .lowercase()
+    suspend fun preloadLibrarySearchSnapshot(songs: List<Song>) =
+        snapshotManager.preloadSearchSnapshot(songs)
 
     suspend fun clearLibrarySnapshotCache() = withContext(Dispatchers.IO) {
-        searchTextCache.clear()
-        searchSnapshotLoaded = true
-        searchSnapshotDirty = false
-        if (librarySearchSnapshotFile.exists()) librarySearchSnapshotFile.delete()
-        ratingSnapshotCache.clear()
-        ratingSnapshotLoaded = true
-        ratingSnapshotDirty = false
-        if (libraryRatingSnapshotFile.exists()) libraryRatingSnapshotFile.delete()
+        snapshotManager.clearLibraryCache()
     }
 
-    fun getSongRating(song: Song): Int {
-        ensureRatingSnapshotLoaded()
-        val key = song.searchSnapshotKey()
-        ratingSnapshotCache[key]?.takeIf { it.isFreshFor(song) }?.let { return it.rating }
-        val rating = getSongTagInfo(song).rating
-        updateRatingSnapshot(song, rating)
-        return rating
-    }
+    fun getSongRating(song: Song): Int =
+        snapshotManager.getSongRating(song)
 
-    suspend fun preloadSongRatings(songs: List<Song>) = withContext(Dispatchers.IO) {
-        ensureRatingSnapshotLoaded()
-        songs.forEach { song ->
-            val key = song.searchSnapshotKey()
-            if (ratingSnapshotCache[key]?.isFreshFor(song) == true) return@forEach
-            updateRatingSnapshot(song, getSongTagInfo(song).rating)
-        }
-        saveRatingSnapshot()
-    }
+    suspend fun preloadSongRatings(songs: List<Song>) =
+        snapshotManager.preloadSongRatings(songs)
 
     suspend fun writeSongRating(song: Song, rating: Int): Result<Song?> = withContext(Dispatchers.IO) {
         val safeRating = rating.coerceIn(0, 5)
@@ -977,10 +701,10 @@ class MusicRepository(private val context: Context) {
         result.writePermissionRequestIfNeeded(song)?.let { return@withContext it }
         result.map {
             val immediate = updateSongAfterLocalTagWrite(song)
-            updateRatingSnapshot(immediate, safeRating)
+            snapshotManager.updateRatingSnapshot(immediate, safeRating)
             val refreshed = refreshSongAfterExternalEdit(immediate) ?: immediate
-            updateRatingSnapshot(refreshed, safeRating)
-            saveRatingSnapshot()
+            snapshotManager.updateRatingSnapshot(refreshed, safeRating)
+            snapshotManager.saveAll()
             refreshed
         }
     }
@@ -1020,8 +744,8 @@ class MusicRepository(private val context: Context) {
             val immediate = updateSongAfterLocalTagWrite(song)
             val refreshed = refreshSongAfterExternalEdit(immediate) ?: immediate
             tags.rating?.let { rating ->
-                updateRatingSnapshot(refreshed, rating.coerceIn(0, 5))
-                saveRatingSnapshot()
+                snapshotManager.updateRatingSnapshot(refreshed, rating.coerceIn(0, 5))
+                snapshotManager.saveAll()
             }
             refreshed
         }
@@ -1182,239 +906,15 @@ class MusicRepository(private val context: Context) {
         return ((fileSize * 8_000L) / duration).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
-    fun getCoverArt(song: Song): ByteArray? {
-        val cacheKey = song.coverDataCacheKey()
-        coverArtCache.get(cacheKey)?.let { return it }
-        when (coverDataStates[cacheKey]) {
-            CoverDataState.Missing,
-            is CoverDataState.Error -> return null
-            CoverDataState.Found,
-            null -> Unit
-        }
-        synchronized(coverArtLock) {
-            coverArtCache.get(cacheKey)?.let { return it }
-            val metadataPath = song.effectiveLocalPathForMetadata()
-            val shouldPersistFailureState = !(song.isWebDavRemoteSong() && metadataPath == song.path)
-            val art = try {
-                if (song.isWebDavRemoteSong() && metadataPath == song.path) {
-                    null
-                } else {
-                    audioTagRepository.readEmbeddedCoverDataBlocking(metadataPath)
-                        ?: if (metadataPath.isHttpAudioSource()) {
-                            null
-                        } else {
-                            readEmbeddedPictureWithRetriever(metadataPath)
-                        }
-                }
-            } catch (error: Throwable) {
-                if (error is OutOfMemoryError) {
-                    coverArtCache.evictAll()
-                    coverBitmapCache.evictAll()
-                }
-                Log.w("MusicRepo", "Failed to extract cover art for ${song.path}", error)
-                if (shouldPersistFailureState) {
-                    coverDataStates[cacheKey] = CoverDataState.Error(error.message)
-                }
-                null
-            }
-            if (art != null) {
-                coverArtCache.put(cacheKey, art)
-                coverDataStates[cacheKey] = CoverDataState.Found
-            } else if (shouldPersistFailureState) {
-                coverDataStates.putIfAbsent(cacheKey, CoverDataState.Missing)
-            }
-            return art
-        }
-    }
-
-    private fun readEmbeddedPictureWithRetriever(path: String): ByteArray? {
-        if (path.isBlank()) return null
-        return runCatching {
-            val retriever = MediaMetadataRetriever()
-            try {
-                if (path.isContentAudioSource()) {
-                    retriever.setDataSource(context, Uri.parse(path))
-                } else {
-                    retriever.setDataSource(path)
-                }
-                retriever.embeddedPicture?.takeIf { it.isNotEmpty() }
-            } finally {
-                retriever.release()
-            }
-        }.getOrElse { error ->
-            Log.d("MusicRepo", "MediaMetadataRetriever embedded picture unavailable for $path", error)
-            null
-        }
-    }
+    fun getCoverArt(song: Song): ByteArray? = coverArtManager.getCoverArt(song)
 
     fun getCoverArtBitmap(
         song: Song,
         maxSize: Int = 512,
         usage: CoverUsage = CoverUsage.ListThumbnail
-    ): Bitmap? {
-        val targetSize = maxSize.coerceIn(64, 3000)
-        val cacheKey = "${song.coverDataCacheKey()}:${usage.name}:$targetSize"
-        coverBitmapCache.get(cacheKey)?.let { return it }
-        return synchronized(coverArtLock) {
-            coverBitmapCache.get(cacheKey)?.let { return it }
-            if (usage == CoverUsage.ListThumbnail) {
-                val thumbnailBitmap = decodeExternalThumbnailBitmap(song, targetSize, cacheKey)
-                if (thumbnailBitmap != null) {
-                    return thumbnailBitmap
-                }
-            }
-            if (usage == CoverUsage.ListThumbnail && !song.prefersEmbeddedArtworkForThumbnail()) {
-                val albumBitmap = decodeAlbumArtBitmap(song.albumId, targetSize, usage)
-                if (albumBitmap != null) {
-                    return albumBitmap
-                }
-            }
-            val data = getCoverArt(song)
-            if (data == null) {
-                return decodeAlbumArtBitmap(song.albumId, targetSize, usage)
-            }
-            runCatching {
-                val bounds = BitmapFactory.Options().apply {
-                    inJustDecodeBounds = true
-                }
-                BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
-                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    ): Bitmap? = coverArtManager.getCoverArtBitmap(song, maxSize, usage)
 
-                var sampleSize = 1
-                while ((bounds.outWidth / sampleSize) > targetSize || (bounds.outHeight / sampleSize) > targetSize) {
-                    sampleSize *= 2
-                }
-
-                val options = BitmapFactory.Options().apply {
-                    inSampleSize = sampleSize.coerceAtLeast(1)
-                    inPreferredConfig = if (usage == CoverUsage.ListThumbnail) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
-                }
-                BitmapFactory.decodeByteArray(data, 0, data.size, options)
-                    ?.also { coverBitmapCache.put(cacheKey, it) }
-            }.getOrElse { error ->
-                if (error is OutOfMemoryError) {
-                    coverArtCache.evictAll()
-                    coverBitmapCache.evictAll()
-                }
-                Log.w("MusicRepo", "Failed to decode cover bitmap for ${song.path}", error)
-                null
-            }
-        }
-    }
-
-    private fun decodeExternalThumbnailBitmap(
-        song: Song,
-        targetSize: Int,
-        cacheKey: String
-    ): Bitmap? {
-        val thumbnail = song.externalThumbnailCandidates()
-            .firstOrNull { it.exists() && it.isFile && it.length() > 0L }
-            ?: return null
-        return runCatching {
-            decodeBitmapFile(thumbnail, targetSize, Bitmap.Config.RGB_565)
-                ?.also { coverBitmapCache.put(cacheKey, it) }
-        }.getOrElse { error ->
-            Log.d("MusicRepo", "Failed to decode external thumbnail ${thumbnail.absolutePath}", error)
-            null
-        }
-    }
-
-    private fun decodeBitmapFile(
-        file: File,
-        targetSize: Int,
-        preferredConfig: Bitmap.Config
-    ): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-        var sampleSize = 1
-        while ((bounds.outWidth / sampleSize) > targetSize || (bounds.outHeight / sampleSize) > targetSize) {
-            sampleSize *= 2
-        }
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = sampleSize.coerceAtLeast(1)
-            inPreferredConfig = preferredConfig
-        }
-        return BitmapFactory.decodeFile(file.absolutePath, options)
-    }
-
-    private fun decodeAlbumArtBitmap(
-        albumId: Long,
-        targetSize: Int,
-        usage: CoverUsage
-    ): Bitmap? {
-        if (albumId <= 0L) return null
-        val albumCacheKey = "album:$albumId:${usage.name}:$targetSize"
-        coverBitmapCache.get(albumCacheKey)?.let { return it }
-        val albumArtUri = getAlbumArtUri(albumId) ?: return null
-        return runCatching {
-            val bounds = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
-            }
-            context.contentResolver.openInputStream(albumArtUri)?.use { input ->
-                BitmapFactory.decodeStream(input, null, bounds)
-            }
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-            var sampleSize = 1
-            while ((bounds.outWidth / sampleSize) > targetSize || (bounds.outHeight / sampleSize) > targetSize) {
-                sampleSize *= 2
-            }
-
-            val options = BitmapFactory.Options().apply {
-                inSampleSize = sampleSize.coerceAtLeast(1)
-                inPreferredConfig = if (usage == CoverUsage.ListThumbnail) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888
-            }
-            context.contentResolver.openInputStream(albumArtUri)?.use { input ->
-                BitmapFactory.decodeStream(input, null, options)
-            }?.also { coverBitmapCache.put(albumCacheKey, it) }
-        }.getOrElse { error ->
-            if (error is OutOfMemoryError) {
-                coverArtCache.evictAll()
-                coverBitmapCache.evictAll()
-            }
-            Log.d("MusicRepo", "Failed to decode album art bitmap for albumId=$albumId", error)
-            null
-        }
-    }
-
-    private fun Song.prefersEmbeddedArtworkForThumbnail(): Boolean =
-        fileName.substringAfterLast('.', path.substringAfterLast('.'))
-            .lowercase() in embeddedArtworkThumbnailExtensions
-
-    private fun Song.externalThumbnailCandidates(): List<File> {
-        val metadataPath = effectiveLocalPathForMetadata()
-        val songFile = File(metadataPath)
-        if (!songFile.isFile) return emptyList()
-        val fileNameBase = fileName.ifBlank { songFile.name }
-        val stem = fileNameBase.substringBeforeLast('.').ifBlank { songFile.nameWithoutExtension }
-        val directories = buildList {
-            songFile.parentFile?.let { add(File(it, ".thumbnails")) }
-            add(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), ".thumbnails"))
-        }.distinctBy { it.absolutePath }
-        val keys = listOf(
-            stem,
-            fileNameBase,
-            id.takeIf { it > 0L }?.toString().orEmpty(),
-            albumId.takeIf { it > 0L }?.toString().orEmpty(),
-            path.sha256()
-        ).filter { it.isNotBlank() }.distinct()
-        val extensions = listOf("jpg", "jpeg", "png", "webp")
-        return directories.flatMap { dir ->
-            keys.flatMap { key ->
-                extensions.map { ext -> File(dir, "$key.$ext") }
-            }
-        }
-    }
-
-    fun getAlbumArtUri(albumId: Long): Uri? {
-        if (albumId <= 0L) return null
-        return ContentUris.withAppendedId(
-            Uri.parse("content://media/external/audio/albumart"),
-            albumId
-        )
-    }
+    fun getAlbumArtUri(albumId: Long): Uri? = coverArtManager.getAlbumArtUri(albumId)
 
     fun getSongsForAlbum(albumId: Long): List<Song> {
         return _songs.value
@@ -1509,56 +1009,28 @@ class MusicRepository(private val context: Context) {
     }
 
     fun clearCache() {
-        lyricsCache.clear()
-        lyricFormatAvailabilityCache.clear()
+        lyricsManager.clearCache()
+        coverArtManager.clearCache()
+        snapshotManager.clearCache()
         audioInfoCache.clear()
         tagInfoCache.clear()
         replayGainCache.clear()
         replayGainMissingCache.clear()
-        ratingSnapshotCache.clear()
-        ratingSnapshotLoaded = false
-        ratingSnapshotDirty = false
-        coverArtCache.evictAll()
-        coverBitmapCache.evictAll()
-        coverDataStates.clear()
-    }
-
-    private fun <K, V> ConcurrentHashMap<K, V>.removeKeysMatching(predicate: (K) -> Boolean) {
-        keys.toList().forEach { key ->
-            if (predicate(key)) remove(key)
-        }
     }
 
     fun clearMetadataCache(song: Song) {
+        lyricsManager.clearMetadataCache(song)
+        coverArtManager.clearMetadataCache(song)
+        snapshotManager.clearMetadataCache(song)
         val metadataPrefix = "${song.metadataCachePrefix()}:"
-        lyricsCache.removeKeysMatching { it.startsWith(metadataPrefix) || it.startsWith("${song.id}:") }
-        lyricFormatAvailabilityCache.removeKeysMatching { it.startsWith(metadataPrefix) || it.startsWith("${song.id}:") }
         audioInfoCache.removeKeysMatching { it.startsWith(metadataPrefix) }
         tagInfoCache.removeKeysMatching { it.startsWith(metadataPrefix) || it.startsWith("${song.id}:") }
         replayGainCache.removeKeysMatching { it.startsWith(metadataPrefix) }
         replayGainMissingCache.removeIf { it.startsWith(metadataPrefix) }
-        ensureRatingSnapshotLoaded()
-        ratingSnapshotCache.keys.removeAll { it == song.searchSnapshotKey() || it.startsWith("${song.id}|") }
-        ratingSnapshotDirty = true
-        saveRatingSnapshot()
-        ensureSearchSnapshotLoaded()
-        searchTextCache.keys.removeAll { it == song.searchSnapshotKey() || it.startsWith("${song.id}|") }
-        saveSearchSnapshot()
-        audioTagRepository.clear(song.effectiveLocalPathForMetadata())
+        audioTagRepository.clear(song.effectiveLocalPathForMetadataBlocking(settingsManager, httpClient, remoteAudioCacheDir, remoteMetadataHeaderCacheDir))
         if (song.isWebDavRemoteSong()) {
-            song.webDavHeaderCacheFile().delete()
-            song.webDavFullCacheFile().delete()
-        }
-        val keyPrefix = song.coverCacheKey()
-        coverDataStates.keys.removeAll { it.startsWith(keyPrefix) }
-        coverArtCache.remove(song.coverDataCacheKey())
-        val bitmapKeyPrefix = "${song.coverDataCacheKey()}:"
-        val bitmapKeys = mutableListOf<String>()
-        synchronized(coverArtLock) {
-            for (key in coverBitmapCache.snapshot().keys) {
-                if (key.startsWith(bitmapKeyPrefix)) bitmapKeys += key
-            }
-            bitmapKeys.forEach(coverBitmapCache::remove)
+            song.webDavHeaderCacheFile(remoteMetadataHeaderCacheDir).delete()
+            song.webDavFullCacheFile(remoteAudioCacheDir).delete()
         }
     }
 
@@ -1981,97 +1453,6 @@ class MusicRepository(private val context: Context) {
             if (!file.exists()) return null
             file.readText()
         }.getOrNull()
-
-    private fun ensureSearchSnapshotLoaded() {
-        if (searchSnapshotLoaded) return
-        synchronized(searchTextCache) {
-            if (searchSnapshotLoaded) return
-            if (librarySearchSnapshotFile.exists()) {
-                runCatching {
-                    val root = JSONObject(librarySearchSnapshotFile.readText())
-                    root.keys().forEach { key ->
-                        val value = root.optString(key)
-                        val parts = key.split('|')
-                        val stableKey = if (parts.size >= 2) "${parts[0]}|${parts[1]}" else key
-                        searchTextCache[stableKey] = value
-                    }
-                }.onFailure {
-                    Log.w("MusicRepo", "Failed to load library search snapshot", it)
-                    searchTextCache.clear()
-                }
-            }
-            searchSnapshotLoaded = true
-        }
-    }
-
-    private fun saveSearchSnapshot() {
-        if (!searchSnapshotDirty) return
-        runCatching {
-            val root = JSONObject()
-            searchTextCache.forEach { (key, value) -> root.put(key, value) }
-            librarySearchSnapshotFile.writeText(root.toString())
-            searchSnapshotDirty = false
-        }.onFailure {
-            Log.w("MusicRepo", "Failed to save library search snapshot", it)
-        }
-    }
-
-    private fun ensureRatingSnapshotLoaded() {
-        if (ratingSnapshotLoaded) return
-        synchronized(ratingSnapshotCache) {
-            if (ratingSnapshotLoaded) return
-            if (libraryRatingSnapshotFile.exists()) {
-                runCatching {
-                    val root = JSONObject(libraryRatingSnapshotFile.readText())
-                    root.keys().forEach { key ->
-                        val value = root.optJSONObject(key) ?: return@forEach
-                        ratingSnapshotCache[key] = RatingSnapshotEntry(
-                            rating = value.optInt("rating", 0).coerceIn(0, 5),
-                            dateModified = value.optLong("dateModified", 0L),
-                            fileSize = value.optLong("fileSize", 0L)
-                        )
-                    }
-                }.onFailure {
-                    Log.w("MusicRepo", "Failed to load library rating snapshot", it)
-                    ratingSnapshotCache.clear()
-                }
-            }
-            ratingSnapshotLoaded = true
-        }
-    }
-
-    private fun updateRatingSnapshot(song: Song, rating: Int) {
-        ensureRatingSnapshotLoaded()
-        ratingSnapshotCache[song.searchSnapshotKey()] = RatingSnapshotEntry(
-            rating = rating.coerceIn(0, 5),
-            dateModified = song.dateModified,
-            fileSize = song.fileSize
-        )
-        ratingSnapshotDirty = true
-    }
-
-    private fun saveRatingSnapshot() {
-        if (!ratingSnapshotDirty) return
-        runCatching {
-            val root = JSONObject()
-            ratingSnapshotCache.forEach { (key, value) ->
-                root.put(
-                    key,
-                    JSONObject()
-                        .put("rating", value.rating)
-                        .put("dateModified", value.dateModified)
-                        .put("fileSize", value.fileSize)
-                )
-            }
-            libraryRatingSnapshotFile.writeText(root.toString())
-            ratingSnapshotDirty = false
-        }.onFailure {
-            Log.w("MusicRepo", "Failed to save library rating snapshot", it)
-        }
-    }
-
-    private fun RatingSnapshotEntry.isFreshFor(song: Song): Boolean =
-        dateModified == song.dateModified && fileSize == song.fileSize
 
     private fun Song.librarySyncKey(): String =
         if (id > 0L) {
