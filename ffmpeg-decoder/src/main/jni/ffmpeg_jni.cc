@@ -15,6 +15,7 @@
  */
 #include <android/log.h>
 #include <jni.h>
+#include <new>
 #include <stdlib.h>
 
 extern "C" {
@@ -79,13 +80,22 @@ static jmethodID growOutputBufferMethod;
 const AVCodec* getCodecByName(JNIEnv* env, jstring codecName);
 
 /**
- * Allocates and opens a new AVCodecContext for the specified codec, passing the
+ * Allocates and opens a new decoder context for the specified codec, passing the
  * provided extraData as initialization data for the decoder if it is non-NULL.
  * Returns the created context.
  */
-AVCodecContext* createContext(JNIEnv* env, const AVCodec* codec,
-                              jbyteArray extraData, jboolean outputFloat,
-                              jint rawSampleRate, jint rawChannelCount);
+struct FfmpegDecoderContext {
+  AVCodecContext* codecContext;
+  AVPacket* packet;
+  AVFrame* frame;
+  SwrContext* resampleContext;
+};
+
+FfmpegDecoderContext* createContext(JNIEnv* env, const AVCodec* codec,
+                                    jbyteArray extraData,
+                                    jboolean outputFloat,
+                                    jint rawSampleRate,
+                                    jint rawChannelCount);
 
 struct GrowOutputBufferCallback {
   uint8_t* operator()(int requiredSize) const;
@@ -100,7 +110,7 @@ struct GrowOutputBufferCallback {
  * written, or a negative AUDIO_DECODER_ERROR constant value in the case of an
  * error.
  */
-int decodePacket(AVCodecContext* context, AVPacket* packet,
+int decodePacket(FfmpegDecoderContext* decoderContext, AVPacket* packet,
                  uint8_t* outputBuffer, int outputSize,
                  GrowOutputBufferCallback growBuffer);
 
@@ -117,7 +127,7 @@ void logError(const char* functionName, int errorNumber);
 /**
  * Releases the specified context.
  */
-void releaseContext(AVCodecContext* context);
+void releaseContext(FfmpegDecoderContext* decoderContext);
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   JNIEnv* env;
@@ -169,35 +179,39 @@ AUDIO_DECODER_FUNC(jlong, ffmpegInitialize, jstring codecName,
 AUDIO_DECODER_FUNC(jint, ffmpegDecode, jlong context, jobject inputData,
                    jint inputSize, jobject decoderOutputBuffer,
                    jobject outputData, jint outputSize) {
-  if (!context) {
+  FfmpegDecoderContext* decoderContext = (FfmpegDecoderContext*)context;
+  if (!decoderContext || !decoderContext->codecContext ||
+      !decoderContext->packet || !decoderContext->frame) {
     LOGE("Context must be non-NULL.");
-    return -1;
+    return AUDIO_DECODER_ERROR_OTHER;
   }
   if (!inputData || !decoderOutputBuffer || !outputData) {
     LOGE("Input and output buffers must be non-NULL.");
-    return -1;
+    return AUDIO_DECODER_ERROR_OTHER;
   }
   if (inputSize < 0) {
     LOGE("Invalid input buffer size: %d.", inputSize);
-    return -1;
+    return AUDIO_DECODER_ERROR_OTHER;
   }
   if (outputSize < 0) {
     LOGE("Invalid output buffer length: %d", outputSize);
-    return -1;
+    return AUDIO_DECODER_ERROR_OTHER;
   }
   uint8_t* inputBuffer = (uint8_t*)env->GetDirectBufferAddress(inputData);
   uint8_t* outputBuffer = (uint8_t*)env->GetDirectBufferAddress(outputData);
-  AVPacket* packet = av_packet_alloc();
-  if (!packet) {
-    LOGE("Failed to allocate packet.");
-    return -1;
+  if (!inputBuffer || !outputBuffer) {
+    LOGE("Input and output buffers must be direct ByteBuffers.");
+    return AUDIO_DECODER_ERROR_OTHER;
   }
+
+  AVPacket* packet = decoderContext->packet;
+  av_packet_unref(packet);
   packet->data = inputBuffer;
   packet->size = inputSize;
   const int ret =
-      decodePacket((AVCodecContext*)context, packet, outputBuffer, outputSize,
+      decodePacket(decoderContext, packet, outputBuffer, outputSize,
                    GrowOutputBufferCallback{env, thiz, decoderOutputBuffer});
-  av_packet_free(&packet);
+  av_packet_unref(packet);
   return ret;
 }
 
@@ -213,35 +227,38 @@ uint8_t* GrowOutputBufferCallback::operator()(int requiredSize) const {
 }
 
 AUDIO_DECODER_FUNC(jint, ffmpegGetChannelCount, jlong context) {
-  if (!context) {
+  FfmpegDecoderContext* decoderContext = (FfmpegDecoderContext*)context;
+  if (!decoderContext || !decoderContext->codecContext) {
     LOGE("Context must be non-NULL.");
     return -1;
   }
-  return ((AVCodecContext*)context)->ch_layout.nb_channels;
+  return decoderContext->codecContext->ch_layout.nb_channels;
 }
 
 AUDIO_DECODER_FUNC(jint, ffmpegGetSampleRate, jlong context) {
-  if (!context) {
+  FfmpegDecoderContext* decoderContext = (FfmpegDecoderContext*)context;
+  if (!decoderContext || !decoderContext->codecContext) {
     LOGE("Context must be non-NULL.");
     return -1;
   }
-  return ((AVCodecContext*)context)->sample_rate;
+  return decoderContext->codecContext->sample_rate;
 }
 
 AUDIO_DECODER_FUNC(jlong, ffmpegReset, jlong jContext, jbyteArray extraData) {
-  AVCodecContext* context = (AVCodecContext*)jContext;
-  if (!context) {
+  FfmpegDecoderContext* decoderContext = (FfmpegDecoderContext*)jContext;
+  if (!decoderContext || !decoderContext->codecContext) {
     LOGE("Tried to reset without a context.");
     return 0L;
   }
 
+  AVCodecContext* context = decoderContext->codecContext;
   AVCodecID codecId = context->codec_id;
   if (codecId == AV_CODEC_ID_TRUEHD) {
     jboolean outputFloat =
         (jboolean)(context->request_sample_fmt == OUTPUT_FORMAT_PCM_FLOAT);
     // Release and recreate the context if the codec is TrueHD.
     // TODO: Figure out why flushing doesn't work for this codec.
-    releaseContext(context);
+    releaseContext(decoderContext);
     const AVCodec* codec = avcodec_find_decoder(codecId);
     if (!codec) {
       LOGE("Unexpected error finding codec %d.", codecId);
@@ -253,12 +270,14 @@ AUDIO_DECODER_FUNC(jlong, ffmpegReset, jlong jContext, jbyteArray extraData) {
   }
 
   avcodec_flush_buffers(context);
-  return (jlong)context;
+  av_packet_unref(decoderContext->packet);
+  av_frame_unref(decoderContext->frame);
+  return (jlong)decoderContext;
 }
 
 AUDIO_DECODER_FUNC(void, ffmpegRelease, jlong context) {
   if (context) {
-    releaseContext((AVCodecContext*)context);
+    releaseContext((FfmpegDecoderContext*)context);
   }
 }
 
@@ -272,14 +291,33 @@ const AVCodec* getCodecByName(JNIEnv* env, jstring codecName) {
   return codec;
 }
 
-AVCodecContext* createContext(JNIEnv* env, const AVCodec* codec,
-                              jbyteArray extraData, jboolean outputFloat,
-                              jint rawSampleRate, jint rawChannelCount) {
+FfmpegDecoderContext* createContext(JNIEnv* env, const AVCodec* codec,
+                                    jbyteArray extraData,
+                                    jboolean outputFloat,
+                                    jint rawSampleRate,
+                                    jint rawChannelCount) {
+  FfmpegDecoderContext* decoderContext = new (std::nothrow) FfmpegDecoderContext();
+  if (!decoderContext) {
+    LOGE("Failed to allocate decoder wrapper context.");
+    return NULL;
+  }
+  decoderContext->codecContext = NULL;
+  decoderContext->packet = av_packet_alloc();
+  decoderContext->frame = av_frame_alloc();
+  decoderContext->resampleContext = NULL;
+  if (!decoderContext->packet || !decoderContext->frame) {
+    LOGE("Failed to allocate reusable packet/frame.");
+    releaseContext(decoderContext);
+    return NULL;
+  }
+
   AVCodecContext* context = avcodec_alloc_context3(codec);
   if (!context) {
     LOGE("Failed to allocate context.");
+    releaseContext(decoderContext);
     return NULL;
   }
+  decoderContext->codecContext = context;
   context->request_sample_fmt =
       outputFloat ? OUTPUT_FORMAT_PCM_FLOAT : OUTPUT_FORMAT_PCM_16BIT;
   if (extraData) {
@@ -289,7 +327,7 @@ AVCodecContext* createContext(JNIEnv* env, const AVCodec* codec,
         (uint8_t*)av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
     if (!context->extradata) {
       LOGE("Failed to allocate extradata.");
-      releaseContext(context);
+      releaseContext(decoderContext);
       return NULL;
     }
     env->GetByteArrayRegion(extraData, 0, size, (jbyte*)context->extradata);
@@ -303,15 +341,17 @@ AVCodecContext* createContext(JNIEnv* env, const AVCodec* codec,
   int result = avcodec_open2(context, codec, NULL);
   if (result < 0) {
     logError("avcodec_open2", result);
-    releaseContext(context);
+    releaseContext(decoderContext);
     return NULL;
   }
-  return context;
+  return decoderContext;
 }
 
-int decodePacket(AVCodecContext* context, AVPacket* packet,
+int decodePacket(FfmpegDecoderContext* decoderContext, AVPacket* packet,
                  uint8_t* outputBuffer, int outputSize,
                  GrowOutputBufferCallback growBuffer) {
+  AVCodecContext* context = decoderContext->codecContext;
+  AVFrame* frame = decoderContext->frame;
   int result = 0;
   // Queue input data.
   result = avcodec_send_packet(context, packet);
@@ -323,14 +363,10 @@ int decodePacket(AVCodecContext* context, AVPacket* packet,
   // Dequeue output data until it runs out.
   int outSize = 0;
   while (true) {
-    AVFrame* frame = av_frame_alloc();
-    if (!frame) {
-      LOGE("Failed to allocate output frame.");
-      return AUDIO_DECODER_ERROR_INVALID_DATA;
-    }
+    av_frame_unref(frame);
     result = avcodec_receive_frame(context, frame);
     if (result) {
-      av_frame_free(&frame);
+      av_frame_unref(frame);
       if (result == AVERROR(EAGAIN)) {
         break;
       }
@@ -345,7 +381,7 @@ int decodePacket(AVCodecContext* context, AVPacket* packet,
     int sampleCount = frame->nb_samples;
     int dataSize = av_samples_get_buffer_size(NULL, channelCount, sampleCount,
                                               sampleFormat, 1);
-    SwrContext* resampleContext = static_cast<SwrContext*>(context->opaque);
+    SwrContext* resampleContext = decoderContext->resampleContext;
     if (!resampleContext) {
       result =
           swr_alloc_set_opts2(&resampleContext,             // ps
@@ -357,19 +393,21 @@ int decodePacket(AVCodecContext* context, AVPacket* packet,
                               sampleRate,                   // in_sample_rate
                               0,                            // log_offset
                               NULL                          // log_ctx
-          );
+      );
       if (result < 0) {
         logError("swr_alloc_set_opts2", result);
-        av_frame_free(&frame);
+        swr_free(&resampleContext);
+        av_frame_unref(frame);
         return transformError(result);
       }
       result = swr_init(resampleContext);
       if (result < 0) {
         logError("swr_init", result);
-        av_frame_free(&frame);
+        swr_free(&resampleContext);
+        av_frame_unref(frame);
         return transformError(result);
       }
-      context->opaque = resampleContext;
+      decoderContext->resampleContext = resampleContext;
     }
 
     int outSampleSize = av_get_bytes_per_sample(context->request_sample_fmt);
@@ -384,13 +422,13 @@ int decodePacket(AVCodecContext* context, AVPacket* packet,
       outputBuffer = growBuffer(outputSize);
       if (!outputBuffer) {
         LOGE("Failed to reallocate output buffer.");
-        av_frame_free(&frame);
+        av_frame_unref(frame);
         return AUDIO_DECODER_ERROR_OTHER;
       }
     }
     result = swr_convert(resampleContext, &outputBuffer, bufferOutSize,
                          (const uint8_t**)frame->data, frame->nb_samples);
-    av_frame_free(&frame);
+    av_frame_unref(frame);
     if (result < 0) {
       logError("swr_convert", result);
       return AUDIO_DECODER_ERROR_INVALID_DATA;
@@ -419,14 +457,21 @@ void logError(const char* functionName, int errorNumber) {
   free(buffer);
 }
 
-void releaseContext(AVCodecContext* context) {
-  if (!context) {
+void releaseContext(FfmpegDecoderContext* decoderContext) {
+  if (!decoderContext) {
     return;
   }
-  SwrContext* swrContext;
-  if ((swrContext = (SwrContext*)context->opaque)) {
-    swr_free(&swrContext);
-    context->opaque = NULL;
+  if (decoderContext->resampleContext) {
+    swr_free(&decoderContext->resampleContext);
   }
-  avcodec_free_context(&context);
+  if (decoderContext->frame) {
+    av_frame_free(&decoderContext->frame);
+  }
+  if (decoderContext->packet) {
+    av_packet_free(&decoderContext->packet);
+  }
+  if (decoderContext->codecContext) {
+    avcodec_free_context(&decoderContext->codecContext);
+  }
+  delete decoderContext;
 }
