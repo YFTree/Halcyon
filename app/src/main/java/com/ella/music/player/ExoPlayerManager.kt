@@ -107,8 +107,7 @@ class ExoPlayerManager(private val context: Context) {
     private var currentSongRefreshJob: Job? = null
     private var artworkAppliedSongKey: String? = null
     private var sessionMetadataSongKey: String? = null
-    private var bluetoothMetadataSongKey: String? = null
-    private var bluetoothMetadataPayload: Pair<String?, String?>? = null
+    private var bluetoothMetadataPatchState = MediaNotificationLyricPatchPolicy.onCleared()
     private var suppressExternalSnapshotsUntilMs = 0L
 
     init {
@@ -181,8 +180,7 @@ class ExoPlayerManager(private val context: Context) {
         notificationArtworkJob = null
         sessionMetadataSongKey = null
         artworkAppliedSongKey = null
-        bluetoothMetadataSongKey = null
-        bluetoothMetadataPayload = null
+        clearBluetoothMetadataPatchState()
         delay(650)
         connect()
     }
@@ -207,7 +205,7 @@ class ExoPlayerManager(private val context: Context) {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 Log.d(TIMING_TAG, "controller media transition reason=$reason mediaId=${mediaItem?.mediaId}")
                 externalSnapshotGuard = null
-                clearBluetoothMetadataPatchState()
+                resetBluetoothMetadataPatchStateForSong(mediaItem?.toSongFromMediaItemExtras())
                 if (pendingShuffleReorder && reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
                     performPendingShuffleReorder(trigger = "transition", seekToNextAfterReorder = false)
                 }
@@ -313,8 +311,7 @@ class ExoPlayerManager(private val context: Context) {
         notificationArtworkJob = null
         sessionMetadataSongKey = null
         artworkAppliedSongKey = null
-        bluetoothMetadataSongKey = null
-        bluetoothMetadataPayload = null
+        clearBluetoothMetadataPatchState()
         // The whole queue is shipped to the playback service over Binder (~1MB transaction limit);
         // a 60k-song library overflows it and crashes with TransactionTooLargeException. For
         // pathologically large queues, play a window around the chosen song instead of everything.
@@ -401,8 +398,7 @@ class ExoPlayerManager(private val context: Context) {
         notificationArtworkJob = null
         sessionMetadataSongKey = null
         artworkAppliedSongKey = null
-        bluetoothMetadataSongKey = null
-        bluetoothMetadataPayload = null
+        clearBluetoothMetadataPatchState()
         playlist.clear()
         playlist.addAll(songs.mapIndexed { index, song -> if (index == safeIndex) resolvedSong else song })
         _playlist.value = playlist.toList()
@@ -631,8 +627,7 @@ class ExoPlayerManager(private val context: Context) {
         notificationArtworkJob = null
         sessionMetadataSongKey = null
         artworkAppliedSongKey = null
-        bluetoothMetadataSongKey = null
-        bluetoothMetadataPayload = null
+        clearBluetoothMetadataPatchState()
         _currentPosition.value = 0L
         _duration.value = 0L
         _isPlaying.value = false
@@ -876,25 +871,43 @@ class ExoPlayerManager(private val context: Context) {
         if (_currentSong.value != null) savePlaybackState()
     }
 
-    fun updateBluetoothLyric(text: String?, secondaryText: String? = null) {
-        val controller = mediaController ?: return
-        val song = _currentSong.value ?: return
+    fun updateBluetoothLyric(text: String?, secondaryText: String? = null, force: Boolean = false): Boolean {
+        val controller = mediaController ?: return true
+        val song = _currentSong.value ?: return true
         val index = controller.currentMediaItemIndex
 
-        if (index < 0 || index >= controller.mediaItemCount) return
+        if (index < 0 || index >= controller.mediaItemCount) return true
 
-        val currentItem = controller.currentMediaItem ?: return
+        val currentItem = controller.currentMediaItem ?: return true
         if (!currentItem.matchesSong(song)) {
             clearBluetoothMetadataPatchState()
-            return
+            return true
         }
         val lyricText = text?.takeIf { it.isNotBlank() }
         val lyricSecondaryText = secondaryText?.takeIf { it.isNotBlank() }
-        val payload = lyricText to lyricSecondaryText
+        val payload = MediaNotificationLyricPayload(lyricText, lyricSecondaryText)
         val songKey = song.playbackStackKey()
 
-        if (lyricText == null && bluetoothMetadataSongKey != songKey) return
-        if (bluetoothMetadataSongKey == songKey && bluetoothMetadataPayload == payload) return
+        val decision = MediaNotificationLyricPatchPolicy.actionFor(
+            state = bluetoothMetadataPatchState,
+            songKey = songKey,
+            payload = payload,
+            nowMs = SystemClock.elapsedRealtime(),
+            force = force
+        )
+        when (decision.action) {
+            MediaNotificationLyricPatchAction.Defer -> return false
+            MediaNotificationLyricPatchAction.Skip -> {
+                if (lyricText != null ||
+                    (currentItem.mediaMetadata.title == song.title &&
+                        currentItem.mediaMetadata.artist == song.artist)
+                ) {
+                    return true
+                }
+            }
+            MediaNotificationLyricPatchAction.Patch,
+            MediaNotificationLyricPatchAction.RestoreSongMetadata -> Unit
+        }
 
         val displayTitle = lyricText ?: song.title
         val displayArtist = if (lyricText != null) {
@@ -906,9 +919,12 @@ class ExoPlayerManager(private val context: Context) {
         if (currentItem.mediaMetadata.title == displayTitle &&
             currentItem.mediaMetadata.artist == displayArtist
         ) {
-            bluetoothMetadataSongKey = if (lyricText == null) null else songKey
-            bluetoothMetadataPayload = if (lyricText == null) null else payload
-            return
+            bluetoothMetadataPatchState = if (lyricText == null) {
+                MediaNotificationLyricPatchPolicy.onCleared()
+            } else {
+                MediaNotificationLyricPatchPolicy.onPatched(songKey, payload, SystemClock.elapsedRealtime())
+            }
+            return true
         }
 
         val cachedArtwork = notificationArtworkCache.get(song.notificationArtworkKey())
@@ -925,9 +941,14 @@ class ExoPlayerManager(private val context: Context) {
 
         runCatching {
             controller.replaceMediaItem(index, newItem)
-            bluetoothMetadataSongKey = if (lyricText == null) null else songKey
-            bluetoothMetadataPayload = if (lyricText == null) null else payload
+            bluetoothMetadataPatchState = if (lyricText == null) {
+                MediaNotificationLyricPatchPolicy.onCleared()
+            } else {
+                MediaNotificationLyricPatchPolicy.onPatched(songKey, payload, SystemClock.elapsedRealtime())
+            }
+            Log.d(TIMING_TAG, "media notification lyric metadata ${if (lyricText == null) "restored" else "patched"} mediaId=${song.id}")
         }
+        return true
     }
 
     fun clearBluetoothLyric() {
@@ -1030,7 +1051,7 @@ class ExoPlayerManager(private val context: Context) {
             notificationArtworkJob = null
             artworkAppliedSongKey = null
             sessionMetadataSongKey = null
-            clearBluetoothMetadataPatchState()
+            resetBluetoothMetadataPatchStateForSong(snapshotSong)
         }
 
         refreshCurrentNotificationArtwork(snapshotSong)
@@ -1482,8 +1503,14 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     private fun clearBluetoothMetadataPatchState() {
-        bluetoothMetadataSongKey = null
-        bluetoothMetadataPayload = null
+        bluetoothMetadataPatchState = MediaNotificationLyricPatchPolicy.onCleared()
+    }
+
+    private fun resetBluetoothMetadataPatchStateForSong(song: Song?) {
+        bluetoothMetadataPatchState = MediaNotificationLyricPatchPolicy.onSongChanged(
+            songKey = song?.playbackStackKey(),
+            nowMs = SystemClock.elapsedRealtime()
+        )
     }
 
     private fun MediaMetadata.withPatchedExtrasFrom(item: MediaItem, reason: String): MediaMetadata {

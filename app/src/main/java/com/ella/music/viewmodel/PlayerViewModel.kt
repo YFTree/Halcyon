@@ -20,6 +20,7 @@ import com.ella.music.player.DesktopLyricBridge
 import com.ella.music.player.ExoPlayerManager
 import com.ella.music.player.LyricGetterBridge
 import com.ella.music.player.LyriconBridge
+import com.ella.music.player.MediaNotificationLyricPatchPolicy
 import com.ella.music.player.PlaybackService
 import com.ella.music.player.SuperLyricBridge
 import com.ella.music.player.TickerBridge
@@ -142,6 +143,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var previousButtonAction = SettingsManager.PREVIOUS_BUTTON_PREVIOUS
     private var manualSeekAfterPreviousButton = false
     private var lastBluetoothLyricPayload: Pair<String, String?>? = null
+    private var bluetoothLyricRetryJob: Job? = null
     private var externalLyricResendJob: Job? = null
     private var loadedLyricSongKey: String? = null
     private var lastLyricPositionSongKey: String? = null
@@ -364,6 +366,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (enabled) {
                     resendBluetoothLyric()
                 } else {
+                    bluetoothLyricRetryJob?.cancel()
                     playerManager.clearBluetoothLyric()
                 }
             }
@@ -565,8 +568,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         ) ?: return
         if (payload == lastBluetoothLyricPayload) return
 
-        lastBluetoothLyricPayload = payload
-        playerManager.updateBluetoothLyric(payload.first, payload.second)
+        if (playerManager.updateBluetoothLyric(payload.first, payload.second)) {
+            lastBluetoothLyricPayload = payload
+            bluetoothLyricRetryJob?.cancel()
+        } else {
+            scheduleBluetoothLyricRetry()
+        }
     }
 
     private fun resendBluetoothLyric(force: Boolean = false) {
@@ -581,8 +588,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         ) ?: return
         if (!force && payload == lastBluetoothLyricPayload) return
 
-        lastBluetoothLyricPayload = payload
-        playerManager.updateBluetoothLyric(payload.first, payload.second)
+        if (playerManager.updateBluetoothLyric(payload.first, payload.second, force = force)) {
+            lastBluetoothLyricPayload = payload
+            bluetoothLyricRetryJob?.cancel()
+        } else {
+            scheduleBluetoothLyricRetry()
+        }
+    }
+
+    private fun scheduleBluetoothLyricRetry() {
+        bluetoothLyricRetryJob?.cancel()
+        val scheduledSongKey = currentSong.value?.lyricIdentityKey()
+        bluetoothLyricRetryJob = viewModelScope.launch {
+            delay(MediaNotificationLyricPatchPolicy.MIN_PATCH_INTERVAL_MS)
+            if (currentSong.value?.lyricIdentityKey() != scheduledSongKey) return@launch
+            if (!bluetoothLyricEnabled || !isPlaying.value) return@launch
+            resendBluetoothLyric(force = true)
+        }
     }
 
     private fun startPositionUpdates() {
@@ -629,6 +651,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     // Clear external bridge state before async fetch to prevent stale lyrics
                     lastTickerPayload = null
                     lastBluetoothLyricPayload = null
+                    bluetoothLyricRetryJob?.cancel()
                     lyricGetterBridge.clearLyric()
                     tickerBridge.clearLyric()
                     if (desktopLyricHideWhenPausedEnabled) {
@@ -689,6 +712,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         lyricGetterBridge.clearLyric()
                         playerManager.clearBluetoothLyric()
                         lastBluetoothLyricPayload = null
+                        bluetoothLyricRetryJob?.cancel()
                     } else {
                         viewModelScope.launch { resendExternalLyrics(force = true) }
                         resendBluetoothLyric(force = true)
@@ -971,6 +995,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun clearExternalLyrics(clearLyricon: Boolean, clearSuperLyricSong: Boolean) {
         externalLyricResendJob?.cancel()
+        bluetoothLyricRetryJob?.cancel()
         lastTickerPayload = null
         lastBluetoothLyricPayload = null
         tickerBridge.clearLyric()
@@ -1248,6 +1273,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun reloadLyrics(song: Song, force: Boolean = false) {
         lastTickerPayload = null
         lastBluetoothLyricPayload = null
+        bluetoothLyricRetryJob?.cancel()
         val availability = repository.getLyricFormatAvailability(song)
         _lyricFormatAvailability.value = availability
         val formatOverride = _preferTtmlLyrics.value.takeIf { availability.hasBoth }
@@ -1486,6 +1512,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (enabled) {
                 resendBluetoothLyric()
             } else {
+                bluetoothLyricRetryJob?.cancel()
                 playerManager.clearBluetoothLyric()
             }
         }
