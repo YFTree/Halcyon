@@ -1384,16 +1384,19 @@ class ExoPlayerManager(private val context: Context) {
 
         runCatching {
             val cachedArtwork = notificationArtworkCache.get(song.notificationArtworkKey())
+            val targetMetadata = song.mediaMetadata(
+                artworkData = cachedArtwork,
+                includeArtworkUri = cachedArtwork != null
+            ).withPatchedExtrasFrom(currentItem, PATCH_REASON_BASE_SESSION_METADATA)
             sessionMetadataSongKey = songKey
+            if (currentItem.mediaMetadata.matchesNotificationDisplay(targetMetadata)) {
+                Log.d(TIMING_TAG, "base metadata already current mediaId=${song.id}")
+                return@runCatching
+            }
             controller.replaceMediaItem(
                 index,
                 currentItem.buildUpon()
-                    .setMediaMetadata(
-                        song.mediaMetadata(
-                            artworkData = cachedArtwork,
-                            includeArtworkUri = cachedArtwork != null
-                        ).withPatchedExtrasFrom(currentItem, PATCH_REASON_BASE_SESSION_METADATA)
-                    )
+                    .setMediaMetadata(targetMetadata)
                     .build()
             )
             Log.d(TIMING_TAG, "base metadata updated mediaId=${song.id}")
@@ -1479,13 +1482,16 @@ class ExoPlayerManager(private val context: Context) {
         if (!latestItem.matchesSong(song)) return
         runCatching {
             artworkAppliedSongKey = song.notificationArtworkKey()
+            val targetMetadata = song.mediaMetadata(artworkData = artworkData)
+                .withPatchedExtrasFrom(latestItem, PATCH_REASON_NOTIFICATION_ARTWORK)
+            if (latestItem.mediaMetadata.matchesNotificationDisplay(targetMetadata)) {
+                Log.d(TIMING_TAG, "artwork metadata already current mediaId=${song.id}")
+                return@runCatching
+            }
             controller.replaceMediaItem(
                 index,
                 latestItem.buildUpon()
-                    .setMediaMetadata(
-                        song.mediaMetadata(artworkData = artworkData)
-                            .withPatchedExtrasFrom(latestItem, PATCH_REASON_NOTIFICATION_ARTWORK)
-                    )
+                    .setMediaMetadata(targetMetadata)
                     .build()
             )
             Log.d(TIMING_TAG, "artwork metadata updated mediaId=${song.id}")
@@ -1511,6 +1517,22 @@ class ExoPlayerManager(private val context: Context) {
             songKey = song?.playbackStackKey(),
             nowMs = SystemClock.elapsedRealtime()
         )
+    }
+
+    private fun MediaMetadata.matchesNotificationDisplay(other: MediaMetadata): Boolean {
+        return title?.toString() == other.title?.toString() &&
+            artist?.toString() == other.artist?.toString() &&
+            albumTitle?.toString() == other.albumTitle?.toString() &&
+            artworkUri == other.artworkUri &&
+            artworkData.contentEqualsOrBothNull(other.artworkData)
+    }
+
+    private fun ByteArray?.contentEqualsOrBothNull(other: ByteArray?): Boolean {
+        return when {
+            this == null && other == null -> true
+            this == null || other == null -> false
+            else -> contentEquals(other)
+        }
     }
 
     private fun MediaMetadata.withPatchedExtrasFrom(item: MediaItem, reason: String): MediaMetadata {
