@@ -22,7 +22,8 @@ internal class OPlusLyricHandler(
     private val settingsManager: SettingsManager,
     private val musicRepository: MusicRepository,
     private val serviceScope: CoroutineScope,
-    private val playerProvider: () -> Player?
+    private val playerProvider: () -> Player?,
+    private val onCurrentLyricInfoApplied: () -> Unit = {}
 ) {
     companion object {
         private const val TAG = "PlaybackService"
@@ -155,12 +156,14 @@ internal class OPlusLyricHandler(
         if (oplusLyricInfoJson.isNullOrBlank()) return
 
         oplusLyricInfoReapplyJob = serviceScope.launch {
-            delay(OPlusLyricPublishPolicy.COMPAT_REAPPLY_DELAY_MS)
-            if (!colorOsLockScreenLyricEnabled || oplusLyricInfoSongKey != songKey) return@launch
-            val player = playerProvider() ?: return@launch
-            val song = player.currentMediaItem?.toSongFromMediaItemExtras() ?: return@launch
-            if (song.oplusLyricCacheKey(colorOsLockScreenLyricMode) != songKey) return@launch
-            applyCurrentOplusLyricInfo(player, song, oplusLyricInfoJson, force = true)
+            for (delayMs in OPlusLyricPublishPolicy.COMPAT_REAPPLY_DELAYS_MS) {
+                delay(delayMs)
+                if (!colorOsLockScreenLyricEnabled || oplusLyricInfoSongKey != songKey) return@launch
+                val player = playerProvider() ?: return@launch
+                val song = player.currentMediaItem?.toSongFromMediaItemExtras() ?: return@launch
+                if (song.oplusLyricCacheKey(colorOsLockScreenLyricMode) != songKey) return@launch
+                applyCurrentOplusLyricInfo(player, song, oplusLyricInfoJson, force = true)
+            }
         }
     }
 
@@ -288,6 +291,7 @@ internal class OPlusLyricHandler(
 
         runCatching {
             player.replaceMediaItem(index, updatedItem)
+            onCurrentLyricInfoApplied()
             Log.d(TIMING_TAG, "OPlus lyricInfo metadata updated mediaId=${song.id} hasLyric=${!lyricInfoJson.isNullOrBlank()}")
         }.onFailure { error ->
             Log.w(TAG, "Failed to update OPlus lyricInfo metadata for ${song.title}", error)

@@ -137,7 +137,13 @@ class PlaybackService : MediaLibraryService() {
         setMediaNotificationProvider(notificationProvider)
         settingsManager = SettingsManager.getInstance(this)
         musicRepository = MusicRepository.getInstance(this)
-        oplusLyricHandler = OPlusLyricHandler(settingsManager, musicRepository, serviceScope) { mediaSession?.player }
+        oplusLyricHandler = OPlusLyricHandler(
+            settingsManager,
+            musicRepository,
+            serviceScope,
+            playerProvider = { mediaSession?.player },
+            onCurrentLyricInfoApplied = { notificationProvider.refresh() }
+        )
         var webDavConfig = currentWebDavConfig(settingsManager)
         appShuffleEnabled = loadAppShuffleEnabled()
         previousButtonAction = runBlocking(Dispatchers.IO) {
