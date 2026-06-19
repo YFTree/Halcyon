@@ -96,6 +96,8 @@ class PlaybackService : MediaLibraryService() {
         private const val LIBRARY_QUEUE_ID = "ella_music_current_queue"
         private const val PLAYBACK_PREFS = "ella_playback_state"
         private const val KEY_APP_SHUFFLE = "app_shuffle_enabled"
+        const val ACTION_TOGGLE_TRANSLATION =
+            "io.github.andrealtb.lockscreenlyrics.action.TOGGLE_TRANSLATION"
         const val ACTION_TOGGLE_FAVORITE = "com.ella.music.action.TOGGLE_FAVORITE"
         const val ACTION_TOGGLE_SHUFFLE = "com.ella.music.action.TOGGLE_SHUFFLE"
         const val ACTION_SKIP_PREVIOUS = "com.ella.music.action.SKIP_PREVIOUS"
@@ -145,7 +147,10 @@ class PlaybackService : MediaLibraryService() {
             musicRepository,
             serviceScope,
             playerProvider = { mediaSession?.player },
-            onCurrentLyricInfoApplied = { notificationProvider.refresh() }
+            onCurrentLyricInfoApplied = {
+                updateMediaButtonPreferences()
+                notificationProvider.refresh()
+            }
         )
         var webDavConfig = currentWebDavConfig(settingsManager)
         appShuffleEnabled = loadAppShuffleEnabled()
@@ -184,6 +189,7 @@ class PlaybackService : MediaLibraryService() {
                 } else {
                     oplusLyricHandler.clearCurrentOplusLyricInfo()
                 }
+                updateMediaButtonPreferences()
             }
         }
         serviceScope.launch {
@@ -194,6 +200,7 @@ class PlaybackService : MediaLibraryService() {
                     oplusLyricHandler.clearCurrentOplusLyricInfo()
                     oplusLyricHandler.refreshCurrentOplusLyricInfo()
                 }
+                updateMediaButtonPreferences()
             }
         }
         serviceScope.launch {
@@ -276,6 +283,7 @@ class PlaybackService : MediaLibraryService() {
             }
 
             override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
+                updateMediaButtonPreferences()
                 oplusLyricHandler.scheduleOplusLyricInfoRefreshBurst(player)
             }
 
@@ -464,6 +472,11 @@ class PlaybackService : MediaLibraryService() {
                 true
             }
 
+            ACTION_TOGGLE_TRANSLATION -> {
+                AppLogStore.info(this, TAG, "Lockscreen translation action delegated to bridge module")
+                true
+            }
+
             else -> false
         }
     }
@@ -481,6 +494,14 @@ class PlaybackService : MediaLibraryService() {
         appShuffleEnabled = loadAppShuffleEnabled()
         val playbackModeAction = player.notificationPlaybackModeAction()
         val buttons = mutableListOf<CommandButton>()
+
+        if (player.shouldPublishOplusTranslationAction()) {
+            buttons += CommandButton.Builder()
+                .setDisplayName(getString(R.string.settings_status_secondary_translation))
+                .setIconResId(R.drawable.ic_shortcut_lyricist)
+                .setSessionCommand(SessionCommand(ACTION_TOGGLE_TRANSLATION, Bundle.EMPTY))
+                .build()
+        }
 
         buttons += CommandButton.Builder()
             .setDisplayName(if (isFavorite) getString(R.string.common_unfavorite) else getString(R.string.common_favorite))
@@ -525,6 +546,16 @@ class PlaybackService : MediaLibraryService() {
             .build()
 
         session.setMediaButtonPreferences(ImmutableList.copyOf(buttons))
+    }
+
+    private fun Player.shouldPublishOplusTranslationAction(): Boolean {
+        val lyricInfoJson = currentMediaItem?.mediaMetadata?.extras
+            ?.getString(OPlusLyricHandler.OPLUS_LYRIC_INFO_KEY)
+        return OPlusTranslationActionPolicy.shouldPublish(
+            colorOsLyricEnabled = colorOsLockScreenLyricEnabled,
+            deliveryMode = oplusLyricHandler.colorOsLockScreenLyricMode,
+            lyricInfoJson = lyricInfoJson
+        )
     }
 
     private data class MediaButtonPlaybackModeAction(
@@ -686,6 +717,7 @@ class PlaybackService : MediaLibraryService() {
         ): MediaSession.ConnectionResult {
             val sessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
                 .buildUpon()
+                .add(SessionCommand(ACTION_TOGGLE_TRANSLATION, Bundle.EMPTY))
                 .add(SessionCommand(ACTION_TOGGLE_FAVORITE, Bundle.EMPTY))
                 .add(SessionCommand(ACTION_TOGGLE_SHUFFLE, Bundle.EMPTY))
                 .build()
