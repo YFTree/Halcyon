@@ -97,6 +97,9 @@ internal fun SettingsLyricOutputControls(
     val bluetoothLyricTranslation by settingsManager.bluetoothLyricTranslation.collectAsState(initial = true)
     val bluetoothLyricPronunciation by settingsManager.bluetoothLyricPronunciation.collectAsState(initial = false)
     val colorOsLockScreenLyricEnabled by settingsManager.colorOsLockScreenLyricEnabled.collectAsState(initial = false)
+    val colorOsLockScreenLyricMode by settingsManager.colorOsLockScreenLyricMode.collectAsState(
+        initial = SettingsManager.OPLUS_LYRIC_MODE_SYSTEM
+    )
     val isFlymeDevice = remember {
         Build.MANUFACTURER.orEmpty().contains("meizu", ignoreCase = true) ||
             Build.BRAND.orEmpty().contains("meizu", ignoreCase = true) ||
@@ -104,6 +107,11 @@ internal fun SettingsLyricOutputControls(
     }
     val labels = rememberLyricSecondaryLabels()
     val entries = remember(labels) { labels.map { DropdownItem(title = it) } }
+    val oplusModeLabels = listOf(
+        stringResource(R.string.settings_coloros_lock_screen_lyric_mode_system),
+        stringResource(R.string.settings_coloros_lock_screen_lyric_mode_module)
+    )
+    val oplusModeEntries = remember(oplusModeLabels) { oplusModeLabels.map { DropdownItem(title = it) } }
 
     SwitchPreference(
         title = stringResource(R.string.settings_enable_super_lyric),
@@ -233,6 +241,28 @@ internal fun SettingsLyricOutputControls(
         checked = colorOsLockScreenLyricEnabled,
         onCheckedChange = { enabled ->
             scope.launch { settingsManager.setColorOsLockScreenLyricEnabled(enabled) }
+        }
+    )
+
+    WindowSpinnerPreference(
+        title = stringResource(R.string.settings_coloros_lock_screen_lyric_mode),
+        summary = stringResource(
+            R.string.settings_current_value,
+            oplusModeLabels[colorOsLockScreenLyricMode.coerceIn(0, oplusModeLabels.lastIndex)]
+        ),
+        enabled = colorOsLockScreenLyricEnabled,
+        items = oplusModeEntries,
+        selectedIndex = colorOsLockScreenLyricMode.coerceIn(0, oplusModeLabels.lastIndex),
+        onSelectedIndexChange = { index ->
+            scope.launch {
+                settingsManager.setColorOsLockScreenLyricMode(
+                    if (index == SettingsManager.OPLUS_LYRIC_MODE_MODULE) {
+                        SettingsManager.OPLUS_LYRIC_MODE_MODULE
+                    } else {
+                        SettingsManager.OPLUS_LYRIC_MODE_SYSTEM
+                    }
+                )
+            }
         }
     )
 

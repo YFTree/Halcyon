@@ -900,6 +900,9 @@
     <string name="settings_heads_up_lyric_secondary">橫幅歌詞通知副行內容</string>
     <string name="settings_enable_coloros_lock_screen_lyric">ColorOS 鎖屏島歌詞</string>
     <string name="settings_enable_coloros_lock_screen_lyric_summary">透過 MediaMetadata[&quot;lyricInfo&quot;] 向 ColorOS 鎖屏島傳送整首 LRC 歌詞，部分系統版本可能仍受白名單限制。</string>
+    <string name="settings_coloros_lock_screen_lyric_mode">歌詞傳遞模式</string>
+    <string name="settings_coloros_lock_screen_lyric_mode_system">使用系統</string>
+    <string name="settings_coloros_lock_screen_lyric_mode_module">使用模組</string>
     <string name="settings_enable_bluetooth_lyric">啟用媒體通知歌詞</string>
     <string name="settings_enable_bluetooth_lyric_summary">將目前歌詞寫入媒體通知標題，供藍牙裝置、車用主機或媒體中心顯示。</string>
     <string name="settings_bluetooth_lyric_translation">媒體通知歌詞傳送翻譯</string>

@@ -43,6 +43,8 @@ internal class OPlusLyricHandler(
     }
     @Volatile
     var colorOsLockScreenLyricEnabled = false
+    @Volatile
+    var colorOsLockScreenLyricMode = SettingsManager.OPLUS_LYRIC_MODE_SYSTEM
 
     fun refreshCurrentOplusLyricInfo(player: Player? = playerProvider()) {
         val currentPlayer = player ?: return
@@ -59,8 +61,9 @@ internal class OPlusLyricHandler(
             return
         }
 
-        val songKey = song.playbackStackKey()
-        val existingLyricInfoJson = currentItem.oplusLyricInfoJsonFor(song)
+        val deliveryMode = colorOsLockScreenLyricMode
+        val songKey = song.oplusLyricCacheKey(deliveryMode)
+        val existingLyricInfoJson = currentItem.oplusLyricInfoJsonFor(song, deliveryMode)
         if (existingLyricInfoJson != null) {
             oplusLyricInfoCache[songKey] = existingLyricInfoJson
             oplusLyricInfoSongKey = songKey
@@ -90,7 +93,7 @@ internal class OPlusLyricHandler(
         oplusLyricInfoJob = serviceScope.launch {
             try {
                 val lyricInfoJson = runCatching {
-                    loadOplusLyricInfoJson(song)
+                    loadOplusLyricInfoJson(song, deliveryMode)
                 }.getOrElse { error ->
                     Log.w(TAG, "Failed to prepare OPlus lyricInfo for ${song.title}", error)
                     null
@@ -98,7 +101,8 @@ internal class OPlusLyricHandler(
 
                 val latestPlayer = playerProvider() ?: return@launch
                 val latestSong = latestPlayer.currentMediaItem?.toSongFromMediaItemExtras()
-                if (latestSong?.playbackStackKey() != songKey) return@launch
+                if (latestSong?.oplusLyricCacheKey(deliveryMode) != songKey) return@launch
+                if (colorOsLockScreenLyricMode != deliveryMode) return@launch
 
                 oplusLyricInfoSongKey = songKey
                 oplusLyricInfoJson = lyricInfoJson
@@ -154,7 +158,7 @@ internal class OPlusLyricHandler(
                 if (!colorOsLockScreenLyricEnabled || oplusLyricInfoSongKey != songKey) return@launch
                 val player = playerProvider() ?: return@launch
                 val song = player.currentMediaItem?.toSongFromMediaItemExtras() ?: return@launch
-                if (song.playbackStackKey() != songKey) return@launch
+                if (song.oplusLyricCacheKey(colorOsLockScreenLyricMode) != songKey) return@launch
                 applyCurrentOplusLyricInfo(player, song, oplusLyricInfoJson)
             }
         }
@@ -178,13 +182,14 @@ internal class OPlusLyricHandler(
     private fun prefetchAdjacentOplusLyricInfo(player: Player? = playerProvider()) {
         val currentPlayer = player ?: return
         if (!colorOsLockScreenLyricEnabled || currentPlayer.mediaItemCount < 2) return
+        val deliveryMode = colorOsLockScreenLyricMode
 
         for (targetIndex in currentPlayer.oplusLyricPrefetchIndices()) {
             val targetItem = currentPlayer.getMediaItemAt(targetIndex)
             val targetSong = targetItem.toSongFromMediaItemExtras() ?: continue
-            val targetSongKey = targetSong.playbackStackKey()
+            val targetSongKey = targetSong.oplusLyricCacheKey(deliveryMode)
 
-            if (targetItem.oplusLyricInfoJsonFor(targetSong) != null) continue
+            if (targetItem.oplusLyricInfoJsonFor(targetSong, deliveryMode) != null) continue
             if (oplusLyricInfoCache.containsKey(targetSongKey)) {
                 oplusLyricInfoCache[targetSongKey]?.let { cachedJson ->
                     applyOplusLyricInfoToQueueItem(currentPlayer, targetIndex, targetSong, cachedJson)
@@ -197,7 +202,7 @@ internal class OPlusLyricHandler(
             prefetchJob = serviceScope.launch(start = CoroutineStart.LAZY) {
                 try {
                     val lyricInfoJson = runCatching {
-                        loadOplusLyricInfoJson(targetSong)
+                        loadOplusLyricInfoJson(targetSong, deliveryMode)
                     }.getOrElse { error ->
                         Log.w(TAG, "Failed to prefetch OPlus lyricInfo for ${targetSong.title}", error)
                         null
@@ -207,6 +212,7 @@ internal class OPlusLyricHandler(
 
                     val latestPlayer = playerProvider() ?: return@launch
                     if (targetIndex >= latestPlayer.mediaItemCount) return@launch
+                    if (colorOsLockScreenLyricMode != deliveryMode) return@launch
                     val latestItem = latestPlayer.getMediaItemAt(targetIndex)
                     if (!latestItem.matchesSong(targetSong)) return@launch
                     applyOplusLyricInfoToQueueItem(latestPlayer, targetIndex, targetSong, lyricInfoJson)
@@ -256,7 +262,11 @@ internal class OPlusLyricHandler(
         } else {
             if (currentJson == lyricInfoJson && currentRawLyric == rawLyric) return
             extras.putString(OPLUS_LYRIC_INFO_KEY, lyricInfoJson)
-            rawLyric?.let { extras.putString(OPLUS_RAW_LYRIC_KEY, it) }
+            if (rawLyric != null) {
+                extras.putString(OPLUS_RAW_LYRIC_KEY, rawLyric)
+            } else {
+                extras.remove(OPLUS_RAW_LYRIC_KEY)
+            }
         }
         extras.markMetadataOnlyPatch(PATCH_REASON_OPLUS_LYRIC)
 
@@ -285,7 +295,11 @@ internal class OPlusLyricHandler(
             extras.getString(OPLUS_RAW_LYRIC_KEY) == rawLyric
         ) return
         extras.putString(OPLUS_LYRIC_INFO_KEY, lyricInfoJson)
-        rawLyric?.let { extras.putString(OPLUS_RAW_LYRIC_KEY, it) }
+        if (rawLyric != null) {
+            extras.putString(OPLUS_RAW_LYRIC_KEY, rawLyric)
+        } else {
+            extras.remove(OPLUS_RAW_LYRIC_KEY)
+        }
         extras.markMetadataOnlyPatch(PATCH_REASON_OPLUS_LYRIC)
 
         val updatedItem = mediaItem.buildUpon()
@@ -312,20 +326,20 @@ internal class OPlusLyricHandler(
         return localConfiguration?.uri?.toString().orEmpty() == song.path
     }
 
-    private fun MediaItem.oplusLyricInfoJsonFor(song: Song): String? {
+    private fun MediaItem.oplusLyricInfoJsonFor(song: Song, mode: Int): String? {
         val raw = mediaMetadata.extras
             ?.getString(OPLUS_LYRIC_INFO_KEY)
             ?.takeIf { it.isNotBlank() }
             ?: return null
-        return raw.takeIf { it.matchesOplusLyricSong(song) }
+        return raw.takeIf { it.matchesOplusLyricSong(song) && OPlusLyricPayload.matchesMode(it, mode) }
     }
 
-    private suspend fun loadOplusLyricInfoJson(song: Song): String? {
+    private suspend fun loadOplusLyricInfoJson(song: Song, mode: Int): String? {
         val sourceMode = settingsManager.lyricSourceMode.first()
         val offsetMs = settingsManager.lyricOffsetOverrides.first()[song.oplusLyricOffsetKey()] ?: 0L
         return musicRepository.getLyrics(song, sourceMode)
             .shiftedBy(offsetMs)
-            .let { lyrics -> OPlusLyricPayload.build(song, lyrics) }
+            .let { lyrics -> OPlusLyricPayload.build(song, lyrics, mode) }
     }
 
     private fun String.matchesOplusLyricSong(song: Song): Boolean {
@@ -339,4 +353,7 @@ internal class OPlusLyricHandler(
             else -> "id:$id"
         }
     }
+
+    private fun Song.oplusLyricCacheKey(mode: Int): String =
+        "$mode:${playbackStackKey()}"
 }

@@ -3,13 +3,32 @@ package com.ella.music.player
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
 import com.ella.music.data.model.Song
+import com.ella.music.data.SettingsManager
 import java.util.Locale
 
 internal object OPlusLyricPayload {
     const val RAW_LYRIC_INFO_KEY = "rawLyric"
     const val TRANSLATION_LYRIC_INFO_KEY = "translationLyric"
 
-    fun build(song: Song, lyrics: List<LyricLine>): String? {
+    fun build(song: Song, lyrics: List<LyricLine>, mode: Int = SettingsManager.OPLUS_LYRIC_MODE_MODULE): String? {
+        return if (mode == SettingsManager.OPLUS_LYRIC_MODE_SYSTEM) {
+            buildSystemPayload(song, lyrics)
+        } else {
+            buildModulePayload(song, lyrics)
+        }
+    }
+
+    fun buildSystemPayload(song: Song, lyrics: List<LyricLine>): String? {
+        val lrc = lyrics.toOplusLrc().takeIf { it.isNotBlank() } ?: return null
+        return buildJsonObject(
+            "songName" to song.title,
+            "artist" to song.artist,
+            "songId" to song.oplusLyricSongId(),
+            "lyric" to lrc
+        )
+    }
+
+    fun buildModulePayload(song: Song, lyrics: List<LyricLine>): String? {
         val lrc = lyrics.toOplusLrc().takeIf { it.isNotBlank() } ?: return null
         val rawLyric = lyrics.toOplusRawLyric().takeIf { it.isNotBlank() } ?: lrc
         val translationLyric = lyrics.toOplusTranslationLyric().takeIf { it.isNotBlank() }
@@ -24,6 +43,16 @@ internal object OPlusLyricPayload {
             fields += TRANSLATION_LYRIC_INFO_KEY to translationLyric
         }
         return buildJsonObject(*fields.toTypedArray())
+    }
+
+    fun matchesMode(rawJson: String, mode: Int): Boolean {
+        val hasRawLyric = rawLyric(rawJson) != null
+        val hasTranslationLyric = stringField(rawJson, TRANSLATION_LYRIC_INFO_KEY)?.isNotBlank() == true
+        return if (mode == SettingsManager.OPLUS_LYRIC_MODE_SYSTEM) {
+            !hasRawLyric && !hasTranslationLyric
+        } else {
+            hasRawLyric
+        }
     }
 
     fun matchesSong(rawJson: String, song: Song): Boolean {

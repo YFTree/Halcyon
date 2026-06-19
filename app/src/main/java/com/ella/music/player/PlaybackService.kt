@@ -146,6 +146,9 @@ class PlaybackService : MediaLibraryService() {
         colorOsLockScreenLyricEnabled = runBlocking(Dispatchers.IO) {
             settingsManager.colorOsLockScreenLyricEnabled.first()
         }
+        oplusLyricHandler.colorOsLockScreenLyricMode = runBlocking(Dispatchers.IO) {
+            settingsManager.colorOsLockScreenLyricMode.first()
+        }
         val httpDataSourceFactory = OkHttpDataSource.Factory(
             WebDavClient.newAuthenticatedOkHttpClient { webDavConfig }
         )
@@ -170,6 +173,16 @@ class PlaybackService : MediaLibraryService() {
                     oplusLyricHandler.refreshCurrentOplusLyricInfo()
                 } else {
                     oplusLyricHandler.clearCurrentOplusLyricInfo()
+                }
+            }
+        }
+        serviceScope.launch {
+            settingsManager.colorOsLockScreenLyricMode.collect { mode ->
+                if (oplusLyricHandler.colorOsLockScreenLyricMode == mode) return@collect
+                oplusLyricHandler.colorOsLockScreenLyricMode = mode
+                if (colorOsLockScreenLyricEnabled) {
+                    oplusLyricHandler.clearCurrentOplusLyricInfo()
+                    oplusLyricHandler.refreshCurrentOplusLyricInfo()
                 }
             }
         }

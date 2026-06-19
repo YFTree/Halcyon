@@ -900,6 +900,9 @@
     <string name="settings_heads_up_lyric_secondary">Ligne secondaire des paroles en notification flottante</string>
     <string name="settings_enable_coloros_lock_screen_lyric">Paroles de l’ilot d’écran verrouillé ColorOS</string>
     <string name="settings_enable_coloros_lock_screen_lyric_summary">Envoie les paroles LRC complètes à l’ilot d’écran verrouillé ColorOS via MediaMetadata[&quot;lyricInfo&quot;]. Certaines versions du système peuvent encore limiter les apps prises en charge.</string>
+    <string name="settings_coloros_lock_screen_lyric_mode">Lyric delivery mode</string>
+    <string name="settings_coloros_lock_screen_lyric_mode_system">Use system</string>
+    <string name="settings_coloros_lock_screen_lyric_mode_module">Use module</string>
     <string name="settings_enable_bluetooth_lyric">Activer les paroles dans la notification média</string>
     <string name="settings_enable_bluetooth_lyric_summary">Écrire la parole actuelle dans le titre de la notification média pour les appareils Bluetooth, les systèmes embarqués ou les centres multimédias.</string>
     <string name="settings_bluetooth_lyric_translation">Envoyer la traduction aux paroles de notification média</string>

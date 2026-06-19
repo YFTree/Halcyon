@@ -246,6 +246,7 @@ class SettingsManager(private val context: Context) {
         val KEY_BLUETOOTH_LYRIC_TRANSLATION = booleanPreferencesKey("bluetooth_lyric_translation")
         val KEY_BLUETOOTH_LYRIC_PRONUNCIATION = booleanPreferencesKey("bluetooth_lyric_pronunciation")
         val KEY_COLOROS_LOCK_SCREEN_LYRIC_ENABLED = booleanPreferencesKey("coloros_lock_screen_lyric_enabled")
+        val KEY_COLOROS_LOCK_SCREEN_LYRIC_MODE = intPreferencesKey("coloros_lock_screen_lyric_mode")
 
         const val SHUFFLE_MODE_PSEUDO = 0
         const val SHUFFLE_MODE_TRUE_RANDOM = 1
@@ -256,6 +257,9 @@ class SettingsManager(private val context: Context) {
 
         const val PLAY_NEXT_MODE_REVERSE_STACK = 0
         const val PLAY_NEXT_MODE_FORWARD_STACK = 1
+
+        const val OPLUS_LYRIC_MODE_SYSTEM = 0
+        const val OPLUS_LYRIC_MODE_MODULE = 1
 
         const val STARTUP_PLAY_OFF = 0
         const val STARTUP_PLAY_RANDOM = 1
@@ -396,8 +400,15 @@ class SettingsManager(private val context: Context) {
             return requested
                 .ifEmpty { DEFAULT_BOTTOM_DOCK_ITEMS.split(',') }
                 .joinToString(",")
-        }
     }
+    }
+
+    private fun Int.coerceInOplusLyricMode(): Int =
+        if (this == OPLUS_LYRIC_MODE_MODULE) {
+            OPLUS_LYRIC_MODE_MODULE
+        } else {
+            OPLUS_LYRIC_MODE_SYSTEM
+        }
 
     private fun metadataCategorySortKey(type: String): Preferences.Key<Int> =
         intPreferencesKey("sort_metadata_category_${type.safePreferenceSuffix()}")
@@ -805,6 +816,8 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_BLUETOOTH_LYRIC_PRONUNCIATION] ?: false }
     val colorOsLockScreenLyricEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_COLOROS_LOCK_SCREEN_LYRIC_ENABLED] ?: false }
+    val colorOsLockScreenLyricMode: Flow<Int> =
+        context.dataStore.data.map { (it[KEY_COLOROS_LOCK_SCREEN_LYRIC_MODE] ?: OPLUS_LYRIC_MODE_SYSTEM).coerceInOplusLyricMode() }
     suspend fun setLyriconEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRICON_ENABLED] = enabled }
     }
@@ -939,6 +952,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setColorOsLockScreenLyricEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_COLOROS_LOCK_SCREEN_LYRIC_ENABLED] = enabled }
+    }
+
+    suspend fun setColorOsLockScreenLyricMode(mode: Int) {
+        context.dataStore.edit { it[KEY_COLOROS_LOCK_SCREEN_LYRIC_MODE] = mode.coerceInOplusLyricMode() }
     }
 
     suspend fun setMinDurationSec(seconds: Int) {
@@ -1862,6 +1879,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_PREVIOUS_BUTTON_ACTION)
             setInt(KEY_PLAY_NEXT_MODE)
             setInt(KEY_STARTUP_PLAY_MODE)
+            setInt(KEY_COLOROS_LOCK_SCREEN_LYRIC_MODE)
             setInt(KEY_LYRIC_SOURCE_MODE)
             setInt(KEY_PLAYER_LYRIC_TEXT_ALIGN)
             setInt(KEY_DESKTOP_LYRIC_FONT_SCALE)

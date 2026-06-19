@@ -3,16 +3,46 @@ package com.ella.music.player
 import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.LyricWord
 import com.ella.music.data.model.Song
+import com.ella.music.data.SettingsManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OPlusLyricPayloadTest {
     @Test
-    fun payloadSplitsNativeLyricWordTimedRawLyricAndTranslation() {
+    fun systemPayloadOnlyContainsPlainOriginalLyric() {
         val song = song()
         val payload = OPlusLyricPayload.build(
             song = song,
+            mode = SettingsManager.OPLUS_LYRIC_MODE_SYSTEM,
+            lyrics = listOf(
+                LyricLine(
+                    timeMs = 1_000L,
+                    text = "Hello world",
+                    words = listOf(
+                        LyricWord("Hello", 1_000L, 1_500L),
+                        LyricWord("world", 1_500L, 2_200L)
+                    ),
+                    translation = "你好世界",
+                    endMs = 2_200L
+                )
+            )
+        )
+
+        val json = payload ?: error("payload is null")
+        assertEquals("[00:01.00]Hello world", OPlusLyricPayload.stringField(json, "lyric"))
+        assertEquals(null, OPlusLyricPayload.stringField(json, "rawLyric"))
+        assertEquals(null, OPlusLyricPayload.stringField(json, "translationLyric"))
+        assertTrue(OPlusLyricPayload.matchesSong(json, song))
+        assertTrue(OPlusLyricPayload.matchesMode(json, SettingsManager.OPLUS_LYRIC_MODE_SYSTEM))
+    }
+
+    @Test
+    fun modulePayloadSplitsNativeLyricWordTimedRawLyricAndTranslation() {
+        val song = song()
+        val payload = OPlusLyricPayload.build(
+            song = song,
+            mode = SettingsManager.OPLUS_LYRIC_MODE_MODULE,
             lyrics = listOf(
                 LyricLine(
                     timeMs = 1_000L,
@@ -35,12 +65,14 @@ class OPlusLyricPayloadTest {
         )
         assertEquals("[00:01.000]你好世界", OPlusLyricPayload.stringField(json, "translationLyric"))
         assertTrue(OPlusLyricPayload.matchesSong(json, song))
+        assertTrue(OPlusLyricPayload.matchesMode(json, SettingsManager.OPLUS_LYRIC_MODE_MODULE))
     }
 
     @Test
-    fun rawLyricFallsBackToPlainTimedLineWhenWordsAreMissing() {
+    fun moduleRawLyricFallsBackToPlainTimedLineWhenWordsAreMissing() {
         val payload = OPlusLyricPayload.build(
             song = song(),
+            mode = SettingsManager.OPLUS_LYRIC_MODE_MODULE,
             lyrics = listOf(LyricLine(timeMs = 2_345L, text = "Plain line"))
         )
 
