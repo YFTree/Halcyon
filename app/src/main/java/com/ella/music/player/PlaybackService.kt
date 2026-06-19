@@ -53,6 +53,8 @@ import com.ella.music.data.webdav.WebDavConfig
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +67,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import android.os.Bundle
 import org.json.JSONObject
 import java.util.Locale
@@ -152,6 +155,7 @@ class PlaybackService : MediaLibraryService() {
         colorOsLockScreenLyricEnabled = runBlocking(Dispatchers.IO) {
             settingsManager.colorOsLockScreenLyricEnabled.first()
         }
+        oplusLyricHandler.colorOsLockScreenLyricEnabled = colorOsLockScreenLyricEnabled
         oplusLyricHandler.colorOsLockScreenLyricMode = runBlocking(Dispatchers.IO) {
             settingsManager.colorOsLockScreenLyricMode.first()
         }
@@ -703,6 +707,44 @@ class PlaybackService : MediaLibraryService() {
                 SessionResult(SessionResult.RESULT_ERROR_NOT_SUPPORTED)
             }
             return Futures.immediateFuture(result)
+        }
+
+        override fun onSetMediaItems(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: List<MediaItem>,
+            startIndex: Int,
+            startPositionMs: Long
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+            val result = SettableFuture.create<MediaSession.MediaItemsWithStartPosition>()
+            val job = service.serviceScope.launch(Dispatchers.IO) {
+                val preparedItems = try {
+                    withTimeoutOrNull(1_500L) {
+                        service.oplusLyricHandler.prepareInitialOplusLyricInfo(mediaItems, startIndex)
+                    } ?: mediaItems
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Throwable) {
+                    Log.w(TAG, "Failed to attach OPlus lyricInfo before initial publish", error)
+                    mediaItems
+                }
+                result.set(
+                    MediaSession.MediaItemsWithStartPosition(
+                        preparedItems,
+                        startIndex,
+                        startPositionMs
+                    )
+                )
+            }
+            job.invokeOnCompletion { cause ->
+                if (cause == null || result.isDone) return@invokeOnCompletion
+                if (cause is CancellationException) {
+                    result.cancel(false)
+                } else {
+                    result.setException(cause)
+                }
+            }
+            return result
         }
 
         override fun onGetLibraryRoot(

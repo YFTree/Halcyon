@@ -43,7 +43,11 @@ object EnhancedLrcParser : ILyricsParser {
         return timestampPattern.matches(s.trim())
     }
 
-    private fun proceduralParseSyllables(content: String, bracketType: BracketType = BracketType.ANGLE): List<KaraokeSyllable> {
+    private fun proceduralParseSyllables(
+        content: String,
+        bracketType: BracketType = BracketType.ANGLE,
+        fallbackStart: Int? = null
+    ): List<KaraokeSyllable> {
         if (content.isBlank()) return emptyList()
 
         val syllables = mutableListOf<KaraokeSyllable>()
@@ -54,6 +58,21 @@ object EnhancedLrcParser : ILyricsParser {
         }
 
         val matches = syllableRegex.findAll(content).toList()
+        val firstInlineTime = matches.asSequence()
+            .mapNotNull { match ->
+                match.groupValues[1]
+                    .trim()
+                    .takeIf(::isTimestamp)
+                    ?.let { runCatching { it.parseAsTime() }.getOrNull() }
+            }
+            .firstOrNull()
+        val leadingText = matches.firstOrNull()
+            ?.let { content.substring(0, it.range.first) }
+            .orEmpty()
+        if (leadingText.isNotEmpty() && fallbackStart != null && firstInlineTime != null) {
+            val leadingStart = if (firstInlineTime < fallbackStart) 0 else fallbackStart
+            syllables.add(KaraokeSyllable(leadingText, leadingStart, leadingStart))
+        }
 
         for (match in matches) {
             val tsPart = match.groupValues[1].trim()
@@ -144,9 +163,12 @@ object EnhancedLrcParser : ILyricsParser {
         // 检测内容中使用的括号类型
         val bracketType = detectBracketType(content, bgTag)
 
-        val bgSyllables = bgTag?.let { proceduralParseSyllables(it, bracketType) } ?: emptyList()
+        val firstTimestamp = timestamps.firstOrNull() ?: 0
+        val bgSyllables = bgTag?.let {
+            proceduralParseSyllables(it, bracketType, fallbackStart = firstTimestamp)
+        } ?: emptyList()
         val mainSyllables = if (timestamps.isNotEmpty() && content.isNotBlank()) {
-            proceduralParseSyllables(content, bracketType)
+            proceduralParseSyllables(content, bracketType, fallbackStart = firstTimestamp)
         } else emptyList()
 
         val voiceMatch = voiceParser.find(content)
@@ -157,7 +179,6 @@ object EnhancedLrcParser : ILyricsParser {
         }
         val textContent = voiceMatch?.groupValues?.get(2)?.trim() ?: content
 
-        val firstTimestamp = timestamps.firstOrNull() ?: 0
         val isRelative = mainSyllables.firstOrNull()?.start?.let { it < firstTimestamp } ?: false
         val bgIsRelative = bgSyllables.firstOrNull()?.start?.let { it < firstTimestamp } ?: false
 

@@ -11,6 +11,7 @@ import com.ella.music.data.SettingsManager
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.shiftedBy
 import com.ella.music.data.repository.MusicRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -48,6 +49,38 @@ internal class OPlusLyricHandler(
     var colorOsLockScreenLyricEnabled = false
     @Volatile
     var colorOsLockScreenLyricMode = SettingsManager.OPLUS_LYRIC_MODE_SYSTEM
+
+    suspend fun prepareInitialOplusLyricInfo(
+        mediaItems: List<MediaItem>,
+        startIndex: Int
+    ): List<MediaItem> {
+        if (!colorOsLockScreenLyricEnabled || startIndex !in mediaItems.indices) return mediaItems
+        val item = mediaItems[startIndex]
+        val song = item.toSongFromMediaItemExtras() ?: return mediaItems
+        val deliveryMode = colorOsLockScreenLyricMode
+        val existing = item.oplusLyricInfoJsonFor(song, deliveryMode)
+        if (existing != null) return mediaItems
+        val lyricInfoJson = try {
+            loadOplusLyricInfoJson(song, deliveryMode)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Log.w(TAG, "Failed to prepare initial OPlus lyricInfo for ${song.title}", error)
+            null
+        } ?: return mediaItems
+
+        val extras = Bundle(item.mediaMetadata.extras ?: Bundle.EMPTY).apply {
+            putString(OPLUS_LYRIC_INFO_KEY, lyricInfoJson)
+            OPlusLyricPayload.rawLyric(lyricInfoJson)?.let {
+                putString(OPLUS_RAW_LYRIC_KEY, it)
+            }
+        }
+        val preparedItem = item.buildUpon()
+            .setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build())
+            .build()
+        Log.d(TIMING_TAG, "OPlus lyricInfo attached before initial publish mediaId=${song.id}")
+        return mediaItems.toMutableList().apply { this[startIndex] = preparedItem }
+    }
 
     fun refreshCurrentOplusLyricInfo(player: Player? = playerProvider()) {
         val currentPlayer = player ?: return
