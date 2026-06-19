@@ -565,7 +565,11 @@ class PlaybackService : MediaLibraryService() {
                 appShuffleEnabled = true
                 persistAppShuffleEnabled(true)
                 repeatMode = Player.REPEAT_MODE_ALL
-                shuffleModeEnabled = false
+                // Temporary bridge for notification/headset next actions. ExoPlayerManager owns
+                // the deferred Halcyon queue reorder; if it is disconnected, it will adopt this
+                // native shuffle as pending (or disable it if no pending reorder is valid) when
+                // the controller reconnects and refreshes state.
+                shuffleModeEnabled = true
             }
         }
     }
