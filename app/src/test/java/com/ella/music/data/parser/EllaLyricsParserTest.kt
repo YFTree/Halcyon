@@ -103,4 +103,20 @@ class EllaLyricsParserTest {
         assertEquals("ka ku se i READY OK", result.lyrics.single().pronunciation)
         assertEquals("该觉醒了 Ready，ok？", result.lyrics.single().translation)
     }
+
+    @Test
+    fun kugouKrcWordTimingAndTranslationAreParsed() {
+        val result = LrcParser.parse(
+            """
+            [language:eyJjb250ZW50IjpbeyJ0eXBlIjoxLCJseXJpY0NvbnRlbnQiOltbIuS9oOWlveS4lueVjCJdXX1dfQ==]
+            [1000,2000]<0,500,0>Hel<500,500,0>lo
+            """.trimIndent()
+        )
+
+        assertEquals(1, result.lyrics.size)
+        assertEquals("Hello", result.lyrics.single().text)
+        assertEquals("你好世界", result.lyrics.single().translation)
+        assertEquals(listOf("Hel", "lo"), result.lyrics.single().words.map { it.text })
+        assertEquals(listOf(1000L, 1500L), result.lyrics.single().words.map { it.startMs })
+    }
 }
