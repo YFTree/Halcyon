@@ -85,6 +85,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _rawLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     private val _lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val lyrics: StateFlow<List<LyricLine>> = _lyrics.asStateFlow()
+    private val _lyricsLoading = MutableStateFlow(false)
+    val lyricsLoading: StateFlow<Boolean> = _lyricsLoading.asStateFlow()
     private val _currentLyricOffsetMs = MutableStateFlow(0L)
     val currentLyricOffsetMs: StateFlow<Long> = _currentLyricOffsetMs.asStateFlow()
 
@@ -165,6 +167,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         initShuffleMode()
         initPlayNextMode()
         initPreviousButtonAction()
+        initResumePlaybackPosition()
         initDecoderMode()
         initAudioFocusMode()
         initReplayGain()
@@ -472,13 +475,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun initReplayGain() {
         viewModelScope.launch {
             combine(
-                settingsManager.replayGainEnabled.distinctUntilChanged(),
+                settingsManager.replayGainMode.distinctUntilChanged(),
                 currentSong
-            ) { enabled, song -> enabled to song }
-                .collectLatest { (enabled, song) ->
-                    val volume = if (enabled && song != null) {
+            ) { mode, song -> mode to song }
+                .collectLatest { (mode, song) ->
+                    val volume = if (mode != SettingsManager.REPLAY_GAIN_OFF && song != null) {
                         withContext(Dispatchers.IO) {
-                            repository.getReplayGain(song)
+                            repository.getReplayGain(song, mode)
                         }.toReplayGainVolume()
                     } else {
                         1f
@@ -596,6 +599,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun initResumePlaybackPosition() {
+        viewModelScope.launch {
+            settingsManager.resumePlaybackPosition.distinctUntilChanged().collect { enabled ->
+                playerManager.setResumePlaybackPositionEnabled(enabled)
+            }
+        }
+    }
+
     private fun scheduleBluetoothLyricRetry() {
         bluetoothLyricRetryJob?.cancel()
         val scheduledSongKey = currentSong.value?.lyricIdentityKey()
@@ -645,6 +656,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         return@collectLatest
                     }
                     suppressLeadingZeroLyric = true
+                    _lyricsLoading.value = true
                     _rawLyrics.value = emptyList()
                     _lyrics.value = emptyList()
                     _currentLyricIndex.value = -1
@@ -672,6 +684,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     loadedLyricSongKey = songKey
                     setLoadedLyrics(song, songLyrics, notifyExternal = false)
+                    _lyricsLoading.value = false
                     val displayedLyrics = _lyrics.value
 
                     if (lyriconBridge.isEnabled()) {
@@ -685,6 +698,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     loadedLyricSongKey = null
                     suppressLeadingZeroLyric = false
+                    _lyricsLoading.value = false
                     _rawLyrics.value = emptyList()
                     _lyrics.value = emptyList()
                     _currentLyricOffsetMs.value = 0L
@@ -1130,6 +1144,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             settingsManager.setPreviousButtonAction(previousButtonAction)
         }
+    }
+
+    fun setResumePlaybackPositionEnabled(enabled: Boolean) {
+        playerManager.setResumePlaybackPositionEnabled(enabled)
     }
 
     fun setDecoderMode(mode: Int) {

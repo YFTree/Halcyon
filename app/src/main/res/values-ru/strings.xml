@@ -495,6 +495,16 @@
     <string name="settings_audio_screen_title">Аудио</string>
     <string name="settings_replay_gain">ReplayGain выравнивание</string>
     <string name="settings_replay_gain_summary">Автоматическая регулировка громкости воспроизведения с помощью аудиотегов</string>
+    <string name="settings_replay_gain_off">Off</string>
+    <string name="settings_replay_gain_track">Track</string>
+    <string name="settings_replay_gain_album">Album</string>
+    <string name="settings_replay_gain_auto">Auto</string>
+    <string name="settings_replay_gain_off_summary">Do not adjust playback volume</string>
+    <string name="settings_replay_gain_track_summary">Use replaygain_track_gain</string>
+    <string name="settings_replay_gain_album_summary">Use replaygain_album_gain</string>
+    <string name="settings_replay_gain_auto_summary">Prefer album gain, then fall back to track gain</string>
+    <string name="settings_resume_playback_position">Resume track position</string>
+    <string name="settings_resume_playback_position_summary">When returning to a previously played song, continue from where you left</string>
     <string name="settings_shuffle_mode">Режим перемешивания</string>
     <string name="settings_play_next_mode">Воспроизвести следующий режим</string>
     <string name="settings_previous_button">Предыдущая кнопка</string>
@@ -1538,7 +1548,4 @@
     <string name="song_more_metadata_no_ttml_lyrics">无 TTML 歌词</string>
     <string name="song_more_metadata_section_lyrics">歌词</string>
     <string name="song_more_metadata_ttml_lyrics">TTML 歌词</string>
-    <string name="settings_progress_bar_style">Progress bar style</string>
-    <string name="settings_progress_bar_glow">Glow</string>
-    <string name="settings_progress_bar_comet">Comet</string>
-    <string name="easter_egg_activated">Easter egg activated ✨</string></resources>
+</resources>

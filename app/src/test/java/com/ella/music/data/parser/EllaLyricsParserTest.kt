@@ -119,4 +119,45 @@ class EllaLyricsParserTest {
         assertEquals(listOf("Hel", "lo"), result.lyrics.single().words.map { it.text })
         assertEquals(listOf(1000L, 1500L), result.lyrics.single().words.map { it.startMs })
     }
+
+    @Test
+    fun accompanistTtmlPreservesLatinWordSpacesAndDropsPlaceholders() {
+        val result = LrcParser.parse(
+            """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+              <body>
+                <div>
+                  <p begin="00:00.000" end="00:04.000">
+                    <span begin="00:00.000" end="00:01.000">That</span>
+                    <span begin="00:01.000" end="00:02.000">we</span>
+                    <span begin="00:02.000" end="00:03.000">shoot</span>
+                    <span begin="00:03.000" end="00:04.000">across</span>
+                    <span ttm:role="x-translation">我们划过天际</span>
+                  </p>
+                  <p begin="00:05.000" end="00:06.000">//</p>
+                </div>
+              </body>
+            </tt>
+            """.trimIndent()
+        )
+
+        assertEquals(1, result.lyrics.size)
+        assertEquals("That we shoot across", result.lyrics.single().text)
+        assertEquals("我们划过天际", result.lyrics.single().translation)
+        assertEquals(listOf("That", " we", " shoot", " across"), result.lyrics.single().words.map { it.text })
+    }
+
+    @Test
+    fun accompanistElrcAgentPrefixesAreHiddenAndKeptAsAlignment() {
+        val result = LrcParser.parse(
+            """
+            [00:01.000]<00:01.000>v1:<00:01.100>Hello <00:01.600>again
+            [00:02.000]<00:02.000>v2:<00:02.100>Answer <00:02.600>line
+            """.trimIndent()
+        )
+
+        assertEquals(listOf("Hello again", "Answer line"), result.lyrics.map { it.text })
+        assertEquals(listOf("v1", "v2"), result.lyrics.map { it.agent })
+        assertEquals(listOf("Hello ", "again"), result.lyrics.first().words.map { it.text })
+    }
 }

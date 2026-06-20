@@ -568,11 +568,13 @@ class MusicRepository(private val context: Context) {
 
     suspend fun reloadLyricsByFormat(song: Song, preferTtml: Boolean): List<LyricLine> = lyricsManager.reloadLyricsByFormat(song, preferTtml)
 
-    fun getReplayGain(song: Song): Float? {
-        val cacheKey = song.metadataCacheKey()
+    fun getReplayGain(song: Song, mode: Int = SettingsManager.REPLAY_GAIN_AUTO): Float? {
+        val safeMode = mode.coerceIn(SettingsManager.REPLAY_GAIN_OFF, SettingsManager.REPLAY_GAIN_AUTO)
+        if (safeMode == SettingsManager.REPLAY_GAIN_OFF) return null
+        val cacheKey = "${song.metadataCacheKey()}:rg=$safeMode"
         replayGainCache[cacheKey]?.let { return it }
         if (replayGainMissingCache.contains(cacheKey)) return null
-        val gain = scanner.extractReplayGain(song.effectiveLocalPathForMetadata())
+        val gain = scanner.extractReplayGain(song.effectiveLocalPathForMetadata(), safeMode)
         if (gain == null) {
             replayGainCache.remove(cacheKey)
             replayGainMissingCache.add(cacheKey)

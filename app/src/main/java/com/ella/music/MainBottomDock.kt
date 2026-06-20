@@ -221,7 +221,7 @@ internal fun FloatingBottomControls(
                                                     contentDescription = tab.label,
                                                     tint = if (currentTabRoute == tab.route) MiuixTheme.colorScheme.primary
                                                     else MiuixTheme.colorScheme.onSurface,
-                                                    modifier = Modifier
+                                                    modifier = Modifier.size(26.dp)
                                                 )
                                             },
                                             label = {

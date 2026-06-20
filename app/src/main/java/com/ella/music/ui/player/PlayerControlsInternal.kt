@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import com.ella.music.R
-import com.ella.music.data.SettingsManager
 import com.ella.music.data.AudioQualitySummary
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.oem.MiPlayAudioSupport
@@ -141,9 +138,6 @@ internal fun GlowSeekBar(
     val displayProgress = draggingProgress ?: safeProgress
     val glowArgb = LocalPlayerContentColor.current.toArgb()
     val trackArgb = LocalPlayerContentColor.current.copy(alpha = 0.19f).toArgb()
-    val context = LocalContext.current
-    val settingsManager = remember { SettingsManager.getInstance(context) }
-    val progressBarStyle by settingsManager.playerProgressBarStyle.collectAsState(initial = SettingsManager.PROGRESS_BAR_STYLE_GLOW)
 
     fun progressAt(width: Float, x: Float): Float {
         return (x / width.coerceAtLeast(1f)).coerceIn(0f, 1f)
@@ -152,49 +146,23 @@ internal fun GlowSeekBar(
     Box(
         modifier = modifier.height(30.dp)
     ) {
-        if (progressBarStyle == SettingsManager.PROGRESS_BAR_STYLE_COMET) {
-            AndroidView(
-                factory = { ctx ->
-                    android.widget.ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
-                        progressDrawable = com.ella.music.ui.components.SquigglyProgress().apply {
-                            waveLength = resources.displayMetrics.density * 18f
-                            lineAmplitude = resources.displayMetrics.density * 8f
-                            phaseSpeed = resources.displayMetrics.density * 12f
-                            strokeWidth = resources.displayMetrics.density * 3f
-                            setAnimate(true)
-                            transitionEnabled = true
-                        }
-                        max = 10000
-                        setProgress((displayProgress * 10000).toInt())
-                    }
-                },
-                update = { view ->
-                    view.progress = (displayProgress * 10000).toInt()
-                    (view.progressDrawable as? com.ella.music.ui.components.SquigglyProgress)?.let { sq ->
-                        sq.updateColors(glowArgb, 255)
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            AndroidView(
-                factory = { ctx ->
-                    GlowGlowProgressBar(ctx).apply {
-                        shaderMode = GlowGlowProgressBar.ShaderMode.HIGH_END
-                        trackHeightPx = resources.displayMetrics.density * 4.5f
-                        trackHorizontalPaddingPx = 0f
-                        headGlowAlpha = 1f
-                    }
-                },
-                update = { view ->
-                    view.progressFraction = displayProgress
-                    view.glowColor = glowArgb
-                    view.trackColor = trackArgb
-                    view.fallbackProgressColor = accent.copy(alpha = 0.82f).toArgb()
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
+        AndroidView(
+            factory = { ctx ->
+                GlowGlowProgressBar(ctx).apply {
+                    shaderMode = GlowGlowProgressBar.ShaderMode.HIGH_END
+                    trackHeightPx = resources.displayMetrics.density * 4.5f
+                    trackHorizontalPaddingPx = 0f
+                    headGlowAlpha = 1f
+                }
+            },
+            update = { view ->
+                view.progressFraction = displayProgress
+                view.glowColor = glowArgb
+                view.trackColor = trackArgb
+                view.fallbackProgressColor = accent.copy(alpha = 0.82f).toArgb()
+            },
+            modifier = Modifier.fillMaxSize()
+        )
         Box(
             modifier = Modifier
                 .fillMaxSize()

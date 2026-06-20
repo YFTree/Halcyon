@@ -34,6 +34,7 @@ internal fun PlayerLandscapeOverlayHost(
     audioInfo: AudioInfo?,
     palette: PlayerPalette,
     lyrics: List<LyricLine>,
+    lyricsLoading: Boolean,
     currentLyricIndex: Int,
     showTranslation: Boolean,
     showPronunciation: Boolean,

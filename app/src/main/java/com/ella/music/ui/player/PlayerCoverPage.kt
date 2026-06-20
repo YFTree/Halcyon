@@ -74,6 +74,7 @@ internal fun CoverPlayerPage(
     flowEffectMode: Int,
     dynamicFlowEnabled: Boolean,
     lyrics: List<LyricLine>,
+    lyricsLoading: Boolean,
     currentLyricIndex: Int,
     miniLyricLine: LyricLine?,
     showTranslation: Boolean,
@@ -234,6 +235,8 @@ internal fun CoverPlayerPage(
                 shuffleEnabled = shuffleEnabled,
                 repeatMode = repeatMode,
                 audioInfo = audioInfo,
+                hiResLogoEnabled = hiResLogoEnabled,
+                hiResLogoUri = hiResLogoUri,
                 palette = pagePalette,
                 flowEffectMode = flowEffectMode,
                 dynamicFlowEnabled = dynamicFlowEnabled,
@@ -242,6 +245,7 @@ internal fun CoverPlayerPage(
                 customBackgroundDim = playerBackgroundDim,
                 beautifulLyricsBackground = beautifulLyricsBackground,
                 lyrics = lyrics,
+                lyricsLoading = lyricsLoading,
                 currentLyricIndex = currentLyricIndex,
                 showTranslation = showTranslation,
                 showPronunciation = showPronunciation,
@@ -405,7 +409,7 @@ internal fun CoverPlayerPage(
                                         }
                                     )
                             )
-                        } else if (lyrics.isEmpty()) {
+                        } else if (lyrics.isEmpty() && !lyricsLoading) {
                             Spacer(modifier = Modifier.height(6.dp))
                             MiniNoLyricsPreview(
                                 contentColor = pagePalette.onBackground,
@@ -500,7 +504,7 @@ internal fun CoverPlayerPage(
                                 )
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -555,7 +559,7 @@ internal fun CoverPlayerPage(
                                         }
                                     )
                             )
-                        } else if (lyrics.isEmpty()) {
+                        } else if (lyrics.isEmpty() && !lyricsLoading) {
                             Spacer(modifier = Modifier.height(8.dp))
                             MiniNoLyricsPreview(
                                 contentColor = pagePalette.onBackground,

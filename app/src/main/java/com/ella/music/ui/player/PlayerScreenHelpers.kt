@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.ella.music.R
-import com.ella.music.data.audioQualitySummary
+import com.ella.music.data.normalizedBitDepth
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import kotlinx.coroutines.delay
@@ -220,9 +220,7 @@ private fun String.isLikelyLocalDeviceModelName(): Boolean {
 }
 
 internal fun AudioInfo.isHiResLogoTrack(): Boolean {
-    val summary = audioQualitySummary(this)
-    return summary.listTag in setOf("HR", "MQ") ||
-        summary.compactLabel.equals("Hi-Res", ignoreCase = true)
+    return normalizedBitDepth(this) >= 24 && sampleRate >= 48_000
 }
 
 internal fun Float.nextPlaybackStep(): Float {

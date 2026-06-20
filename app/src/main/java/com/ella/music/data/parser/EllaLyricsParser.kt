@@ -170,7 +170,13 @@ internal object EllaLyricsParser {
         val rawContent = embeddedBackground?.groupValues?.get(1)?.trim() ?: taggedContent
         if (rawContent.isBlank()) return emptyList()
 
-        val (agent, content) = rawContent.extractLrcAgent()
+        val (agent, content) = rawContent.extractLrcAgent().let { (agent, content) ->
+            if (agent != null) {
+                agent to content
+            } else {
+                content.extractEnhancedLrcAgent()
+            }
+        }
 
         return leadingTimes.mapNotNull { timeMatch ->
             val start = parseLrcTime(timeMatch.groupValues)
@@ -198,7 +204,7 @@ internal object EllaLyricsParser {
     }
 
     private fun String.extractLrcAgent(): Pair<String?, String> {
-        Regex("""^(v[12])\s*:\s*(.*)$""", RegexOption.IGNORE_CASE)
+        Regex("""^(v[12])\s*[:：]\s*(.*)$""", RegexOption.IGNORE_CASE)
             .matchEntire(this)
             ?.let { match ->
                 return match.groupValues[1].lowercase() to match.groupValues[2].trim()
@@ -209,6 +215,14 @@ internal object EllaLyricsParser {
                 return match.groupValues[1].lowercase() to match.groupValues[2].trim()
             }
         return null to this
+    }
+
+    private fun String.extractEnhancedLrcAgent(): Pair<String?, String> {
+        val match = Regex(
+            """^(\s*(?:<\d{1,3}:\d{2}(?:\.\d{1,3})?>|\[\d{1,3}:\d{2}(?:\.\d{1,3})?])\s*)(v[12])\s*[:：]\s*""",
+            RegexOption.IGNORE_CASE
+        ).find(this) ?: return null to this
+        return match.groupValues[2].lowercase() to match.groupValues[1] + substring(match.range.last + 1)
     }
 
     private fun parseEnhancedWords(content: String, lineStartMs: Long): List<LyricWord> {

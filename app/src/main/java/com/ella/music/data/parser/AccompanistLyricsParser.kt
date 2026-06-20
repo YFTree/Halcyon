@@ -43,19 +43,23 @@ internal object AccompanistLyricsParser {
     }
 
     private fun KaraokeLine.MainKaraokeLine.toMainLyricLine(isTtmlFormat: Boolean): LyricLine? {
-        val text = syllables.joinToString(separator = "") { it.content }.trimMeaningful()
-        if (text.isBlank()) return null
+        val mainParts = syllables.toTimedTextParts(isTtmlFormat).withoutElrcAgentPrefix()
+        val textParts = mainParts.parts
+        val text = textParts.toDisplayText().trimMeaningful()
+        if (text.isBlank() || EllaLyricsParser.isPlaceholderOnlyLine(text)) return null
         val background = accompanimentLines?.firstOrNull()
+        val backgroundParts = background?.syllables.orEmpty().toTimedTextParts(isTtmlFormat).withoutElrcAgentPrefix().parts
+        val backgroundText = backgroundParts.toDisplayText().trimMeaningful().takeUsefulSecondaryText()
         return LyricLine(
             timeMs = start.toLong().coerceAtLeast(0L),
             text = text,
-            words = syllables.toLyricWords(),
-            translation = translation?.trimMeaningful(),
-            pronunciation = phonetic?.trimMeaningful(),
-            agent = alignment.toEllaAgent(),
-            backgroundText = background?.syllables?.joinToString(separator = "") { it.content }?.trimMeaningful(),
-            backgroundWords = background?.syllables.orEmpty().toLyricWords(),
-            backgroundTranslation = background?.translation?.trimMeaningful(),
+            words = textParts.toLyricWords(),
+            translation = translation.takeUsefulSecondaryText(),
+            pronunciation = phonetic.takeUsefulSecondaryText(),
+            agent = mainParts.agent ?: alignment.toEllaAgent(),
+            backgroundText = backgroundText,
+            backgroundWords = if (backgroundText == null) emptyList() else backgroundParts.toLyricWords(),
+            backgroundTranslation = background?.translation.takeUsefulSecondaryText(),
             backgroundStartMs = background?.start?.toLong()?.coerceAtLeast(0L),
             backgroundEndMs = background?.end?.toSafeEndMs(),
             isTtml = isTtmlFormat,
@@ -64,41 +68,121 @@ internal object AccompanistLyricsParser {
     }
 
     private fun KaraokeLine.AccompanimentKaraokeLine.toBackgroundLyricLine(isTtmlFormat: Boolean): LyricLine? {
-        val text = syllables.joinToString(separator = "") { it.content }.trimMeaningful()
-        if (text.isBlank()) return null
+        val parsedParts = syllables.toTimedTextParts(isTtmlFormat).withoutElrcAgentPrefix()
+        val textParts = parsedParts.parts
+        val text = textParts.toDisplayText().trimMeaningful()
+        if (text.isBlank() || EllaLyricsParser.isPlaceholderOnlyLine(text)) return null
         return LyricLine(
             timeMs = start.toLong().coerceAtLeast(0L),
             text = "",
             backgroundText = text,
-            backgroundWords = syllables.toLyricWords(),
-            backgroundTranslation = translation?.trimMeaningful(),
+            backgroundWords = textParts.toLyricWords(),
+            backgroundTranslation = translation.takeUsefulSecondaryText(),
             backgroundStartMs = start.toLong().coerceAtLeast(0L),
             backgroundEndMs = end.toSafeEndMs(),
-            agent = alignment.toEllaAgent(),
+            agent = parsedParts.agent ?: alignment.toEllaAgent(),
             isTtml = isTtmlFormat,
             endMs = end.toSafeEndMs()
         )
     }
 
     private fun SyncedLine.toPlainLyricLine(): LyricLine? {
-        val text = content.trimMeaningful()
-        if (text.isBlank()) return null
+        val parsedContent = content.withoutElrcAgentPrefix()
+        val text = parsedContent.text.trimMeaningful()
+        if (text.isBlank() || EllaLyricsParser.isPlaceholderOnlyLine(text)) return null
         return LyricLine(
             timeMs = start.toLong().coerceAtLeast(0L),
             text = text,
-            translation = translation?.trimMeaningful(),
+            translation = translation.takeUsefulSecondaryText(),
+            agent = parsedContent.agent,
             endMs = end.toSafeEndMs()
         )
     }
 
-    private fun List<com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable>.toLyricWords(): List<LyricWord> =
+    private data class TimedTextPart(
+        val text: String,
+        val startMs: Long,
+        val endMs: Long
+    )
+
+    private data class AgentTimedTextParts(
+        val agent: String?,
+        val parts: List<TimedTextPart>
+    )
+
+    private data class AgentText(
+        val agent: String?,
+        val text: String
+    )
+
+    private fun List<com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable>.toTimedTextParts(
+        preserveLatinWordSpaces: Boolean
+    ): List<TimedTextPart> =
         mapIndexedNotNull { index, syllable ->
-            val text = syllable.content
-                .let { if (index == lastIndex) it.trimEnd() else it }
-                .takeIf { it.isNotBlank() } ?: return@mapIndexedNotNull null
             val startMs = syllable.start.toLong().coerceAtLeast(0L)
             val endMs = syllable.end.toLong().coerceAtLeast(startMs + 1L)
-            LyricWord(text = text, startMs = startMs, endMs = endMs)
+            val rawText = syllable.content
+                .normalizeTimedTokenText(preserveLatinWordSpaces, trimEnd = index == lastIndex)
+                .takeIf { it.isNotBlank() } ?: return@mapIndexedNotNull null
+            val previous = getOrNull(index - 1)
+            val text = if (
+                preserveLatinWordSpaces &&
+                previous != null &&
+                shouldInsertLatinWordSpace(
+                    previous.content.normalizeTimedTokenText(preserveLatinWordSpaces, trimEnd = false),
+                    rawText
+                )
+            ) {
+                " $rawText"
+            } else {
+                rawText
+            }
+            TimedTextPart(text = text, startMs = startMs, endMs = endMs)
+        }
+
+    private fun List<TimedTextPart>.toDisplayText(): String =
+        joinToString(separator = "") { it.text }
+
+    private fun List<TimedTextPart>.withoutElrcAgentPrefix(): AgentTimedTextParts {
+        if (isEmpty()) return AgentTimedTextParts(agent = null, parts = this)
+        val first = first()
+        val stripped = first.text.withoutElrcAgentPrefix()
+        if (stripped.agent == null) return AgentTimedTextParts(agent = null, parts = this)
+        val updated = buildList {
+            val firstText = stripped.text
+            if (firstText.isNotBlank()) {
+                add(first.copy(text = firstText))
+            }
+            addAll(drop(1))
+        }
+        return AgentTimedTextParts(agent = stripped.agent, parts = updated)
+    }
+
+    private fun List<TimedTextPart>.toLyricWords(): List<LyricWord> =
+        mapNotNull { part ->
+            part.text.takeIf { it.isNotBlank() }?.let { text ->
+                LyricWord(text = text, startMs = part.startMs, endMs = part.endMs)
+            }
+        }
+
+    private fun shouldInsertLatinWordSpace(previous: String, current: String): Boolean {
+        val prev = previous.lastOrNull { !it.isWhitespace() } ?: return false
+        val next = current.firstOrNull { !it.isWhitespace() } ?: return false
+        if (previous.lastOrNull()?.isWhitespace() == true || current.firstOrNull()?.isWhitespace() == true) return false
+        if (!prev.isLatinWordChar() || !next.isLatinWordChar()) return false
+        return true
+    }
+
+    private fun Char.isLatinWordChar(): Boolean =
+        this in 'A'..'Z' || this in 'a'..'z' || this in '0'..'9' || this == '\''
+
+    private fun String.normalizeTimedTokenText(preserveLatinWordSpaces: Boolean, trimEnd: Boolean): String =
+        if (preserveLatinWordSpaces) {
+            replace(Regex("""\s+"""), " ").trim()
+        } else if (trimEnd) {
+            trimEnd()
+        } else {
+            this
         }
 
     private fun Int.toSafeEndMs(): Long? =
@@ -106,6 +190,20 @@ internal object AccompanistLyricsParser {
 
     private fun String.trimMeaningful(): String =
         trim().replace(Regex("""[ \t\r\n]+"""), " ")
+
+    private fun String.withoutElrcAgentPrefix(): AgentText {
+        val match = Regex("""^\s*(v[12])\s*[:：]\s*""", RegexOption.IGNORE_CASE).find(this)
+            ?: return AgentText(agent = null, text = this)
+        return AgentText(
+            agent = match.groupValues[1].lowercase(),
+            text = removeRange(match.range)
+        )
+    }
+
+    private fun String?.takeUsefulSecondaryText(): String? =
+        this
+            ?.trimMeaningful()
+            ?.takeIf { it.isNotBlank() && !EllaLyricsParser.isPlaceholderOnlyLine(it) && !EllaLyricsParser.isIgnorableRawLyricLine(it) }
 
     private fun com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment.toEllaAgent(): String? =
         when (name.lowercase()) {

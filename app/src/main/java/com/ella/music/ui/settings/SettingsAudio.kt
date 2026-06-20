@@ -52,7 +52,8 @@ fun AudioSettingsScreen(
     val pageBackground = if (isDark) Color(0xFF101014) else Color(0xFFF4F4F7)
 
     val gaplessPlayback by settingsManager.gaplessPlayback.collectAsState(initial = true)
-    val replayGainEnabled by settingsManager.replayGainEnabled.collectAsState(initial = false)
+    val replayGainMode by settingsManager.replayGainMode.collectAsState(initial = SettingsManager.REPLAY_GAIN_OFF)
+    val resumePlaybackPosition by settingsManager.resumePlaybackPosition.collectAsState(initial = false)
     val audioFocusDisabled by settingsManager.audioFocusDisabled.collectAsState(initial = false)
     val shuffleMode by settingsManager.shuffleMode.collectAsState(initial = SettingsManager.SHUFFLE_MODE_PSEUDO)
     val playNextMode by settingsManager.playNextMode.collectAsState(initial = SettingsManager.PLAY_NEXT_MODE_REVERSE_STACK)
@@ -81,6 +82,13 @@ fun AudioSettingsScreen(
         stringResource(R.string.settings_previous_button_replay_current)
     )
     val selectedPreviousButtonAction = previousButtonAction.coerceIn(previousButtonLabels.indices)
+    val replayGainLabels = listOf(
+        stringResource(R.string.settings_replay_gain_off),
+        stringResource(R.string.settings_replay_gain_track),
+        stringResource(R.string.settings_replay_gain_album),
+        stringResource(R.string.settings_replay_gain_auto)
+    )
+    val selectedReplayGainMode = replayGainMode.coerceIn(replayGainLabels.indices)
     val startupPlayLabels = listOf(
         stringResource(R.string.settings_startup_play_off),
         stringResource(R.string.settings_startup_play_random),
@@ -145,6 +153,24 @@ fun AudioSettingsScreen(
             summary = stringResource(R.string.settings_play_next_mode_forward_stack_summary)
         )
     )
+    val replayGainEntries = listOf(
+        DropdownItem(
+            title = replayGainLabels[SettingsManager.REPLAY_GAIN_OFF],
+            summary = stringResource(R.string.settings_replay_gain_off_summary)
+        ),
+        DropdownItem(
+            title = replayGainLabels[SettingsManager.REPLAY_GAIN_TRACK],
+            summary = stringResource(R.string.settings_replay_gain_track_summary)
+        ),
+        DropdownItem(
+            title = replayGainLabels[SettingsManager.REPLAY_GAIN_ALBUM],
+            summary = stringResource(R.string.settings_replay_gain_album_summary)
+        ),
+        DropdownItem(
+            title = replayGainLabels[SettingsManager.REPLAY_GAIN_AUTO],
+            summary = stringResource(R.string.settings_replay_gain_auto_summary)
+        )
+    )
 
     Column(
         modifier = Modifier
@@ -196,12 +222,22 @@ fun AudioSettingsScreen(
                             scope.launch { settingsManager.setGaplessPlayback(it) }
                         }
                     )
-                    SwitchPreference(
+                    WindowSpinnerPreference(
                         title = stringResource(R.string.settings_replay_gain),
-                        summary = stringResource(R.string.settings_replay_gain_summary),
-                        checked = replayGainEnabled,
+                        summary = stringResource(R.string.settings_current_value, replayGainLabels[selectedReplayGainMode]),
+                        items = replayGainEntries,
+                        selectedIndex = selectedReplayGainMode,
+                        onSelectedIndexChange = { index ->
+                            scope.launch { settingsManager.setReplayGainMode(index) }
+                        }
+                    )
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_resume_playback_position),
+                        summary = stringResource(R.string.settings_resume_playback_position_summary),
+                        checked = resumePlaybackPosition,
                         onCheckedChange = {
-                            scope.launch { settingsManager.setReplayGainEnabled(it) }
+                            scope.launch { settingsManager.setResumePlaybackPosition(it) }
+                            playerViewModel?.setResumePlaybackPositionEnabled(it)
                         }
                     )
                     WindowSpinnerPreference(

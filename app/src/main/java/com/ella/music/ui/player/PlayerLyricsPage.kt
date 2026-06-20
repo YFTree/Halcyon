@@ -39,6 +39,7 @@ internal fun LyricsPlayerPage(
     paletteBitmap: Bitmap?,
     annotation: String,
     lyrics: List<LyricLine>,
+    lyricsLoading: Boolean,
     currentLyricIndex: Int,
     currentPosition: Long,
     showTranslation: Boolean,
@@ -165,30 +166,32 @@ internal fun LyricsPlayerPage(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                SmoothLyricView(
-                    songId = song?.id ?: 0L,
-                    songTitle = song?.title.orEmpty(),
-                    songArtist = song?.artist.orEmpty(),
-                    lyrics = lyrics,
-                    currentIndex = currentLyricIndex,
-                    currentPositionMs = currentPositionMs,
-                    isPlaying = isPlaying,
-                    showTranslation = showTranslation,
-                    showPronunciation = showPronunciation,
-                    fontScale = fontScale,
-                    fontPath = fontPath,
-                    fontWeight = fontWeight,
-                    italic = italic,
-                    lyricTextAlign = lyricTextAlign,
-                    secondaryFontScale = secondaryFontScale,
-                    contentColor = palette.onBackground,
-                    // Keep far lines sharp over a busy custom wallpaper so they stay readable.
-                    nonCurrentLineBlurEnabled = !useCustomPlayerBackground,
-                    onLineClick = onLineClick,
-                    onLineDoubleClick = onLineDoubleClick,
-                    onLineLongClick = onLineLongClick,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (!lyricsLoading) {
+                    SmoothLyricView(
+                        songId = song?.id ?: 0L,
+                        songTitle = song?.title.orEmpty(),
+                        songArtist = song?.artist.orEmpty(),
+                        lyrics = lyrics,
+                        currentIndex = currentLyricIndex,
+                        currentPositionMs = currentPositionMs,
+                        isPlaying = isPlaying,
+                        showTranslation = showTranslation,
+                        showPronunciation = showPronunciation,
+                        fontScale = fontScale,
+                        fontPath = fontPath,
+                        fontWeight = fontWeight,
+                        italic = italic,
+                        lyricTextAlign = lyricTextAlign,
+                        secondaryFontScale = secondaryFontScale,
+                        contentColor = palette.onBackground,
+                        // Keep far lines sharp over a busy custom wallpaper so they stay readable.
+                        nonCurrentLineBlurEnabled = !useCustomPlayerBackground,
+                        onLineClick = onLineClick,
+                        onLineDoubleClick = onLineDoubleClick,
+                        onLineLongClick = onLineLongClick,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
 

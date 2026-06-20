@@ -14,7 +14,7 @@ internal class LyricBlacklistRule(rawRule: String) {
 }
 
 internal fun List<LyricLine>.filterBlacklistedLyricLines(rules: List<LyricBlacklistRule>): List<LyricLine> {
-    if (isEmpty() || rules.isEmpty()) return this
+    if (isEmpty()) return this
     return mapNotNull { line -> line.withoutBlacklistedParts(rules) }
 }
 

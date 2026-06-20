@@ -64,10 +64,11 @@ class LyricView @JvmOverloads constructor(
         private const val LINE_GAP_DP = 12f
         private const val LINE_PAD_TOP_DP = 2f
         private const val LINE_PAD_BOTTOM_DP = 6f
-        private const val TRANS_GAP_DP = 6f
+        private const val TRANS_GAP_DP = 3.5f
         private const val FEATHER_WIDTH_DP = 30f
         private const val TEXT_CLIP_BLEED_DP = 4f
         private const val RIGHT_ALIGN_GLYPH_SAFE_INSET_DP = 3f
+        private const val TEXT_EDGE_SAFE_INSET_DP = 10f
         private const val SCROLL_ANIM_MS = 400L
         private const val AUTO_SCROLL_RESUME_MS = 5000L
         private const val INTERLUDE_MIN_GAP_MS = 7000L
@@ -643,7 +644,9 @@ class LyricView @JvmOverloads constructor(
             val secondaryTranslationText = secondaryBlock?.second?.takeIf { displayTranslation && it.isNotBlank() }
             val secondaryStart = line.secondaryWords?.minOfOrNull { it.begin }
             val secondaryEnd = line.secondaryWords?.maxOfOrNull { it.end }
-            val secondaryVisible = secondaryText != null && isSecondaryVisible(secondaryStart, secondaryEnd, line.end, currentPosMs)
+            val lineIndex = result.size
+            val secondaryVisible = secondaryText != null &&
+                (lineIndex == currentIndex || isSecondaryVisible(secondaryStart, secondaryEnd, line.end, currentPosMs))
             val secondaryH = if (secondaryVisible) {
                 max(measureTransHeight(secondaryText), measureWordsHeight(line.secondaryWords, transPaint)) + transGapPx
             } else {
@@ -736,7 +739,8 @@ class LyricView @JvmOverloads constructor(
             val start = line.secondaryWords?.minOfOrNull { it.begin }
             val end = line.secondaryWords?.maxOfOrNull { it.end }
             result = 31 * result + index
-            result = 31 * result + if (isSecondaryVisible(start, end, line.end, positionMs)) 1 else 0
+            val activeIndex = findCurrentLine(positionMs + lineOffsetMs)
+            result = 31 * result + if (index == activeIndex || isSecondaryVisible(start, end, line.end, positionMs)) 1 else 0
         }
         return result
     }
@@ -1173,7 +1177,7 @@ class LyricView @JvmOverloads constructor(
             drawTextAligned(canvas, entry.romaText, tPaint, textStartX, romaBaseline, entry.alignedRight, entry.centered, farBlur)
             secondaryBaseY += entry.transH
         }
-        val shouldDrawSecondary = entry.secondaryText != null && entry.isSecondaryVisible(currentPosMs)
+        val shouldDrawSecondary = entry.secondaryText != null && (isCurrent || entry.isSecondaryVisible(currentPosMs))
         if (entry.secondaryText != null && shouldDrawSecondary) {
             val secondaryBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
             val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
@@ -1229,11 +1233,9 @@ class LyricView @JvmOverloads constructor(
             paint.maskFilter = oldMask
             return
         }
-        val safeLayoutWidth = if (alignedRight) {
-            (w - RIGHT_ALIGN_GLYPH_SAFE_INSET_DP * density).toInt().coerceAtLeast(1)
-        } else {
-            w
-        }
+        val edgeInset = TEXT_EDGE_SAFE_INSET_DP * density
+        val alignInset = if (alignedRight) RIGHT_ALIGN_GLYPH_SAFE_INSET_DP * density else 0f
+        val safeLayoutWidth = (w - edgeInset - alignInset).toInt().coerceAtLeast(1)
         val layout = buildLayout(text, paint, safeLayoutWidth, alignedRight, centered, forMain)
         canvas.save()
         // StaticLayout line 0 baseline is at getLineTop(0) + getLineBaseline(0) - getLineTop(0)
@@ -1443,17 +1445,29 @@ class LyricView @JvmOverloads constructor(
         textOverride: String? = null
     ) {
         val words = wordsOverride ?: (if (useSecondary) entry.secondaryWords else entry.words) ?: return
-        val elapsed = SystemClock.elapsedRealtime() - lastPositionWallTime
-        val pos = if (playbackActive && lastPositionWallTime > 0 && elapsed in 0..2000) currentPosMs + elapsed else currentPosMs
-        val karaokePos = pos + KARAOKE_WORD_OFFSET_MS
+        val karaokePos = currentKaraokePosition()
         if (alignedRight) {
             drawAlignedKaraokeWords(canvas, entry, words, startX, baseline, karaokePos, useSecondary, textOverride)
             return
         }
-        val availW = (width - paddingLeft - paddingRight).toFloat()
+        val availW = (width - paddingLeft - paddingRight - TEXT_EDGE_SAFE_INSET_DP * density).coerceAtLeast(1f)
         val activePaint = if (useSecondary) hlTransPaint else hlPaint
         val inactivePaint = if (useSecondary) dimTransPaint else dimPaint
         val lineSpacing = activePaint.fontSpacing
+        val displayText = buildKaraokeDisplayText(entry, words, useSecondary, textOverride)
+        if (displayText.isNotBlank() && words.any { activePaint.measureText(it.text.orEmpty()) > availW }) {
+            drawTextAligned(
+                canvas = canvas,
+                text = displayText,
+                paint = activePaint,
+                startX = startX,
+                baseline = baseline,
+                alignedRight = alignedRight,
+                centered = centered,
+                forMain = !useSecondary
+            )
+            return
+        }
 
         data class WordDrawInfo(val word: LyricWord, val text: String, val x: Float, val y: Float, val w: Float, val visualLine: Int)
         val wordInfos = mutableListOf<WordDrawInfo>()
@@ -1462,12 +1476,17 @@ class LyricView @JvmOverloads constructor(
         var visualLine = 0
 
         for (word in words) {
-            val wordText = word.text ?: continue
-            val wordW = activePaint.measureText(wordText)
+            val rawWordText = word.text ?: continue
+            var wordText = if (cursorX == startX) rawWordText.trimStart() else rawWordText
+            if (wordText.isBlank()) continue
+            var wordW = activePaint.measureText(wordText)
             if (cursorX + wordW > startX + availW && cursorX > startX) {
                 cursorX = startX
                 cursorY += lineSpacing
                 visualLine++
+                wordText = rawWordText.trimStart()
+                if (wordText.isBlank()) continue
+                wordW = activePaint.measureText(wordText)
             }
             wordInfos.add(WordDrawInfo(word, wordText, cursorX, cursorY, wordW, visualLine))
             cursorX += wordW
@@ -1583,10 +1602,12 @@ class LyricView @JvmOverloads constructor(
             }
         }
 
-        wordInfos.firstOrNull { info -> karaokePos in info.word.begin..info.word.end }
-            ?.let { activeInfo ->
-                drawSustainGlowIfNeeded(canvas, activeInfo.text, activeInfo.drawX(), activeInfo.y, activeInfo.w, activePaint, activeInfo.word, karaokePos)
-            }
+        if (words.allowsSustainGlow(entry, displayText)) {
+            wordInfos.firstOrNull { info -> karaokePos in info.word.begin..info.word.end }
+                ?.let { activeInfo ->
+                    drawSustainGlowIfNeeded(canvas, activeInfo.text, activeInfo.drawX(), activeInfo.y, activeInfo.w, activePaint, activeInfo.word, karaokePos)
+                }
+        }
 
         canvas.restore()
     }
@@ -1613,7 +1634,7 @@ class LyricView @JvmOverloads constructor(
         val inactivePaint = if (useSecondary) dimTransPaint else dimPaint
         val text = buildKaraokeDisplayText(entry, words, useSecondary, textOverride)
         if (text.isBlank()) return
-        val availW = width - paddingLeft - paddingRight
+        val availW = (width - paddingLeft - paddingRight - TEXT_EDGE_SAFE_INSET_DP * density).toInt().coerceAtLeast(1)
         if (availW <= 0) return
 
         val activeLayout = buildLayout(text, activePaint, availW, alignedRight = true)
@@ -1702,20 +1723,39 @@ class LyricView @JvmOverloads constructor(
                     layoutHorizontalForOffset(activeLayout, glowLine, glowEnd)
                 ) - glowX
                 val glowBaseline = activeLayout.getLineBaseline(glowLine).toFloat()
-                drawSustainGlowIfNeeded(
-                    canvas = canvas,
-                    text = activeWordText,
-                    x = glowX,
-                    baseline = glowBaseline,
-                    width = glowWidth,
-                    sourcePaint = activePaint,
-                    word = activeWord,
-                    position = karaokePos
-                )
+                if (words.allowsSustainGlow(entry, text)) {
+                    drawSustainGlowIfNeeded(
+                        canvas = canvas,
+                        text = activeWordText,
+                        x = glowX,
+                        baseline = glowBaseline,
+                        width = glowWidth,
+                        sourcePaint = activePaint,
+                        word = activeWord,
+                        position = karaokePos
+                    )
+                }
             }
         }
 
         canvas.restore()
+    }
+
+    private fun List<LyricWord>.allowsSustainGlow(entry: LineEntry, displayText: String): Boolean {
+        val visibleWords = filter { !it.text.isNullOrBlank() }
+        if (visibleWords.isEmpty()) return false
+        if (visibleWords.size > 1) return true
+        val only = visibleWords.single()
+        val normalizedWord = only.text.orEmpty().trim().replace(Regex("""\s+"""), " ")
+        val normalizedLine = displayText.trim().replace(Regex("""\s+"""), " ")
+        val coversWholeLine = only.begin <= entry.begin + 20L && only.end >= entry.end - 20L
+        return !(normalizedWord == normalizedLine && coversWholeLine)
+    }
+
+    private fun currentKaraokePosition(): Long {
+        val elapsed = SystemClock.elapsedRealtime() - lastPositionWallTime
+        val pos = if (playbackActive && lastPositionWallTime > 0 && elapsed in 0..2000) currentPosMs + elapsed else currentPosMs
+        return pos + KARAOKE_WORD_OFFSET_MS
     }
 
     private fun drawAlignedCompletedText(

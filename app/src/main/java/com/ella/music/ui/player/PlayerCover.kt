@@ -154,7 +154,7 @@ internal fun AlbumArtView(
 }
 
 @Composable
-private fun HiResLogoBadge(
+internal fun HiResLogoBadge(
     logoUri: String,
     modifier: Modifier = Modifier
 ) {

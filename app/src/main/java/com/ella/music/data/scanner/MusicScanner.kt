@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
+import com.ella.music.data.SettingsManager
 import com.ella.music.data.metadata.AudioTagInfo
 import com.ella.music.data.metadata.LyricoAudioTagReaderWriter
 import com.ella.music.data.metadata.WavMetadataReader
@@ -770,14 +771,13 @@ class MusicScanner(private val context: Context) {
         }.getOrNull()
     }
 
-    fun extractReplayGain(path: String): Float? {
+    fun extractReplayGain(path: String, mode: Int = SettingsManager.REPLAY_GAIN_AUTO): Float? {
         return try {
             val file = File(path)
             if (!file.exists()) return null
             readTagsBlocking(path)
                 ?.let { tagInfo ->
-                    tagInfo.replayGainTrackGain?.parseReplayGain()
-                        ?: tagInfo.customTagValue("R128_TRACK_GAIN")?.parseR128Gain()
+                    tagInfo.replayGainForMode(mode)
                 }
                 ?.let { return it }
             null
@@ -896,6 +896,23 @@ class MusicScanner(private val context: Context) {
                 ?.let { return it }
         }
         return null
+    }
+
+    private fun AudioTagInfo.replayGainForMode(mode: Int): Float? {
+        fun trackGain(): Float? =
+            replayGainTrackGain?.parseReplayGain()
+                ?: customTagValue("R128_TRACK_GAIN")?.parseR128Gain()
+
+        fun albumGain(): Float? =
+            replayGainAlbumGain?.parseReplayGain()
+                ?: customTagValue("R128_ALBUM_GAIN")?.parseR128Gain()
+
+        return when (mode.coerceIn(SettingsManager.REPLAY_GAIN_OFF, SettingsManager.REPLAY_GAIN_AUTO)) {
+            SettingsManager.REPLAY_GAIN_TRACK -> trackGain()
+            SettingsManager.REPLAY_GAIN_ALBUM -> albumGain()
+            SettingsManager.REPLAY_GAIN_AUTO -> albumGain() ?: trackGain()
+            else -> null
+        }
     }
 
     private fun Map<String, List<String>>.flattenForSearch(): String =

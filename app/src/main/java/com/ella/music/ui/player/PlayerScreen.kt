@@ -203,6 +203,7 @@ fun PlayerScreen(
     val playlists by mainViewModel.playlists.collectAsState()
     val playlist by playerViewModel.playlist.collectAsState()
     val lyrics by playerViewModel.lyrics.collectAsState()
+    val lyricsLoading by playerViewModel.lyricsLoading.collectAsState()
     val lyricFormatAvailability by playerViewModel.lyricFormatAvailability.collectAsState()
     val preferTtmlLyrics by playerViewModel.preferTtmlLyrics.collectAsState()
     val currentLyricOffsetMs by playerViewModel.currentLyricOffsetMs.collectAsState()
@@ -446,6 +447,7 @@ fun PlayerScreen(
                         palette = palette,
                         lyricPalette = lyricPalette,
                         lyrics = lyrics,
+                        lyricsLoading = lyricsLoading,
                         currentLyricIndex = currentLyricIndex,
                         miniLyricLine = miniLyricLine,
                         showLyricTranslation = showLyricTranslation,
@@ -517,6 +519,7 @@ fun PlayerScreen(
                         paletteBitmap = paletteBitmap,
                         songAnnotation = displayAnnotation,
                         lyrics = lyrics,
+                        lyricsLoading = lyricsLoading,
                         currentLyricIndex = currentLyricIndex,
                         currentPosition = currentPosition,
                         showLyricTranslation = showLyricTranslation,
@@ -601,6 +604,7 @@ fun PlayerScreen(
                 audioInfo = audioInfo,
                 palette = if (landscapeState.coverMode) palette else lyricPalette,
                 lyrics = lyrics,
+                lyricsLoading = lyricsLoading,
                 currentLyricIndex = currentLyricIndex,
                 showTranslation = showLyricTranslation,
                 showPronunciation = showLyricPronunciation,

@@ -95,6 +95,8 @@ class ExoPlayerManager(private val context: Context) {
     private var playNextAnchorKey: String? = null
     private var playNextForwardCount = 0
     private var replayGainVolume = 1f
+    private var resumePlaybackPositionEnabled = false
+    private val perSongResumePositions = LinkedHashMap<String, Long>()
     private var externalSnapshotGuard: ExternalSnapshotGuard? = null
 
     private val persistenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -312,6 +314,7 @@ class ExoPlayerManager(private val context: Context) {
         sessionMetadataSongKey = null
         artworkAppliedSongKey = null
         clearBluetoothMetadataPatchState()
+        rememberCurrentSongResumePosition()
         // The whole queue is shipped to the playback service over Binder (~1MB transaction limit);
         // a 60k-song library overflows it and crashes with TransactionTooLargeException. For
         // pathologically large queues, play a window around the chosen song instead of everything.
@@ -319,6 +322,7 @@ class ExoPlayerManager(private val context: Context) {
         val prepared = preparePlaybackQueue(songs, requestedIndex, honorShuffle)
         val queueSongs = prepared.songs
         val safeIndex = prepared.startIndex
+        val startPositionMs = queueSongs.getOrNull(safeIndex)?.let(::resumePositionFor) ?: 0L
         playlistBeforeShuffle = prepared.sourceOrderBeforeShuffle
         playlist.clear()
         playlist.addAll(queueSongs)
@@ -343,7 +347,7 @@ class ExoPlayerManager(private val context: Context) {
             if (repeatMode == Player.REPEAT_MODE_OFF) {
                 repeatMode = Player.REPEAT_MODE_ALL
             }
-            setMediaItems(mediaItems, safeIndex, 0L)
+            setMediaItems(mediaItems, safeIndex, startPositionMs)
             prepare()
             play()
         }
@@ -399,12 +403,13 @@ class ExoPlayerManager(private val context: Context) {
         sessionMetadataSongKey = null
         artworkAppliedSongKey = null
         clearBluetoothMetadataPatchState()
+        rememberCurrentSongResumePosition()
         playlist.clear()
         playlist.addAll(songs.mapIndexed { index, song -> if (index == safeIndex) resolvedSong else song })
         _playlist.value = playlist.toList()
 
         mediaController?.apply {
-            setMediaItems(listOf(songToMediaItem(resolvedSong)), 0, 0L)
+            setMediaItems(listOf(songToMediaItem(resolvedSong)), 0, resumePositionFor(resolvedSong))
             prepare()
             play()
         }
@@ -558,7 +563,9 @@ class ExoPlayerManager(private val context: Context) {
         suppressExternalSnapshotsUntilMs = 0L
         resetPlayNextForwardStack()
         clearPendingShuffleReorder(disableNativeShuffle = true, clearOriginalOrder = false)
-        mediaController?.seekToDefaultPosition(index)
+        rememberCurrentSongResumePosition()
+        val resumePosition = resumePositionFor(playlist[index])
+        mediaController?.seekTo(index, resumePosition)
         mediaController?.play()
         updateCurrentSong()
         savePlaybackQueue(force = true)
@@ -644,7 +651,8 @@ class ExoPlayerManager(private val context: Context) {
         if (index >= 0) {
             resetPlayNextForwardStack()
             clearPendingShuffleReorder(disableNativeShuffle = true, clearOriginalOrder = false)
-            mediaController?.seekToDefaultPosition(index)
+            rememberCurrentSongResumePosition()
+            mediaController?.seekTo(index, resumePositionFor(playlist[index]))
             mediaController?.play()
             updateCurrentSong()
             savePlaybackQueue(force = true)
@@ -685,6 +693,7 @@ class ExoPlayerManager(private val context: Context) {
 
     fun skipToNext() {
         val controller = mediaController ?: return
+        rememberCurrentSongResumePosition()
         if (!performPendingShuffleReorder(trigger = "skipNext", seekToNextAfterReorder = true)) {
             controller.seekToNextMediaItem()
         }
@@ -693,7 +702,14 @@ class ExoPlayerManager(private val context: Context) {
     }
 
     fun skipToPrevious() {
-        mediaController?.seekToPreviousMediaItem()
+        val controller = mediaController ?: return
+        rememberCurrentSongResumePosition()
+        val targetIndex = (controller.currentMediaItemIndex - 1).takeIf { it in playlist.indices }
+        if (targetIndex != null) {
+            controller.seekTo(targetIndex, resumePositionFor(playlist[targetIndex]))
+        } else {
+            controller.seekToPreviousMediaItem()
+        }
         scheduleCurrentSongRefresh()
         savePlaybackQueue(force = true)
     }
@@ -771,6 +787,46 @@ class ExoPlayerManager(private val context: Context) {
             SettingsManager.PLAY_NEXT_MODE_FORWARD_STACK
         )
         resetPlayNextForwardStack()
+    }
+
+    fun setResumePlaybackPositionEnabled(enabled: Boolean) {
+        resumePlaybackPositionEnabled = enabled
+        if (!enabled) perSongResumePositions.clear()
+    }
+
+    private fun rememberCurrentSongResumePosition() {
+        if (!resumePlaybackPositionEnabled) return
+        val controller = mediaController ?: return
+        val song = _currentSong.value ?: resolveCurrentPlaybackSong(controller) ?: return
+        val position = controller.currentPosition.coerceAtLeast(0L)
+        val duration = controller.duration.takeIf { it > 0L } ?: song.duration
+        val key = song.playbackStackKey()
+        if (position < RESUME_POSITION_MIN_MS ||
+            (duration > 0L && duration - position < RESUME_POSITION_END_GUARD_MS)
+        ) {
+            perSongResumePositions.remove(key)
+            return
+        }
+        perSongResumePositions[key] = position
+        trimResumePositions()
+    }
+
+    private fun resumePositionFor(song: Song): Long {
+        if (!resumePlaybackPositionEnabled) return 0L
+        val position = perSongResumePositions[song.playbackStackKey()] ?: return 0L
+        val duration = song.duration
+        return if (duration > 0L) {
+            position.coerceIn(0L, (duration - SEEK_END_GUARD_MS).coerceAtLeast(0L))
+        } else {
+            position.coerceAtLeast(0L)
+        }
+    }
+
+    private fun trimResumePositions() {
+        while (perSongResumePositions.size > MAX_RESUME_POSITION_ENTRIES) {
+            val firstKey = perSongResumePositions.keys.firstOrNull() ?: return
+            perSongResumePositions.remove(firstKey)
+        }
     }
 
     fun toggleRepeat() {
@@ -1686,6 +1742,9 @@ class ExoPlayerManager(private val context: Context) {
         const val TIMING_TAG = "EllaPlaybackTiming"
         // Guard so a seek never lands on the last frame and trips end-of-stream auto-advance.
         const val SEEK_END_GUARD_MS = 600L
+        const val RESUME_POSITION_MIN_MS = 5_000L
+        const val RESUME_POSITION_END_GUARD_MS = 8_000L
+        const val MAX_RESUME_POSITION_ENTRIES = 256
         const val CLEAR_EXTERNAL_SNAPSHOT_SUPPRESSION_MS = 3_000L
         // Max items handed to the media session at once; larger queues overflow the ~1MB Binder
         // transaction limit (TransactionTooLargeException) on very large libraries.

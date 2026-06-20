@@ -99,6 +99,8 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_GETTER_ENABLED = booleanPreferencesKey("lyric_getter_enabled")
         val KEY_MIN_DURATION = intPreferencesKey("min_duration_sec")
         val KEY_REPLAYGAIN_ENABLED = booleanPreferencesKey("replaygain_enabled")
+        val KEY_REPLAYGAIN_MODE = intPreferencesKey("replaygain_mode")
+        val KEY_RESUME_PLAYBACK_POSITION = booleanPreferencesKey("resume_playback_position")
         val KEY_AUDIO_FOCUS_DISABLED = booleanPreferencesKey("audio_focus_disabled")
         val KEY_SHUFFLE_MODE = intPreferencesKey("shuffle_mode")
         val KEY_PREVIOUS_BUTTON_ACTION = intPreferencesKey("previous_button_action")
@@ -117,9 +119,6 @@ class SettingsManager(private val context: Context) {
         val KEY_MINI_PLAYER_LYRICS_ENABLED = booleanPreferencesKey("mini_player_lyrics_enabled")
         val KEY_MINI_PLAYER_RIGHT_BUTTON = intPreferencesKey("mini_player_right_button")
         val KEY_TRANSPORT_BUTTON_OUTLINES = booleanPreferencesKey("transport_button_outlines")
-        val KEY_PLAYER_PROGRESS_BAR_STYLE = intPreferencesKey("player_progress_bar_style")
-        const val PROGRESS_BAR_STYLE_GLOW = 0
-        const val PROGRESS_BAR_STYLE_COMET = 1
         val KEY_PLAYER_TAP_SEEK_ENABLED = booleanPreferencesKey("player_tap_seek_enabled")
         val KEY_PLAYER_SHOW_TOTAL_DURATION = booleanPreferencesKey("player_show_total_duration")
         val KEY_PLAYER_SHOW_SONG_ANNOTATION = booleanPreferencesKey("player_show_song_annotation")
@@ -253,6 +252,10 @@ class SettingsManager(private val context: Context) {
 
         const val SHUFFLE_MODE_PSEUDO = 0
         const val SHUFFLE_MODE_TRUE_RANDOM = 1
+        const val REPLAY_GAIN_OFF = 0
+        const val REPLAY_GAIN_TRACK = 1
+        const val REPLAY_GAIN_ALBUM = 2
+        const val REPLAY_GAIN_AUTO = 3
 
         const val PREVIOUS_BUTTON_PREVIOUS = 0
         const val PREVIOUS_BUTTON_REPLAY_CURRENT = 1
@@ -508,6 +511,12 @@ class SettingsManager(private val context: Context) {
     val lyricGetterEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_GETTER_ENABLED] ?: false }
     val minDurationSec: Flow<Int> = context.dataStore.data.map { it[KEY_MIN_DURATION] ?: 15 }
     val replayGainEnabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_REPLAYGAIN_ENABLED] ?: false }
+    val replayGainMode: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_REPLAYGAIN_MODE]
+            ?: if (preferences[KEY_REPLAYGAIN_ENABLED] == true) REPLAY_GAIN_AUTO else REPLAY_GAIN_OFF
+    }.map { it.coerceIn(REPLAY_GAIN_OFF, REPLAY_GAIN_AUTO) }
+    val resumePlaybackPosition: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_RESUME_PLAYBACK_POSITION] ?: false }
     val audioFocusDisabled: Flow<Boolean> = context.dataStore.data.map { it[KEY_AUDIO_FOCUS_DISABLED] ?: false }
     val shuffleMode: Flow<Int> =
         context.dataStore.data.map { it[KEY_SHUFFLE_MODE] ?: SHUFFLE_MODE_PSEUDO }
@@ -551,8 +560,6 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_MINI_PLAYER_RIGHT_BUTTON] ?: MINI_PLAYER_RIGHT_NEXT }
     val transportButtonOutlines: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_TRANSPORT_BUTTON_OUTLINES] ?: false }
-    val playerProgressBarStyle: Flow<Int> =
-        context.dataStore.data.map { it[KEY_PLAYER_PROGRESS_BAR_STYLE] ?: PROGRESS_BAR_STYLE_GLOW }
     val playerTapSeekEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_PLAYER_TAP_SEEK_ENABLED] ?: true }
     val playerShowTotalDuration: Flow<Boolean> =
@@ -968,7 +975,22 @@ class SettingsManager(private val context: Context) {
     }
 
     suspend fun setReplayGainEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_REPLAYGAIN_ENABLED] = enabled }
+        context.dataStore.edit {
+            it[KEY_REPLAYGAIN_ENABLED] = enabled
+            it[KEY_REPLAYGAIN_MODE] = if (enabled) REPLAY_GAIN_AUTO else REPLAY_GAIN_OFF
+        }
+    }
+
+    suspend fun setReplayGainMode(mode: Int) {
+        val safeMode = mode.coerceIn(REPLAY_GAIN_OFF, REPLAY_GAIN_AUTO)
+        context.dataStore.edit {
+            it[KEY_REPLAYGAIN_MODE] = safeMode
+            it[KEY_REPLAYGAIN_ENABLED] = safeMode != REPLAY_GAIN_OFF
+        }
+    }
+
+    suspend fun setResumePlaybackPosition(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_RESUME_PLAYBACK_POSITION] = enabled }
     }
 
     suspend fun setAudioFocusDisabled(disabled: Boolean) {
@@ -1051,10 +1073,6 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setTransportButtonOutlines(enabled: Boolean) {
         context.dataStore.edit { it[KEY_TRANSPORT_BUTTON_OUTLINES] = enabled }
-    }
-
-    suspend fun setPlayerProgressBarStyle(style: Int) {
-        context.dataStore.edit { it[KEY_PLAYER_PROGRESS_BAR_STYLE] = style }
     }
 
     suspend fun setPlayerHdrGlow(enabled: Boolean) {
@@ -1823,6 +1841,8 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_LYRIC_GETTER_ENABLED)
             setBoolean(KEY_IGNORE_LYRIC_HEADER_TAGS)
             setBoolean(KEY_REPLAYGAIN_ENABLED)
+            setInt(KEY_REPLAYGAIN_MODE)
+            setBoolean(KEY_RESUME_PLAYBACK_POSITION)
             setBoolean(KEY_AUDIO_FOCUS_DISABLED)
             setBoolean(KEY_LYRIC_PAGE_TRANSLATION)
             setBoolean(KEY_LYRIC_PAGE_KEEP_SCREEN_ON)
@@ -1913,7 +1933,6 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_SORT_PLAYLIST_DETAIL_SONG)
             setInt(KEY_CATEGORY_GRID_COLUMNS)
             setInt(KEY_MINI_PLAYER_LYRIC_SECONDARY)
-            setInt(KEY_PLAYER_PROGRESS_BAR_STYLE)
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_TOP_OFFSET)
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_POSITION)
             setInt(KEY_DESKTOP_LYRIC_STATUS_BAR_WIDTH)

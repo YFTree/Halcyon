@@ -482,10 +482,6 @@
     <string name="folder_playlist_more_refresh">刷新</string>
     <string name="folder_playlist_more_pin">置顶</string>
     <string name="playlist_name_exists">歌单名已存在</string>
-    <string name="settings_progress_bar_style">进度条样式</string>
-    <string name="settings_progress_bar_glow">辉光</string>
-    <string name="settings_progress_bar_comet">彗星</string>
-    <string name="easter_egg_activated">彩蛋已激活 ✨</string>
     <string name="folder_playlist_delete_title">删除文件夹歌单</string>
     <string name="folder_playlist_delete_message">确定要删除「%1$s」吗？不会删除音乐文件。</string>
     <string name="folder_show_folder">显示文件夹</string>
@@ -571,6 +567,16 @@
     <string name="equalizer_unavailable">当前设备暂不支持音效,或开始播放后再来调节。</string>
     <string name="settings_replay_gain">ReplayGain 音量均衡</string>
     <string name="settings_replay_gain_summary">根据音频标签自动调整播放音量</string>
+    <string name="settings_replay_gain_off">关闭</string>
+    <string name="settings_replay_gain_track">按单曲</string>
+    <string name="settings_replay_gain_album">按专辑</string>
+    <string name="settings_replay_gain_auto">自动</string>
+    <string name="settings_replay_gain_off_summary">不调整播放音量</string>
+    <string name="settings_replay_gain_track_summary">使用 replaygain_track_gain</string>
+    <string name="settings_replay_gain_album_summary">使用 replaygain_album_gain</string>
+    <string name="settings_replay_gain_auto_summary">优先使用专辑增益，没有时回落到单曲增益</string>
+    <string name="settings_resume_playback_position">断点续播</string>
+    <string name="settings_resume_playback_position_summary">切回之前听过的歌曲时，从离开时的位置继续播放</string>
     <string name="settings_shuffle_mode">随机播放模式</string>
     <string name="settings_play_next_mode">下一首播放模式</string>
     <string name="settings_previous_button">上一曲按钮</string>
@@ -1555,4 +1561,5 @@
     <string name="settings_hide_system_bars">隐藏状态栏和导航栏</string>
     <string name="settings_hide_system_bars_summary">进入全屏沉浸，隐藏系统状态栏与导航栏，适合车机等场景</string>
     <string name="settings_player_bg_theme">播放页背景</string>
+
 </resources>

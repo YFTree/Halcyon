@@ -42,7 +42,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
@@ -71,8 +70,11 @@ internal fun LandscapeCoverPlayerPage(
     shuffleEnabled: Boolean,
     repeatMode: Int,
     audioInfo: AudioInfo?,
+    hiResLogoEnabled: Boolean,
+    hiResLogoUri: String,
     palette: PlayerPalette,
     lyrics: List<LyricLine>,
+    lyricsLoading: Boolean,
     currentLyricIndex: Int,
     showTranslation: Boolean,
     showPronunciation: Boolean,
@@ -125,6 +127,7 @@ internal fun LandscapeCoverPlayerPage(
     val bluetoothDeviceName = rememberBluetoothOutputName()
     val hasLyrics = lyrics.isNotEmpty()
     val compactPhoneLandscape = LocalConfiguration.current.smallestScreenWidthDp < 600
+    val showHiResLogo = hiResLogoEnabled && audioInfo?.isHiResLogoTrack() == true
     val swipeThresholdPx = with(LocalDensity.current) { 84.dp.toPx() }
     val swipeScope = rememberCoroutineScope()
     val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -140,8 +143,11 @@ internal fun LandscapeCoverPlayerPage(
             currentPosition = currentPosition,
             duration = duration,
             audioInfo = audioInfo,
+            showHiResLogo = showHiResLogo,
+            hiResLogoUri = hiResLogoUri,
             palette = palette,
             lyrics = lyrics,
+            lyricsLoading = lyricsLoading,
             currentLyricIndex = currentLyricIndex,
             showTranslation = showTranslation,
             showPronunciation = showPronunciation,
@@ -335,7 +341,17 @@ internal fun LandscapeCoverPlayerPage(
                             AlbumArtView(
                                 song = song,
                                 embeddedCover = embeddedCover,
+                                showHiResLogo = showHiResLogo,
+                                hiResLogoUri = hiResLogoUri,
                                 modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        if (dynamicCoverSource != null && showHiResLogo) {
+                            HiResLogoBadge(
+                                logoUri = hiResLogoUri,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(10.dp)
                             )
                         }
                     }
@@ -440,8 +456,11 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
     currentPosition: Long,
     duration: Long,
     audioInfo: AudioInfo?,
+    showHiResLogo: Boolean,
+    hiResLogoUri: String,
     palette: PlayerPalette,
     lyrics: List<LyricLine>,
+    lyricsLoading: Boolean,
     currentLyricIndex: Int,
     showTranslation: Boolean,
     showPronunciation: Boolean,
@@ -556,23 +575,11 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
                     PhoneLandscapeCoverImage(
                         song = song,
                         embeddedCover = embeddedCover,
+                        showHiResLogo = showHiResLogo,
+                        hiResLogoUri = hiResLogoUri,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            Brush.horizontalGradient(
-                                colorStops = arrayOf(
-                                    0.00f to Color.Transparent,
-                                    0.58f to Color.Transparent,
-                                    0.90f to palette.middle.copy(alpha = 0.42f),
-                                    1.00f to palette.middle.copy(alpha = 0.92f)
-                                )
-                            )
-                        )
-                )
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -593,15 +600,6 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(0.50f)
-                    .background(
-                        Brush.horizontalGradient(
-                            colorStops = arrayOf(
-                                0.00f to palette.middle.copy(alpha = 0.36f),
-                                0.18f to palette.middle.copy(alpha = 0.64f),
-                                1.00f to palette.middle.copy(alpha = 0.82f)
-                            )
-                        )
-                    )
                     .padding(start = 18.dp, end = 26.dp)
             ) {
                 Row(
@@ -612,6 +610,14 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    CompactLandscapeIconButton(onClick = onPrevious) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_skip_previous),
+                            contentDescription = stringResource(R.string.common_previous),
+                            tint = palette.onBackground.copy(alpha = 0.94f),
+                            modifier = Modifier.size(27.dp)
+                        )
+                    }
                     CompactLandscapeIconButton(onClick = onPlayPause) {
                         CenteredPlayPauseGlyph(
                             isPlaying = isPlaying,
@@ -639,41 +645,34 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .windowInsetsPadding(WindowInsets.statusBars)
-                        .padding(top = 18.dp, end = 176.dp),
+                        .padding(top = 18.dp, end = 220.dp),
                     horizontalAlignment = Alignment.Start
                 ) {
-                    Text(
+                    PlayerSongTitleText(
                         text = song?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.app_name),
                         color = palette.onBackground.copy(alpha = 0.96f),
                         fontSize = 22.sp,
-                        lineHeight = 25.sp,
                         fontWeight = FontWeight.ExtraBold,
                         fontFamily = fontFamily,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text(
+                    PlayerMarqueeText(
                         text = song?.artist?.takeIf { it.isNotBlank() } ?: stringResource(R.string.player_unknown_artist),
                         color = palette.onBackground.copy(alpha = 0.58f),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = fontFamily,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 2.dp)
                     )
                     annotation.takeIf { it.isNotBlank() }?.let { text ->
-                        Text(
+                        PlayerMarqueeText(
                             text = text,
                             color = palette.onBackground.copy(alpha = 0.44f),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             fontFamily = fontFamily,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 2.dp)
@@ -728,11 +727,11 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
                             onLineLongClick = onLyricLineLongClick,
                             modifier = Modifier.fillMaxSize()
                         )
-                    } else {
+                    } else if (!lyricsLoading) {
                         Text(
                             text = stringResource(R.string.player_no_lyrics),
                             color = palette.onBackground.copy(alpha = 0.54f),
-                            fontSize = 24.sp,
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = fontFamily,
                             textAlign = TextAlign.Center,
@@ -767,6 +766,8 @@ private fun CompactLandscapeIconButton(
 private fun PhoneLandscapeCoverImage(
     song: Song?,
     embeddedCover: Bitmap?,
+    showHiResLogo: Boolean,
+    hiResLogoUri: String,
     modifier: Modifier = Modifier
 ) {
     val coverModel = embeddedCover
@@ -790,6 +791,14 @@ private fun PhoneLandscapeCoverImage(
             )
         } else {
             DefaultAlbumCover(modifier = Modifier.fillMaxSize())
+        }
+        if (showHiResLogo) {
+            HiResLogoBadge(
+                logoUri = hiResLogoUri,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp)
+            )
         }
     }
 }
