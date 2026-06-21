@@ -55,6 +55,7 @@ import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Play
 import top.yukonga.miuix.kmp.icon.extended.Share
 
 private const val MAX_SHARE_LINES = 14
@@ -70,7 +71,8 @@ fun LyricSharePicker(
     customInfo: String = "",
     shareTypeface: android.graphics.Typeface? = null,
     onDismiss: () -> Unit,
-    onShare: (List<LyricLine>, Boolean) -> Unit
+    onShare: (List<LyricLine>, Boolean) -> Unit,
+    onVideoShare: ((List<LyricLine>, Boolean) -> Unit)? = null
 ) {
     BackHandler(onBack = onDismiss)
 
@@ -134,6 +136,7 @@ fun LyricSharePicker(
             LyricShareHeader(
                 selectedCount = selectedIndexes.size,
                 shareEnabled = selectedIndexes.isNotEmpty(),
+                videoShareEnabled = onVideoShare != null,
                 onDismiss = onDismiss,
                 onShare = {
                     selectedIndexes
@@ -141,6 +144,15 @@ fun LyricSharePicker(
                         .mapNotNull(lyrics::getOrNull)
                         .takeIf { it.isNotEmpty() }
                         ?.let { onShare(it, includeTranslation) }
+                },
+                onVideoShare = onVideoShare?.let { callback ->
+                    {
+                        selectedIndexes
+                            .sorted()
+                            .mapNotNull(lyrics::getOrNull)
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { callback(it, includeTranslation) }
+                    }
                 }
             )
 
@@ -222,8 +234,10 @@ fun LyricSharePicker(
 private fun LyricShareHeader(
     selectedCount: Int,
     shareEnabled: Boolean,
+    videoShareEnabled: Boolean,
     onDismiss: () -> Unit,
-    onShare: () -> Unit
+    onShare: () -> Unit,
+    onVideoShare: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -255,6 +269,15 @@ private fun LyricShareHeader(
                 color = Color.White.copy(alpha = 0.56f),
                 fontSize = 12.sp
             )
+        }
+        if (videoShareEnabled && onVideoShare != null) {
+            IconButton(onClick = onVideoShare) {
+                Icon(
+                    imageVector = MiuixIcons.Regular.Play,
+                    contentDescription = stringResource(R.string.lyric_video_share_chooser_title),
+                    tint = if (!shareEnabled) Color.White.copy(alpha = 0.34f) else Color.White
+                )
+            }
         }
         IconButton(onClick = onShare) {
             Icon(

@@ -55,6 +55,7 @@ internal fun LyricsPlayerPage(
     fontScale: Float,
     secondaryFontScale: Float,
     perspectiveEffect: Boolean,
+    perspectiveYAngle: Int,
     lyricTextAlign: Int,
     palette: PlayerPalette,
     flowEffectMode: Int,
@@ -76,6 +77,8 @@ internal fun LyricsPlayerPage(
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
     onToggleKeepScreenOn: () -> Unit,
+    onTogglePerspectiveEffect: () -> Unit,
+    onPerspectiveYAngle: (Int) -> Unit,
     onToggleFavorite: () -> Unit,
     onFontScale: (Float) -> Unit,
     onSecondaryFontScale: (Float) -> Unit,
@@ -214,6 +217,8 @@ internal fun LyricsPlayerPage(
             showPronunciation = showPronunciation,
             showTranslation = showTranslation,
             keepScreenOn = keepScreenOn,
+            perspectiveEffect = perspectiveEffect,
+            perspectiveYAngle = perspectiveYAngle,
             lyricFormatAvailability = lyricFormatAvailability,
             preferTtmlLyrics = preferTtmlLyrics,
             lyricSourceMode = lyricSourceMode,
@@ -232,6 +237,10 @@ internal fun LyricsPlayerPage(
                 lyricMenuExpanded = false
                 onToggleKeepScreenOn()
             },
+            onTogglePerspectiveEffect = {
+                onTogglePerspectiveEffect()
+            },
+            onPerspectiveYAngle = onPerspectiveYAngle,
             onLyricSourceMode = { mode ->
                 lyricMenuExpanded = false
                 onLyricSourceMode(mode)

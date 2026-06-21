@@ -308,6 +308,10 @@
     <string name="lyric_share_unknown_artist">Unknown artist</string>
     <string name="lyric_share_footer_default">Halcyon</string>
     <string name="lyric_share_footer_custom">by @%1$s</string>
+    <string name="lyric_video_share_generating">Generating video…</string>
+    <string name="lyric_video_share_failed">Failed to generate video</string>
+    <string name="lyric_video_share_chooser_title">Share lyric video</string>
+    <string name="lyric_video_share_cancel">Cancel</string>
     <string name="aspect_pro_requires_local_audio">Aspect Pro requires a local audio file</string>
     <string name="aspect_pro_open_failed">Could not open Aspect Pro. Make sure it is installed</string>
 
@@ -1062,6 +1066,9 @@
     <string name="player_show_translation">Show translation</string>
     <string name="player_disable_keep_screen_on">Disable lyrics screen always-on</string>
     <string name="player_enable_keep_screen_on">Enable lyrics screen always-on</string>
+    <string name="player_disable_perspective_effect">Disable 3D lyrics effect</string>
+    <string name="player_enable_perspective_effect">Enable 3D lyrics effect</string>
+    <string name="player_perspective_y_angle">Y-axis rotation angle</string>
     <string name="player_disable_playback_keep_screen_on">Disable player always-on</string>
     <string name="player_enable_playback_keep_screen_on">Enable player always-on</string>
     <string name="player_lyric_font_size">Lyric font size</string>

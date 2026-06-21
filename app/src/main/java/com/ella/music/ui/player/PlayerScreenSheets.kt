@@ -192,7 +192,8 @@ internal fun PlayerLyricShareHost(
     customInfo: String,
     shareTypeface: Typeface?,
     onDismiss: () -> Unit,
-    onShare: (List<LyricLine>, Boolean) -> Unit
+    onShare: (List<LyricLine>, Boolean) -> Unit,
+    onVideoShare: ((List<LyricLine>, Boolean) -> Unit)? = null
 ) {
     initialLine?.let { line ->
         LyricSharePicker(
@@ -205,7 +206,8 @@ internal fun PlayerLyricShareHost(
             customInfo = customInfo,
             shareTypeface = shareTypeface,
             onDismiss = onDismiss,
-            onShare = onShare
+            onShare = onShare,
+            onVideoShare = onVideoShare
         )
     }
 }

@@ -210,6 +210,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_FONT_ITALIC = booleanPreferencesKey("lyric_font_italic")
         val KEY_LYRIC_FONT_APPLY_TO_PAGE = booleanPreferencesKey("lyric_font_apply_to_page")
         val KEY_LYRIC_PERSPECTIVE_EFFECT = booleanPreferencesKey("lyric_perspective_effect")
+        val KEY_LYRIC_PERSPECTIVE_Y_ANGLE = intPreferencesKey("lyric_perspective_y_angle")
         val KEY_SCAN_INCLUDE_FOLDERS = stringPreferencesKey("scan_include_folders")
         val KEY_SCAN_EXCLUDE_FOLDERS = stringPreferencesKey("scan_exclude_folders")
         val KEY_USB_FOLDER_URIS = stringPreferencesKey("usb_folder_uris")
@@ -748,6 +749,7 @@ class SettingsManager(private val context: Context) {
     val lyricFontApplyToPage: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_APPLY_TO_PAGE] ?: true }
     val lyricShareUseLyricFont: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_SHARE_USE_LYRIC_FONT] ?: false }
     val lyricPerspectiveEffect: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PERSPECTIVE_EFFECT] ?: false }
+    val lyricPerspectiveYAngle: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_PERSPECTIVE_Y_ANGLE] ?: 25 }
     val scanIncludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_INCLUDE_FOLDERS] ?: "" }
     val scanExcludeFolders: Flow<String> = context.dataStore.data.map { it[KEY_SCAN_EXCLUDE_FOLDERS] ?: "" }
     val usbFolderUris: Flow<String> = context.dataStore.data.map { it[KEY_USB_FOLDER_URIS] ?: "" }
@@ -1045,6 +1047,10 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setLyricPerspectiveEffect(enabled: Boolean) {
         context.dataStore.edit { it[KEY_LYRIC_PERSPECTIVE_EFFECT] = enabled }
+    }
+
+    suspend fun setLyricPerspectiveYAngle(angle: Int) {
+        context.dataStore.edit { it[KEY_LYRIC_PERSPECTIVE_Y_ANGLE] = angle.coerceIn(0, 45) }
     }
 
     suspend fun setMiniPlayerLyricTranslation(enabled: Boolean) {

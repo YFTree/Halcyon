@@ -113,8 +113,12 @@ import com.ella.music.data.model.LyricLine
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.player.PlaybackAudioSession
+import com.ella.music.ui.components.LyricVideoProgress
+import com.ella.music.ui.components.LyricVideoShareProgressOverlay
 import com.ella.music.ui.components.TagEditorOptionKind
+import com.ella.music.ui.components.generateLyricVideo
 import com.ella.music.ui.components.shareLyricCard
+import com.ella.music.ui.components.shareLyricVideoFile
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -213,6 +217,7 @@ fun PlayerScreen(
     val showLyricPronunciation by playerViewModel.showLyricPronunciation.collectAsState()
     val lyricPageKeepScreenOn = playerSettings.lyricPageKeepScreenOn
     val lyricPerspectiveEffect = playerSettings.lyricPerspectiveEffect
+    val lyricPerspectiveYAngle = playerSettings.lyricPerspectiveYAngle
     val playerLyricTextAlign = playerSettings.playerLyricTextAlign
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
     val sleepTimerEndRealtimeMs by playerViewModel.sleepTimerEndRealtimeMs.collectAsState()
@@ -311,6 +316,37 @@ fun PlayerScreen(
         )
         lyricShareInitialLine = null
     }
+    var videoShareProgress by remember { mutableStateOf<LyricVideoProgress?>(null) }
+    var videoShareGenerating by remember { mutableStateOf(false) }
+    var videoShareJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    fun shareSelectedLyricsVideo(lines: List<LyricLine>, includeTranslation: Boolean) {
+        lyricShareInitialLine = null
+        videoShareGenerating = true
+        videoShareProgress = LyricVideoProgress(0, 1)
+        videoShareJob = scope.launch {
+            val uri = generateLyricVideo(
+                context = context,
+                song = song,
+                lines = lines,
+                cover = embeddedCover ?: paletteBitmap,
+                includeTranslation = includeTranslation,
+                typeface = lyricShareTypeface,
+                onProgress = { progress -> videoShareProgress = progress }
+            )
+            videoShareGenerating = false
+            videoShareProgress = null
+            videoShareJob = null
+            if (uri != null) {
+                withContext(Dispatchers.Main) {
+                    shareLyricVideoFile(context, uri)
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, context.getString(R.string.lyric_video_share_failed), Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     fun navigateToArtistOrChoose(artistText: String) {
         val artists = splitArtistNames(artistText)
             .distinctBy { it.tagIdentityKey() }
@@ -358,7 +394,18 @@ fun PlayerScreen(
                 customInfo = lyricShareCustomInfo,
                 shareTypeface = lyricShareTypeface,
                 onDismiss = { lyricShareInitialLine = null },
-                onShare = ::shareSelectedLyrics
+                onShare = ::shareSelectedLyrics,
+                onVideoShare = ::shareSelectedLyricsVideo
+            )
+            LyricVideoShareProgressOverlay(
+                visible = videoShareGenerating,
+                progress = videoShareProgress,
+                onCancel = {
+                    videoShareJob?.cancel()
+                    videoShareJob = null
+                    videoShareGenerating = false
+                    videoShareProgress = null
+                }
             )
         }
     ) { dismissingPlayer ->
@@ -534,6 +581,7 @@ fun PlayerScreen(
                         lyricFontScale = lyricFontScale,
                         lyricSecondaryFontScale = lyricSecondaryFontScale,
                         lyricPerspectiveEffect = lyricPerspectiveEffect,
+                        lyricPerspectiveYAngle = lyricPerspectiveYAngle,
                         lyricTextAlign = playerLyricTextAlign,
                         lyricPalette = lyricPalette,
                         isPlaying = isPlaying,
@@ -614,6 +662,8 @@ fun PlayerScreen(
                 fontScale = lyricFontScale,
                 secondaryFontScale = lyricSecondaryFontScale,
                 lyricTextAlign = playerLyricTextAlign,
+                lyricPerspectiveEffect = lyricPerspectiveEffect,
+                lyricPerspectiveYAngle = lyricPerspectiveYAngle,
                 showTotalDuration = playerShowTotalDuration,
                 queueExpanded = uiState.queueExpanded,
                 playlist = playlist,

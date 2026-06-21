@@ -27,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,6 +59,8 @@ internal fun LandscapeLyricsOverlay(
     fontScale: Float,
     secondaryFontScale: Float,
     lyricTextAlign: Int,
+    lyricPerspectiveEffect: Boolean,
+    lyricPerspectiveYAngle: Int,
     showTotalDuration: Boolean,
     palette: PlayerPalette,
     flowEffectMode: Int,
@@ -152,10 +156,19 @@ internal fun LandscapeLyricsOverlay(
                 )
             }
             Spacer(modifier = Modifier.width(34.dp))
+            val density = LocalDensity.current
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .weight(0.67f)
+                    .then(
+                        if (lyricPerspectiveEffect && lyricPerspectiveYAngle > 0) {
+                            Modifier.graphicsLayer {
+                                rotationY = lyricPerspectiveYAngle.toFloat()
+                                cameraDistance = density.density * 12f
+                            }
+                        } else Modifier
+                    )
             ) {
                 SmoothLyricView(
                     songId = song?.id ?: 0L,

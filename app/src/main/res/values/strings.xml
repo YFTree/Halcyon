@@ -313,6 +313,10 @@
     <string name="lyric_share_unknown_artist">未知艺术家</string>
     <string name="lyric_share_footer_default">Halcyon</string>
     <string name="lyric_share_footer_custom">by @%1$s</string>
+    <string name="lyric_video_share_generating">正在生成视频…</string>
+    <string name="lyric_video_share_failed">生成视频失败</string>
+    <string name="lyric_video_share_chooser_title">分享歌词视频</string>
+    <string name="lyric_video_share_cancel">取消</string>
     <string name="aspect_pro_requires_local_audio">Aspect Pro 需要本地音频文件</string>
     <string name="aspect_pro_open_failed">未能打开 Aspect Pro，请确认已安装</string>
 
@@ -1124,6 +1128,9 @@
     <string name="player_show_translation">显示翻译</string>
     <string name="player_disable_keep_screen_on">关闭歌词页常亮</string>
     <string name="player_enable_keep_screen_on">开启歌词页常亮</string>
+    <string name="player_disable_perspective_effect">关闭立体歌词效果</string>
+    <string name="player_enable_perspective_effect">开启立体歌词效果</string>
+    <string name="player_perspective_y_angle">Y轴旋转角度</string>
     <string name="player_disable_playback_keep_screen_on">关闭播放页常亮</string>
     <string name="player_enable_playback_keep_screen_on">开启播放页常亮</string>
     <string name="player_lyric_font_size">歌词字号</string>

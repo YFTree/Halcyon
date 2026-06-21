@@ -428,6 +428,7 @@ internal fun LyricsPageContent(
     lyricFontScale: Float,
     lyricSecondaryFontScale: Float,
     lyricPerspectiveEffect: Boolean,
+    lyricPerspectiveYAngle: Int,
     lyricTextAlign: Int,
     lyricPalette: PlayerPalette,
     isPlaying: Boolean,
@@ -473,6 +474,7 @@ internal fun LyricsPageContent(
         fontScale = lyricFontScale,
         secondaryFontScale = lyricSecondaryFontScale,
         perspectiveEffect = lyricPerspectiveEffect,
+        perspectiveYAngle = lyricPerspectiveYAngle,
         lyricTextAlign = lyricTextAlign,
         palette = lyricPalette,
         flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
@@ -499,6 +501,12 @@ internal fun LyricsPageContent(
         },
         onToggleKeepScreenOn = {
             scope.launch { settingsManager.setLyricPageKeepScreenOn(!lyricPageKeepScreenOn) }
+        },
+        onTogglePerspectiveEffect = {
+            scope.launch { settingsManager.setLyricPerspectiveEffect(!lyricPerspectiveEffect) }
+        },
+        onPerspectiveYAngle = { angle ->
+            scope.launch { settingsManager.setLyricPerspectiveYAngle(angle) }
         },
         onToggleFavorite = { playerViewModel.toggleCurrentSongFavorite() },
         onFontScale = { scale ->

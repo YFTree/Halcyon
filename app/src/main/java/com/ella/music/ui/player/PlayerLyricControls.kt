@@ -64,9 +64,13 @@ internal fun LyricActionMenu(
     lyricSourceMode: Int,
     fontScale: Float,
     secondaryFontScale: Float,
+    perspectiveEffect: Boolean,
+    perspectiveYAngle: Int,
     onTogglePronunciation: () -> Unit,
     onToggleTranslation: () -> Unit,
     onToggleKeepScreenOn: () -> Unit,
+    onTogglePerspectiveEffect: () -> Unit,
+    onPerspectiveYAngle: (Int) -> Unit,
     onLyricSourceMode: (Int) -> Unit,
     onLyricFormatPreference: (Boolean) -> Unit,
     onFontScale: (Float) -> Unit,
@@ -91,6 +95,29 @@ internal fun LyricActionMenu(
             text = stringResource(if (keepScreenOn) R.string.player_disable_keep_screen_on else R.string.player_enable_keep_screen_on),
             onClick = onToggleKeepScreenOn
         )
+        PlayerActionMenuItem(
+            text = stringResource(if (perspectiveEffect) R.string.player_disable_perspective_effect else R.string.player_enable_perspective_effect),
+            onClick = onTogglePerspectiveEffect
+        )
+        if (perspectiveEffect) {
+            Text(
+                text = stringResource(R.string.player_perspective_y_angle),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            )
+            DottedValueSlider(
+                value = perspectiveYAngle.toFloat().coerceIn(0f, 45f),
+                valueRange = 0f..45f,
+                steps = 9,
+                label = "${perspectiveYAngle}°",
+                onValueChange = { onPerspectiveYAngle(it.toInt()) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(82.dp)
+            )
+        }
         Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = stringResource(R.string.player_lyric_font_size),
