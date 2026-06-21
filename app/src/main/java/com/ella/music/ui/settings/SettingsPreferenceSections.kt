@@ -298,6 +298,7 @@ internal fun SettingsScanSection(
     val genreSeparators by settingsManager.genreSeparators.collectAsState(initial = "")
     val genreProtectedNames by settingsManager.genreProtectedNames.collectAsState(initial = "")
     val tagIgnoreCase by settingsManager.tagIgnoreCase.collectAsState(initial = false)
+    val showAlbumArtists by settingsManager.showAlbumArtists.collectAsState(initial = true)
 
     SmallTitle(text = stringResource(R.string.settings_scan))
 
@@ -362,6 +363,14 @@ internal fun SettingsScanSection(
                 checked = tagIgnoreCase,
                 onCheckedChange = {
                     scope.launch { settingsManager.setTagIgnoreCase(it) }
+                }
+            )
+            SwitchPreference(
+                title = stringResource(R.string.settings_show_album_artists),
+                summary = stringResource(R.string.settings_show_album_artists_summary),
+                checked = showAlbumArtists,
+                onCheckedChange = {
+                    scope.launch { settingsManager.setShowAlbumArtists(it) }
                 }
             )
         }

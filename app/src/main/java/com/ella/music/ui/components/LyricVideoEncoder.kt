@@ -10,7 +10,6 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
-import android.os.Build
 import android.view.Surface
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -102,14 +101,16 @@ private suspend fun encodeVideoTrack(
     outputFile: File,
     onProgress: (LyricVideoProgress) -> Unit
 ) {
+    val size = LyricVideoRenderer.VIDEO_SIZE
+    val fps = LyricVideoRenderer.FPS
+    val frameDurationUs = 1_000_000L / fps
+
     val videoFormat = MediaFormat.createVideoFormat(
-        MediaFormat.MIMETYPE_VIDEO_AVC,
-        LyricVideoRenderer.VIDEO_SIZE,
-        LyricVideoRenderer.VIDEO_SIZE
+        MediaFormat.MIMETYPE_VIDEO_AVC, size, size
     ).apply {
         setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
         setInteger(MediaFormat.KEY_BIT_RATE, 8_000_000)
-        setInteger(MediaFormat.KEY_FRAME_RATE, LyricVideoRenderer.FPS)
+        setInteger(MediaFormat.KEY_FRAME_RATE, fps)
         setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
     }
 
@@ -122,46 +123,52 @@ private suspend fun encodeVideoTrack(
     var videoTrackIndex = -1
     var muxerStarted = false
     val bufferInfo = MediaCodec.BufferInfo()
+    var outputFrameCount = 0L
+
+    val frameBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val frameCanvas = android.graphics.Canvas(frameBitmap)
+    val bitmapPaint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
 
     try {
         for (frameIndex in 0 until totalFrames) {
             coroutineContext.ensureActive()
             onProgress(LyricVideoProgress(frameIndex, totalFrames))
 
-            val canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                inputSurface.lockHardwareCanvas()
-            } else {
-                inputSurface.lockCanvas(null)
-            }
+            frameCanvas.drawColor(android.graphics.Color.BLACK)
+            renderer.drawFrame(frameCanvas, frameIndex)
+
+            val surfaceCanvas = inputSurface.lockCanvas(null)
             try {
-                renderer.drawFrame(canvas, frameIndex)
+                surfaceCanvas.drawBitmap(frameBitmap, 0f, 0f, bitmapPaint)
             } finally {
-                inputSurface.unlockCanvasAndPost(canvas)
+                inputSurface.unlockCanvasAndPost(surfaceCanvas)
             }
 
-            drainEncoder(encoder, muxer, bufferInfo, false) { format ->
+            drainEncoder(encoder, muxer, bufferInfo, false, frameDurationUs, { outputFrameCount++ }) { format ->
                 videoTrackIndex = muxer.addTrack(format)
                 muxer.start()
                 muxerStarted = true
                 videoTrackIndex
-            }.let { track -> if (track >= 0) videoTrackIndex = track }
+            }.let { result -> if (result.first >= 0) videoTrackIndex = result.first }
         }
 
         encoder.signalEndOfInputStream()
 
         var eos = false
         while (!eos) {
-            drainEncoder(encoder, muxer, bufferInfo, true) { format ->
+            val result = drainEncoder(encoder, muxer, bufferInfo, true, frameDurationUs, { outputFrameCount++ }) { format ->
                 if (videoTrackIndex < 0) {
                     videoTrackIndex = muxer.addTrack(format)
                     muxer.start()
                     muxerStarted = true
                 }
                 videoTrackIndex
-            }.let { track -> if (track >= 0) videoTrackIndex = track }
-            eos = true
+            }
+            if (result.first >= 0) videoTrackIndex = result.first
+            eos = result.second
         }
     } finally {
+        frameBitmap.recycle()
         try { encoder.stop() } catch (_: Exception) {}
         try { encoder.release() } catch (_: Exception) {}
         try { inputSurface.release() } catch (_: Exception) {}
@@ -177,10 +184,13 @@ private fun drainEncoder(
     muxer: MediaMuxer,
     bufferInfo: MediaCodec.BufferInfo,
     endOfStream: Boolean,
+    frameDurationUs: Long,
+    onFrameWritten: () -> Long,
     onFormatAvailable: (MediaFormat) -> Int
-): Int {
+): Pair<Int, Boolean> {
     val timeoutUs = if (endOfStream) 10_000L else 0L
     var trackIndex = -1
+    var hitEos = false
 
     while (true) {
         val index = encoder.dequeueOutputBuffer(bufferInfo, timeoutUs)
@@ -196,14 +206,19 @@ private fun drainEncoder(
                     bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0 &&
                     trackIndex >= 0
                 ) {
+                    val frameNum = onFrameWritten()
+                    bufferInfo.presentationTimeUs = frameNum * frameDurationUs
                     muxer.writeSampleData(trackIndex, buf, bufferInfo)
                 }
                 encoder.releaseOutputBuffer(index, false)
-                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+                if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                    hitEos = true
+                    break
+                }
             }
         }
     }
-    return trackIndex
+    return Pair(trackIndex, hitEos)
 }
 
 private fun muxVideoAndAudio(

@@ -741,7 +741,10 @@ internal object EllaLyricsParser {
                 } else {
                     val cjkCandidates = group.filter { it.text.cleanLyricText().hasCjk() && it.text.isUsefulMainText() }
                     if (cjkCandidates.size >= 2) {
-                        cjkCandidates.firstOrNull { it.text.cleanLyricText().hasJapaneseKana() }
+                        cjkCandidates.firstOrNull {
+                            val t = it.text.cleanLyricText()
+                            t.hasJapaneseKana() && !t.isLyricCreditLine()
+                        } ?: cjkCandidates.firstOrNull { it.text.cleanLyricText().hasJapaneseKana() }
                     } else null
                 } ?: group.firstOrNull { it.text.isUsefulMainText() } ?: group.first()
                 val primaryText = primary.text.cleanLyricText()
@@ -1064,6 +1067,14 @@ internal object EllaLyricsParser {
             val block = Character.UnicodeBlock.of(it)
             block == Character.UnicodeBlock.HIRAGANA || block == Character.UnicodeBlock.KATAKANA
         }
+
+    private val creditPrefixPattern = Regex(
+        "^(作词|作曲|编曲|原唱|翻唱|制作|演唱|录音|混音|监制|企划|出品|填词|歌手|歌|曲|词|Lyrics|Music|Arrangement|Compose[rd]?|Vocal|Mix|Produce[rd]?)[：:]",
+        RegexOption.IGNORE_CASE
+    )
+
+    private fun String.isLyricCreditLine(): Boolean =
+        creditPrefixPattern.containsMatchIn(trim())
 
     private fun String.hasCjk(): Boolean =
         any { it.isCjkChar() }
