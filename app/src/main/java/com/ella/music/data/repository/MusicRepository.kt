@@ -21,7 +21,6 @@ import com.ella.music.data.AppNetworkLoggingInterceptor
 import com.ella.music.data.LibraryAlbumAggregator
 import com.ella.music.data.LibraryNormalizer
 import com.ella.music.data.SettingsManager
-import com.ella.music.data.artwork.ArtworkLoadResult
 import com.ella.music.data.isContentAudioSource
 import com.ella.music.data.isHttpAudioSource
 import com.ella.music.data.isMediaStoreContentAudioSource
@@ -182,7 +181,6 @@ class MusicRepository(private val context: Context) {
                 excludeFolders = excludeFolders,
                 deepMetadata = true
             ) { count -> scanProgressState.update(count) }
-                .map { song -> song.withRepositoryTags() }
             LibraryScanResult(
                 songs = scannedSongs,
                 summary = buildFullScanSummary(previousSongs, scannedSongs, fullRescan = true)
@@ -326,7 +324,7 @@ class MusicRepository(private val context: Context) {
                 )
                 if (reused.duration >= minDurationMs) {
                     mergedSongs += reused
-                    if (cached.hasSameLibraryTags(reused)) reusedCount++ else updatedCount++
+                    reusedCount++
                 }
             }
             scanProgressState.update(index + 1)
@@ -561,6 +559,13 @@ class MusicRepository(private val context: Context) {
         return info
     }
 
+    private fun resolveSongRatingFromTags(song: Song): Int =
+        runCatching { getSongTagInfo(song).rating.coerceIn(0, 5) }
+            .getOrElse {
+                Log.w("MusicRepo", "Failed to resolve rating for ${song.path}", it)
+                0
+            }
+
     suspend fun songMatchesSearchSnapshot(song: Song, query: String): Boolean =
         snapshotManager.songMatchesSearchSnapshot(song, query)
 
@@ -577,11 +582,17 @@ class MusicRepository(private val context: Context) {
         snapshotManager.clearLibraryCache()
     }
 
-    fun getSongRating(song: Song): Int =
-        snapshotManager.getSongRating(song)
+    fun getSongRating(song: Song): Int {
+        snapshotManager.getFreshSongRating(song)?.let { return it }
+        val resolved = resolveSongRatingFromTags(song)
+        snapshotManager.updateRatingSnapshot(song, resolved, trustedLocalWrite = false)
+        return resolved
+    }
 
-    suspend fun preloadSongRatings(songs: List<Song>) =
-        snapshotManager.preloadSongRatings(songs)
+    suspend fun preloadSongRatings(songs: List<Song>) = withContext(Dispatchers.IO) {
+        snapshotManager.preloadSongRatings(songs, ::resolveSongRatingFromTags)
+        snapshotManager.saveAll()
+    }
 
     suspend fun writeSongRating(song: Song, rating: Int): Result<Song?> = withContext(Dispatchers.IO) {
         val safeRating = rating.coerceIn(0, 5)
@@ -806,9 +817,6 @@ class MusicRepository(private val context: Context) {
     }
 
     fun getCoverArt(song: Song): ByteArray? = coverArtManager.getCoverArt(song)
-
-    fun getPlayerArtworkLoadResult(song: Song): ArtworkLoadResult =
-        coverArtManager.getPlayerArtworkLoadResult(song)
 
     fun getCoverArtBitmap(
         song: Song,
@@ -1173,18 +1181,6 @@ class MusicRepository(private val context: Context) {
             albumArtist = albumArtist.takeIf { it.isUsableArtistText() }.orEmpty()
         )
     }
-
-    private fun Song.hasSameLibraryTags(other: Song): Boolean =
-        title == other.title &&
-            artist == other.artist &&
-            album == other.album &&
-            albumArtist == other.albumArtist &&
-            genre == other.genre &&
-            year == other.year &&
-            composer == other.composer &&
-            lyricist == other.lyricist &&
-            trackNumber == other.trackNumber &&
-            discNumber == other.discNumber
 
     private fun Song.needsMetadataPlaceholderRefresh(): Boolean =
         LibraryNormalizer.isGeneratedUnknownArtistPlaceholder(artist) ||

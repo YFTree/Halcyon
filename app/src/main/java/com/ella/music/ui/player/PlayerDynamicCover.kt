@@ -20,10 +20,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player as Media3Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import com.ella.music.data.artwork.ArtworkLoadResult
-import com.ella.music.data.artwork.EmbeddedArtworkKind
 import com.ella.music.data.model.Song
-import com.ella.music.data.repository.MusicRepository
 import com.ella.music.ui.components.SafeCoverImage
 import java.io.File
 
@@ -129,25 +126,7 @@ internal fun Song.dynamicCoverSource(
             return DynamicCoverSource(uri = Uri.fromFile(file), failureKey = file.absolutePath)
         }
     }
-    when (val embeddedArtwork = MusicRepository.getInstance(context).getPlayerArtworkLoadResult(this)) {
-        is ArtworkLoadResult.AnimatedArtwork -> {
-            if (embeddedArtwork.kind == EmbeddedArtworkKind.AVIF_SEQUENCE && !embeddedArtwork.isSystemImageDecoderSafe) {
-                Log.i(
-                    "PlayerScreen",
-                    "Embedded AVIF sequence artwork cached for ${title.ifBlank { fileName }}, but no safe renderer is available yet; falling back to static/default cover."
-                )
-            } else {
-                return DynamicCoverSource(
-                    uri = embeddedArtwork.uri,
-                    failureKey = "embedded-artwork:${embeddedArtwork.uri}:${dateModified}:${fileSize}",
-                    kind = DynamicCoverKind.AnimatedImage
-                )
-            }
-        }
-
-        ArtworkLoadResult.None -> legacyEmbeddedAnimatedImageSource(context)?.let { return it }
-        is ArtworkLoadResult.StaticBitmap -> Unit
-    }
+    legacyEmbeddedAnimatedImageSource(context)?.let { return it }
     return embeddedDynamicVideoSource(context)
 }
 

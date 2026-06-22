@@ -69,6 +69,7 @@ import com.ella.music.data.model.Album
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.SongTagInfo
 import com.ella.music.data.model.UserPlaylist
+import com.ella.music.data.model.albumIdentityId
 import com.ella.music.data.model.formatPlaybackDuration
 import com.ella.music.data.model.playlistIdentityKey
 import com.ella.music.ui.LibrarySortUiState
@@ -94,6 +95,7 @@ import com.ella.music.ui.components.SongItem
 import com.ella.music.ui.components.AddToPlaylistSheet
 import com.ella.music.ui.components.ArtworkUsage
 import com.ella.music.ui.components.ConfirmDangerDialog
+import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.SortDropdownItem
 import com.ella.music.ui.components.SortDropdownMenu
@@ -113,6 +115,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
+import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
@@ -146,6 +149,8 @@ fun ArtistScreen(
     val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val showAlbumArtists by mainViewModel.settingsManager.showAlbumArtists.collectAsState(initial = true)
     var sortExpanded by remember { mutableStateOf(false) }
+    var searchExpanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     val sortIndex by mainViewModel.settingsManager.artistDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.artistDetailSongSortIndex)
     val sortMode = ArtistDetailSongSortMode.entries.getOrElse(sortIndex) { ArtistDetailSongSortMode.Title }
     val albumSortIndex by mainViewModel.settingsManager.artistDetailAlbumSortIndex.collectAsState(initial = LibrarySortUiState.artistDetailAlbumSortIndex)
@@ -171,7 +176,22 @@ fun ArtistScreen(
     val artistSongs = remember(songs, artistName) {
         mainViewModel.getSongsForArtist(artistName)
     }
-    val sortedArtistSongs = remember(artistSongs, sortMode) { artistSongs.sortedForArtistDetail(sortMode) }
+    val artistQuery = searchQuery.trim()
+    val filteredArtistSongs = remember(artistSongs, artistQuery) {
+        if (artistQuery.isBlank()) {
+            artistSongs
+        } else {
+            artistSongs.filter { song ->
+                song.title.contains(artistQuery, ignoreCase = true) ||
+                    song.artist.contains(artistQuery, ignoreCase = true) ||
+                    song.album.contains(artistQuery, ignoreCase = true) ||
+                    song.fileName.contains(artistQuery, ignoreCase = true)
+            }
+        }
+    }
+    val sortedArtistSongs = remember(filteredArtistSongs, sortMode) {
+        filteredArtistSongs.sortedForArtistDetail(sortMode)
+    }
     val participatedAlbums = remember(albums, songs, artistName) {
         mainViewModel.getParticipatedAlbumsForArtist(artistName)
     }
@@ -187,11 +207,35 @@ fun ArtistScreen(
     val representativeSongsByAlbumId = remember(songs) {
         LibraryAlbumAggregator.representativeSongsByAlbumIdentity(songs)
     }
-    val sortedParticipatedAlbums = remember(participatedAlbums, albumSortMode, albumDurations) {
-        participatedAlbums.sortedForArtistAlbumDetail(albumSortMode, albumDurations)
+    val filteredParticipatedAlbums = remember(participatedAlbums, artistQuery) {
+        if (artistQuery.isBlank()) {
+            participatedAlbums
+        } else {
+            participatedAlbums.filter { album ->
+                album.name.contains(artistQuery, ignoreCase = true) ||
+                    album.artist.contains(artistQuery, ignoreCase = true) ||
+                    album.albumArtist.contains(artistQuery, ignoreCase = true) ||
+                    album.year.contains(artistQuery, ignoreCase = true)
+            }
+        }
     }
-    val sortedReleaseAlbums = remember(releaseAlbums, albumSortMode, albumDurations) {
-        releaseAlbums.sortedForArtistAlbumDetail(albumSortMode, albumDurations)
+    val sortedParticipatedAlbums = remember(filteredParticipatedAlbums, albumSortMode, albumDurations) {
+        filteredParticipatedAlbums.sortedForArtistAlbumDetail(albumSortMode, albumDurations)
+    }
+    val filteredReleaseAlbums = remember(releaseAlbums, artistQuery) {
+        if (artistQuery.isBlank()) {
+            releaseAlbums
+        } else {
+            releaseAlbums.filter { album ->
+                album.name.contains(artistQuery, ignoreCase = true) ||
+                    album.artist.contains(artistQuery, ignoreCase = true) ||
+                    album.albumArtist.contains(artistQuery, ignoreCase = true) ||
+                    album.year.contains(artistQuery, ignoreCase = true)
+            }
+        }
+    }
+    val sortedReleaseAlbums = remember(filteredReleaseAlbums, albumSortMode, albumDurations) {
+        filteredReleaseAlbums.sortedForArtistAlbumDetail(albumSortMode, albumDurations)
     }
     val hasComposerCategory = remember(songs, artistName) {
         mainViewModel.hasMetadataCategory("composer", artistName)
@@ -259,6 +303,40 @@ fun ArtistScreen(
         usage = ArtworkUsage.ArtistImage,
         showDefaultWhenMissing = false
     )
+    val librarySongsByAlbumId = remember(songs) {
+        songs.groupBy { it.albumIdentityId() }
+    }
+    val currentSelectionIds = remember(
+        selectedArtistTab,
+        sortedArtistSongs,
+        sortedParticipatedAlbums,
+        sortedReleaseAlbums
+    ) {
+        when (selectedArtistTab) {
+            ArtistTab.Songs -> sortedArtistSongs.map { it.id }
+            ArtistTab.ParticipatedAlbums -> sortedParticipatedAlbums.map { it.id }
+            ArtistTab.ReleaseAlbums -> sortedReleaseAlbums.map { it.id }
+        }
+    }
+    val currentSelectionIndexById = remember(currentSelectionIds) {
+        buildMap {
+            currentSelectionIds.forEachIndexed { index, id -> put(id, index) }
+        }
+    }
+    fun selectedActionSongs(): List<Song> {
+        val selectedAlbums = when (selectedArtistTab) {
+            ArtistTab.ParticipatedAlbums -> sortedParticipatedAlbums.filter { it.id in selectedIds }
+            ArtistTab.ReleaseAlbums -> sortedReleaseAlbums.filter { it.id in selectedIds }
+            ArtistTab.Songs -> emptyList()
+        }
+        return when (selectedArtistTab) {
+            ArtistTab.Songs -> sortedArtistSongs.filter { it.id in selectedIds }
+            ArtistTab.ParticipatedAlbums,
+            ArtistTab.ReleaseAlbums -> selectedAlbums
+                .flatMap { librarySongsByAlbumId[it.id].orEmpty() }
+                .distinctBy { it.playlistIdentityKey() }
+        }
+    }
 
     fun finishSelectionMode() {
         selectionMode = false
@@ -281,18 +359,17 @@ fun ArtistScreen(
             }
         }
     }
-    fun toggleSelection(song: Song) {
-        val selecting = song.id !in selectedIds
-        val next = if (selecting) selectedIds + song.id else selectedIds - song.id
+    fun toggleSelection(id: Long) {
+        val selecting = id !in selectedIds
+        val next = if (selecting) selectedIds + id else selectedIds - id
         selectedIds = next
-        updateRangeAnchorsForManualSelection(song.id, selecting)
+        updateRangeAnchorsForManualSelection(id, selecting)
         if (next.isEmpty()) selectionMode = false
     }
-    fun selectedSongs(): List<Song> = sortedArtistSongs.filter { it.id in selectedIds }
-    val selectedVisibleCount = remember(selectedIds, sortedArtistSongs) {
-        sortedArtistSongs.count { it.id in selectedIds }
+    val selectedVisibleCount = remember(selectedIds, currentSelectionIds) {
+        currentSelectionIds.count { it in selectedIds }
     }
-    val rangeSelectionAvailable = remember(sortedArtistSongIndexById, selectedIds, rangeAnchorId, rangeTargetId) {
+    val rangeSelectionAvailable = remember(currentSelectionIndexById, selectedIds, rangeAnchorId, rangeTargetId) {
         val anchor = rangeAnchorId
         val target = rangeTargetId
         anchor != null &&
@@ -300,48 +377,56 @@ fun ArtistScreen(
             anchor != target &&
             anchor in selectedIds &&
             target in selectedIds &&
-            anchor in sortedArtistSongIndexById &&
-            target in sortedArtistSongIndexById
+            anchor in currentSelectionIndexById &&
+            target in currentSelectionIndexById
     }
     fun applyRangeSelection() {
         val anchor = rangeAnchorId ?: return
         val target = rangeTargetId ?: return
-        val anchorIndex = sortedArtistSongIndexById[anchor] ?: return
-        val targetIndex = sortedArtistSongIndexById[target] ?: return
+        val anchorIndex = currentSelectionIndexById[anchor] ?: return
+        val targetIndex = currentSelectionIndexById[target] ?: return
         if (anchorIndex == targetIndex) return
         val bounds = if (anchorIndex < targetIndex) anchorIndex..targetIndex else targetIndex..anchorIndex
-        selectedIds = selectedIds + bounds.map { sortedArtistSongs[it].id }
+        selectedIds = selectedIds + bounds.map { currentSelectionIds[it] }
         rangeAnchorId = target
         rangeTargetId = null
     }
-    fun toggleSelectAllVisibleSongs() {
-        if (sortedArtistSongs.isEmpty()) return
-        val ids = sortedArtistSongs.mapTo(mutableSetOf()) { it.id }
+    fun toggleSelectAllVisibleItems() {
+        if (currentSelectionIds.isEmpty()) return
+        val ids = currentSelectionIds.toMutableSet()
         if (ids.all { it in selectedIds }) {
             selectedIds = selectedIds - ids
             rangeAnchorId = null
             rangeTargetId = null
         } else {
             selectedIds = selectedIds + ids
-            rangeAnchorId = sortedArtistSongs.firstOrNull()?.id
-            rangeTargetId = sortedArtistSongs.lastOrNull()?.id
+            rangeAnchorId = currentSelectionIds.firstOrNull()
+            rangeTargetId = currentSelectionIds.lastOrNull()
         }
         selectionMode = true
     }
 
-    BackHandler(enabled = selectionMode || sortExpanded) {
-        if (selectionMode) finishSelectionMode() else sortExpanded = false
+    BackHandler(enabled = selectionMode || sortExpanded || searchExpanded) {
+        when {
+            selectionMode -> finishSelectionMode()
+            searchExpanded -> {
+                searchExpanded = false
+                searchQuery = ""
+            }
+            else -> sortExpanded = false
+        }
     }
 
     LaunchedEffect(selectedArtistTab) {
-        if (selectedArtistTab != ArtistTab.Songs && selectionMode) finishSelectionMode()
+        if (selectionMode) finishSelectionMode()
     }
-    LaunchedEffect(selectionMode, sortedArtistSongs) {
+    LaunchedEffect(selectionMode, currentSelectionIds) {
         if (!selectionMode) return@LaunchedEffect
-        val visibleIds = sortedArtistSongs.mapTo(mutableSetOf()) { it.id }
+        val visibleIds = currentSelectionIds.toMutableSet()
         selectedIds = selectedIds.filterTo(mutableSetOf()) { it in visibleIds }
         if (rangeAnchorId !in visibleIds) rangeAnchorId = selectedIds.firstOrNull()
         if (rangeTargetId !in visibleIds) rangeTargetId = null
+        if (selectedIds.isEmpty()) selectionMode = false
     }
 
     LaunchedEffect(scrollToTopRequest) {
@@ -429,7 +514,7 @@ fun ArtistScreen(
                             selected = selected,
                             onClick = {
                                 if (selectionMode) {
-                                    toggleSelection(song)
+                                    toggleSelection(song.id)
                                 } else {
                                     playerViewModel.setPlaylist(sortedArtistSongs, index)
                                     if (openPlayerOnPlay) onNavigateToPlayer()
@@ -470,7 +555,20 @@ fun ArtistScreen(
                             albumArtUri = albumArtUri,
                             representativeSong = representativeSongsByAlbumId[album.id],
                             loadCoverArt = mainViewModel::getLargeCoverArtBitmap,
-                            onClick = { onAlbumClick(album.id) }
+                            selectionMode = selectionMode,
+                            selected = album.id in selectedIds,
+                            onClick = {
+                                if (selectionMode) {
+                                    toggleSelection(album.id)
+                                } else {
+                                    onAlbumClick(album.id)
+                                }
+                            },
+                            onLongClick = {
+                                selectionMode = true
+                                selectedIds = selectedIds + album.id
+                                updateRangeAnchorsForManualSelection(album.id, selectedNow = true)
+                            }
                         )
                     }
                 }
@@ -499,7 +597,20 @@ fun ArtistScreen(
                             albumArtUri = albumArtUri,
                             representativeSong = representativeSongsByAlbumId[album.id],
                             loadCoverArt = mainViewModel::getLargeCoverArtBitmap,
-                            onClick = { onAlbumClick(album.id) }
+                            selectionMode = selectionMode,
+                            selected = album.id in selectedIds,
+                            onClick = {
+                                if (selectionMode) {
+                                    toggleSelection(album.id)
+                                } else {
+                                    onAlbumClick(album.id)
+                                }
+                            },
+                            onLongClick = {
+                                selectionMode = true
+                                selectedIds = selectedIds + album.id
+                                updateRangeAnchorsForManualSelection(album.id, selectedNow = true)
+                            }
                         )
                     }
                 }
@@ -543,7 +654,7 @@ fun ArtistScreen(
         }
 
         IconButton(
-            onClick = onBack,
+            onClick = { if (selectionMode) finishSelectionMode() else onBack() },
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(start = 8.dp, top = 8.dp)
@@ -561,7 +672,7 @@ fun ArtistScreen(
         IconButton(
             onClick = {
                 if (selectionMode) {
-                    val selected = selectedSongs()
+                    val selected = selectedActionSongs()
                     if (selected.isNotEmpty()) playlistPickerSongs = selected
                 } else {
                     selectionMode = true
@@ -572,7 +683,7 @@ fun ArtistScreen(
             },
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(end = 56.dp, top = 8.dp)
+                .padding(end = 104.dp, top = 8.dp)
                 .size(48.dp)
                 .align(Alignment.TopEnd)
         ) {
@@ -587,7 +698,7 @@ fun ArtistScreen(
         if (selectionMode) {
             IconButton(
                 onClick = {
-                    val selected = selectedSongs()
+                    val selected = selectedActionSongs()
                     if (selected.isNotEmpty()) {
                         playerViewModel.playNext(selected)
                         finishSelectionMode()
@@ -608,7 +719,7 @@ fun ArtistScreen(
             }
             IconButton(
                 onClick = {
-                    val selected = selectedSongs()
+                    val selected = selectedActionSongs()
                     if (selected.isNotEmpty()) pendingDeleteSongs = selected
                 },
                 modifier = Modifier
@@ -627,6 +738,24 @@ fun ArtistScreen(
         }
 
         if (!selectionMode) {
+            IconButton(
+                onClick = {
+                    searchExpanded = !searchExpanded
+                    if (!searchExpanded) searchQuery = ""
+                },
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(end = 56.dp, top = 8.dp)
+                    .size(48.dp)
+                    .align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    imageVector = MiuixIcons.Basic.Search,
+                    contentDescription = stringResource(R.string.common_search),
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -667,6 +796,26 @@ fun ArtistScreen(
             }
         }
 
+        AnimatedVisibility(
+            visible = searchExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 60.dp)
+        ) {
+            EllaSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onSearch = { searchExpanded = false },
+                placeholder = stringResource(R.string.library_search_placeholder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+            )
+        }
+
         DoubleTapScrollOverlay(
             onDoubleTap = { scrollToTopRequest++ },
             modifier = Modifier
@@ -675,12 +824,12 @@ fun ArtistScreen(
                 .fillMaxWidth()
                 .height(56.dp),
             startPadding = 64.dp,
-            endPadding = 104.dp
+            endPadding = 160.dp
         )
 
         if (selectionMode) {
             Text(
-                text = stringResource(R.string.library_selected_fraction, selectedIds.size, sortedArtistSongs.size),
+                text = stringResource(R.string.library_selected_fraction, selectedIds.size, currentSelectionIds.size),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -755,11 +904,11 @@ fun ArtistScreen(
                 .padding(end = LibraryFloatingControlsEndPadding, bottom = LibraryFloatingControlsBottomPadding)
         )
         FloatingSelectionControls(
-            visible = selectionMode && selectedArtistTab == ArtistTab.Songs && sortedArtistSongs.isNotEmpty(),
+            visible = selectionMode && currentSelectionIds.isNotEmpty(),
             rangeEnabled = rangeSelectionAvailable,
-            allSelected = sortedArtistSongs.isNotEmpty() && selectedVisibleCount == sortedArtistSongs.size,
+            allSelected = currentSelectionIds.isNotEmpty() && selectedVisibleCount == currentSelectionIds.size,
             onRangeSelect = ::applyRangeSelection,
-            onSelectAll = ::toggleSelectAllVisibleSongs,
+            onSelectAll = ::toggleSelectAllVisibleItems,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = LibraryFloatingControlsEndPadding, bottom = LibraryFloatingControlsBottomPadding)

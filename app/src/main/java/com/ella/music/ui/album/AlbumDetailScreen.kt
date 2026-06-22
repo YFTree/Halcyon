@@ -73,6 +73,7 @@ import com.ella.music.ui.components.CreatePlaylistAndAddSheet
 import com.ella.music.ui.components.createPlaylistOrShowDuplicateToast
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.DoubleTapScrollOverlay
+import com.ella.music.ui.components.EllaSearchBar
 import com.ella.music.ui.components.FastIndexBar
 import com.ella.music.ui.components.FloatingSelectionControls
 import com.ella.music.ui.components.LibraryFloatingControlsBottomPadding
@@ -93,6 +94,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.basic.Search
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
@@ -130,6 +132,8 @@ fun AlbumDetailScreen(
     val sortMode = AlbumDetailSongSortMode.entries.getOrElse(sortIndex) { AlbumDetailSongSortMode.Track }
     val scope = rememberCoroutineScope()
     var sortExpanded by remember { mutableStateOf(false) }
+    var searchExpanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var rangeAnchorId by remember { mutableStateOf<Long?>(null) }
@@ -142,7 +146,20 @@ fun AlbumDetailScreen(
     val requestDeleteSongs = rememberSongDeleteRequester(mainViewModel)
     val album = albums.find { it.id == albumId }
     val albumSongs = mainViewModel.getSongsForAlbum(albumId)
-    val sortedAlbumSongs = remember(albumSongs, sortMode) { albumSongs.sortedForAlbumDetail(sortMode) }
+    val filteredAlbumSongs = remember(albumSongs, searchQuery) {
+        val query = searchQuery.trim()
+        if (query.isBlank()) {
+            albumSongs
+        } else {
+            albumSongs.filter { song ->
+                song.title.contains(query, ignoreCase = true) ||
+                    song.artist.contains(query, ignoreCase = true) ||
+                    song.album.contains(query, ignoreCase = true) ||
+                    song.fileName.contains(query, ignoreCase = true)
+            }
+        }
+    }
+    val sortedAlbumSongs = remember(filteredAlbumSongs, sortMode) { filteredAlbumSongs.sortedForAlbumDetail(sortMode) }
     val sortedAlbumSongIndexById = remember(sortedAlbumSongs) {
         buildMap {
             sortedAlbumSongs.forEachIndexed { index, song -> put(song.id, index) }
@@ -312,8 +329,15 @@ fun AlbumDetailScreen(
         }
     }
 
-    BackHandler(enabled = selectionMode || sortExpanded) {
-        if (selectionMode) finishSelectionMode() else sortExpanded = false
+    BackHandler(enabled = selectionMode || sortExpanded || searchExpanded) {
+        when {
+            selectionMode -> finishSelectionMode()
+            searchExpanded -> {
+                searchExpanded = false
+                searchQuery = ""
+            }
+            else -> sortExpanded = false
+        }
     }
 
     LaunchedEffect(scrollToTopRequest) {
@@ -522,7 +546,7 @@ fun AlbumDetailScreen(
             },
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(end = 56.dp, top = 8.dp)
+                .padding(end = 104.dp, top = 8.dp)
                 .size(48.dp)
                 .align(Alignment.TopEnd)
         ) {
@@ -577,6 +601,24 @@ fun AlbumDetailScreen(
         }
 
         if (!selectionMode) {
+            IconButton(
+                onClick = {
+                    searchExpanded = !searchExpanded
+                    if (!searchExpanded) searchQuery = ""
+                },
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(end = 56.dp, top = 8.dp)
+                    .size(48.dp)
+                    .align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    imageVector = MiuixIcons.Basic.Search,
+                    contentDescription = stringResource(R.string.common_search),
+                    tint = MiuixTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -601,6 +643,26 @@ fun AlbumDetailScreen(
             }
         }
 
+        AnimatedVisibility(
+            visible = searchExpanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(top = 60.dp)
+        ) {
+            EllaSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onSearch = { searchExpanded = false },
+                placeholder = stringResource(R.string.folder_detail_search_placeholder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+            )
+        }
+
         DoubleTapScrollOverlay(
             onDoubleTap = { scrollToTopRequest++ },
             modifier = Modifier
@@ -609,7 +671,7 @@ fun AlbumDetailScreen(
                 .fillMaxWidth()
                 .height(56.dp),
             startPadding = 64.dp,
-            endPadding = 104.dp
+            endPadding = 160.dp
         )
 
         if (selectionMode) {

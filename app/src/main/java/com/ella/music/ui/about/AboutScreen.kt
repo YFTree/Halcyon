@@ -14,9 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +41,7 @@ import com.ella.music.BuildConfig
 import com.ella.music.R
 import com.ella.music.ui.effect.BgEffectBackground
 import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
@@ -63,6 +64,8 @@ import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AboutScreen(
@@ -73,6 +76,7 @@ fun AboutScreen(
     val lazyListState = rememberLazyListState()
     var logoHeightPx by remember { mutableIntStateOf(0) }
     val isDark = colorScheme.background.luminance() < 0.5f
+    var updateState by remember { mutableStateOf<UpdateUiState>(UpdateUiState.Loading) }
 
     val scrollProgress by remember {
         derivedStateOf {
@@ -82,6 +86,21 @@ fun AboutScreen(
                 val offset = lazyListState.firstVisibleItemScrollOffset
                 if (index > 0) 1f else (offset.toFloat() / logoHeightPx).coerceIn(0f, 1f)
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        updateState = withContext(Dispatchers.IO) {
+            runCatching { fetchLatestRelease() }
+                .fold(
+                    onSuccess = { release ->
+                        UpdateUiState.Ready(
+                            release = release,
+                            hasUpdate = compareVersionNames(release.versionName, BuildConfig.VERSION_NAME) > 0
+                        )
+                    },
+                    onFailure = { UpdateUiState.Error(it.localizedMessage.orEmpty()) }
+                )
         }
     }
 
@@ -111,6 +130,7 @@ fun AboutScreen(
             scrollProgress = scrollProgress,
             lazyListState = lazyListState,
             onLogoHeightChanged = { logoHeightPx = it },
+            updateState = updateState,
             onNavigateToUpdate = onNavigateToUpdate,
         )
     }
@@ -123,6 +143,7 @@ private fun AboutContent(
     scrollProgress: Float,
     lazyListState: androidx.compose.foundation.lazy.LazyListState,
     onLogoHeightChanged: (Int) -> Unit,
+    updateState: UpdateUiState,
     onNavigateToUpdate: () -> Unit,
 ) {
     val backdrop = rememberLayerBackdrop()
@@ -214,10 +235,32 @@ private fun AboutContent(
                 SmallTitle(text = stringResource(R.string.about_project))
                 FrostedCard(backdrop = backdrop, blurEnable = blurEnable, cardBlendColors = cardBlendColors, scrollProgress = scrollProgress) {
                     BasicComponent(
-                        title = stringResource(R.string.about_update),
-                        summary = stringResource(R.string.about_update_summary),
+                        title = when {
+                            updateState is UpdateUiState.Ready && updateState.hasUpdate ->
+                                stringResource(R.string.update_new_version_found)
+                            else -> stringResource(R.string.about_update)
+                        },
+                        summary = when (updateState) {
+                            UpdateUiState.Loading -> stringResource(R.string.update_fetching_latest)
+                            is UpdateUiState.Ready -> if (updateState.hasUpdate) {
+                                stringResource(R.string.update_found_version, updateState.release.tagName)
+                            } else {
+                                stringResource(R.string.about_update_summary)
+                            }
+                            is UpdateUiState.Error -> stringResource(R.string.about_update_summary)
+                        },
                         onClick = onNavigateToUpdate,
                     )
+                    if (updateState is UpdateUiState.Ready && updateState.hasUpdate) {
+                        Button(
+                            onClick = onNavigateToUpdate,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Text(text = stringResource(R.string.update_download))
+                        }
+                    }
                     BasicComponent(
                         title = stringResource(R.string.about_open_source),
                         summary = "Apache-2.0",

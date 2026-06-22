@@ -44,6 +44,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private const val LYRIC_POSITION_BACKWARD_DRIFT_TOLERANCE_MS = 600L
+
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -758,13 +760,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val position = playerManager.currentPosition.value
         val songKey = currentSong.value?.lyricIdentityKey()
         val previousPosition = if (lastLyricPositionSongKey == songKey) lastLyricPositionMs else position
+        val effectivePosition = if (
+            isPlaying.value &&
+            previousPosition > position &&
+            previousPosition - position <= LYRIC_POSITION_BACKWARD_DRIFT_TOLERANCE_MS
+        ) {
+            previousPosition
+        } else {
+            position
+        }
         val loopedToStart = playerManager.repeatMode.value == Player.REPEAT_MODE_ONE &&
             previousPosition > 1_500L &&
-            position <= 750L &&
-            previousPosition - position > 1_500L
+            effectivePosition <= 750L &&
+            previousPosition - effectivePosition > 1_500L
 
         val indexResult = currentLyricIndexAt(
-            positionMs = position,
+            positionMs = effectivePosition,
             lyrics = currentLyrics,
             suppressLeadingZero = suppressLeadingZeroLyric
         )
@@ -786,7 +797,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
         lastLyricPositionSongKey = songKey
-        lastLyricPositionMs = position
+        lastLyricPositionMs = effectivePosition
     }
 
     private suspend fun updatePlaybackStats() {

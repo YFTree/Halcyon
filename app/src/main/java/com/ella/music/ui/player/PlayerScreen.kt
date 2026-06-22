@@ -107,6 +107,7 @@ import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
+import com.ella.music.data.normalizedAudioFormat
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.tagIdentityKey
 import com.ella.music.data.model.LyricLine
@@ -296,6 +297,9 @@ fun PlayerScreen(
     val songAnnotation = songPresentation.annotation
     val displayAnnotation = if (playerSettings.showSongAnnotation) songAnnotation else ""
     val neteaseInfo = songPresentation.neteaseInfo
+    val lyricVideoShareEnabled = remember(song?.path, song?.mimeType, audioInfo?.format) {
+        !isAppleLosslessLyricVideoShareUnsupported(song, audioInfo?.format)
+    }
     var lyricShareInitialLine by remember { mutableStateOf<LyricLine?>(null) }
     fun openLyricSharePicker(line: LyricLine) {
         lyricShareInitialLine = line
@@ -397,7 +401,7 @@ fun PlayerScreen(
                 shareTypeface = lyricShareTypeface,
                 onDismiss = { lyricShareInitialLine = null },
                 onShare = ::shareSelectedLyrics,
-                onVideoShare = ::shareSelectedLyricsVideo
+                onVideoShare = if (lyricVideoShareEnabled) ::shareSelectedLyricsVideo else null
             )
             LyricVideoShareProgressOverlay(
                 visible = videoShareGenerating,
@@ -770,4 +774,17 @@ fun PlayerScreen(
             )
         }
     }
+}
+
+private fun isAppleLosslessLyricVideoShareUnsupported(
+    song: Song?,
+    audioFormat: String?
+): Boolean {
+    if (normalizedAudioFormat(audioFormat.orEmpty()) == "ALAC") return true
+
+    val mimeType = song?.mimeType.orEmpty().lowercase()
+    if ("alac" in mimeType) return true
+
+    val path = song?.path.orEmpty().lowercase()
+    return path.endsWith(".alac")
 }

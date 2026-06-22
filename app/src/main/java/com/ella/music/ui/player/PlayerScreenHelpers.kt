@@ -32,6 +32,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 
+internal const val PLAYER_POSITION_BACKWARD_DRIFT_TOLERANCE_MS = 600L
+
+internal fun shouldIgnoreMinorPlaybackRegression(
+    currentUiPositionMs: Long,
+    nextPositionMs: Long,
+    isPlaying: Boolean,
+    toleranceMs: Long = PLAYER_POSITION_BACKWARD_DRIFT_TOLERANCE_MS
+): Boolean =
+    isPlaying &&
+        nextPositionMs < currentUiPositionMs &&
+        currentUiPositionMs - nextPositionMs in 1..toleranceMs
+
 @Composable
 internal fun rememberThrottledPlayerPosition(
     positionFlow: StateFlow<Long>,
@@ -47,6 +59,7 @@ internal fun rememberThrottledPlayerPosition(
         var lastLoggedTickMs = 0L
         fun applyPosition(positionMs: Long) {
             val now = SystemClock.elapsedRealtime()
+            if (shouldIgnoreMinorPlaybackRegression(value, positionMs, latestPlaying)) return
             val reset = positionMs < value || kotlin.math.abs(positionMs - value) > 1_500L
             val shouldUpdate = reset || !latestPlaying || now - lastUiTickMs >= intervalMs
             if (!shouldUpdate) return

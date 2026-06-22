@@ -37,7 +37,10 @@ internal class MusicSnapshotManager(
         return text
     }
 
-    fun getSongRating(song: Song): Int {
+    fun getSongRating(song: Song): Int =
+        getFreshSongRating(song) ?: 0
+
+    fun getFreshSongRating(song: Song): Int? {
         ensureRatingSnapshotLoaded()
         val key = song.searchSnapshotKey()
         val entry = ratingSnapshotCache[key] ?: ratingSnapshotCache.values.firstOrNull { entry ->
@@ -45,8 +48,8 @@ internal class MusicSnapshotManager(
         }?.also { migrated ->
             ratingSnapshotCache[key] = migrated.copy(id = song.id, path = song.path)
             ratingSnapshotDirty = true
-        } ?: return 0
-        return if (entry.isFreshFor(song)) entry.rating else 0
+        } ?: return null
+        return entry.rating.takeIf { entry.isFreshFor(song) }
     }
 
     fun updateRatingSnapshot(song: Song, rating: Int, trustedLocalWrite: Boolean = true) {
@@ -79,13 +82,17 @@ internal class MusicSnapshotManager(
         saveSearchSnapshot()
     }
 
-    fun preloadSongRatings(songs: List<Song>) {
+    fun preloadSongRatings(
+        songs: List<Song>,
+        ratingProvider: (Song) -> Int
+    ) {
         ensureRatingSnapshotLoaded()
         songs.forEach { song ->
             val key = song.searchSnapshotKey()
-            if (!ratingSnapshotCache.containsKey(key)) {
+            val existing = ratingSnapshotCache[key]
+            if (existing == null || !existing.isFreshFor(song)) {
                 ratingSnapshotCache[key] = RatingSnapshotEntry(
-                    rating = 0,
+                    rating = ratingProvider(song).coerceIn(0, 5),
                     dateModified = song.dateModified,
                     fileSize = song.fileSize,
                     path = song.path,

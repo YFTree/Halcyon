@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -233,7 +234,10 @@ internal fun ArtistAlbumRow(
     albumArtUri: Uri?,
     representativeSong: Song?,
     loadCoverArt: ((Song) -> Bitmap?)?,
-    onClick: () -> Unit
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coverState = rememberSongArtworkState(
@@ -253,7 +257,14 @@ internal fun ArtistAlbumRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .background(
+                if (selected) MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)
+                else Color.Transparent
+            )
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -296,7 +307,11 @@ internal fun ArtistAlbumRow(
         Icon(
             imageVector = MiuixIcons.Basic.ArrowRight,
             contentDescription = null,
-            tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            tint = if (selectionMode && selected) {
+                MiuixTheme.colorScheme.primary
+            } else {
+                MiuixTheme.colorScheme.onSurfaceVariantSummary
+            },
             modifier = Modifier.size(18.dp)
         )
     }

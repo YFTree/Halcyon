@@ -277,12 +277,16 @@ class MusicScanner(private val context: Context) {
             verifyFileSnapshot = deepMetadata
         )
         mediaStoreItems.forEachIndexed { index, item ->
-            val song = if (deepMetadata) {
-                scanAudioItem(item, minDurationMs = minDurationMs, deepMetadata = true)
-            } else {
-                item.toShallowSong(minDurationMs)
-                    ?: scanAudioItem(item, minDurationMs = minDurationMs, deepMetadata = false)
-            }
+            val song = runCatching {
+                if (deepMetadata) {
+                    scanAudioItem(item, minDurationMs = minDurationMs, deepMetadata = true)
+                } else {
+                    item.toShallowSong(minDurationMs)
+                        ?: scanAudioItem(item, minDurationMs = minDurationMs, deepMetadata = false)
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "scanAllSongs item failed for ${item.path}", error)
+            }.getOrNull()
             if (song != null) songs += song
             onProgress?.invoke(index + 1)
         }
@@ -293,7 +297,11 @@ class MusicScanner(private val context: Context) {
             existingPaths = songs.map { it.path }.toSet()
         )
         fallbackItems.forEach { item ->
-            scanAudioItem(item, minDurationMs = minDurationMs, deepMetadata = true)?.let { song ->
+            runCatching {
+                scanAudioItem(item, minDurationMs = minDurationMs, deepMetadata = true)
+            }.onFailure { error ->
+                Log.w(TAG, "scanAllSongs fallback item failed for ${item.path}", error)
+            }.getOrNull()?.let { song ->
                 songs.add(song)
                 onProgress?.invoke(songs.size)
             }

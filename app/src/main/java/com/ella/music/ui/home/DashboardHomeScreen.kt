@@ -99,11 +99,7 @@ fun HomeScreen(
     val wallpaperVisible = appWallpaperEnabled && appWallpaperUri.isNotBlank()
     val baseHomeCardColor = homeCardColorRaw.parseHomeCardColorOrNull()
         ?: MiuixTheme.colorScheme.surfaceContainer
-    val homeTileCardColor = if (wallpaperVisible || homeCardColorRaw.isNotBlank()) {
-        baseHomeCardColor.copy(alpha = homeCardOpacity.coerceIn(20, 100) / 100f)
-    } else {
-        baseHomeCardColor
-    }
+    val homeTileCardColor = baseHomeCardColor.copy(alpha = homeCardOpacity.coerceIn(20, 100) / 100f)
     val customTileColors = remember(homeTileColorsRaw) { homeTileColorsRaw.parseHomeTileColors() }
     fun tileColor(id: String, fallback: Color): Color = customTileColors[id] ?: fallback
     val featuredSongs = remember(songs) {
@@ -262,6 +258,7 @@ fun HomeScreen(
                 context,
                 tileOrder,
                 hiddenTiles,
+                homeTileColorsRaw,
                 artistCount,
                 albums.size,
                 folderCount,
@@ -287,7 +284,7 @@ fun HomeScreen(
                 )
                 tileOrder.mapNotNull { all[it] }.filterNot { it.id in hiddenTiles }
             }
-            val onlineTiles = remember(context, onlineTileOrder, hiddenOnlineTiles) {
+            val onlineTiles = remember(context, onlineTileOrder, hiddenOnlineTiles, homeTileColorsRaw) {
                 val all = mapOf(
                     "lx" to HomeTileSpec("lx", "LX Music", context.getString(R.string.home_import_api_source), tileColor("lx", Color(0xFF00A896)), Screen.LxOnline.route, onNavigateToLxOnline),
                     "navidrome" to HomeTileSpec("navidrome", "Navidrome", context.getString(R.string.remote_source_navidrome_summary), tileColor("navidrome", Color(0xFF5E60CE)), Screen.NavidromeOnline.route, onNavigateToNavidrome),

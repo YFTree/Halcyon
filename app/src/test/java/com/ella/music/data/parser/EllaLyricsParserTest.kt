@@ -198,6 +198,40 @@ class EllaLyricsParserTest {
     }
 
     @Test
+    fun accompanistTtmlPreservesLeadingSpacesEmbeddedInTimedSpans() {
+        val result = LrcParser.parse(
+            """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+              <body>
+                <div>
+                  <p begin="00:00.313" end="00:01.968">
+                    <span begin="00:00.313" end="00:00.776">Runnin'</span><span begin="00:00.776" end="00:00.976"> through</span><span begin="00:00.976" end="00:01.208"> this</span><span begin="00:01.208" end="00:01.611"> strange</span><span begin="00:01.611" end="00:01.968"> life</span>
+                    <span ttm:role="x-translation">在奇怪的生活里奔波</span>
+                  </p>
+                  <p begin="00:01.979" end="00:03.714">
+                    <span begin="00:01.979" end="00:02.429">Chasin'</span><span begin="00:02.429" end="00:02.645"> all</span><span begin="00:02.645" end="00:02.893"> them</span><span begin="00:02.893" end="00:03.328"> green</span><span begin="00:03.328" end="00:03.714"> lights</span>
+                    <span ttm:role="x-translation">追逐一个又一个绿灯</span>
+                  </p>
+                </div>
+              </body>
+            </tt>
+            """.trimIndent()
+        )
+
+        assertEquals(
+            listOf("Runnin' through this strange life", "Chasin' all them green lights"),
+            result.lyrics.map { it.text }
+        )
+        assertEquals(
+            listOf(
+                listOf("Runnin'", " through", " this", " strange", " life"),
+                listOf("Chasin'", " all", " them", " green", " lights")
+            ),
+            result.lyrics.map { line -> line.words.map { it.text } }
+        )
+    }
+
+    @Test
     fun accompanistElrcAgentPrefixesAreHiddenAndKeptAsAlignment() {
         val result = LrcParser.parse(
             """

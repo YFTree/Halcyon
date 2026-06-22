@@ -74,8 +74,13 @@ internal class SimpleXmlParser {
                     }
                     val whitespace = xml.substring(i, j)
                     if (stack.isNotEmpty()) {
-                        val textNode = XmlElement("#text", emptyList(), emptyList(), whitespace)
-                        stack.last().children.add(textNode)
+                        val nextChar = xml.getOrNull(j)
+                        if (nextChar != null && nextChar != '<') {
+                            stack.last().textBuilder.append(whitespace)
+                        } else {
+                            val textNode = XmlElement("#text", emptyList(), emptyList(), whitespace)
+                            stack.last().children.add(textNode)
+                        }
                     }
                     i = j
                 }
@@ -85,7 +90,7 @@ internal class SimpleXmlParser {
                     val rawText = if (nextTagIndex == -1) xml.substring(i) else xml.substring(i, nextTagIndex)
                     
                     if (rawText.isNotEmpty() && stack.isNotEmpty()) {
-                        stack.last().textBuilder.append(rawText.trim())
+                        stack.last().textBuilder.append(rawText)
                     }
                     i = if (nextTagIndex == -1) xml.length else nextTagIndex
                 }
