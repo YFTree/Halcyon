@@ -146,7 +146,8 @@ fun ArtistScreen(
     var sortExpanded by remember { mutableStateOf(false) }
     val sortIndex by mainViewModel.settingsManager.artistDetailSongSortIndex.collectAsState(initial = LibrarySortUiState.artistDetailSongSortIndex)
     val sortMode = ArtistDetailSongSortMode.entries.getOrElse(sortIndex) { ArtistDetailSongSortMode.Title }
-    var albumSortMode by remember { mutableStateOf(ArtistDetailAlbumSortMode.YearAsc) }
+    val albumSortIndex by mainViewModel.settingsManager.artistDetailAlbumSortIndex.collectAsState(initial = LibrarySortUiState.artistDetailAlbumSortIndex)
+    val albumSortMode = ArtistDetailAlbumSortMode.entries.getOrElse(albumSortIndex) { ArtistDetailAlbumSortMode.YearAsc }
     val scope = rememberCoroutineScope()
     var selectedTabTarget by rememberSaveable(artistName) { mutableStateOf(ArtistTab.Songs) }
     var scrollToTopRequest by remember { mutableStateOf(0) }
@@ -650,7 +651,8 @@ fun ArtistScreen(
                             text = stringResource(mode.labelRes),
                             selected = albumSortMode == mode,
                             onClick = {
-                                albumSortMode = mode
+                                LibrarySortUiState.artistDetailAlbumSortIndex = mode.ordinal
+                                scope.launch { mainViewModel.settingsManager.setArtistDetailAlbumSortIndex(mode.ordinal) }
                                 scrollToTopRequest++
                             }
                         )
@@ -730,7 +732,8 @@ fun ArtistScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    albumSortMode = mode
+                                    LibrarySortUiState.artistDetailAlbumSortIndex = mode.ordinal
+                                    scope.launch { mainViewModel.settingsManager.setArtistDetailAlbumSortIndex(mode.ordinal) }
                                     scrollToTopRequest++
                                     sortExpanded = false
                                 }

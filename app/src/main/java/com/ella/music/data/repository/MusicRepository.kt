@@ -392,12 +392,14 @@ class MusicRepository(private val context: Context) {
         item: MediaStoreAudioItem,
         minDurationMs: Long
     ): Song? {
-        item.toShallowSong(minDurationMs)?.let { return it }
+        item.toShallowSong(minDurationMs)?.let { shallow ->
+            return shallow.withRepositoryTags()
+        }
         return scanner.scanAudioItem(
             item = item,
             minDurationMs = minDurationMs,
             deepMetadata = false
-        )
+        )?.withRepositoryTags()
     }
 
     suspend fun refreshSongAfterExternalEdit(song: Song): Song? = withContext(Dispatchers.IO) {

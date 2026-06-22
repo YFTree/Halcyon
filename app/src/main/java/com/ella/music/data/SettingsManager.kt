@@ -230,6 +230,7 @@ class SettingsManager(private val context: Context) {
         val KEY_SORT_ARTIST_LIST = intPreferencesKey("sort_artist_list")
         val KEY_SORT_ALBUM_DETAIL_SONG = intPreferencesKey("sort_album_detail_song")
         val KEY_SORT_ARTIST_DETAIL_SONG = intPreferencesKey("sort_artist_detail_song")
+        val KEY_SORT_ARTIST_DETAIL_ALBUM = intPreferencesKey("sort_artist_detail_album")
         val KEY_SORT_FOLDER_LIST = intPreferencesKey("sort_folder_list")
         val KEY_SORT_FOLDER_DETAIL_SONG = intPreferencesKey("sort_folder_detail_song")
         val KEY_SORT_PLAYLIST_LIST = intPreferencesKey("sort_playlist_list")
@@ -785,6 +786,7 @@ class SettingsManager(private val context: Context) {
     val artistListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ARTIST_LIST] ?: 0 }
     val albumDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ALBUM_DETAIL_SONG] ?: 0 }
     val artistDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ARTIST_DETAIL_SONG] ?: 0 }
+    val artistDetailAlbumSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_ARTIST_DETAIL_ALBUM] ?: 0 }
     val folderListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_FOLDER_LIST] ?: 0 }
     val folderDetailSongSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_FOLDER_DETAIL_SONG] ?: 0 }
     val playlistListSortIndex: Flow<Int> = context.dataStore.data.map { it[KEY_SORT_PLAYLIST_LIST] ?: 2 }
@@ -1635,6 +1637,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_SORT_ARTIST_DETAIL_SONG] = index.coerceAtLeast(0) }
     }
 
+    suspend fun setArtistDetailAlbumSortIndex(index: Int) {
+        context.dataStore.edit { it[KEY_SORT_ARTIST_DETAIL_ALBUM] = index.coerceAtLeast(0) }
+    }
+
     suspend fun setFolderListSortIndex(index: Int) {
         context.dataStore.edit { it[KEY_SORT_FOLDER_LIST] = index.coerceAtLeast(0) }
     }
@@ -1966,6 +1972,7 @@ class SettingsManager(private val context: Context) {
             setInt(KEY_SORT_ARTIST_LIST)
             setInt(KEY_SORT_ALBUM_DETAIL_SONG)
             setInt(KEY_SORT_ARTIST_DETAIL_SONG)
+            setInt(KEY_SORT_ARTIST_DETAIL_ALBUM)
             setInt(KEY_SORT_FOLDER_LIST)
             setInt(KEY_SORT_FOLDER_DETAIL_SONG)
             setInt(KEY_SORT_PLAYLIST_LIST)

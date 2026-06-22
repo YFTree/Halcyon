@@ -16,6 +16,7 @@ object LibrarySortUiState {
     val artistListScrollPositions = mutableMapOf<String, Pair<Int, Int>>()
     var albumDetailSongSortIndex by mutableIntStateOf(0)
     var artistDetailSongSortIndex by mutableIntStateOf(0)
+    var artistDetailAlbumSortIndex by mutableIntStateOf(0)
     var folderListSortIndex by mutableIntStateOf(0)
     var folderListFirstVisibleItemIndex by mutableIntStateOf(0)
     var folderListFirstVisibleItemScrollOffset by mutableIntStateOf(0)

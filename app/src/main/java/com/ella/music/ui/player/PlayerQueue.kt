@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -239,7 +240,7 @@ internal fun PlayerQueueMenu(
                         key = item.stableKey
                     ) { isDragging ->
                         val dragHandleModifier = Modifier.draggableHandle(
-                            dragGestureDetector = ImmediateDragHandleGestureDetector,
+                            dragGestureDetector = LongPressDragHandleGestureDetector,
                             onDragStopped = {
                                 val move = resolveQueueMoveCommit(
                                     fromIndex = pendingMoveStart,
@@ -339,7 +340,7 @@ internal fun PlayerQueueMenu(
     }
 }
 
-private object ImmediateDragHandleGestureDetector : DragGestureDetector {
+private object LongPressDragHandleGestureDetector : DragGestureDetector {
     override suspend fun PointerInputScope.detect(
         onDragStart: (Offset) -> Unit,
         onDragEnd: () -> Unit,
@@ -348,10 +349,15 @@ private object ImmediateDragHandleGestureDetector : DragGestureDetector {
     ) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
-            onDragStart(down.position)
+            val longPress = awaitLongPressOrCancellation(down.id)
+            if (longPress == null) {
+                onDragCancel()
+                return@awaitEachGesture
+            }
+            onDragStart(longPress.position)
             while (true) {
                 val event = awaitPointerEvent()
-                val change = event.changes.firstOrNull { it.id == down.id } ?: run {
+                val change = event.changes.firstOrNull { it.id == longPress.id } ?: run {
                     onDragCancel()
                     break
                 }
