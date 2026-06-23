@@ -128,11 +128,20 @@ internal fun HomeTileSection(
     tiles: List<HomeTileSpec>,
     context: Context,
     showPinButtons: Boolean,
-    cardColor: Color = MiuixTheme.colorScheme.surfaceContainer
+    cardColor: Color = MiuixTheme.colorScheme.surfaceContainer,
+    gradientEnabled: Boolean = false,
+    gradientStartColor: Color? = null
 ) {
     if (tiles.isEmpty()) return
     SectionTitle(title)
-    HomeTileGrid(tiles = tiles, context = context, showPinButtons = showPinButtons, cardColor = cardColor)
+    HomeTileGrid(
+        tiles = tiles,
+        context = context,
+        showPinButtons = showPinButtons,
+        cardColor = cardColor,
+        gradientEnabled = gradientEnabled,
+        gradientStartColor = gradientStartColor
+    )
 }
 
 @Composable
@@ -140,7 +149,9 @@ internal fun HomeTileGrid(
     tiles: List<HomeTileSpec>,
     context: Context,
     showPinButtons: Boolean,
-    cardColor: Color = MiuixTheme.colorScheme.surfaceContainer
+    cardColor: Color = MiuixTheme.colorScheme.surfaceContainer,
+    gradientEnabled: Boolean = false,
+    gradientStartColor: Color? = null
 ) {
     tiles.chunked(2).forEachIndexed { index, rowTiles ->
         if (index > 0) Spacer(modifier = Modifier.height(10.dp))
@@ -162,6 +173,8 @@ internal fun HomeTileGrid(
                     } else null,
                     cardColor = cardColor,
                     tileColor = tile.color,
+                    gradientEnabled = gradientEnabled,
+                    gradientStartColor = gradientStartColor,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -308,18 +321,30 @@ private fun HomeTile(
     onPinClick: (() -> Unit)? = null,
     cardColor: Color = MiuixTheme.colorScheme.surfaceContainer,
     tileColor: Color = MiuixTheme.colorScheme.primary,
+    gradientEnabled: Boolean = false,
+    gradientStartColor: Color? = null,
     modifier: Modifier = Modifier
 ) {
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     val background = tileColor
         .copy(alpha = if (isDark) 0.30f else 0.24f)
         .compositeOver(cardColor)
+    val gradientBase = gradientStartColor ?: tileColor.copy(alpha = if (isDark) 0.18f else 0.14f)
+    val gradientStart = gradientBase.copy(alpha = if (isDark) 0.52f else 0.44f).compositeOver(cardColor)
     val contentColor = if (background.luminance() < 0.42f) Color.White else Color(0xFF15151A)
     Column(
         modifier = modifier
             .height(96.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(background)
+            .background(
+                if (gradientEnabled) {
+                    Brush.linearGradient(
+                        colors = listOf(gradientStart, background, background.copy(alpha = 0.92f))
+                    )
+                } else {
+                    Brush.linearGradient(listOf(background, background))
+                }
+            )
             .combinedClickable(onClick = onClick, onLongClick = onPinClick)
             .padding(14.dp),
         verticalArrangement = Arrangement.SpaceBetween

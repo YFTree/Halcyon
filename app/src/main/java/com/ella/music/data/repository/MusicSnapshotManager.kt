@@ -70,15 +70,18 @@ internal class MusicSnapshotManager(
         return ratingSnapshotCache[song.searchSnapshotKey()]
     }
 
-    fun preloadSearchSnapshot(songs: List<Song>) {
+    fun preloadSearchSnapshot(songs: List<Song>, refreshExisting: Boolean = false) {
         ensureSearchSnapshotLoaded()
         songs.forEach { song ->
             val key = song.searchSnapshotKey()
-            if (!searchTextCache.containsKey(key)) {
-                searchTextCache[key] = buildSongSearchText(song)
+            if (refreshExisting || !searchTextCache.containsKey(key)) {
+                val text = buildSongSearchText(song)
+                if (searchTextCache[key] != text) {
+                    searchTextCache[key] = text
+                    searchSnapshotDirty = true
+                }
             }
         }
-        searchSnapshotDirty = true
         saveSearchSnapshot()
     }
 

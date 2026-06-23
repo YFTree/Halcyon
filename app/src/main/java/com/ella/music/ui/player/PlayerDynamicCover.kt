@@ -1,6 +1,7 @@
 package com.ella.music.ui.player
 
 import android.content.Context
+import android.graphics.Outline
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
@@ -8,6 +9,7 @@ import android.net.Uri
 import android.os.Environment
 import android.util.Log
 import android.view.View
+import android.view.ViewOutlineProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -40,7 +42,8 @@ internal fun DynamicCoverVideo(
     source: DynamicCoverSource,
     isPlaying: Boolean,
     onPlaybackError: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cornerRadiusDp: Float = 14f
 ) {
     if (source.kind == DynamicCoverKind.AnimatedImage) {
         SafeCoverImage(
@@ -96,6 +99,13 @@ internal fun DynamicCoverVideo(
                 setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                 findViewById<View>(androidx.media3.ui.R.id.exo_controller)?.visibility = View.GONE
                 player = exoPlayer
+                clipToOutline = true
+                outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: Outline) {
+                        val radiusPx = view.resources.displayMetrics.density * cornerRadiusDp
+                        outline.setRoundRect(0, 0, view.width, view.height, radiusPx)
+                    }
+                }
                 hideController()
             }
         },
@@ -106,6 +116,7 @@ internal fun DynamicCoverVideo(
             view.findViewById<View>(androidx.media3.ui.R.id.exo_controller)?.visibility = View.GONE
             view.player = exoPlayer
             view.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+            view.clipToOutline = true
             view.hideController()
             exoPlayer.playWhenReady = isPlaying
         }

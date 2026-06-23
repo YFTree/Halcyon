@@ -159,6 +159,8 @@ class SettingsManager(private val context: Context) {
         val KEY_HOME_CARD_COLOR = stringPreferencesKey("home_card_color")
         val KEY_HOME_CARD_OPACITY = intPreferencesKey("home_card_opacity")
         val KEY_HOME_TILE_COLORS = stringPreferencesKey("home_tile_colors")
+        val KEY_HOME_TILE_GRADIENT_ENABLED = booleanPreferencesKey("home_tile_gradient_enabled")
+        val KEY_HOME_TILE_GRADIENT_START_COLOR = stringPreferencesKey("home_tile_gradient_start_color")
         val KEY_HI_RES_LOGO_ENABLED = booleanPreferencesKey("hi_res_logo_enabled")
         val KEY_HI_RES_LOGO_URI = stringPreferencesKey("hi_res_logo_uri")
         val KEY_MCP_SERVER_ENABLED = booleanPreferencesKey("mcp_server_enabled")
@@ -677,6 +679,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.data.map { it[KEY_HOME_CARD_OPACITY]?.coerceIn(20, 100) ?: 58 }
     val homeTileColors: Flow<String> =
         context.dataStore.data.map { it[KEY_HOME_TILE_COLORS] ?: "" }
+    val homeTileGradientEnabled: Flow<Boolean> =
+        context.dataStore.data.map { it[KEY_HOME_TILE_GRADIENT_ENABLED] ?: false }
+    val homeTileGradientStartColor: Flow<String> =
+        context.dataStore.data.map { it[KEY_HOME_TILE_GRADIENT_START_COLOR] ?: "" }
     val hiResLogoEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_HI_RES_LOGO_ENABLED] ?: false }
     val hiResLogoUri: Flow<String> =
@@ -1295,6 +1301,17 @@ class SettingsManager(private val context: Context) {
             val json = runCatching { JSONObject(prefs[KEY_HOME_TILE_COLORS].orEmpty()) }.getOrElse { JSONObject() }
             if (safeColor.isBlank()) json.remove(safeId) else json.put(safeId, safeColor.uppercase(Locale.ROOT))
             if (json.length() == 0) prefs.remove(KEY_HOME_TILE_COLORS) else prefs[KEY_HOME_TILE_COLORS] = json.toString()
+        }
+    }
+
+    suspend fun setHomeTileGradientEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_HOME_TILE_GRADIENT_ENABLED] = enabled }
+    }
+
+    suspend fun setHomeTileGradientStartColor(color: String) {
+        context.dataStore.edit {
+            val safeColor = color.trim()
+            if (safeColor.isBlank()) it.remove(KEY_HOME_TILE_GRADIENT_START_COLOR) else it[KEY_HOME_TILE_GRADIENT_START_COLOR] = safeColor
         }
     }
 

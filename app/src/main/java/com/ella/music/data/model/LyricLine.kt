@@ -25,26 +25,45 @@ data class LyricWord(
 )
 
 fun LyricLine.primaryEndMs(
+    nextLine: LyricLine? = null,
     nextLineStartMs: Long? = null,
     fallbackDurationMs: Long = 4_000L
 ): Long {
+    val resolvedNextLineStartMs = nextLineStartMs ?: nextLine?.timeMs
     if (text.isBlank() && !backgroundText.isNullOrBlank()) {
         return (backgroundEndMs
             ?: backgroundWords.maxOfOrNull { it.endMs }
             ?: endMs
-            ?: nextLineStartMs
+            ?: resolvedNextLineStartMs
             ?: (timeMs + fallbackDurationMs))
             .coerceAtLeast(timeMs + 1L)
     }
 
+    if (isTtml) {
+        val ttmlEnd = words.maxOfOrNull { it.endMs }
+            ?: endMs
+            ?: resolvedNextLineStartMs
+            ?: (timeMs + fallbackDurationMs)
+        return ttmlEnd.coerceAtLeast(timeMs + 1L)
+    }
+
     val mainEnd = words.maxOfOrNull { it.endMs } ?: endMs
     val cappedEnd = when {
-        nextLineStartMs == null -> mainEnd
-        mainEnd == null -> nextLineStartMs
-        mainEnd > nextLineStartMs -> nextLineStartMs
+        resolvedNextLineStartMs == null -> mainEnd
+        mainEnd == null -> resolvedNextLineStartMs
+        mainEnd > resolvedNextLineStartMs && !preservesPrimaryOverlapWith(nextLine) -> resolvedNextLineStartMs
         else -> mainEnd
     }
     return (cappedEnd ?: timeMs + fallbackDurationMs).coerceAtLeast(timeMs + 1L)
+}
+
+private fun LyricLine.preservesPrimaryOverlapWith(nextLine: LyricLine?): Boolean {
+    val currentAgent = agent?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return false
+    val nextAgent = nextLine?.agent?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return false
+    if (currentAgent == nextAgent) return false
+    return (currentAgent == "v1" && nextAgent == "v2") ||
+        (currentAgent == "v2" && nextAgent == "v1") ||
+        (isTtml && nextLine.isTtml)
 }
 
 fun List<LyricLine>.shiftedBy(offsetMs: Long): List<LyricLine> {

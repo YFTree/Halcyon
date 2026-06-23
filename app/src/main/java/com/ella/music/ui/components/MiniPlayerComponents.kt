@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -30,21 +31,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.data.model.Song
 import kotlinx.coroutines.isActive
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -93,6 +97,7 @@ internal fun MiniPlayerAnimatedText(
                     MiuixTheme.colorScheme.onSurface
                 },
                 enabled = state.showingLyric,
+                highlightWithProgress = state.showingLyric,
                 progress = lyricProgress
             )
 
@@ -102,6 +107,7 @@ internal fun MiniPlayerAnimatedText(
                 fontWeight = FontWeight.Normal,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 enabled = state.scrollSecondary,
+                highlightWithProgress = state.highlightSecondaryWithProgress,
                 progress = lyricProgress
             )
         }
@@ -245,7 +251,8 @@ internal fun rememberMiniPlayerTextState(
             else -> song.artist
         },
         showingLyric = lyricText != null,
-        scrollSecondary = lyricText != null && hasTranslation
+        scrollSecondary = lyricText != null && hasTranslation,
+        highlightSecondaryWithProgress = false
     )
 }
 
@@ -256,10 +263,14 @@ private fun AutoScrollingMiniText(
     fontWeight: FontWeight,
     color: Color,
     enabled: Boolean,
+    highlightWithProgress: Boolean,
     progress: Float,
     modifier: Modifier = Modifier
 ) {
     val safeProgress = progress.coerceIn(0f, 1f)
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val highlightedColor = MiuixTheme.colorScheme.onSurface
     var autoScrollElapsedMs by remember(text, enabled) { mutableFloatStateOf(0f) }
 
     LaunchedEffect(text, enabled) {
@@ -276,41 +287,61 @@ private fun AutoScrollingMiniText(
         }
     }
 
-    Layout(
-        content = {
-            Text(
-                text = text,
-                fontSize = fontSize.sp,
-                fontWeight = fontWeight,
-                color = color,
-                maxLines = 1,
-                overflow = TextOverflow.Visible
-            )
-        },
+    val textStyle = TextStyle(
+        fontSize = fontSize.sp,
+        fontWeight = fontWeight
+    )
+    val textLayout = remember(text, textStyle, textMeasurer) {
+        textMeasurer.measure(
+            text = AnnotatedString(text),
+            style = textStyle,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+    val canvasHeight = with(density) { textLayout.size.height.toDp() }
+    val horizontalPaddingPx = with(density) { 2.dp.toPx() }
+    Canvas(
         modifier = modifier
             .fillMaxWidth()
+            .height(canvasHeight)
             .clipToBounds()
-    ) { measurables, constraints ->
-        val placeable = measurables.first().measure(
-            constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
-        )
-        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else placeable.width
-        val overflowPx = (placeable.width - width).coerceAtLeast(0)
-        val scrollProgress = if (enabled && overflowPx > 0) {
+    ) {
+        val viewportPx = size.width.toInt().coerceAtLeast(1)
+        val textWidth = textLayout.size.width.toFloat()
+        val overflowPx = (textWidth - size.width).coerceAtLeast(0f)
+        val scrollProgress = if (enabled && overflowPx > 0f) {
             miniMarqueeProgress(
                 progress = safeProgress,
-                overflowPx = overflowPx.toFloat(),
-                viewportPx = width,
+                overflowPx = overflowPx,
+                viewportPx = viewportPx,
                 autoScrollElapsedMs = autoScrollElapsedMs
             )
         } else {
             0f
         }
         val offsetPx = overflowPx * scrollProgress
+        val highlightRight = (textWidth * safeProgress - offsetPx + horizontalPaddingPx)
+            .coerceIn(0f, size.width)
+        val topLeft = Offset(-offsetPx, 0f)
 
-        layout(width, placeable.height) {
-            placeable.placeRelativeWithLayer(0, 0) {
-                translationX = -offsetPx
+        drawText(
+            textLayoutResult = textLayout,
+            color = color,
+            topLeft = topLeft
+        )
+        if (enabled && highlightWithProgress && highlightRight > 0f) {
+            clipRect(
+                left = 0f,
+                top = 0f,
+                right = highlightRight,
+                bottom = size.height
+            ) {
+                drawText(
+                    textLayoutResult = textLayout,
+                    color = highlightedColor,
+                    topLeft = topLeft
+                )
             }
         }
     }
@@ -345,7 +376,8 @@ internal data class MiniPlayerTextState(
     val primary: String,
     val secondary: String,
     val showingLyric: Boolean,
-    val scrollSecondary: Boolean
+    val scrollSecondary: Boolean,
+    val highlightSecondaryWithProgress: Boolean
 )
 
 @Composable

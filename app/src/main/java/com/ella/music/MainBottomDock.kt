@@ -351,17 +351,11 @@ private fun CompactBottomDock(
     val isHomeSelected = currentTabRoute == Screen.Home.route
     val leftIcon = if (isHomeSelected) MiuixIcons.Regular.Music else MiuixIcons.Regular.Playlist
     val leftLabel = if (isHomeSelected) stringResource(R.string.tab_home) else stringResource(R.string.tab_library)
-    val interactionSource = remember { MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .height(64.dp)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onExpand
-            ),
+            .height(64.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -410,11 +404,14 @@ private fun Modifier.consumeBottomDockPassthrough(vararg keys: Any?): Modifier =
             while (true) {
                 val event = awaitPointerEvent(pass = PointerEventPass.Final)
                 event.changes.forEach { change ->
+                    if (!change.pressed) return@forEach
                     val dx = change.position.x - change.previousPosition.x
                     val dy = change.position.y - change.previousPosition.y
-                    // Only consume vertical events; let horizontal drags pass through
-                    // so the MiniPlayer's swipe-to-skip gesture works
-                    if (kotlin.math.abs(dy) >= kotlin.math.abs(dx)) {
+                    val movedX = kotlin.math.abs(dx)
+                    val movedY = kotlin.math.abs(dy)
+                    if (movedX == 0f && movedY == 0f) return@forEach
+                    // Keep preventing passthrough scrolls, but don't eat simple taps.
+                    if (movedY > movedX) {
                         change.consume()
                     }
                 }

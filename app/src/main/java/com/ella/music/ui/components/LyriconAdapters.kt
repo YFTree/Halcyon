@@ -68,7 +68,8 @@ internal fun List<LyricLine>.toLyriconSong(
     songArtist: String
 ): LyriconSong {
     val lines = mapIndexedNotNull { index, line ->
-        val end = line.primaryEndMs(nextLineStartMs = getOrNull(index + 1)?.timeMs)
+        val nextLine = getOrNull(index + 1)
+        val end = line.primaryEndMs(nextLine = nextLine)
         if (line.text.isBlank() && line.backgroundText.isNullOrBlank()) return@mapIndexedNotNull null
         LyriconRichLyricLine(
             begin = line.timeMs,
@@ -77,7 +78,7 @@ internal fun List<LyricLine>.toLyriconSong(
             text = line.text.ifBlank { "♪" },
             words = line.words.toLyriconWords().ifEmpty { null },
             secondary = line.displaySmoothSecondaryBlockText(),
-            secondaryWords = line.backgroundWords.toLyriconWords().ifEmpty { null },
+            secondaryWords = line.displaySmoothSecondaryWords(),
             translation = line.displayTranslationText(),
             roma = line.displayPronunciationText()
         )
@@ -112,7 +113,7 @@ private fun LyricLine.displayTranslationText(): String? {
 }
 
 private fun LyricLine.displaySmoothSecondaryBlockText(): String? {
-    val background = backgroundText?.takeIf { it.isNotBlank() } ?: return null
+    val background = displayBackgroundText() ?: return null
     val translation = displayBackgroundTranslationText()
     return if (translation.isNullOrBlank()) {
         background
@@ -121,16 +122,36 @@ private fun LyricLine.displaySmoothSecondaryBlockText(): String? {
     }
 }
 
+private fun LyricLine.displaySmoothSecondaryWords(): List<LyriconWord>? {
+    if (!displayBackgroundTranslationText().isNullOrBlank()) return null
+    return backgroundWords
+        .mapNotNull { word ->
+            val normalizedText = word.text.normalizeBackgroundAsideText()
+            if (normalizedText.isBlank() || word.endMs <= word.startMs) return@mapNotNull null
+            LyriconWord(
+                begin = word.startMs,
+                end = word.endMs,
+                text = normalizedText
+            )
+        }
+        .ifEmpty { null }
+}
+
+private fun LyricLine.displayBackgroundText(): String? =
+    backgroundText
+        ?.normalizeBackgroundAsideText()
+        ?.takeIf { it.isNotBlank() }
+
 private fun LyricLine.displayBackgroundTranslationText(): String? {
     val value = backgroundTranslation?.takeIf { it.isNotBlank() } ?: return null
-    val primary = backgroundText?.takeIf { it.isNotBlank() } ?: text
+    val primary = displayBackgroundText() ?: text
     if (pronunciation.isNullOrBlank() && isLikelyRomanizationSecondary(primary, value)) return null
     return value
 }
 
 private fun LyricLine.romanizationSecondaryCandidate(): String? {
     translation?.takeIf { isLikelyRomanizationSecondary(text, it) }?.let { return it }
-    val primary = backgroundText?.takeIf { it.isNotBlank() } ?: text
+    val primary = displayBackgroundText() ?: text
     return backgroundTranslation?.takeIf { isLikelyRomanizationSecondary(primary, it) }
 }
 
@@ -162,5 +183,12 @@ private fun String.hasCjkKanaOrHangul(): Boolean = any { char ->
 }
 
 private fun Char.isLatinLetter(): Boolean = this in 'A'..'Z' || this in 'a'..'z'
+
+private fun String.normalizeBackgroundAsideText(): String =
+    trim()
+        .replace(Regex("""^[（(]+\s*"""), "")
+        .replace(Regex("""\s*[）)]+$"""), "")
+        .replace(Regex("""[ \t\r\n]+"""), " ")
+        .trim()
 
 private const val SMOOTH_SECONDARY_TRANSLATION_SEPARATOR = "\u000B"

@@ -308,10 +308,16 @@ internal fun CoverPlayerPage(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (immersiveAlbumCover) {
+                    val immersiveCoverShape = RoundedCornerShape(14.dp)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
+                            .graphicsLayer {
+                                shape = immersiveCoverShape
+                                clip = true
+                            }
+                            .clip(immersiveCoverShape)
                             .then(coverSwipeModifier),
                         contentAlignment = Alignment.Center
                     ) {
@@ -320,10 +326,16 @@ internal fun CoverPlayerPage(
                                 source = resolvedDynamicCover,
                                 isPlaying = isPlaying,
                                 onPlaybackError = { onDynamicCoverFailed(resolvedDynamicCover.failureKey) },
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                cornerRadiusDp = 14f
                             )
                         } else {
-                            FullBleedCover(song = song, embeddedCover = embeddedCover, modifier = Modifier.fillMaxSize())
+                            FullBleedCover(
+                                song = song,
+                                embeddedCover = embeddedCover,
+                                cornerRadius = 14.dp,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                         Box(
                             modifier = Modifier
@@ -523,7 +535,8 @@ internal fun CoverPlayerPage(
                                     source = resolvedDynamicCover,
                                     isPlaying = isPlaying,
                                     onPlaybackError = { onDynamicCoverFailed(resolvedDynamicCover.failureKey) },
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
+                                    cornerRadiusDp = 14f
                                 )
                                 if (showHiResLogo) {
                                     HiResLogoBadge(

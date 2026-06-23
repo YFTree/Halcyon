@@ -62,12 +62,11 @@ internal fun resolveLyricViewIndex(
         var candidate = currentIndex
         while (candidate + 1 < lines.size) {
             val nextBegin = lines[candidate + 1].begin
-            val previewOffset = computeLyricViewPreviewOffsetMs(candidate, lines)
-            if (positionMs + previewOffset < nextBegin) break
+            if (positionMs < nextBegin) break
             candidate++
         }
         return candidate
     }
 
-    return previewLyricViewIndexAt(positionMs + currentPreviewOffsetMs, lines)
+    return previewLyricViewIndexAt(positionMs, lines)
 }

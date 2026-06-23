@@ -90,8 +90,12 @@ sealed class Screen(val route: String) {
         const val baseRoute = "folder"
         fun createRoute(fromDock: Boolean = false) = "$baseRoute?fromDock=$fromDock"
     }
-    data object ScanSettings : Screen("scan_settings?highlight={highlight}") {
-        fun createRoute(highlight: String = "") = "scan_settings?highlight=${java.net.URLEncoder.encode(highlight, "UTF-8")}"
+    data object ScanSettings : Screen("scan_settings?highlight={highlight}&fromDock={fromDock}") {
+        const val baseRoute = "scan_settings"
+        fun createRoute(highlight: String = "", fromDock: Boolean = false): String {
+            val encodedHighlight = java.net.URLEncoder.encode(highlight, "UTF-8")
+            return "$baseRoute?highlight=$encodedHighlight&fromDock=$fromDock"
+        }
     }
     data object MetadataCategory : Screen("category/{type}?fromDock={fromDock}") {
         const val baseRoute = "category"
@@ -120,7 +124,10 @@ sealed class Screen(val route: String) {
         fun createRoute(playlistId: String) = "folder_playlist/${java.net.URLEncoder.encode(playlistId, "UTF-8")}"
     }
     data object LibraryAnalysis : Screen("library_analysis")
-    data object Settings : Screen("settings")
+    data object Settings : Screen("settings?fromDock={fromDock}") {
+        const val baseRoute = "settings"
+        fun createRoute(fromDock: Boolean = false) = "$baseRoute?fromDock=$fromDock"
+    }
     data object SettingsDetail : Screen("settings_detail?highlight={highlight}") {
         fun createRoute(highlight: String = "") = "settings_detail?highlight=${java.net.URLEncoder.encode(highlight, "UTF-8")}"
     }
@@ -218,7 +225,7 @@ fun AppNavigation(
                 onNavigateToAiChat = { navController.navigate(Screen.AiChat.route) },
                 onNavigateToMetadataCategory = { type -> navigateRestorableTopLevel(Screen.MetadataCategory.createRoute(type)) },
                 onNavigateToPlayer = onNavigateToPlayer,
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+                onNavigateToSettings = { navController.navigate(Screen.Settings.createRoute()) }
             )
         }
 
@@ -347,11 +354,15 @@ fun AppNavigation(
 
         composable(
             route = Screen.ScanSettings.route,
-            arguments = listOf(navArgument("highlight") { defaultValue = "" })
+            arguments = listOf(
+                navArgument("highlight") { defaultValue = "" },
+                navArgument("fromDock") { type = NavType.BoolType; defaultValue = false }
+            )
         ) { backStackEntry ->
+            val fromDock = backStackEntry.arguments?.getBoolean("fromDock") == true
             ScanSettingsScreen(
                 mainViewModel = mainViewModel,
-                showBackButton = !isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_SCAN_SETTINGS),
+                showBackButton = !(fromDock && isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_SCAN_SETTINGS)),
                 onBack = { navController.popBackStack() },
                 highlightKey = backStackEntry.arguments?.getString("highlight").orEmpty()
             )
@@ -541,7 +552,11 @@ fun AppNavigation(
             )
         }
 
-        composable(Screen.Settings.route) {
+        composable(
+            route = Screen.Settings.route,
+            arguments = listOf(navArgument("fromDock") { type = NavType.BoolType; defaultValue = false })
+        ) { backStackEntry ->
+            val fromDock = backStackEntry.arguments?.getBoolean("fromDock") == true
             SettingsScreen(
                 onNavigateToAbout = { navController.navigate(Screen.About.route) },
                 onNavigateToAppearanceSettings = { navController.navigate(Screen.SettingsDetail.createRoute()) },
@@ -583,7 +598,7 @@ fun AppNavigation(
                     navController.navigate(Screen.Equalizer.createRoute(highlight))
                 },
                 onBack = { navController.popBackStack() },
-                showBackButton = !isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_SETTINGS),
+                showBackButton = !(fromDock && isDockItem(SettingsManager.BOTTOM_DOCK_ITEM_SETTINGS)),
                 mainViewModel = mainViewModel,
                 playerViewModel = playerViewModel
             )

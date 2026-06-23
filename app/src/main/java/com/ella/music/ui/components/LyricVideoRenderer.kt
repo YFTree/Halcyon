@@ -112,7 +112,7 @@ internal class LyricVideoRenderer(
             val line = lines[i]
             val nextLine = lines.getOrNull(i + 1)
             val relativeStart = line.timeMs - globalStartMs
-            val lineEndMs = line.primaryEndMs(nextLine?.timeMs)
+            val lineEndMs = line.primaryEndMs(nextLine = nextLine)
             val karaokeEnd = lineEndMs - globalStartMs
             val holdEnd = karaokeEnd + HOLD_AFTER_MS
             val dissolveEnd = holdEnd + DISSOLVE_MS
@@ -132,49 +132,75 @@ internal class LyricVideoRenderer(
         val timeMs = (frameIndex * 1000L) / FPS
         drawDynamicBackground(canvas, timeMs)
 
-        val activeTimeline = timelines.firstOrNull { timeMs < it.dissolveEndMs && timeMs >= it.startMs }
-            ?: timelines.lastOrNull()?.takeIf { timeMs >= it.startMs }
-            ?: return
+        val activeIndex = timelines.indexOfLast { timeMs >= it.startMs }.takeIf { it >= 0 } ?: return
+        val activeTimeline = timelines[activeIndex]
+        val previousTimeline = timelines.getOrNull(activeIndex - 1)
+        val dissolvingTimeline = when {
+            previousTimeline != null &&
+                timeMs >= previousTimeline.holdEndMs &&
+                timeMs < previousTimeline.dissolveEndMs -> previousTimeline to (activeIndex - 1)
+            timeMs >= activeTimeline.holdEndMs &&
+                timeMs < activeTimeline.dissolveEndMs -> activeTimeline to activeIndex
+            else -> null
+        }
 
-        val lineIndex = timelines.indexOf(activeTimeline)
+        dissolvingTimeline?.let { (timeline, lineIndex) ->
+            drawDissolvingLine(canvas, timeline, lineIndex)
+        } ?: clearParticleEffect()
+
+        val shouldDrawActiveLine =
+            dissolvingTimeline == null || dissolvingTimeline.second != activeIndex || timeMs < activeTimeline.holdEndMs
+        if (!shouldDrawActiveLine) return
 
         when {
             timeMs < activeTimeline.startMs + FADE_IN_MS -> {
                 val progress = ((timeMs - activeTimeline.startMs).toFloat() / FADE_IN_MS).coerceIn(0f, 1f)
-                drawLyricLine(canvas, activeTimeline, timeMs, alpha = progress, scale = 0.95f + 0.05f * progress)
-                activeParticleEffect = null
-                particleLineIndex = -1
+                val easedProgress = easeOutCubic(progress)
+                drawLyricLine(
+                    canvas = canvas,
+                    timeline = activeTimeline,
+                    timeMs = timeMs,
+                    alpha = 0.58f + 0.42f * easedProgress,
+                    scale = 0.92f + 0.08f * easedProgress,
+                    translateY = (1f - easedProgress) * 32f
+                )
             }
-            timeMs < activeTimeline.karaokeEndMs -> {
+            timeMs < activeTimeline.karaokeEndMs || timeMs < activeTimeline.holdEndMs -> {
                 drawLyricLine(canvas, activeTimeline, timeMs, alpha = 1f, scale = 1f)
-                activeParticleEffect = null
-                particleLineIndex = -1
             }
-            timeMs < activeTimeline.holdEndMs -> {
+            else -> {
                 drawLyricLine(canvas, activeTimeline, timeMs, alpha = 1f, scale = 1f)
-                activeParticleEffect = null
-                particleLineIndex = -1
-            }
-            timeMs < activeTimeline.dissolveEndMs -> {
-                if (particleLineIndex != lineIndex) {
-                    particleLineIndex = lineIndex
-                    val textBmp = renderLineToBitmap(activeTimeline)
-                    textBitmapCache?.recycle()
-                    textBitmapCache = textBmp
-                    val drawY = calculateLineY(activeTimeline)
-                    activeParticleEffect = LyricVideoParticleEffect(
-                        textBitmap = textBmp,
-                        destX = calculateLineX(activeTimeline, textBmp.width),
-                        destY = drawY,
-                        totalFrames = LyricVideoParticleEffect.DISSOLVE_FRAMES
-                    )
-                }
-                activeParticleEffect?.let {
-                    it.advanceFrame()
-                    it.draw(canvas)
-                }
             }
         }
+    }
+
+    private fun drawDissolvingLine(
+        canvas: Canvas,
+        timeline: LineTimeline,
+        lineIndex: Int
+    ) {
+        if (particleLineIndex != lineIndex) {
+            particleLineIndex = lineIndex
+            val textBmp = renderLineToBitmap(timeline)
+            textBitmapCache?.recycle()
+            textBitmapCache = textBmp
+            val drawY = calculateLineY(timeline)
+            activeParticleEffect = LyricVideoParticleEffect(
+                textBitmap = textBmp,
+                destX = calculateLineX(timeline, textBmp.width),
+                destY = drawY,
+                totalFrames = LyricVideoParticleEffect.DISSOLVE_FRAMES
+            )
+        }
+        activeParticleEffect?.let {
+            it.advanceFrame()
+            it.draw(canvas)
+        }
+    }
+
+    private fun clearParticleEffect() {
+        activeParticleEffect = null
+        particleLineIndex = -1
     }
 
     private fun drawLyricLine(
@@ -182,7 +208,8 @@ internal class LyricVideoRenderer(
         timeline: LineTimeline,
         timeMs: Long,
         alpha: Float,
-        scale: Float
+        scale: Float,
+        translateY: Float = 0f
     ) {
         val line = timeline.line
         val text = line.text.ifBlank { line.backgroundText.orEmpty() }
@@ -197,6 +224,9 @@ internal class LyricVideoRenderer(
         val startX = (VIDEO_SIZE - textWidth) / 2f
 
         canvas.save()
+        if (translateY != 0f) {
+            canvas.translate(0f, translateY)
+        }
         if (scale != 1f) {
             canvas.scale(scale, scale, VIDEO_SIZE / 2f, VIDEO_SIZE / 2f)
         }
@@ -435,12 +465,12 @@ internal class LyricVideoRenderer(
 
         val cropped = centerCropScale(localCover, COVER_TEXTURE_SIZE, COVER_TEXTURE_SIZE)
         val boosted = Bitmap.createBitmap(cropped.width, cropped.height, Bitmap.Config.ARGB_8888)
-        val saturationMatrix = ColorMatrix().apply { setSaturation(2.15f) }
+        val saturationMatrix = ColorMatrix().apply { setSaturation(2.5f) }
         val brightnessMatrix = ColorMatrix(
             floatArrayOf(
-                1.08f, 0f, 0f, 0f, 0f,
-                0f, 1.08f, 0f, 0f, 0f,
-                0f, 0f, 1.08f, 0f, 0f,
+                1.05f, 0f, 0f, 0f, 0f,
+                0f, 1.05f, 0f, 0f, 0f,
+                0f, 0f, 1.05f, 0f, 0f,
                 0f, 0f, 0f, 1f, 0f
             )
         )
@@ -455,7 +485,7 @@ internal class LyricVideoRenderer(
             }
         )
         if (cropped !== localCover) cropped.recycle()
-        stackBlur(boosted, 28)
+        stackBlur(boosted, 25)
 
         val colors = sampleFlowingBackgroundColors(localCover)
         return BackgroundAssets(
@@ -480,44 +510,15 @@ internal class LyricVideoRenderer(
         backgroundPaint.shader = null
 
         textureShader?.let { shader ->
-            drawTextureLayer(canvas, shader, size, timeMs, 100_000L, 360f, 1.70f, -0.22f, -0.16f, 88)
-            drawTextureLayer(canvas, shader, size, timeMs, 70_000L, -360f, 1.82f, 0.18f, -0.24f, 70)
-            drawTextureLayer(canvas, shader, size, timeMs, 40_000L, -360f, 1.60f, -0.14f, 0.26f, 94)
+            drawTextureLayer(canvas, shader, size, timeMs, 100_000L, 360f, 1.78f, 0f, 0f, 92)
+            drawTextureLayer(canvas, shader, size, timeMs, 70_000L, -360f, 1.82f, -0.95f, -0.70f, 80)
+            drawTextureLayer(canvas, shader, size, timeMs, 40_000L, -360f, 1.68f, -0.50f, 0.70f, 108)
         }
 
-        val pulse = 0.5f + 0.5f * kotlin.math.sin(timeMs / 760.0).toFloat()
-        drawBlob(
-            canvas = canvas,
-            color = backgroundAssets.blobColors[0],
-            centerX = size * (0.18f + 0.24f * kotlin.math.sin(timeMs / 16_000.0).toFloat()),
-            centerY = size * (0.20f + 0.18f * kotlin.math.cos(timeMs / 18_000.0).toFloat()),
-            radius = size * 0.56f,
-            alpha = (86 + pulse * 24f).roundToInt().coerceIn(0, 255)
-        )
-        drawBlob(
-            canvas = canvas,
-            color = backgroundAssets.blobColors[1],
-            centerX = size * (0.84f + 0.18f * kotlin.math.cos(timeMs / 14_000.0).toFloat()),
-            centerY = size * (0.28f + 0.20f * kotlin.math.sin(timeMs / 17_000.0).toFloat()),
-            radius = size * 0.50f,
-            alpha = 74
-        )
-        drawBlob(
-            canvas = canvas,
-            color = backgroundAssets.blobColors[2],
-            centerX = size * (0.50f + 0.28f * kotlin.math.sin(timeMs / 22_000.0).toFloat()),
-            centerY = size * (0.68f + 0.16f * kotlin.math.cos(timeMs / 15_000.0).toFloat()),
-            radius = size * 0.46f,
-            alpha = 66
-        )
-        drawBlob(
-            canvas = canvas,
-            color = backgroundAssets.blobColors[3],
-            centerX = size * (0.76f + 0.16f * kotlin.math.cos(timeMs / 19_000.0).toFloat()),
-            centerY = size * (0.82f + 0.12f * kotlin.math.sin(timeMs / 21_000.0).toFloat()),
-            radius = size * 0.42f,
-            alpha = 72
-        )
+        overlayPaint.color = Color.parseColor("#52000000")
+        canvas.drawRect(0f, 0f, size, size, overlayPaint)
+        overlayPaint.color = Color.parseColor("#1A000000")
+        canvas.drawRect(0f, 0f, size, size, overlayPaint)
 
         overlayPaint.shader = LinearGradient(
             0f,
@@ -525,11 +526,26 @@ internal class LyricVideoRenderer(
             0f,
             size,
             intArrayOf(
-                Color.argb(84, 0, 0, 0),
-                Color.argb(124, 0, 0, 0),
-                Color.argb(160, 0, 0, 0)
+                Color.argb(62, 0, 0, 0),
+                Color.argb(108, 0, 0, 0),
+                Color.argb(154, 0, 0, 0)
             ),
             floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, size, size, overlayPaint)
+        overlayPaint.shader = null
+
+        overlayPaint.shader = RadialGradient(
+            size * 0.5f,
+            size * 0.42f,
+            size * 0.82f,
+            intArrayOf(
+                Color.TRANSPARENT,
+                Color.argb(54, 0, 0, 0),
+                Color.argb(118, 0, 0, 0)
+            ),
+            floatArrayOf(0f, 0.72f, 1f),
             Shader.TileMode.CLAMP
         )
         canvas.drawRect(0f, 0f, size, size, overlayPaint)
@@ -615,6 +631,11 @@ internal class LyricVideoRenderer(
         backgroundAssets.texture?.recycle()
         textBitmapCache?.recycle()
         textBitmapCache = null
+    }
+
+    private fun easeOutCubic(value: Float): Float {
+        val clamped = value.coerceIn(0f, 1f)
+        return 1f - (1f - clamped) * (1f - clamped) * (1f - clamped)
     }
 }
 

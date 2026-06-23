@@ -83,6 +83,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
     private var scanJob: Job? = null
+    private var searchSnapshotPrewarmJob: Job? = null
     private var autoScanRequested = false
 
     init {
@@ -204,13 +205,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun preloadLibrarySearchSnapshot() {
         val currentSongs = songs.value
         if (currentSongs.isEmpty()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            // Defer the per-file tag warm-up so the cold-start library open and its
-            // cover decoding aren't starved by this disk I/O. Search still works before
-            // this completes: the snapshot is built lazily per song on demand.
-            delay(2000)
-            repository.preloadSongRatings(currentSongs)
+        searchSnapshotPrewarmJob?.cancel()
+        searchSnapshotPrewarmJob = viewModelScope.launch(Dispatchers.IO) {
+            // Prewarm a cheap base snapshot immediately so the first search can hit cached
+            // normalized song fields. Deeper tag fields are enriched in a second pass.
             repository.preloadLibrarySearchSnapshot(currentSongs)
+            delay(1200)
+            repository.preloadSongRatings(currentSongs)
+            repository.preloadSongTagInfos(currentSongs)
+            repository.preloadLibrarySearchSnapshot(currentSongs, refreshExisting = true)
         }
     }
 

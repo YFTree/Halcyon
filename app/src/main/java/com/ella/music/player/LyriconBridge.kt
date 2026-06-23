@@ -122,7 +122,7 @@ class LyriconBridge(private val context: Context) {
                 }
 
                 val nextLineTime = line.primaryEndMs(
-                    nextLineStartMs = lyrics.getOrNull(index + 1)?.timeMs,
+                    nextLine = lyrics.getOrNull(index + 1),
                     fallbackDurationMs = 3_000L
                 )
 
@@ -178,7 +178,7 @@ class LyriconBridge(private val context: Context) {
                 }
 
                 val nextLineTime = line.primaryEndMs(
-                    nextLineStartMs = lyrics.getOrNull(index + 1)?.timeMs,
+                    nextLine = lyrics.getOrNull(index + 1),
                     fallbackDurationMs = 3_000L
                 )
 

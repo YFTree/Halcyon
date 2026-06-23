@@ -74,6 +74,8 @@ fun SettingsDetailScreen(
     val homeCardColor by settingsManager.homeCardColor.collectAsState(initial = "")
     val homeCardOpacity by settingsManager.homeCardOpacity.collectAsState(initial = 58)
     val homeTileColors by settingsManager.homeTileColors.collectAsState(initial = "")
+    val homeTileGradientEnabled by settingsManager.homeTileGradientEnabled.collectAsState(initial = false)
+    val homeTileGradientStartColor by settingsManager.homeTileGradientStartColor.collectAsState(initial = "")
     val homeSectionItems = listOf(
         HomePreferenceItem("library", stringResource(R.string.settings_home_section_library), stringResource(R.string.settings_home_section_library_summary)),
         HomePreferenceItem("online", stringResource(R.string.settings_home_section_online), stringResource(R.string.settings_home_section_online_summary)),
@@ -155,6 +157,8 @@ fun SettingsDetailScreen(
                     homeCardColor = homeCardColor,
                     homeCardOpacity = homeCardOpacity,
                     homeTileColors = homeTileColors,
+                    homeTileGradientEnabled = homeTileGradientEnabled,
+                    homeTileGradientStartColor = homeTileGradientStartColor,
                     highlightKey = highlightKey,
                     onHiddenSectionsChange = { value ->
                         scope.launch { settingsManager.setHomeHiddenSections(value) }
@@ -185,6 +189,12 @@ fun SettingsDetailScreen(
                     },
                     onHomeTileColorChange = { id, value ->
                         scope.launch { settingsManager.setHomeTileColor(id, value) }
+                    },
+                    onHomeTileGradientEnabledChange = { value ->
+                        scope.launch { settingsManager.setHomeTileGradientEnabled(value) }
+                    },
+                    onHomeTileGradientStartColorChange = { value ->
+                        scope.launch { settingsManager.setHomeTileGradientStartColor(value) }
                     }
                 )
                 Spacer(modifier = Modifier.height(160.dp))

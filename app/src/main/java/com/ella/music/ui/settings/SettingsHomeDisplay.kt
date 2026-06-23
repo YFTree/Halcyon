@@ -83,6 +83,8 @@ internal fun HomeDisplaySettingsPage(
     homeCardColor: String,
     homeCardOpacity: Int,
     homeTileColors: String,
+    homeTileGradientEnabled: Boolean,
+    homeTileGradientStartColor: String,
     highlightKey: String? = null,
     onHiddenSectionsChange: (String) -> Unit,
     onHiddenTilesChange: (String) -> Unit,
@@ -93,7 +95,9 @@ internal fun HomeDisplaySettingsPage(
     onTilePinButtonsVisibleChange: (Boolean) -> Unit,
     onHomeCardColorChange: (String) -> Unit,
     onHomeCardOpacityChange: (Int) -> Unit,
-    onHomeTileColorChange: (String, String) -> Unit
+    onHomeTileColorChange: (String, String) -> Unit,
+    onHomeTileGradientEnabledChange: (Boolean) -> Unit,
+    onHomeTileGradientStartColorChange: (String) -> Unit
 ) {
     val orderedSections = remember(sectionItems, sectionOrder) {
         sectionItems.orderedByCsv(sectionOrder, SettingsManager.DEFAULT_HOME_SECTION_ORDER)
@@ -116,10 +120,14 @@ internal fun HomeDisplaySettingsPage(
             homeCardColor = homeCardColor,
             homeCardOpacity = homeCardOpacity,
             tileColorMap = tileColorMap,
+            homeTileGradientEnabled = homeTileGradientEnabled,
+            homeTileGradientStartColor = homeTileGradientStartColor,
             highlight = true,
             onHomeCardColorChange = onHomeCardColorChange,
             onHomeCardOpacityChange = onHomeCardOpacityChange,
-            onHomeTileColorChange = onHomeTileColorChange
+            onHomeTileColorChange = onHomeTileColorChange,
+            onHomeTileGradientEnabledChange = onHomeTileGradientEnabledChange,
+            onHomeTileGradientStartColorChange = onHomeTileGradientStartColorChange
         )
     }
 
@@ -163,10 +171,14 @@ internal fun HomeDisplaySettingsPage(
             homeCardColor = homeCardColor,
             homeCardOpacity = homeCardOpacity,
             tileColorMap = tileColorMap,
+            homeTileGradientEnabled = homeTileGradientEnabled,
+            homeTileGradientStartColor = homeTileGradientStartColor,
             highlight = false,
             onHomeCardColorChange = onHomeCardColorChange,
             onHomeCardOpacityChange = onHomeCardOpacityChange,
-            onHomeTileColorChange = onHomeTileColorChange
+            onHomeTileColorChange = onHomeTileColorChange,
+            onHomeTileGradientEnabledChange = onHomeTileGradientEnabledChange,
+            onHomeTileGradientStartColorChange = onHomeTileGradientStartColorChange
         )
     }
 }
@@ -177,10 +189,14 @@ private fun HomeTileColorSettings(
     homeCardColor: String,
     homeCardOpacity: Int,
     tileColorMap: Map<String, String>,
+    homeTileGradientEnabled: Boolean,
+    homeTileGradientStartColor: String,
     highlight: Boolean,
     onHomeCardColorChange: (String) -> Unit,
     onHomeCardOpacityChange: (Int) -> Unit,
-    onHomeTileColorChange: (String, String) -> Unit
+    onHomeTileColorChange: (String, String) -> Unit,
+    onHomeTileGradientEnabledChange: (Boolean) -> Unit,
+    onHomeTileGradientStartColorChange: (String) -> Unit
 ) {
     var colorTarget by remember { mutableStateOf<HomeColorTarget?>(null) }
     SmallTitle(text = stringResource(R.string.settings_home_tile_colors_title))
@@ -199,6 +215,17 @@ private fun HomeTileColorSettings(
                 valueText = "$homeCardOpacity%",
                 onValueChange = onHomeCardOpacityChange
             )
+            SwitchPreference(
+                title = stringResource(R.string.settings_home_tile_gradient_enabled),
+                summary = stringResource(R.string.settings_home_tile_gradient_enabled_summary),
+                checked = homeTileGradientEnabled,
+                onCheckedChange = onHomeTileGradientEnabledChange
+            )
+            BasicComponent(
+                title = stringResource(R.string.settings_home_tile_gradient_start_color),
+                summary = homeTileGradientStartColor.ifBlank { stringResource(R.string.settings_home_card_color_default) },
+                modifier = Modifier.clickable { colorTarget = HomeColorTarget.GradientStart }
+            )
             tileItems.forEach { item ->
                 HomeTileColorRow(
                     item = item,
@@ -214,6 +241,7 @@ private fun HomeTileColorSettings(
         show = target != null,
         title = when (target) {
             HomeColorTarget.Global -> stringResource(R.string.settings_home_card_color)
+            HomeColorTarget.GradientStart -> stringResource(R.string.settings_home_tile_gradient_start_color)
             is HomeColorTarget.Tile -> target.item.title
             null -> ""
         },
@@ -221,6 +249,7 @@ private fun HomeTileColorSettings(
     ) {
         val saved = when (target) {
             HomeColorTarget.Global -> homeCardColor
+            HomeColorTarget.GradientStart -> homeTileGradientStartColor
             is HomeColorTarget.Tile -> tileColorMap[target.item.id].orEmpty()
             null -> ""
         }
@@ -241,6 +270,7 @@ private fun HomeTileColorSettings(
                     val value = "#%08X".format(pickerColor.toArgb())
                     when (target) {
                         HomeColorTarget.Global -> onHomeCardColorChange(value)
+                        HomeColorTarget.GradientStart -> onHomeTileGradientStartColorChange(value)
                         is HomeColorTarget.Tile -> onHomeTileColorChange(target.item.id, value)
                         null -> Unit
                     }
@@ -255,6 +285,7 @@ private fun HomeTileColorSettings(
                 onClick = {
                     when (target) {
                         HomeColorTarget.Global -> onHomeCardColorChange("")
+                        HomeColorTarget.GradientStart -> onHomeTileGradientStartColorChange("")
                         is HomeColorTarget.Tile -> onHomeTileColorChange(target.item.id, "")
                         null -> Unit
                     }
@@ -291,6 +322,7 @@ private fun HomeTileColorRow(
 
 private sealed class HomeColorTarget {
     data object Global : HomeColorTarget()
+    data object GradientStart : HomeColorTarget()
     data class Tile(val item: HomePreferenceItem) : HomeColorTarget()
 }
 

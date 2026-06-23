@@ -1437,6 +1437,9 @@
     <string name="settings_home_card_color_default">Follow theme default</string>
     <string name="settings_home_card_opacity">Home card opacity</string>
     <string name="settings_home_card_opacity_summary">Adjust the background opacity of home library and online music cards.</string>
+    <string name="settings_home_tile_gradient_enabled">Tile translucent gradient</string>
+    <string name="settings_home_tile_gradient_enabled_summary">Use a translucent gradient on home tiles instead of a solid color.</string>
+    <string name="settings_home_tile_gradient_start_color">Gradient start color</string>
     <string name="song_more_metadata_section_cover">Song cover</string>
     <string name="song_more_metadata_cover_empty">No cover</string>
     <string name="song_more_metadata_cover_choose">Choose cover</string>

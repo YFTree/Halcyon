@@ -161,7 +161,8 @@ internal fun LandscapeCoverStack(
                             source = dynamicCoverSource,
                             isPlaying = isPlaying,
                             onPlaybackError = { onDynamicCoverFailed(dynamicCoverSource.failureKey) },
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            cornerRadiusDp = if (isCenter) 14f else 10f
                         )
                     } else {
                         LandscapeStackCoverImage(

@@ -901,6 +901,9 @@
     <string name="settings_home_tile_colors_title">功能块颜色</string>
     <string name="settings_home_tile_colors_summary">自定义首页每一个音乐库和在线音乐功能块颜色</string>
     <string name="settings_home_tile_color_default">使用默认颜色</string>
+    <string name="settings_home_tile_gradient_enabled">功能块半透明渐变</string>
+    <string name="settings_home_tile_gradient_enabled_summary">开启后首页功能块使用半透明渐变色；关闭时保持纯色</string>
+    <string name="settings_home_tile_gradient_start_color">渐变起始颜色</string>
     <string name="settings_hi_res_logo">Hi-Res 封面标识</string>
     <string name="settings_hi_res_logo_summary">非沉浸播放页中，Hi-Res 音质歌曲的封面右下角显示小标识</string>
     <string name="settings_hi_res_logo_image">选择 Hi-Res 标识图片</string>
@@ -1215,6 +1218,7 @@
     <string name="playlist_remove_selected_title">从歌单移除</string>
     <string name="playlist_remove_selected_message">确定要从当前歌单移除已选的 %1$d 首歌曲吗？不会删除本地文件。</string>
     <string name="playlist_detail_summary">%1$d 首歌曲 · %2$s · %3$s</string>
+    <string name="playlist_detail_summary_basic">%1$d 首歌曲 · %2$s</string>
     <string name="playlist_sort_custom">自定义</string>
     <string name="playlist_sort_custom_desc">自定义倒序</string>
     <string name="playlist_sort_updated_at">最近更新</string>

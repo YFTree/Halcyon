@@ -1,5 +1,8 @@
 package com.ella.music.data.parser
 
+import com.ella.music.data.model.LyricLine
+import com.ella.music.data.model.LyricWord
+import com.ella.music.data.model.primaryEndMs
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -243,5 +246,92 @@ class EllaLyricsParserTest {
         assertEquals(listOf("Hello again", "Answer line"), result.lyrics.map { it.text })
         assertEquals(listOf("v1", "v2"), result.lyrics.map { it.agent })
         assertEquals(listOf("Hello ", "again"), result.lyrics.first().words.map { it.text })
+    }
+
+    @Test
+    fun accompanistElrcStandaloneSpaceTokensBecomeDisplaySpaces() {
+        val result = LrcParser.parse(
+            """
+            [00:04.722]Love[00:05.201] [00:05.201]hits[00:05.838] [00:05.838]hard[00:06.297] [00:06.297]I[00:06.716] [00:06.716]know[00:07.511]
+            """.trimIndent()
+        )
+
+        assertEquals(1, result.lyrics.size)
+        assertEquals("Love hits hard I know", result.lyrics.single().text)
+        assertEquals(
+            listOf("Love", " hits", " hard", " I", " know"),
+            result.lyrics.single().words.map { it.text }
+        )
+    }
+
+    @Test
+    fun duetPrimaryEndMsPreservesOverlapAcrossAgents() {
+        val first = LyricLine(
+            timeMs = 1_000L,
+            text = "パッと花火が",
+            words = listOf(LyricWord("パッと花火が", 1_000L, 2_400L)),
+            agent = "v1"
+        )
+        val second = LyricLine(
+            timeMs = 1_800L,
+            text = "パッと花火が",
+            words = listOf(LyricWord("パッと花火が", 1_800L, 2_800L)),
+            agent = "v2"
+        )
+
+        assertEquals(2_400L, first.primaryEndMs(nextLine = second))
+    }
+
+    @Test
+    fun ttmlBackgroundParenthesesAreTrimmedAndTranslationSeparated() {
+        val result = LrcParser.parse(
+            """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+              <body>
+                <div>
+                  <p begin="00:01.000" end="00:03.000">
+                    <span begin="00:01.000" end="00:02.000">To get respect from</span>
+                    <span ttm:role="x-translation">他人的尊重</span>
+                    <span ttm:role="x-bg" begin="00:02.000" end="00:03.000">
+                      <span begin="00:02.000" end="00:03.000">(Baby</span>
+                      <span ttm:role="x-translation">宝贝</span>
+                    </span>
+                  </p>
+                </div>
+              </body>
+            </tt>
+            """.trimIndent()
+        )
+
+        assertEquals(1, result.lyrics.size)
+        assertEquals("To get respect from", result.lyrics[0].text)
+        assertEquals("他人的尊重", result.lyrics[0].translation)
+        assertEquals("Baby", result.lyrics[0].backgroundText)
+        assertEquals("宝贝", result.lyrics[0].backgroundTranslation)
+        assertEquals(listOf("Baby"), result.lyrics[0].backgroundWords.map { it.text })
+    }
+
+    @Test
+    fun ellaTtmlFallbackTrimsStandaloneBackgroundParentheses() {
+        val result = EllaLyricsParser.parse(
+            """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+              <body>
+                <div>
+                  <p begin="00:03.000" end="00:04.000">
+                    <span ttm:role="x-bg" begin="00:03.000" end="00:04.000">
+                      <span begin="00:03.000" end="00:04.000">(Yeah</span>
+                    </span>
+                  </p>
+                </div>
+              </body>
+            </tt>
+            """.trimIndent()
+        )
+
+        requireNotNull(result)
+        assertEquals(1, result.lyrics.size)
+        assertEquals("Yeah", result.lyrics[0].backgroundText)
+        assertEquals(listOf("Yeah"), result.lyrics[0].backgroundWords.map { it.text })
     }
 }

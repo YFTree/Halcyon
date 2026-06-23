@@ -148,7 +148,7 @@ class MusicRepository(private val context: Context) {
     private val snapshotManager = MusicSnapshotManager(
         File(context.filesDir, "library_search_snapshot.json"),
         File(context.filesDir, "library_rating_snapshot.json")
-    ) { song -> song.searchableTagValues(getSongTagInfo(song)).joinToString(separator = "\n").lowercase() }
+    ) { song -> buildSongSearchSnapshotText(song, includeCachedTagInfo = true) }
 
     private val audioInfoCache = ConcurrentHashMap<String, AudioInfo>()
     private val tagInfoCache = ConcurrentHashMap<String, SongTagInfo>()
@@ -559,6 +559,9 @@ class MusicRepository(private val context: Context) {
         return info
     }
 
+    fun getCachedSongTagInfo(song: Song): SongTagInfo? =
+        tagInfoCache[song.metadataCacheKey()]
+
     private fun resolveSongRatingFromTags(song: Song): Int =
         runCatching { getSongTagInfo(song).rating.coerceIn(0, 5) }
             .getOrElse {
@@ -575,8 +578,14 @@ class MusicRepository(private val context: Context) {
     suspend fun getSongSearchText(song: Song): String =
         snapshotManager.getSongSearchText(song)
 
-    suspend fun preloadLibrarySearchSnapshot(songs: List<Song>) =
-        snapshotManager.preloadSearchSnapshot(songs)
+    suspend fun preloadLibrarySearchSnapshot(
+        songs: List<Song>,
+        refreshExisting: Boolean = false
+    ) = snapshotManager.preloadSearchSnapshot(songs, refreshExisting)
+
+    suspend fun preloadSongTagInfos(songs: List<Song>) = withContext(Dispatchers.IO) {
+        songs.forEach(::getSongTagInfo)
+    }
 
     suspend fun clearLibrarySnapshotCache() = withContext(Dispatchers.IO) {
         snapshotManager.clearLibraryCache()
@@ -592,6 +601,20 @@ class MusicRepository(private val context: Context) {
     suspend fun preloadSongRatings(songs: List<Song>) = withContext(Dispatchers.IO) {
         snapshotManager.preloadSongRatings(songs, ::resolveSongRatingFromTags)
         snapshotManager.saveAll()
+    }
+
+    private fun buildSongSearchSnapshotText(
+        song: Song,
+        includeCachedTagInfo: Boolean
+    ): String {
+        val tagInfo = if (includeCachedTagInfo) {
+            getCachedSongTagInfo(song) ?: SongTagInfo()
+        } else {
+            SongTagInfo()
+        }
+        return song.searchableTagValues(tagInfo)
+            .joinToString(separator = "\n")
+            .lowercase()
     }
 
     suspend fun writeSongRating(song: Song, rating: Int): Result<Song?> = withContext(Dispatchers.IO) {

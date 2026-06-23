@@ -739,12 +739,12 @@ fun EllaApp(
             icon = MiuixIcons.Regular.Album
         ),
         SettingsManager.BOTTOM_DOCK_ITEM_SCAN_SETTINGS to BottomDockTab(
-            route = Screen.ScanSettings.route,
+            route = Screen.ScanSettings.createRoute(fromDock = true),
             label = stringResource(R.string.folder_scan_settings),
             icon = MiuixIcons.Regular.Settings
         ),
         SettingsManager.BOTTOM_DOCK_ITEM_SETTINGS to BottomDockTab(
-            route = Screen.Settings.route,
+            route = Screen.Settings.createRoute(fromDock = true),
             label = stringResource(R.string.settings),
             icon = MiuixIcons.Regular.Settings
         ),

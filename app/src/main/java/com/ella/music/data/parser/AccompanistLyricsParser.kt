@@ -49,7 +49,7 @@ internal object AccompanistLyricsParser {
         if (text.isBlank() || EllaLyricsParser.isPlaceholderOnlyLine(text)) return null
         val background = accompanimentLines?.firstOrNull()
         val backgroundParts = background?.syllables.orEmpty().toTimedTextParts(isTtmlFormat).withoutElrcAgentPrefix().parts
-        val backgroundText = backgroundParts.toDisplayText().trimMeaningful().takeUsefulSecondaryText()
+        val backgroundText = backgroundParts.toDisplayText().normalizeBackgroundAsideText().takeUsefulSecondaryText()
         return LyricLine(
             timeMs = start.toLong().coerceAtLeast(0L),
             text = text,
@@ -58,7 +58,7 @@ internal object AccompanistLyricsParser {
             pronunciation = phonetic.takeUsefulSecondaryText(),
             agent = mainParts.agent ?: alignment.toEllaAgent(),
             backgroundText = backgroundText,
-            backgroundWords = if (backgroundText == null) emptyList() else backgroundParts.toLyricWords(),
+            backgroundWords = if (backgroundText == null) emptyList() else backgroundParts.toBackgroundLyricWords(),
             backgroundTranslation = background?.translation.takeUsefulSecondaryText(),
             backgroundStartMs = background?.start?.toLong()?.coerceAtLeast(0L),
             backgroundEndMs = background?.end?.toSafeEndMs(),
@@ -70,13 +70,13 @@ internal object AccompanistLyricsParser {
     private fun KaraokeLine.AccompanimentKaraokeLine.toBackgroundLyricLine(isTtmlFormat: Boolean): LyricLine? {
         val parsedParts = syllables.toTimedTextParts(isTtmlFormat).withoutElrcAgentPrefix()
         val textParts = parsedParts.parts
-        val text = textParts.toDisplayText().trimMeaningful()
+        val text = textParts.toDisplayText().normalizeBackgroundAsideText()
         if (text.isBlank() || EllaLyricsParser.isPlaceholderOnlyLine(text)) return null
         return LyricLine(
             timeMs = start.toLong().coerceAtLeast(0L),
             text = "",
             backgroundText = text,
-            backgroundWords = textParts.toLyricWords(),
+            backgroundWords = textParts.toBackgroundLyricWords(),
             backgroundTranslation = translation.takeUsefulSecondaryText(),
             backgroundStartMs = start.toLong().coerceAtLeast(0L),
             backgroundEndMs = end.toSafeEndMs(),
@@ -117,33 +117,45 @@ internal object AccompanistLyricsParser {
 
     private fun List<com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable>.toTimedTextParts(
         preserveLatinWordSpaces: Boolean
-    ): List<TimedTextPart> =
-        mapIndexedNotNull { index, syllable ->
+    ): List<TimedTextPart> {
+        val result = mutableListOf<TimedTextPart>()
+        var pendingLeadingSpace = false
+        forEachIndexed { index, syllable ->
             val startMs = syllable.start.toLong().coerceAtLeast(0L)
             val endMs = syllable.end.toLong().coerceAtLeast(startMs + 1L)
             val rawText = syllable.content
                 .normalizeTimedTokenText(preserveLatinWordSpaces, trimEnd = index == lastIndex)
-                .takeIf { it.isNotBlank() } ?: return@mapIndexedNotNull null
+            if (rawText.isBlank()) {
+                if (syllable.content.any(Char::isWhitespace)) {
+                    pendingLeadingSpace = true
+                }
+                return@forEachIndexed
+            }
             val previous = getOrNull(index - 1)
-            val text = if (
-                preserveLatinWordSpaces &&
-                previous != null &&
-                shouldInsertLatinWordSpace(
-                    previous.content,
-                    syllable.content,
-                    previous.content.normalizeTimedTokenText(preserveLatinWordSpaces, trimEnd = false),
-                    rawText
-                )
-            ) {
+            val needsInsertedLeadingSpace =
+                pendingLeadingSpace ||
+                    (
+                        previous != null &&
+                                shouldInsertLatinWordSpace(
+                                    previous.content,
+                                    syllable.content,
+                                    previous.content.normalizeTimedTokenText(preserveLatinWordSpaces, trimEnd = false),
+                                    rawText
+                                )
+                            )
+            val text = if (needsInsertedLeadingSpace && rawText.firstOrNull()?.isWhitespace() != true) {
                 " $rawText"
             } else {
                 rawText
             }
-            TimedTextPart(text = text, startMs = startMs, endMs = endMs)
+            pendingLeadingSpace = false
+            result += TimedTextPart(text = text, startMs = startMs, endMs = endMs)
         }
+        return result
+    }
 
     private fun List<TimedTextPart>.toDisplayText(): String =
-        joinToString(separator = "") { it.text }
+        joinToString(separator = "") { it.text }.trimMeaningful()
 
     private fun List<TimedTextPart>.withoutElrcAgentPrefix(): AgentTimedTextParts {
         if (isEmpty()) return AgentTimedTextParts(agent = null, parts = this)
@@ -167,6 +179,15 @@ internal object AccompanistLyricsParser {
             }
         }
 
+    private fun List<TimedTextPart>.toBackgroundLyricWords(): List<LyricWord> =
+        mapNotNull { part ->
+            part.text.normalizeBackgroundAsideText()
+                .takeIf { it.isNotBlank() }
+                ?.let { text ->
+                    LyricWord(text = text, startMs = part.startMs, endMs = part.endMs)
+                }
+        }
+
     private fun shouldInsertLatinWordSpace(
         previousRaw: String,
         currentRaw: String,
@@ -176,6 +197,8 @@ internal object AccompanistLyricsParser {
         val hasExplicitWhitespaceBoundary =
             previousRaw.lastOrNull()?.isWhitespace() == true || currentRaw.firstOrNull()?.isWhitespace() == true
         if (!hasExplicitWhitespaceBoundary) return false
+        if (previousNormalized.lastOrNull()?.isWhitespace() == true) return false
+        if (currentNormalized.firstOrNull()?.isWhitespace() == true) return false
         val prev = previousNormalized.lastOrNull { !it.isWhitespace() } ?: return false
         val next = currentNormalized.firstOrNull { !it.isWhitespace() } ?: return false
         if (prev.isCjkWordChar() || next.isCjkWordChar()) return false
@@ -221,6 +244,12 @@ internal object AccompanistLyricsParser {
             ?.trimMeaningful()
             ?.takeIf { it.isNotBlank() && !EllaLyricsParser.isPlaceholderOnlyLine(it) && !EllaLyricsParser.isIgnorableRawLyricLine(it) }
 
+    private fun String.normalizeBackgroundAsideText(): String =
+        trimMeaningful()
+            .replace(Regex("""^[（(]+\s*"""), "")
+            .replace(Regex("""\s*[）)]+$"""), "")
+            .trimMeaningful()
+
     private fun com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment.toEllaAgent(): String? =
         when (name.lowercase()) {
             "start" -> "v1"
@@ -233,6 +262,9 @@ internal object AccompanistLyricsParser {
             .values
             .flatMap { group ->
                 if (group.size == 1) return@flatMap group
+                if (group.shouldKeepIndependentDuetLines()) {
+                    return@flatMap group.sortedBy { it.agentSortOrder() }
+                }
                 val primary = group.firstOrNull { it.words.isNotEmpty() && it.text.isUsefulMainText() }
                     ?: group.firstOrNull { it.text.isUsefulMainText() }
                     ?: group.first()
@@ -265,6 +297,21 @@ internal object AccompanistLyricsParser {
             }
             .sortedBy { it.timeMs }
     }
+
+    private fun List<LyricLine>.shouldKeepIndependentDuetLines(): Boolean =
+        mapNotNull { line ->
+            line.agent
+                ?.trim()
+                ?.lowercase()
+                ?.takeIf { it in setOf("v1", "v2") && line.text.isUsefulMainText() }
+        }.distinct().size >= 2
+
+    private fun LyricLine.agentSortOrder(): Int =
+        when (agent?.trim()?.lowercase()) {
+            "v1" -> 0
+            "v2" -> 1
+            else -> 2
+        }
 
     private fun String?.mergeText(extra: String?): String? =
         listOfNotNull(this?.takeIf { it.isNotBlank() }, extra?.takeIf { it.isNotBlank() })

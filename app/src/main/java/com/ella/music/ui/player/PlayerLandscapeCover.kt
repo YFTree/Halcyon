@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -126,13 +127,46 @@ internal fun LandscapeCoverPlayerPage(
     drawBackground: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
     val bluetoothDeviceName = rememberBluetoothOutputName()
     val hasLyrics = lyrics.isNotEmpty()
-    val compactPhoneLandscape = LocalConfiguration.current.smallestScreenWidthDp < 600
+    val ultraWideLandscape = isUltraWideLandscapePlayerLayout(
+        screenWidthDp = configuration.screenWidthDp,
+        screenHeightDp = configuration.screenHeightDp
+    )
+    val compactPhoneLandscape = configuration.smallestScreenWidthDp < 600 && !ultraWideLandscape
     val showHiResLogo = hiResLogoEnabled && audioInfo?.isHiResLogoTrack() == true
     val swipeThresholdPx = with(LocalDensity.current) { 84.dp.toPx() }
     val swipeScope = rememberCoroutineScope()
     val dragOffset = remember { androidx.compose.animation.core.Animatable(0f) }
+    val leftPaneWeight = if (hasLyrics && ultraWideLandscape) 0.34f else 0.38f
+    val rightPaneWeight = if (ultraWideLandscape) 0.66f else 0.62f
+    val headerTitleFontSize = if (hasLyrics) {
+        if (ultraWideLandscape) 18.sp else 20.sp
+    } else {
+        if (ultraWideLandscape) 20.sp else 24.sp
+    }
+    val headerArtistFontSize = if (hasLyrics) {
+        if (ultraWideLandscape) 11.sp else 12.sp
+    } else {
+        if (ultraWideLandscape) 13.sp else 16.sp
+    }
+    val coverWidthFraction = when {
+        ultraWideLandscape && hasLyrics -> 0.72f
+        ultraWideLandscape -> 0.70f
+        hasLyrics -> 0.88f
+        else -> 0.78f
+    }
+    val coverMaxSize = when {
+        ultraWideLandscape && hasLyrics -> 300.dp
+        ultraWideLandscape -> 340.dp
+        hasLyrics -> 520.dp
+        else -> 620.dp
+    }
+    val lyricPrimaryTextSize = if (ultraWideLandscape) 24f else 28f
+    val lyricSecondaryTextSize = if (ultraWideLandscape) 13f else 14f
+    val lyricAnchorOffset = if (ultraWideLandscape) -0.03f else -0.08f
+    val lyricTopPadding = if (ultraWideLandscape) 0.dp else 8.dp
 
     if (compactPhoneLandscape) {
         CompactPhoneLandscapeCoverPlayerPage(
@@ -231,14 +265,20 @@ internal fun LandscapeCoverPlayerPage(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 32.dp, vertical = 22.dp),
+                .padding(
+                    horizontal = if (ultraWideLandscape) 24.dp else 32.dp,
+                    vertical = if (ultraWideLandscape) 14.dp else 22.dp
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (hasLyrics) Arrangement.Start else Arrangement.Center
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .then(if (hasLyrics) Modifier.weight(0.38f) else Modifier.fillMaxWidth(0.46f)),
+                    .then(
+                        if (hasLyrics) Modifier.weight(leftPaneWeight)
+                        else Modifier.fillMaxWidth(if (ultraWideLandscape) 0.42f else 0.46f)
+                    ),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (hasLyrics) {
@@ -249,8 +289,8 @@ internal fun LandscapeCoverPlayerPage(
                         PlayerSongMetaText(
                             song = song,
                             annotation = annotation,
-                            titleFontSize = 20.sp,
-                            artistFontSize = 12.sp,
+                            titleFontSize = headerTitleFontSize,
+                            artistFontSize = headerArtistFontSize,
                             artistAlpha = 0.56f,
                             showArtistWithAnnotation = true,
                             contentColor = palette.onBackground,
@@ -273,8 +313,8 @@ internal fun LandscapeCoverPlayerPage(
                         PlayerSongMetaText(
                             song = song,
                             annotation = annotation,
-                            titleFontSize = 24.sp,
-                            artistFontSize = 16.sp,
+                            titleFontSize = headerTitleFontSize,
+                            artistFontSize = headerArtistFontSize,
                             artistAlpha = 0.62f,
                             showArtistWithAnnotation = true,
                             contentColor = palette.onBackground,
@@ -290,7 +330,7 @@ internal fun LandscapeCoverPlayerPage(
                         PlayerHeaderAction(kind = PlayerHeaderActionKind.More, onClick = onToggleMenu)
                     }
                 }
-                Spacer(modifier = Modifier.height(22.dp))
+                Spacer(modifier = Modifier.height(if (ultraWideLandscape) 14.dp else 22.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -299,7 +339,8 @@ internal fun LandscapeCoverPlayerPage(
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(if (hasLyrics) 0.88f else 0.78f)
+                            .fillMaxWidth(coverWidthFraction)
+                            .widthIn(max = coverMaxSize)
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(14.dp))
                             .then(
@@ -339,7 +380,8 @@ internal fun LandscapeCoverPlayerPage(
                                 source = dynamicCoverSource,
                                 isPlaying = isPlaying,
                                 onPlaybackError = { onDynamicCoverFailed(dynamicCoverSource.failureKey) },
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                cornerRadiusDp = 14f
                             )
                         } else {
                             AlbumArtView(
@@ -360,7 +402,7 @@ internal fun LandscapeCoverPlayerPage(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(if (ultraWideLandscape) 8.dp else 12.dp))
                 PlayerProgressBlock(
                     currentPosition = currentPosition,
                     duration = duration,
@@ -371,7 +413,7 @@ internal fun LandscapeCoverPlayerPage(
                     showTotalDuration = showTotalDuration,
                     onSeek = onSeek
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(if (ultraWideLandscape) 0.dp else 4.dp))
                 PlayerTransportControls(
                     isPlaying = isPlaying,
                     shuffleEnabled = shuffleEnabled,
@@ -394,11 +436,12 @@ internal fun LandscapeCoverPlayerPage(
                 )
             }
             if (hasLyrics) {
-                Spacer(modifier = Modifier.width(48.dp))
+                Spacer(modifier = Modifier.width(if (ultraWideLandscape) 28.dp else 48.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .weight(0.62f)
+                        .weight(rightPaneWeight)
+                        .widthIn(max = if (ultraWideLandscape) 940.dp else 840.dp)
                         .padding(start = 0.dp)
                         .playerLyricPerspective(
                             enabled = lyricPerspectiveEffect,
@@ -421,14 +464,14 @@ internal fun LandscapeCoverPlayerPage(
                         fontPath = fontPath,
                         fontWeight = fontWeight,
                         lyricTextAlign = lyricTextAlign,
-                        primaryTextSizeSp = 28f,
-                        secondaryTextSizeSp = 14f,
-                        anchorOffsetRatio = -0.08f,
-                        topContentPadding = 8.dp,
+                        primaryTextSizeSp = lyricPrimaryTextSize,
+                        secondaryTextSizeSp = lyricSecondaryTextSize,
+                        anchorOffsetRatio = lyricAnchorOffset,
+                        topContentPadding = lyricTopPadding,
                         contentColor = palette.onBackground,
                         // A custom wallpaper is a busy background; blurring far lines makes them
                         // unreadable, so keep all lines sharp when one is set.
-                        nonCurrentLineBlurEnabled = customBackgroundUri.isBlank(),
+                        nonCurrentLineBlurEnabled = customBackgroundUri.isBlank() && !lyricPerspectiveEffect,
                         onLineClick = onLyricLineClick,
                         onLineLongClick = onLyricLineLongClick,
                         modifier = Modifier
@@ -580,7 +623,8 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
                         source = dynamicCoverSource,
                         isPlaying = isPlaying,
                         onPlaybackError = { onDynamicCoverFailed(dynamicCoverSource.failureKey) },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        cornerRadiusDp = 14f
                     )
                 } else {
                     PhoneLandscapeCoverImage(
@@ -708,6 +752,7 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
                     modifier = Modifier
                         .align(Alignment.Center)
                         .fillMaxSize()
+                        .widthIn(max = 900.dp)
                         .windowInsetsPadding(WindowInsets.statusBars)
                         .windowInsetsPadding(WindowInsets.navigationBars)
                         .padding(top = 106.dp, bottom = 42.dp)
@@ -738,7 +783,7 @@ private fun CompactPhoneLandscapeCoverPlayerPage(
                             anchorOffsetRatio = -0.08f,
                             topContentPadding = 0.dp,
                             contentColor = palette.onBackground,
-                            nonCurrentLineBlurEnabled = customBackgroundUri.isBlank(),
+                            nonCurrentLineBlurEnabled = customBackgroundUri.isBlank() && !lyricPerspectiveEffect,
                             onLineClick = onLyricLineClick,
                             onLineLongClick = onLyricLineLongClick,
                             modifier = Modifier.fillMaxSize()

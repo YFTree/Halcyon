@@ -92,6 +92,8 @@ fun HomeScreen(
     val appWallpaperUri by settingsManager.appWallpaperUri.collectAsState(initial = "")
     val homeCardColorRaw by settingsManager.homeCardColor.collectAsState(initial = "")
     val homeCardOpacity by settingsManager.homeCardOpacity.collectAsState(initial = 58)
+    val homeTileGradientEnabled by settingsManager.homeTileGradientEnabled.collectAsState(initial = false)
+    val homeTileGradientStartColorRaw by settingsManager.homeTileGradientStartColor.collectAsState(initial = "")
     val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
     var aiPlaylistLoading by remember { mutableStateOf(false) }
     val pageBackground = ellaPageBackground()
@@ -100,6 +102,7 @@ fun HomeScreen(
     val baseHomeCardColor = homeCardColorRaw.parseHomeCardColorOrNull()
         ?: MiuixTheme.colorScheme.surfaceContainer
     val homeTileCardColor = baseHomeCardColor.copy(alpha = homeCardOpacity.coerceIn(20, 100) / 100f)
+    val homeTileGradientStartColor = homeTileGradientStartColorRaw.parseHomeCardColorOrNull()
     val customTileColors = remember(homeTileColorsRaw) { homeTileColorsRaw.parseHomeTileColors() }
     fun tileColor(id: String, fallback: Color): Color = customTileColors[id] ?: fallback
     val featuredSongs = remember(songs) {
@@ -301,7 +304,9 @@ fun HomeScreen(
                         libraryTiles,
                         context,
                         homeTilePinButtonsVisible,
-                        cardColor = homeTileCardColor
+                        cardColor = homeTileCardColor,
+                        gradientEnabled = homeTileGradientEnabled,
+                        gradientStartColor = homeTileGradientStartColor
                     )
                     "online" -> {
                         if (onlineTiles.isNotEmpty()) {
@@ -310,7 +315,9 @@ fun HomeScreen(
                                 tiles = onlineTiles,
                                 context = context,
                                 showPinButtons = homeTilePinButtonsVisible,
-                                cardColor = homeTileCardColor
+                                cardColor = homeTileCardColor,
+                                gradientEnabled = homeTileGradientEnabled,
+                                gradientStartColor = homeTileGradientStartColor
                             )
                         }
                     }

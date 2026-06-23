@@ -75,6 +75,13 @@ fun SmoothLyricView(
             if (words.isEmpty()) null else line.timeMs to words
         }.toMap()
     }
+    val hasTimedWordAnimations = remember(lyrics) {
+        lyrics.any { line ->
+            line.words.isNotEmpty() ||
+                line.pronunciationWords.isNotEmpty() ||
+                line.backgroundWords.isNotEmpty()
+        }
+    }
     val forcedTextAlignment = remember(lyrics, lyricTextAlign) {
         if (lyrics.hasProtectedLyricAlignment()) {
             -1
@@ -146,7 +153,7 @@ fun SmoothLyricView(
             view.setNonCurrentLineBlurDistance(nonCurrentLineBlurDistance)
             view.setEdgeFadeEnabled(false)
             view.setLineAlphaAnimationsEnabled(false)
-            view.setContinuousFrameUpdatesEnabled(true)
+            view.setContinuousFrameUpdatesEnabled(hasTimedWordAnimations)
             view.setPlaybackActive(isPlaying)
             view.setPronunciationAboveMainEnabled(true)
             view.setAutoScrollResumeEnabled(autoScrollResumeEnabled)

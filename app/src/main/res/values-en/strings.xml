@@ -1149,6 +1149,7 @@
     <string name="playlist_remove_selected_title">Remove from playlist</string>
     <string name="playlist_remove_selected_message">Remove the selected %1$d songs from this playlist? Local files will not be deleted.</string>
     <string name="playlist_detail_summary">%1$d songs · %2$s · %3$s</string>
+    <string name="playlist_detail_summary_basic">%1$d songs · %2$s</string>
     <string name="playlist_sort_custom">Custom</string>
     <string name="playlist_sort_custom_desc">Custom reversed</string>
     <string name="playlist_sort_updated_at">Recently updated</string>

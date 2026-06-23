@@ -134,6 +134,7 @@ class LyricView @JvmOverloads constructor(
     private var lyrics: List<IRichLyricLine> = emptyList()
     private var lyricWindows: List<LyricViewLineWindow> = emptyList()
     private var currentIndex = -1
+    private var activeHighlightIndices: Set<Int> = emptySet()
     private var currentPosMs = 0L
     private var lastPositionWallTime = 0L
     private var playbackActive = true
@@ -198,6 +199,7 @@ class LyricView @JvmOverloads constructor(
 
     private val popPathUp = PathInterpolator(0.25f, 0.1f, 0.25f, 1.0f)
     private val popPathDown = PathInterpolator(0.25f, 0.0f, 1.0f, 0.2f)
+    private val scrollPath = PathInterpolator(0.22f, 1.0f, 0.36f, 1.0f)
     private val lineScales = ConcurrentHashMap<Int, Float>()
     private val popAnimators = ConcurrentHashMap<Int, ValueAnimator>()
     private var previousIndex = -1
@@ -389,6 +391,8 @@ class LyricView @JvmOverloads constructor(
         val previousPositionMs = currentPosMs
         currentPosMs = positionMs
         lastPositionWallTime = SystemClock.elapsedRealtime()
+        val previousHighlights = activeHighlightIndices
+        activeHighlightIndices = resolveActiveHighlightIndices(positionMs)
         updateSecondaryVisibilityIfNeeded()
         val newIndex = resolveLyricViewIndex(
             positionMs = positionMs,
@@ -403,7 +407,7 @@ class LyricView @JvmOverloads constructor(
                 !isDragging &&
                 autoScrollResumeLineIndex >= 0 &&
                 newIndex != autoScrollResumeLineIndex
-            onLineChanged(currentIndex, newIndex)
+            onLineChanged(currentIndex, newIndex, previousHighlights, activeHighlightIndices)
             currentIndex = newIndex
             if (shouldResumeForNextLine) {
                 isUserScrolling = false
@@ -607,6 +611,7 @@ class LyricView @JvmOverloads constructor(
         lyrics = newLines ?: emptyList()
         lyricWindows = lyrics.map { LyricViewLineWindow(begin = it.begin, end = it.end) }
         currentIndex = -1
+        activeHighlightIndices = emptySet()
         currentPosMs = 0L
         lineOffsetMs = LINE_OFFSET_MIN_MS
         secondaryVisibilitySignature = 0
@@ -663,7 +668,7 @@ class LyricView @JvmOverloads constructor(
             val secondaryEnd = line.secondaryWords?.maxOfOrNull { it.end }
             val lineIndex = result.size
             val secondaryVisible = secondaryText != null &&
-                (lineIndex == currentIndex || isSecondaryVisible(secondaryStart, secondaryEnd, line.end, currentPosMs))
+                (isLineHighlighted(lineIndex) || isSecondaryVisible(secondaryStart, secondaryEnd, line.end, currentPosMs))
             val secondaryH = if (secondaryVisible) {
                 max(measureTransHeight(secondaryText), measureWordsHeight(line.secondaryWords, transPaint)) + transGapPx
             } else {
@@ -750,14 +755,14 @@ class LyricView @JvmOverloads constructor(
 
     private fun computeSecondaryVisibilitySignature(positionMs: Long): Int {
         var result = 17
+        val highlightedIndices = resolveActiveHighlightIndices(positionMs)
         lyrics.forEachIndexed { index, line ->
             val hasSecondary = line.secondary?.splitSecondaryBlock()?.first?.isNotBlank() == true
             if (!hasSecondary) return@forEachIndexed
             val start = line.secondaryWords?.minOfOrNull { it.begin }
             val end = line.secondaryWords?.maxOfOrNull { it.end }
             result = 31 * result + index
-            val activeIndex = previewLyricViewIndexAt(positionMs + lineOffsetMs, lyricWindows)
-            result = 31 * result + if (index == activeIndex || isSecondaryVisible(start, end, line.end, positionMs)) 1 else 0
+            result = 31 * result + if (index in highlightedIndices || isSecondaryVisible(start, end, line.end, positionMs)) 1 else 0
         }
         return result
     }
@@ -844,11 +849,17 @@ class LyricView @JvmOverloads constructor(
         lineOffsetMs = computeLyricViewPreviewOffsetMs(currentIdx, lyricWindows)
     }
 
-    private fun onLineChanged(oldIndex: Int, newIndex: Int) {
-        if (oldIndex >= 0 && enableAnim) {
+    private fun onLineChanged(
+        oldIndex: Int,
+        newIndex: Int,
+        previousHighlights: Set<Int>,
+        newHighlights: Set<Int>
+    ) {
+        if (oldIndex >= 0 && enableAnim && oldIndex !in newHighlights) {
             startExitAnim(oldIndex)
         }
-        if (newIndex >= 0 && enableAnim) {
+        val enteringIndices = newHighlights - previousHighlights
+        if (newIndex >= 0 && enableAnim && newIndex in enteringIndices) {
             startPopAnim(newIndex)
         }
         previousIndex = oldIndex
@@ -924,9 +935,10 @@ class LyricView @JvmOverloads constructor(
         if (abs(delta) < 1f) return
         scrollAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = SCROLL_ANIM_MS
-            interpolator = PathInterpolator(0.25f, 0.1f, 0.25f, 1.0f)
+            interpolator = scrollPath
             addUpdateListener {
-                scrollY = start + delta * (it.animatedValue as Float)
+                val progress = it.animatedValue as Float
+                scrollY = start + delta * progress
                 clampScroll()
                 invalidate()
             }
@@ -1054,7 +1066,7 @@ class LyricView @JvmOverloads constructor(
             drawLines(rnCanvas, excludeCurrent = true)
             node.endRecording()
             canvas.drawRenderNode(node)
-            drawSingleCurrentLine(canvas)
+            drawHighlightedLines(canvas)
         } else {
             drawLines(canvas, excludeCurrent = false)
         }
@@ -1078,15 +1090,19 @@ class LyricView @JvmOverloads constructor(
         val viewW = width.toFloat()
         val expandOffset = getInterludeExpandOffset()
         for (i in entries.indices) {
-            if (excludeCurrent && i == currentIndex) continue
+            if (excludeCurrent && isLineHighlighted(i)) continue
             val entry = entries[i]
             val targetAlpha = calculateTargetAlpha(i)
             val alpha = if (lineAlphaAnimationsEnabled) lineAlphas.getOrPut(i) { targetAlpha } else targetAlpha
-            val scale = lineScales[i] ?: if (i == currentIndex) SCALE_HIGHLIGHT else SCALE_NORMAL
+            val scale = lineScales[i] ?: if (isLineHighlighted(i)) SCALE_HIGHLIGHT else SCALE_NORMAL
             val yExtra = if (expandOffset > 0f && i > interludePrevIdx) expandOffset else 0f
             val lineCenterY = entry.yTop + entry.totalH / 2f - scrollY + yExtra
             if (lineCenterY + entry.totalH < -50f || lineCenterY - entry.totalH > viewH + 50f) continue
-            val farBlur = nonCurrentLineBlurEnabled && !isUserScrolling && currentIndex >= 0 && abs(i - currentIndex) >= nonCurrentLineBlurDistance
+            val farBlur = nonCurrentLineBlurEnabled &&
+                !isUserScrolling &&
+                !isLineHighlighted(i) &&
+                currentIndex >= 0 &&
+                abs(i - currentIndex) >= nonCurrentLineBlurDistance
             canvas.save()
             val pivotX = entry.pivotX()
             val pivotY = lineCenterY + entry.totalH / 2f
@@ -1098,34 +1114,43 @@ class LyricView @JvmOverloads constructor(
         }
     }
 
-    private fun drawSingleCurrentLine(canvas: Canvas) {
-        if (currentIndex < 0 || currentIndex >= entries.size) return
-        val entry = entries[currentIndex]
-        val alpha = if (lineAlphaAnimationsEnabled) {
-            lineAlphas.getOrPut(currentIndex) { calculateTargetAlpha(currentIndex) }
-        } else {
-            calculateTargetAlpha(currentIndex)
+    private fun drawHighlightedLines(canvas: Canvas) {
+        val highlighted = buildSet<Int> {
+            addAll(activeHighlightIndices)
+            if (currentIndex >= 0) add(currentIndex)
         }
-        val scale = lineScales[currentIndex] ?: SCALE_HIGHLIGHT
+            .filter { it in entries.indices }
+            .sorted()
+        if (highlighted.isEmpty()) return
         val expandOffset = getInterludeExpandOffset()
-        val yExtra = if (expandOffset > 0f && currentIndex > interludePrevIdx) expandOffset else 0f
-        val lineCenterY = entry.yTop + entry.totalH / 2f - scrollY + yExtra
         val viewH = height.toFloat()
         val viewW = width.toFloat()
-        if (lineCenterY + entry.totalH < -50f || lineCenterY - entry.totalH > viewH + 50f) return
-        canvas.save()
-        val pivotX = entry.pivotX()
-        val pivotY = lineCenterY + entry.totalH / 2f
-        canvas.scale(scale, scale, pivotX, pivotY)
-        canvas.saveLayerAlpha(0f, lineCenterY - entry.totalH, viewW, lineCenterY + entry.totalH, (alpha * 255).toInt())
-        drawSingleLine(canvas, entry, currentIndex, lineCenterY, farBlur = false)
-        canvas.restore()
-        canvas.restore()
+        highlighted.forEach { index ->
+            val entry = entries[index]
+            val alpha = if (lineAlphaAnimationsEnabled) {
+                lineAlphas.getOrPut(index) { calculateTargetAlpha(index) }
+            } else {
+                calculateTargetAlpha(index)
+            }
+            val scale = lineScales[index] ?: SCALE_HIGHLIGHT
+            val yExtra = if (expandOffset > 0f && index > interludePrevIdx) expandOffset else 0f
+            val lineCenterY = entry.yTop + entry.totalH / 2f - scrollY + yExtra
+            if (lineCenterY + entry.totalH < -50f || lineCenterY - entry.totalH > viewH + 50f) return@forEach
+            canvas.save()
+            val pivotX = entry.pivotX()
+            val pivotY = lineCenterY + entry.totalH / 2f
+            canvas.scale(scale, scale, pivotX, pivotY)
+            canvas.saveLayerAlpha(0f, lineCenterY - entry.totalH, viewW, lineCenterY + entry.totalH, (alpha * 255).toInt())
+            drawSingleLine(canvas, entry, index, lineCenterY, farBlur = false)
+            canvas.restore()
+            canvas.restore()
+        }
     }
 
     private fun calculateTargetAlpha(index: Int): Float {
         if (isUserScrolling) return LINE_MAX_ALPHA
         if (currentIndex < 0) return LINE_MAX_ALPHA
+        if (index in activeHighlightIndices) return LINE_MAX_ALPHA
         val distance = abs(index - currentIndex)
         if (distance == 0) return LINE_MAX_ALPHA
         return (LINE_MIN_ALPHA + (LINE_MAX_ALPHA - LINE_MIN_ALPHA) * (1f - distance.toFloat() / FADE_LINES))
@@ -1134,12 +1159,13 @@ class LyricView @JvmOverloads constructor(
 
     private fun drawSingleLine(canvas: Canvas, entry: LineEntry, index: Int, lineCenterY: Float, farBlur: Boolean) {
         val isCurrent = index == currentIndex
+        val isHighlighted = isLineHighlighted(index)
         val contentTop = lineCenterY - entry.totalH / 2f + linePadTopPx
         val textStartX = paddingLeft.toFloat()
         if (entry.preText != null) {
             val preBaseline = contentTop + transGapPx + (-transPaint.fontMetrics.ascent)
-            val pPaint = if (isCurrent) hlTransPaint else dimTransPaint
-            if (!singleLineMarqueeEnabled && !entry.pronunciationWords.isNullOrEmpty() && isCurrent) {
+            val pPaint = if (isHighlighted) hlTransPaint else dimTransPaint
+            if (!singleLineMarqueeEnabled && !entry.pronunciationWords.isNullOrEmpty() && isHighlighted) {
                 drawKaraokeWords(
                     canvas = canvas,
                     entry = entry,
@@ -1163,11 +1189,11 @@ class LyricView @JvmOverloads constructor(
         // 但卡拉OK直接用 baseline 绘制，不含 topPad，所以需要分开处理
         val topPad = mainPaint.fontMetrics.let { it.top - it.ascent }.coerceAtLeast(0f)
         val mainBaseline = mainTopY + topPad + (-mainPaint.fontMetrics.ascent)
-        if (!singleLineMarqueeEnabled && !entry.words.isNullOrEmpty() && isCurrent) {
+        if (!singleLineMarqueeEnabled && !entry.words.isNullOrEmpty() && isHighlighted) {
             drawKaraokeWords(canvas, entry, index, textStartX, mainBaseline, entry.alignedRight, entry.centered)
         } else {
             val paint = when {
-                isCurrent -> hlPaint
+                isHighlighted -> hlPaint
                 index == previousIndex -> dimPaint
                 else -> dimPaint
             }
@@ -1176,20 +1202,20 @@ class LyricView @JvmOverloads constructor(
         var secondaryBaseY = mainBottomY
         if (entry.transText != null) {
             val transBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
-            val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
+            val tPaint = if (isHighlighted) hlTransPaint else dimTransPaint
             drawTextAligned(canvas, entry.transText, tPaint, textStartX, transBaseline, entry.alignedRight, entry.centered, farBlur)
             secondaryBaseY += entry.transH
         } else if (entry.romaText != null) {
             val romaBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
-            val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
+            val tPaint = if (isHighlighted) hlTransPaint else dimTransPaint
             drawTextAligned(canvas, entry.romaText, tPaint, textStartX, romaBaseline, entry.alignedRight, entry.centered, farBlur)
             secondaryBaseY += entry.transH
         }
-        val shouldDrawSecondary = entry.secondaryText != null && (isCurrent || entry.isSecondaryVisible(currentPosMs))
+        val shouldDrawSecondary = entry.secondaryText != null && (isHighlighted || entry.isSecondaryVisible(currentPosMs))
         if (entry.secondaryText != null && shouldDrawSecondary) {
             val secondaryBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
-            val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
-            if (!singleLineMarqueeEnabled && !entry.secondaryWords.isNullOrEmpty() && isCurrent) {
+            val tPaint = if (isHighlighted) hlTransPaint else dimTransPaint
+            if (!singleLineMarqueeEnabled && !entry.secondaryWords.isNullOrEmpty() && isHighlighted) {
                 drawKaraokeWords(canvas, entry, index, textStartX, secondaryBaseline, entry.alignedRight, entry.centered, useSecondary = true)
             } else {
                 drawTextAligned(canvas, entry.secondaryText, tPaint, textStartX, secondaryBaseline, entry.alignedRight, entry.centered, farBlur)
@@ -1198,9 +1224,22 @@ class LyricView @JvmOverloads constructor(
         }
         if (entry.secondaryTranslationText != null && shouldDrawSecondary) {
             val secondaryTranslationBaseline = secondaryBaseY + transGapPx + (-transPaint.fontMetrics.ascent)
-            val tPaint = if (isCurrent) hlTransPaint else dimTransPaint
+            val tPaint = if (isHighlighted) hlTransPaint else dimTransPaint
             drawTextAligned(canvas, entry.secondaryTranslationText, tPaint, textStartX, secondaryTranslationBaseline, entry.alignedRight, entry.centered, farBlur)
             secondaryBaseY += entry.secondaryTranslationH
+        }
+    }
+
+    private fun isLineHighlighted(index: Int): Boolean = index == currentIndex || index in activeHighlightIndices
+
+    private fun resolveActiveHighlightIndices(positionMs: Long): Set<Int> {
+        if (lyricWindows.isEmpty()) return emptySet()
+        return buildSet {
+            lyricWindows.forEachIndexed { index, window ->
+                if (positionMs >= window.begin && positionMs < window.end) {
+                    add(index)
+                }
+            }
         }
     }
 
@@ -1370,10 +1409,12 @@ class LyricView @JvmOverloads constructor(
         val dg = dotSpacingPx
         val dotGroupWidth = ds * 3f + dg * 2f
         val availableWidth = (width - paddingLeft - paddingRight).toFloat().coerceAtLeast(dotGroupWidth)
+        val edgeInset = TEXT_EDGE_SAFE_INSET_DP * density
+        val alignInset = RIGHT_ALIGN_GLYPH_SAFE_INSET_DP * density
         val startX = when {
-            prevEntry.alignedRight -> width - paddingRight.toFloat() - dotGroupWidth - ds
+            prevEntry.alignedRight -> width - paddingRight.toFloat() - edgeInset - alignInset - dotGroupWidth
             prevEntry.centered -> paddingLeft.toFloat() + (availableWidth - dotGroupWidth) / 2f
-            else -> paddingLeft.toFloat() + ds * 0.45f
+            else -> paddingLeft.toFloat() + edgeInset
         }
         val expandOffset = getInterludeExpandOffset()
         if (expandOffset < ds) return

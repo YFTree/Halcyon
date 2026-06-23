@@ -12,8 +12,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,7 +38,6 @@ import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import com.ella.music.data.model.Song
 import com.ella.music.ui.components.DefaultAlbumCover
-import com.ella.music.ui.components.SafeCoverImage
 import java.io.File
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 internal fun FullBleedCover(
     song: Song?,
     embeddedCover: Bitmap?,
+    cornerRadius: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val uri = if ((song?.albumId ?: 0L) > 0) Uri.parse("content://media/external/audio/albumart/${song?.albumId}") else null
@@ -58,7 +60,7 @@ internal fun FullBleedCover(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit,
                 sizePx = 768,
-                cornerRadius = 0.dp
+                cornerRadius = cornerRadius
             )
         } else {
             DefaultAlbumCover(modifier = Modifier.fillMaxSize())
@@ -127,19 +129,17 @@ internal fun AlbumArtView(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(cornerRadius))
-            .background(if (coverModel == null) MiuixTheme.colorScheme.surfaceContainer else Color.Transparent),
+            .background(MiuixTheme.colorScheme.surfaceContainer),
         contentAlignment = Alignment.Center
     ) {
         if (coverModel != null) {
-            SafeCoverImage(
+            PlayerCoverImage(
                 model = coverModel,
                 contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(cornerRadius)),
+                modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
                 sizePx = 768,
-                showDefaultPlaceholder = false
+                cornerRadius = cornerRadius
             )
         } else {
             DefaultAlbumCover(modifier = Modifier.fillMaxSize())

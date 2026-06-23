@@ -1,6 +1,7 @@
 package com.ella.music.ui.player
 
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -125,6 +126,8 @@ internal fun LyricsPlayerPage(
         Modifier
     }
 
+    BackHandler(onBack = onDismissLyrics)
+
     Box(modifier = modifier.then(swipeDismissModifier)) {
         val useCustomPlayerBackground = playerBackgroundEnabled && playerBackgroundUri.isNotBlank() && !useBlurBackground
         if (drawBackground) {
@@ -193,7 +196,7 @@ internal fun LyricsPlayerPage(
                         secondaryFontScale = secondaryFontScale,
                         contentColor = palette.onBackground,
                         // Keep far lines sharp over a busy custom wallpaper so they stay readable.
-                        nonCurrentLineBlurEnabled = !useCustomPlayerBackground,
+                        nonCurrentLineBlurEnabled = !useCustomPlayerBackground && !perspectiveEffect,
                         onLineClick = onLineClick,
                         onLineDoubleClick = onLineDoubleClick,
                         onLineLongClick = onLineLongClick,

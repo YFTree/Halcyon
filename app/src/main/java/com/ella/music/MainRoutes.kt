@@ -48,8 +48,8 @@ private fun Uri.toHalcyonRoute(): String? {
         }
         "shortcut" -> getQueryParameter("route")?.takeIf { it.isNotBlank() }
         "analytics" -> Screen.Analytics.route
-        "settings" -> Screen.Settings.route
-        "scan_settings" -> Screen.ScanSettings.route
+        "settings" -> Screen.Settings.createRoute()
+        "scan_settings" -> Screen.ScanSettings.createRoute()
         "library" -> Screen.Library.route
         "folder" -> path.firstOrNull()
             ?.takeIf { it.isNotBlank() }
@@ -84,8 +84,8 @@ internal fun String?.toCurrentTabRoute(): String? {
         this.isTopLevelRoute(Screen.Folder.baseRoute) -> Screen.Folder.createRoute(fromDock = true)
         this.isTopLevelRoute(Screen.Artist.baseRoute) -> Screen.Artist.createRoute(fromDock = true)
         this.isTopLevelRoute(Screen.Album.baseRoute) -> Screen.Album.createRoute(fromDock = true)
-        this == Screen.ScanSettings.route -> Screen.ScanSettings.route
-        this == Screen.Settings.route -> Screen.Settings.route
+        this.isDockSettingsRoute() -> Screen.Settings.createRoute(fromDock = true)
+        this.isDockScanSettingsRoute() -> Screen.ScanSettings.createRoute(fromDock = true)
         this == Screen.Analytics.route -> Screen.Analytics.route
         this.metadataCategoryType() != null -> Screen.MetadataCategory.createRoute(this.metadataCategoryType().orEmpty(), fromDock = true)
         else -> null
@@ -107,8 +107,8 @@ internal fun String?.isBottomDockRoute(): Boolean {
         this.isTopLevelRoute(Screen.Folder.baseRoute) -> true
         this.isTopLevelRoute(Screen.Artist.baseRoute) -> true
         this.isTopLevelRoute(Screen.Album.baseRoute) -> true
-        this == Screen.ScanSettings.route -> true
-        this == Screen.Settings.route -> true
+        this.isDockSettingsRoute() -> true
+        this.isDockScanSettingsRoute() -> true
         this == Screen.Analytics.route -> true
         this.metadataCategoryType() != null -> true
         else -> false
@@ -122,6 +122,8 @@ internal fun String?.matchesRoute(route: String): Boolean {
         route.isTopLevelRoute(Screen.Folder.baseRoute) -> this.isTopLevelRoute(Screen.Folder.baseRoute)
         route.isTopLevelRoute(Screen.Artist.baseRoute) -> this.isTopLevelRoute(Screen.Artist.baseRoute)
         route.isTopLevelRoute(Screen.Album.baseRoute) -> this.isTopLevelRoute(Screen.Album.baseRoute)
+        route.isDockSettingsRoute() -> this.isDockSettingsRoute()
+        route.isDockScanSettingsRoute() -> this.isDockScanSettingsRoute()
         route.metadataCategoryType() != null -> this.metadataCategoryType() == route.metadataCategoryType()
         else -> this == route
     }
@@ -142,6 +144,19 @@ internal fun NavHostController.navigateBottomDockRoute(
 
 private fun String?.isTopLevelRoute(baseRoute: String): Boolean =
     this == baseRoute || this?.startsWith("$baseRoute?") == true
+
+private fun String?.hasBooleanQueryFlag(name: String): Boolean =
+    this?.substringAfter('?', "")
+        ?.split('&')
+        ?.firstOrNull { it.startsWith("$name=") }
+        ?.substringAfter('=')
+        ?.equals("true", ignoreCase = true) == true
+
+private fun String?.isDockSettingsRoute(): Boolean =
+    this.isTopLevelRoute(Screen.Settings.baseRoute) && this.hasBooleanQueryFlag("fromDock")
+
+private fun String?.isDockScanSettingsRoute(): Boolean =
+    this.isTopLevelRoute(Screen.ScanSettings.baseRoute) && this.hasBooleanQueryFlag("fromDock")
 
 private fun String?.metadataCategoryType(): String? {
     val route = this?.substringBefore('?') ?: return null

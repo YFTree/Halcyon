@@ -5,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ella.music.R
 import com.ella.music.ui.listmodel.SortDirection
@@ -15,6 +16,8 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.menu.WindowIconDropdownMenu
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+private val SortDropdownMaxHeight: Dp = 780.dp
 
 data class SortDropdownItem(
     val text: String,
@@ -84,6 +87,7 @@ fun SortDropdownMenuContent(
     content: @Composable () -> Unit
 ) {
     WindowIconDropdownMenu(
+        maxHeight = SortDropdownMaxHeight,
         entries = listOf(
             DropdownEntry(
                 items = items.map { item ->

@@ -31,8 +31,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.math.max
+import kotlin.math.min
 
 internal const val PLAYER_POSITION_BACKWARD_DRIFT_TOLERANCE_MS = 600L
+
+internal fun isUltraWideLandscapePlayerLayout(
+    screenWidthDp: Int,
+    screenHeightDp: Int
+): Boolean {
+    if (screenWidthDp <= 0 || screenHeightDp <= 0) return false
+    val longSide = max(screenWidthDp, screenHeightDp)
+    val shortSide = min(screenWidthDp, screenHeightDp)
+    return screenWidthDp > screenHeightDp &&
+        longSide.toFloat() / shortSide.toFloat() >= 2.45f
+}
 
 internal fun shouldIgnoreMinorPlaybackRegression(
     currentUiPositionMs: Long,

@@ -733,8 +733,11 @@ internal object EllaLyricsParser {
             .sortedBy { it.timeMs }
             .groupBy { it.timeMs }
             .values
-            .map { group ->
-                if (group.size == 1) return@map group.first()
+            .flatMap { group ->
+                if (group.size == 1) return@flatMap listOf(group.first())
+                if (group.shouldKeepIndependentDuetLines()) {
+                    return@flatMap group.sortedBy { it.agentSortOrder() }
+                }
                 val hasRomanizedCompanion = group.size >= 3 && group.any { it.text.isPronunciationLine() }
                 val primary = if (hasRomanizedCompanion) {
                     group.firstOrNull { it.text.cleanLyricText().hasCjk() && it.text.isUsefulMainText() }
@@ -764,15 +767,31 @@ internal object EllaLyricsParser {
                     .distinct()
                     .joinToString("\n")
                     .takeIf { it.isNotBlank() }
-                primary.copy(
-                    translation = primary.translation.mergeLyricCompanionText(translation),
-                    pronunciation = primary.pronunciation ?: pronunciation?.text?.cleanLyricText(),
-                    pronunciationWords = primary.pronunciationWords.ifEmpty { pronunciation?.words.orEmpty() },
-                    endMs = primary.endMs ?: group.mapNotNull { it.endMs }.maxOrNull()
+                listOf(
+                    primary.copy(
+                        translation = primary.translation.mergeLyricCompanionText(translation),
+                        pronunciation = primary.pronunciation ?: pronunciation?.text?.cleanLyricText(),
+                        pronunciationWords = primary.pronunciationWords.ifEmpty { pronunciation?.words.orEmpty() },
+                        endMs = primary.endMs ?: group.mapNotNull { it.endMs }.maxOrNull()
+                    )
                 )
             }
         return attachBackgroundLines(merged)
     }
+
+    private fun List<LyricLine>.shouldKeepIndependentDuetLines(): Boolean =
+        mapNotNull { line ->
+            line.agent
+                ?.trim()
+                ?.takeIf { it.isNotBlank() && line.text.isUsefulMainText() }
+        }.distinct().size >= 2
+
+    private fun LyricLine.agentSortOrder(): Int =
+        when (agent?.trim()?.lowercase()) {
+            "v1" -> 0
+            "v2" -> 1
+            else -> 2
+        }
 
     private fun attachBackgroundLines(lines: List<LyricLine>): List<LyricLine> {
         val result = mutableListOf<LyricLine>()
@@ -979,7 +998,12 @@ internal object EllaLyricsParser {
     }
 
     private fun String.removeBackgroundParentheses(): String =
-        replace(Regex("""[()（）]"""), "").cleanLyricText()
+        cleanLyricText()
+            .replace(Regex("""^[（(]+\s*"""), "")
+            .replace(Regex("""\s*[）)]+$"""), "")
+            .replace(Regex("""(?<=\s)[（(]+"""), "")
+            .replace(Regex("""[）)]+(?=\s|$)"""), "")
+            .cleanLyricText()
 
     private fun String.withoutFormattingWhitespace(): String =
         if (isBlank() && any { it == '\n' || it == '\r' || it == '\t' }) "" else this

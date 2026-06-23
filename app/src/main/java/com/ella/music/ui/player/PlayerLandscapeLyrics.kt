@@ -1,6 +1,7 @@
 package com.ella.music.ui.player
 
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -78,6 +80,24 @@ internal fun LandscapeLyricsOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val configuration = LocalConfiguration.current
+    val ultraWideLandscape = isUltraWideLandscapePlayerLayout(
+        screenWidthDp = configuration.screenWidthDp,
+        screenHeightDp = configuration.screenHeightDp
+    )
+    val leftPaneWeight = if (ultraWideLandscape) 0.28f else 0.33f
+    val rightPaneWeight = if (ultraWideLandscape) 0.72f else 0.67f
+    val paneSpacer = if (ultraWideLandscape) 24.dp else 34.dp
+    val coverMaxSize = if (ultraWideLandscape) 280.dp else 400.dp
+    val lyricPrimaryTextSize = if (ultraWideLandscape) 26f else 30f
+    val lyricSecondaryTextSize = if (ultraWideLandscape) 13f else 15f
+    val lyricAnchorOffset = if (ultraWideLandscape) -0.03f else -0.06f
+    val topButtonPaddingTop = if (ultraWideLandscape) 18.dp else 26.dp
+    val topButtonSize = if (ultraWideLandscape) 48.dp else 56.dp
+    val topIconSize = if (ultraWideLandscape) 24.dp else 26.dp
+
+    BackHandler(onBack = onShowCoverPlayer)
+
     Box(modifier = modifier.background(palette.middle)) {
         if (beautifulLyricsBackground) {
             BeautifulLyricsDynamicBackground(
@@ -101,14 +121,19 @@ internal fun LandscapeLyricsOverlay(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 34.dp, end = 48.dp, top = 22.dp, bottom = 28.dp),
+                .padding(
+                    start = if (ultraWideLandscape) 24.dp else 34.dp,
+                    end = if (ultraWideLandscape) 36.dp else 48.dp,
+                    top = if (ultraWideLandscape) 14.dp else 22.dp,
+                    bottom = if (ultraWideLandscape) 20.dp else 28.dp
+                ),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(0.33f)
-                    .widthIn(max = 400.dp),
+                    .weight(leftPaneWeight)
+                    .widthIn(max = coverMaxSize),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
@@ -121,7 +146,8 @@ internal fun LandscapeLyricsOverlay(
                         song = song,
                         embeddedCover = embeddedCover,
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillMaxWidth(if (ultraWideLandscape) 0.86f else 1f)
+                            .widthIn(max = coverMaxSize)
                             .aspectRatio(1f)
                             .clip(RoundedCornerShape(16.dp))
                     )
@@ -153,11 +179,12 @@ internal fun LandscapeLyricsOverlay(
                     onNext = onNext
                 )
             }
-            Spacer(modifier = Modifier.width(34.dp))
+            Spacer(modifier = Modifier.width(paneSpacer))
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .weight(0.67f)
+                    .weight(rightPaneWeight)
+                    .widthIn(max = if (ultraWideLandscape) 980.dp else 820.dp)
                     .playerLyricPerspective(
                         enabled = lyricPerspectiveEffect,
                         angle = lyricPerspectiveYAngle,
@@ -179,10 +206,11 @@ internal fun LandscapeLyricsOverlay(
                     fontPath = fontPath,
                     fontWeight = fontWeight,
                     lyricTextAlign = lyricTextAlign,
-                    primaryTextSizeSp = 30f,
-                    secondaryTextSizeSp = 15f,
-                    anchorOffsetRatio = -0.06f,
-                    topContentPadding = 12.dp,
+                    primaryTextSizeSp = lyricPrimaryTextSize,
+                    secondaryTextSizeSp = lyricSecondaryTextSize,
+                    anchorOffsetRatio = lyricAnchorOffset,
+                    topContentPadding = if (ultraWideLandscape) 4.dp else 12.dp,
+                    nonCurrentLineBlurEnabled = !lyricPerspectiveEffect,
                     onLineClick = onLineClick,
                     onLineLongClick = onLineLongClick,
                     modifier = Modifier
@@ -195,8 +223,8 @@ internal fun LandscapeLyricsOverlay(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 26.dp, end = 92.dp)
-                .size(56.dp)
+                .padding(top = topButtonPaddingTop, end = if (ultraWideLandscape) 76.dp else 92.dp)
+                .size(topButtonSize)
                 .clip(CircleShape)
                 .clickable(onClick = onShowCoverPlayer),
             contentAlignment = Alignment.Center
@@ -205,22 +233,22 @@ internal fun LandscapeLyricsOverlay(
                 imageVector = MiuixIcons.Regular.Photos,
                 contentDescription = null,
                 tint = Color.White.copy(alpha = 0.92f),
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(topIconSize)
             )
         }
         Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(top = 26.dp, end = 28.dp)
-                .size(56.dp)
+                .padding(top = topButtonPaddingTop, end = if (ultraWideLandscape) 18.dp else 28.dp)
+                .size(topButtonSize)
                 .clip(CircleShape)
                 .clickable(onClick = onDismiss),
             contentAlignment = Alignment.Center
         ) {
             CloseIcon(
                 color = Color.White.copy(alpha = 0.92f),
-                modifier = Modifier.size(26.dp)
+                modifier = Modifier.size(topIconSize)
             )
         }
     }

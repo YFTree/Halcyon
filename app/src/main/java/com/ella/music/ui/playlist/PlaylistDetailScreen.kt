@@ -104,7 +104,6 @@ fun PlaylistDetailScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var actionSong by remember { mutableStateOf<com.ella.music.data.model.Song?>(null) }
-    var sortExpanded by remember { mutableStateOf(false) }
     val sortIndex by mainViewModel.settingsManager.playlistDetailSongSortIndex.collectAsState(initial = 2)
     val sortMode = PlaylistSongSortMode.entries.getOrElse(sortIndex) { PlaylistSongSortMode.AddedAt }
     var searchExpanded by remember { mutableStateOf(false) }
@@ -210,14 +209,13 @@ fun PlaylistDetailScreen(
     }
     fun selectedDisplayedSongs(): List<Song> =
         displayedSongs.filter { it.playlistIdentityKey() in selectedSongKeys }
-    BackHandler(enabled = selectionMode || sortExpanded || searchExpanded) {
+    BackHandler(enabled = selectionMode || searchExpanded) {
         when {
             selectionMode -> finishSelectionMode()
             searchExpanded -> {
                 searchExpanded = false
                 searchQuery = ""
             }
-            sortExpanded -> sortExpanded = false
         }
     }
     val displayedSongIndexByKey = remember(displayedSongs) {
@@ -323,16 +321,6 @@ fun PlaylistDetailScreen(
                 selectionMode = selectionMode,
                 showRemoveSelected = !isFiveStarPlaylist,
                 showExport = playlist != null && !isFiveStarPlaylist,
-                sortItems = PlaylistSongSortMode.entries.map { mode ->
-                    SortDropdownItem(
-                        text = stringResource(mode.labelRes),
-                        selected = sortMode == mode,
-                        onClick = {
-                            scope.launch { mainViewModel.settingsManager.setPlaylistDetailSongSortIndex(mode.ordinal) }
-                            scope.launch { listState.animateScrollToItem(0) }
-                        }
-                    )
-                },
                 onNavigationClick = {
                     if (selectionMode) finishSelectionMode() else onBack()
                 },
@@ -362,7 +350,14 @@ fun PlaylistDetailScreen(
                     searchExpanded = !searchExpanded
                     if (!searchExpanded) searchQuery = ""
                 },
-                onExportClick = { showExportFormatSheet = true }
+                onExportClick = { showExportFormatSheet = true },
+                onSelectionModeClick = {
+                    selectionMode = true
+                    if (selectedSongKeys.isEmpty()) {
+                        rangeAnchorSongKey = null
+                        rangeTargetSongKey = null
+                    }
+                }
             )
             DoubleTapScrollOverlay(
                 onDoubleTap = { scope.launch { listState.animateScrollToItem(0) } },
@@ -373,16 +368,6 @@ fun PlaylistDetailScreen(
                 endPadding = 160.dp
             )
         }
-
-        PlaylistDetailSortSection(
-            visible = sortExpanded && !selectionMode,
-            sortMode = sortMode,
-            onModeSelected = { mode ->
-                sortExpanded = false
-                scope.launch { mainViewModel.settingsManager.setPlaylistDetailSongSortIndex(mode.ordinal) }
-                scope.launch { listState.animateScrollToItem(0) }
-            }
-        )
 
         PlaylistDetailSearchSection(
             visible = searchExpanded && !selectionMode,
@@ -412,8 +397,7 @@ fun PlaylistDetailScreen(
                         coverModel = playlistCoverModel,
                         songCount = sortedSongs.size,
                         playCount = playlistPlayCount,
-                        duration = sortedSongs.sumOf { it.duration },
-                        sortLabel = stringResource(sortMode.labelRes)
+                        duration = sortedSongs.sumOf { it.duration }
                     )
                 }
 

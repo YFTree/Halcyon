@@ -44,8 +44,7 @@ internal fun PlaylistDetailHero(
     coverModel: Any?,
     songCount: Int,
     playCount: Int = 0,
-    duration: Long,
-    sortLabel: String
+    duration: Long
 ) {
     Box(
         modifier = Modifier
@@ -110,20 +109,14 @@ internal fun PlaylistDetailHero(
                 )
                 Text(
                     text = stringResource(
-                        R.string.playlist_detail_summary,
+                        R.string.playlist_detail_summary_basic,
                         songCount,
-                        duration.formatPlaylistDuration(),
-                        sortLabel
+                        duration.formatPlaylistDuration()
                     ),
                     fontSize = 13.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = stringResource(R.string.playlist_edit_info),
-                    fontSize = 13.sp,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.78f)
                 )
             }
         }
