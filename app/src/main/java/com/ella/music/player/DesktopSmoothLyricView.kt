@@ -194,7 +194,7 @@ internal class DesktopSmoothLyricView(context: Context) : FrameLayout(context) {
                 primaryTextColor = colorWithAlpha(textColor, 255),
                 secondaryTextColor = colorWithAlpha(textColor, secondaryAlpha),
                 syllableHighlightColor = colorWithAlpha(textColor, 255),
-                syllableBackgroundColor = colorWithAlpha(textColor, if (statusBarMode) 42 else 88)
+                syllableBackgroundColor = colorWithAlpha(textColor, if (statusBarMode) 30 else 42)
             )
         )
         lyricView.updateDisplayTranslation(true, true)

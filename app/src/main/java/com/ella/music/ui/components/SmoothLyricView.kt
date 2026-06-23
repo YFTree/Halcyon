@@ -105,9 +105,9 @@ fun SmoothLyricView(
     }
     val contentArgb = contentColor.toArgb()
     val syllableGlowColor = if (contentColor.luminance() < 0.45f) {
-        Color.Black.copy(alpha = 0.44f)
+        Color.Black.copy(alpha = 0.58f)
     } else {
-        Color.White.copy(alpha = 0.345f)
+        Color.White.copy(alpha = 0.16f)
     }
     val style = remember(
         fontScale,

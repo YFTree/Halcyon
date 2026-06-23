@@ -58,6 +58,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -108,6 +109,7 @@ import androidx.core.view.WindowCompat
 import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.normalizedAudioFormat
+import com.ella.music.data.parser.LrcParser
 import com.ella.music.data.splitArtistNames
 import com.ella.music.data.tagIdentityKey
 import com.ella.music.data.model.LyricLine
@@ -165,6 +167,7 @@ fun PlayerScreen(
     val playerTapSeekEnabled = playerSettings.playerTapSeekEnabled
     val playerShowTotalDuration = playerSettings.playerShowTotalDuration
     val coverSwipeEnabled = playerSettings.coverSwipeEnabled
+    val lyricParserEngine = playerSettings.lyricParserEngine
     val playerTitlePosition = playerSettings.playerTitlePosition
     val playerKeepScreenOn = playerSettings.playerKeepScreenOn
     val lyricSourceMode = playerSettings.lyricSourceMode
@@ -373,6 +376,15 @@ fun PlayerScreen(
         initialPage = PLAYER_PAGE_COVER,
         pageCount = { PLAYER_PAGE_COUNT }
     )
+    LaunchedEffect(openToken) {
+        if (playerPagerState.currentPage != PLAYER_PAGE_COVER) {
+            playerPagerState.scrollToPage(PLAYER_PAGE_COVER)
+        }
+    }
+    // Sync the lyric parser engine setting to the LrcParser singleton at runtime.
+    LaunchedEffect(lyricParserEngine) {
+        LrcParser.parserEngine = lyricParserEngine
+    }
     PlayerPagerSyncEffects(
         immersiveAlbumCover = immersiveAlbumCover,
         showLyrics = showLyrics,
@@ -569,7 +581,7 @@ fun PlayerScreen(
                         modifier = pageModifier
                     )
                 },
-                lyricsPage = { onDismissLyrics, enableSwipeDismiss, pageModifier ->
+                lyricsPage = { onDismissLyrics, enableSwipeDismiss, backEnabled, pageModifier ->
                     LyricsPageContent(
                         song = song,
                         embeddedCover = embeddedCover,
@@ -585,6 +597,7 @@ fun PlayerScreen(
                         lyricFormatAvailability = lyricFormatAvailability,
                         preferTtmlLyrics = preferTtmlLyrics,
                         lyricSourceMode = lyricSourceMode,
+                        lyricParserEngine = lyricParserEngine,
                         lyricFontFamily = lyricFontFamily,
                         effectiveLyricFontPath = effectiveLyricFontPath,
                         lyricFontWeight = lyricFontWeight,
@@ -611,6 +624,7 @@ fun PlayerScreen(
                         navigateToArtistOrChoose = ::navigateToArtistOrChoose,
                         onDismissLyrics = onDismissLyrics,
                         enableSwipeDismiss = enableSwipeDismiss,
+                        backEnabled = backEnabled,
                         immersiveAlbumCover = immersiveAlbumCover,
                         drawBackground = immersiveAlbumCover,
                         modifier = pageModifier
@@ -681,7 +695,10 @@ fun PlayerScreen(
                 audioSessionId = audioSessionId,
                 visualizerEnabled = effectiveAudioVisualizerEnabled,
                 visualizerOpacity = audioVisualizerOpacity,
-                coverSwipeEnabled = coverSwipeEnabled,
+                // Landscape player always allows swiping covers to switch songs,
+                // regardless of the "swipe cover to switch song" setting (which only
+                // applies to the portrait player cover page).
+                coverSwipeEnabled = true,
                 beautifulLyricsBackground = beautifulLyricsBackground,
                 flowEffectMode = SettingsManager.PLAYER_FLOW_EFFECT_DARK,
                 isFavorite = isCurrentSongFavorite,

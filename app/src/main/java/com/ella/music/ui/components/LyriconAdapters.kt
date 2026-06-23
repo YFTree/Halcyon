@@ -123,7 +123,6 @@ private fun LyricLine.displaySmoothSecondaryBlockText(): String? {
 }
 
 private fun LyricLine.displaySmoothSecondaryWords(): List<LyriconWord>? {
-    if (!displayBackgroundTranslationText().isNullOrBlank()) return null
     return backgroundWords
         .mapNotNull { word ->
             val normalizedText = word.text.normalizeBackgroundAsideText()

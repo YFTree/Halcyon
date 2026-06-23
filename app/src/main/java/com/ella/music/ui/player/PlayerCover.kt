@@ -40,7 +40,6 @@ import com.ella.music.data.model.Song
 import com.ella.music.ui.components.DefaultAlbumCover
 import java.io.File
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.ui.text.font.FontWeight
 
 @Composable
@@ -127,9 +126,7 @@ internal fun AlbumArtView(
     val coverModel = embeddedCover ?: song?.coverUrl?.takeIf { it.isNotBlank() } ?: uri
 
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(cornerRadius))
-            .background(MiuixTheme.colorScheme.surfaceContainer),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         if (coverModel != null) {
@@ -142,7 +139,11 @@ internal fun AlbumArtView(
                 cornerRadius = cornerRadius
             )
         } else {
-            DefaultAlbumCover(modifier = Modifier.fillMaxSize())
+            DefaultAlbumCover(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(cornerRadius))
+            )
         }
         if (showHiResLogo) {
             HiResLogoBadge(

@@ -95,7 +95,8 @@ object AudioTagReader {
                     "UNSYNCED LYRICS",
                     "USLT",
                     "LYRIC",
-                    "LYRICSENG"
+                    "LYRICSENG",
+                    "©lyr"
 
                 )
 

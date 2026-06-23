@@ -123,6 +123,7 @@ class SettingsManager(private val context: Context) {
         val KEY_PLAYER_SHOW_TOTAL_DURATION = booleanPreferencesKey("player_show_total_duration")
         val KEY_PLAYER_SHOW_SONG_ANNOTATION = booleanPreferencesKey("player_show_song_annotation")
         val KEY_PLAYER_COVER_SWIPE_ENABLED = booleanPreferencesKey("player_cover_swipe_enabled")
+        val KEY_LYRIC_PARSER_ENGINE = intPreferencesKey("lyric_parser_engine")
         val KEY_PLAYER_TITLE_POSITION = intPreferencesKey("player_title_position")
         val KEY_PLAYER_KEEP_SCREEN_ON = booleanPreferencesKey("player_keep_screen_on")
         val KEY_PLAYER_HDR_GLOW = booleanPreferencesKey("player_hdr_glow")
@@ -288,6 +289,11 @@ class SettingsManager(private val context: Context) {
         const val LYRIC_SOURCE_AUTO = 0
         const val LYRIC_SOURCE_EXTERNAL = 1
         const val LYRIC_SOURCE_EMBEDDED = 2
+
+        // Lyric parser engine selection
+        const val LYRIC_PARSER_ENGINE_AUTO = 0
+        const val LYRIC_PARSER_ENGINE_ELLA = 1
+
         const val LYRIC_SOURCE_EMBEDDED_TTML = "embedded_ttml"
         const val LYRIC_SOURCE_EMBEDDED_PLAIN = "embedded_plain"
         const val LYRIC_SOURCE_EXTERNAL_TTML = "external_ttml"
@@ -577,7 +583,10 @@ class SettingsManager(private val context: Context) {
     val playerShowSongAnnotation: Flow<Boolean> =
         context.dataStore.data.map { it[KEY_PLAYER_SHOW_SONG_ANNOTATION] ?: true }
     val playerCoverSwipeEnabled: Flow<Boolean> =
-        context.dataStore.data.map { it[KEY_PLAYER_COVER_SWIPE_ENABLED] ?: true }
+        context.dataStore.data.map { it[KEY_PLAYER_COVER_SWIPE_ENABLED] ?: false }
+
+    val lyricParserEngine: Flow<Int> =
+        context.dataStore.data.map { it[KEY_LYRIC_PARSER_ENGINE] ?: LYRIC_PARSER_ENGINE_ELLA }
     val playerTitlePosition: Flow<Int> =
         context.dataStore.data.map {
             (it[KEY_PLAYER_TITLE_POSITION] ?: PLAYER_TITLE_POSITION_BELOW_COVER)
@@ -1628,6 +1637,12 @@ class SettingsManager(private val context: Context) {
 
     suspend fun setPlayerCoverSwipeEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_PLAYER_COVER_SWIPE_ENABLED] = enabled }
+    }
+
+    suspend fun setLyricParserEngine(engine: Int) {
+        context.dataStore.edit {
+            it[KEY_LYRIC_PARSER_ENGINE] = engine.coerceIn(LYRIC_PARSER_ENGINE_AUTO, LYRIC_PARSER_ENGINE_ELLA)
+        }
     }
 
     suspend fun setPlayerTitlePosition(position: Int) {

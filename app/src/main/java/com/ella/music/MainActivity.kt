@@ -667,9 +667,26 @@ fun EllaApp(
         val end = currentLyricLine.endMs
             ?: nextLyricLine?.timeMs
             ?: (start + 5_000L)
-
-        ((currentPosition - start).toFloat() / (end - start).coerceAtLeast(1L).toFloat())
-            .coerceIn(0f, 1f)
+        val words = currentLyricLine.words
+        if (words.isNotEmpty()) {
+            val wordCount = words.size
+            val activeIndex = words.indexOfLast { currentPosition >= it.startMs }
+            if (activeIndex >= 0) {
+                val word = words[activeIndex]
+                val wordProgress = if (word.endMs > word.startMs) {
+                    ((currentPosition - word.startMs).toFloat() /
+                        (word.endMs - word.startMs).toFloat()).coerceIn(0f, 1f)
+                } else 1f
+                ((activeIndex + wordProgress) / wordCount.toFloat()).coerceIn(0f, 1f)
+            } else if (currentPosition < start) {
+                0f
+            } else {
+                0f
+            }
+        } else {
+            ((currentPosition - start).toFloat() / (end - start).coerceAtLeast(1L).toFloat())
+                .coerceIn(0f, 1f)
+        }
     } else {
         0f
     }

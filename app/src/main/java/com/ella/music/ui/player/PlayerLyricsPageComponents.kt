@@ -83,6 +83,7 @@ internal fun LyricsPlayerMenuSheet(
     lyricFormatAvailability: MusicRepository.LyricFormatAvailability,
     preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
+    lyricParserEngine: Int,
     fontScale: Float,
     secondaryFontScale: Float,
     onDismiss: () -> Unit,
@@ -93,6 +94,7 @@ internal fun LyricsPlayerMenuSheet(
     onPerspectiveYAngle: (Int) -> Unit,
     onLyricSourceMode: (Int) -> Unit,
     onLyricFormatPreference: (Boolean) -> Unit,
+    onLyricParserEngine: (Int) -> Unit,
     onFontScale: (Float) -> Unit,
     onSecondaryFontScale: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -111,6 +113,7 @@ internal fun LyricsPlayerMenuSheet(
             lyricFormatAvailability = lyricFormatAvailability,
             preferTtmlLyrics = preferTtmlLyrics,
             lyricSourceMode = lyricSourceMode,
+            lyricParserEngine = lyricParserEngine,
             fontScale = fontScale,
             secondaryFontScale = secondaryFontScale,
             perspectiveEffect = perspectiveEffect,
@@ -122,6 +125,7 @@ internal fun LyricsPlayerMenuSheet(
             onPerspectiveYAngle = onPerspectiveYAngle,
             onLyricSourceMode = onLyricSourceMode,
             onLyricFormatPreference = onLyricFormatPreference,
+            onLyricParserEngine = onLyricParserEngine,
             onFontScale = onFontScale,
             onSecondaryFontScale = onSecondaryFontScale,
             modifier = modifier

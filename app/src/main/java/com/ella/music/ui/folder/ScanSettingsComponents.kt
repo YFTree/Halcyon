@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.ella.music.R
 import com.ella.music.ui.components.EllaMiuixAction
 import com.ella.music.ui.components.EllaMiuixActionRow
+import com.ella.music.ui.components.EllaMiuixBottomSheet
 import com.ella.music.ui.components.EllaMiuixDialog
 import com.ella.music.ui.components.EllaMiuixDialogActions
 import com.ella.music.ui.components.FolderOutlineIcon
@@ -47,6 +51,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.ArrowRight
 import top.yukonga.miuix.kmp.icon.basic.Check
 import top.yukonga.miuix.kmp.icon.extended.Close
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Folder
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -422,36 +427,47 @@ internal fun BlockedFoldersDialog(
     onRemove: (String) -> Unit,
     onClear: () -> Unit
 ) {
-    EllaMiuixDialog(
+    EllaMiuixBottomSheet(
         show = true,
         title = stringResource(R.string.folder_blocked_folders),
         onDismissRequest = onDismiss
     ) {
-        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            folders.forEach { folder ->
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = folder,
-                        fontSize = 13.sp,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    EllaMiuixActionRow(
-                        actions = listOf(
-                            EllaMiuixAction(
-                                text = stringResource(R.string.common_remove),
-                                onClick = { onRemove(folder) }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .fillMaxHeight(0.6f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(folders) { folder ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = folder,
+                            fontSize = 13.sp,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { onRemove(folder) }) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Delete,
+                                contentDescription = stringResource(R.string.common_remove),
+                                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier.size(20.dp)
                             )
-                        ),
-                        modifier = Modifier.weight(0.58f)
-                    )
+                        }
+                    }
                 }
             }
             EllaMiuixActionRow(
                 actions = listOf(
                     EllaMiuixAction(text = stringResource(R.string.common_clear), onClick = onClear),
                     EllaMiuixAction(text = stringResource(R.string.common_done), onClick = onDismiss, primary = true)
-                )
+                ),
+                modifier = Modifier.padding(top = 12.dp)
             )
         }
     }

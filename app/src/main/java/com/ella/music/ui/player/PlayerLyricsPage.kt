@@ -49,6 +49,7 @@ internal fun LyricsPlayerPage(
     lyricFormatAvailability: MusicRepository.LyricFormatAvailability,
     preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
+    lyricParserEngine: Int,
     fontFamily: FontFamily?,
     fontPath: String,
     fontWeight: FontWeight,
@@ -85,8 +86,10 @@ internal fun LyricsPlayerPage(
     onSecondaryFontScale: (Float) -> Unit,
     onLyricSourceMode: (Int) -> Unit,
     onLyricFormatPreference: (Boolean) -> Unit,
+    onLyricParserEngine: (Int) -> Unit,
     onArtist: () -> Unit,
     enableSwipeDismiss: Boolean,
+    backEnabled: Boolean = true,
     useBlurBackground: Boolean,
     drawBackground: Boolean = true,
     modifier: Modifier = Modifier
@@ -126,7 +129,7 @@ internal fun LyricsPlayerPage(
         Modifier
     }
 
-    BackHandler(onBack = onDismissLyrics)
+    BackHandler(enabled = backEnabled, onBack = onDismissLyrics)
 
     Box(modifier = modifier.then(swipeDismissModifier)) {
         val useCustomPlayerBackground = playerBackgroundEnabled && playerBackgroundUri.isNotBlank() && !useBlurBackground
@@ -196,7 +199,7 @@ internal fun LyricsPlayerPage(
                         secondaryFontScale = secondaryFontScale,
                         contentColor = palette.onBackground,
                         // Keep far lines sharp over a busy custom wallpaper so they stay readable.
-                        nonCurrentLineBlurEnabled = !useCustomPlayerBackground && !perspectiveEffect,
+                        nonCurrentLineBlurEnabled = !useCustomPlayerBackground,
                         onLineClick = onLineClick,
                         onLineDoubleClick = onLineDoubleClick,
                         onLineLongClick = onLineLongClick,
@@ -230,6 +233,7 @@ internal fun LyricsPlayerPage(
             lyricFormatAvailability = lyricFormatAvailability,
             preferTtmlLyrics = preferTtmlLyrics,
             lyricSourceMode = lyricSourceMode,
+            lyricParserEngine = lyricParserEngine,
             fontScale = fontScale,
             secondaryFontScale = secondaryFontScale,
             onDismiss = { lyricMenuExpanded = false },
@@ -256,6 +260,10 @@ internal fun LyricsPlayerPage(
             onLyricFormatPreference = { preferTtml ->
                 lyricMenuExpanded = false
                 onLyricFormatPreference(preferTtml)
+            },
+            onLyricParserEngine = { engine ->
+                lyricMenuExpanded = false
+                onLyricParserEngine(engine)
             },
             onFontScale = onFontScale,
             onSecondaryFontScale = onSecondaryFontScale,

@@ -480,7 +480,11 @@ private fun Map<String, List<String>>.bestLyrics(): String? =
         "SYLT",
         "©lyr",
         "\u00a9lyr",
-        "LYRIC"
+        "LYRIC",
+        "LYR",
+        // iTunes / M4A extended lyric tags
+        "----:com.apple.iTunes:Lyrics",
+        "ITUNESLYRICS"
     )
 
 private fun Map<String, List<String>>.bestNeteaseKey(comment: String?): String? {

@@ -187,6 +187,10 @@ internal fun FloatingBottomControls(
                         }
                     }
 
+                    if (showMiniPlayer && showBottomBar) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+
                     AnimatedVisibility(visible = showBottomBar) {
                         if (useGlass && tabs.isNotEmpty()) {
                             Box(
@@ -409,8 +413,8 @@ private fun Modifier.consumeBottomDockPassthrough(vararg keys: Any?): Modifier =
                     val dy = change.position.y - change.previousPosition.y
                     val movedX = kotlin.math.abs(dx)
                     val movedY = kotlin.math.abs(dy)
-                    if (movedX == 0f && movedY == 0f) return@forEach
-                    // Keep preventing passthrough scrolls, but don't eat simple taps.
+                    val threshold = viewConfiguration.touchSlop
+                    if (movedX < threshold && movedY < threshold) return@forEach
                     if (movedY > movedX) {
                         change.consume()
                     }

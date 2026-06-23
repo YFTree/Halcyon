@@ -62,6 +62,7 @@ internal fun LyricActionMenu(
     lyricFormatAvailability: MusicRepository.LyricFormatAvailability,
     preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
+    lyricParserEngine: Int,
     fontScale: Float,
     secondaryFontScale: Float,
     perspectiveEffect: Boolean,
@@ -73,6 +74,7 @@ internal fun LyricActionMenu(
     onPerspectiveYAngle: (Int) -> Unit,
     onLyricSourceMode: (Int) -> Unit,
     onLyricFormatPreference: (Boolean) -> Unit,
+    onLyricParserEngine: (Int) -> Unit,
     onFontScale: (Float) -> Unit,
     onSecondaryFontScale: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -208,6 +210,31 @@ internal fun LyricActionMenu(
                 text = stringResource(R.string.player_lyric_source_embedded),
                 selected = lyricSourceMode == SettingsManager.LYRIC_SOURCE_EMBEDDED,
                 onClick = { onLyricSourceMode(SettingsManager.LYRIC_SOURCE_EMBEDDED) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "解析引擎",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            LyricSourceChip(
+                text = "Halcyon",
+                selected = lyricParserEngine == SettingsManager.LYRIC_PARSER_ENGINE_ELLA,
+                onClick = { onLyricParserEngine(SettingsManager.LYRIC_PARSER_ENGINE_ELLA) },
+                modifier = Modifier.weight(1f)
+            )
+            LyricSourceChip(
+                text = "Accompanist",
+                selected = lyricParserEngine == SettingsManager.LYRIC_PARSER_ENGINE_AUTO,
+                onClick = { onLyricParserEngine(SettingsManager.LYRIC_PARSER_ENGINE_AUTO) },
                 modifier = Modifier.weight(1f)
             )
         }

@@ -1,5 +1,6 @@
 package com.ella.music.ui.player
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -49,7 +50,7 @@ internal fun PlayerScreenPageHost(
     onShowPagedLyrics: () -> Unit,
     onDismissPagedLyrics: () -> Unit,
     coverPage: @Composable (onShowLyrics: () -> Unit, Modifier) -> Unit,
-    lyricsPage: @Composable (onDismissLyrics: () -> Unit, enableSwipeDismiss: Boolean, Modifier) -> Unit,
+    lyricsPage: @Composable (onDismissLyrics: () -> Unit, enableSwipeDismiss: Boolean, backEnabled: Boolean, Modifier) -> Unit,
     detailPage: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -57,6 +58,7 @@ internal fun PlayerScreenPageHost(
         if (showLyrics) {
             lyricsPage(
                 onDismissImmersiveLyrics,
+                true,
                 true,
                 modifier.fillMaxSize()
             )
@@ -67,6 +69,9 @@ internal fun PlayerScreenPageHost(
             )
         }
     } else {
+        BackHandler(enabled = pagerState.currentPage != PLAYER_PAGE_COVER) {
+            onDismissPagedLyrics()
+        }
         HorizontalPager(
             state = pagerState,
             modifier = modifier.fillMaxSize(),
@@ -80,6 +85,7 @@ internal fun PlayerScreenPageHost(
                 )
                 PLAYER_PAGE_LYRICS -> lyricsPage(
                     onDismissPagedLyrics,
+                    false,
                     false,
                     Modifier.fillMaxSize()
                 )

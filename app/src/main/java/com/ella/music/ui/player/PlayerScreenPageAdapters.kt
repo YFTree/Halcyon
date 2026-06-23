@@ -430,6 +430,7 @@ internal fun LyricsPageContent(
     lyricFormatAvailability: MusicRepository.LyricFormatAvailability,
     preferTtmlLyrics: Boolean?,
     lyricSourceMode: Int,
+    lyricParserEngine: Int,
     lyricFontFamily: FontFamily?,
     effectiveLyricFontPath: String,
     lyricFontWeight: FontWeight,
@@ -456,6 +457,7 @@ internal fun LyricsPageContent(
     navigateToArtistOrChoose: (String) -> Unit,
     onDismissLyrics: () -> Unit,
     enableSwipeDismiss: Boolean,
+    backEnabled: Boolean = true,
     immersiveAlbumCover: Boolean,
     drawBackground: Boolean = true,
     modifier: Modifier = Modifier
@@ -475,6 +477,7 @@ internal fun LyricsPageContent(
         lyricFormatAvailability = lyricFormatAvailability,
         preferTtmlLyrics = preferTtmlLyrics,
         lyricSourceMode = lyricSourceMode,
+        lyricParserEngine = lyricParserEngine,
         fontFamily = lyricFontFamily,
         fontPath = effectiveLyricFontPath,
         fontWeight = lyricFontWeight,
@@ -529,10 +532,14 @@ internal fun LyricsPageContent(
         onLyricFormatPreference = { preferTtml ->
             playerViewModel.setLyricFormatPreference(preferTtml)
         },
+        onLyricParserEngine = { engine ->
+            scope.launch { settingsManager.setLyricParserEngine(engine) }
+        },
         onArtist = {
             navigateToArtistOrChoose(song?.artist.orEmpty())
         },
         enableSwipeDismiss = enableSwipeDismiss,
+        backEnabled = backEnabled,
         useBlurBackground = immersiveAlbumCover,
         drawBackground = drawBackground,
         modifier = modifier

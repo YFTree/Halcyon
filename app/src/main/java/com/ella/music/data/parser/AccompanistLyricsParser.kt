@@ -19,7 +19,7 @@ internal object AccompanistLyricsParser {
             .mapNotNull { toLyricLine(it, isTtmlFormat) }
             .filterNot { line ->
                 val text = line.text.ifBlank { line.backgroundText.orEmpty() }
-                text.isBlank() || EllaLyricsParser.isIgnorableRawLyricLine(text)
+                text.isBlank() || EllaLyricsParser.isIgnorableRawLyricLine(text) || text.isCreditOrMetadataLine()
             }
             .sortedBy { it.timeMs }
             .mergeSameTimestampCompanions()
@@ -43,13 +43,20 @@ internal object AccompanistLyricsParser {
     }
 
     private fun KaraokeLine.MainKaraokeLine.toMainLyricLine(isTtmlFormat: Boolean): LyricLine? {
-        val mainParts = syllables.toTimedTextParts(isTtmlFormat).withoutElrcAgentPrefix()
+        val mainParts = syllables.toTimedTextParts(isTtmlFormat, isBackground = false).withoutElrcAgentPrefix()
         val textParts = mainParts.parts
         val text = textParts.toDisplayText().trimMeaningful()
         if (text.isBlank() || EllaLyricsParser.isPlaceholderOnlyLine(text)) return null
         val background = accompanimentLines?.firstOrNull()
-        val backgroundParts = background?.syllables.orEmpty().toTimedTextParts(isTtmlFormat).withoutElrcAgentPrefix().parts
-        val backgroundText = backgroundParts.toDisplayText().normalizeBackgroundAsideText().takeUsefulSecondaryText()
+        val rawBgParts = background?.syllables.orEmpty()
+            .toTimedTextParts(isTtmlFormat, isBackground = true).withoutElrcAgentPrefix().parts
+        // Fix x-bg/accompaniment text that comes as a concatenated Latin blob
+        // (e.g. "Andthere'salotofcoolchicksoutthere" from spans with no inter-word spacing).
+        // Split into proper words and estimate per-word timing so it animates correctly.
+        val (bgFixedText, bgFixedWords) = rawBgParts.fixBackgroundSpacingAndTiming(
+            bgStart = background?.start?.toLong(),
+            bgEnd = background?.end?.toLong()
+        )
         return LyricLine(
             timeMs = start.toLong().coerceAtLeast(0L),
             text = text,
@@ -57,8 +64,8 @@ internal object AccompanistLyricsParser {
             translation = translation.takeUsefulSecondaryText(),
             pronunciation = phonetic.takeUsefulSecondaryText(),
             agent = mainParts.agent ?: alignment.toEllaAgent(),
-            backgroundText = backgroundText,
-            backgroundWords = if (backgroundText == null) emptyList() else backgroundParts.toBackgroundLyricWords(),
+            backgroundText = bgFixedText,
+            backgroundWords = bgFixedWords,
             backgroundTranslation = background?.translation.takeUsefulSecondaryText(),
             backgroundStartMs = background?.start?.toLong()?.coerceAtLeast(0L),
             backgroundEndMs = background?.end?.toSafeEndMs(),
@@ -68,15 +75,18 @@ internal object AccompanistLyricsParser {
     }
 
     private fun KaraokeLine.AccompanimentKaraokeLine.toBackgroundLyricLine(isTtmlFormat: Boolean): LyricLine? {
-        val parsedParts = syllables.toTimedTextParts(isTtmlFormat).withoutElrcAgentPrefix()
-        val textParts = parsedParts.parts
-        val text = textParts.toDisplayText().normalizeBackgroundAsideText()
-        if (text.isBlank() || EllaLyricsParser.isPlaceholderOnlyLine(text)) return null
+        val parsedParts = syllables.toTimedTextParts(isTtmlFormat, isBackground = true).withoutElrcAgentPrefix()
+        val rawParts = parsedParts.parts
+        val (bgFixedText, bgFixedWords) = rawParts.fixBackgroundSpacingAndTiming(
+            bgStart = start.toLong(),
+            bgEnd = end.toLong()
+        )
+        if (bgFixedText.isNullOrBlank() || EllaLyricsParser.isPlaceholderOnlyLine(bgFixedText)) return null
         return LyricLine(
             timeMs = start.toLong().coerceAtLeast(0L),
             text = "",
-            backgroundText = text,
-            backgroundWords = textParts.toBackgroundLyricWords(),
+            backgroundText = bgFixedText,
+            backgroundWords = bgFixedWords,
             backgroundTranslation = translation.takeUsefulSecondaryText(),
             backgroundStartMs = start.toLong().coerceAtLeast(0L),
             backgroundEndMs = end.toSafeEndMs(),
@@ -116,7 +126,8 @@ internal object AccompanistLyricsParser {
     )
 
     private fun List<com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable>.toTimedTextParts(
-        preserveLatinWordSpaces: Boolean
+        preserveLatinWordSpaces: Boolean,
+        isBackground: Boolean = false
     ): List<TimedTextPart> {
         val result = mutableListOf<TimedTextPart>()
         var pendingLeadingSpace = false
@@ -140,7 +151,8 @@ internal object AccompanistLyricsParser {
                                     previous.content,
                                     syllable.content,
                                     previous.content.normalizeTimedTokenText(preserveLatinWordSpaces, trimEnd = false),
-                                    rawText
+                                    rawText,
+                                    aggressive = isBackground
                                 )
                             )
             val text = if (needsInsertedLeadingSpace && rawText.firstOrNull()?.isWhitespace() != true) {
@@ -192,11 +204,16 @@ internal object AccompanistLyricsParser {
         previousRaw: String,
         currentRaw: String,
         previousNormalized: String,
-        currentNormalized: String
+        currentNormalized: String,
+        aggressive: Boolean = false
     ): Boolean {
         val hasExplicitWhitespaceBoundary =
             previousRaw.lastOrNull()?.isWhitespace() == true || currentRaw.firstOrNull()?.isWhitespace() == true
-        if (!hasExplicitWhitespaceBoundary) return false
+        if (!hasExplicitWhitespaceBoundary) {
+            // For background/accompaniment lines (x-bg), spans are typically word-level (not syllable-level),
+            // so we aggressively insert spaces between adjacent Latin-letter spans even without explicit whitespace.
+            if (!aggressive) return false
+        }
         if (previousNormalized.lastOrNull()?.isWhitespace() == true) return false
         if (currentNormalized.firstOrNull()?.isWhitespace() == true) return false
         val prev = previousNormalized.lastOrNull { !it.isWhitespace() } ?: return false
@@ -265,14 +282,20 @@ internal object AccompanistLyricsParser {
                 if (group.shouldKeepIndependentDuetLines()) {
                     return@flatMap group.sortedBy { it.agentSortOrder() }
                 }
-                val primary = group.firstOrNull { it.words.isNotEmpty() && it.text.isUsefulMainText() }
+                // Prefer non-credit lines as primary so credit/metadata lines (e.g. "Composed by:")
+                // don't absorb actual lyric lines as translations.
+                val primary = group.firstOrNull { it.words.isNotEmpty() && it.text.isUsefulMainText() && !it.text.isCreditLine() }
+                    ?: group.firstOrNull { it.text.isUsefulMainText() && !it.text.isCreditLine() }
+                    ?: group.firstOrNull { it.words.isNotEmpty() && it.text.isUsefulMainText() }
                     ?: group.firstOrNull { it.text.isUsefulMainText() }
                     ?: group.first()
                 val primaryText = primary.text.trimMeaningful()
                 val primaryTranslationAsPronunciation = primary.translation
                     ?.takeIf { primaryText.hasCjk() && it.isPronunciationFor(primaryText) }
                     ?.trimMeaningful()
-                val companions = group.filter { it !== primary }
+                // Filter out credit/metadata lines (e.g. "Lyrics by:", "Composed by:")
+                // from being treated as translation companions
+                val companions = group.filter { it !== primary && !it.text.isCreditLine() }
                 val pronunciation = companions
                     .firstOrNull { primaryText.hasCjk() && it.text.isPronunciationFor(primaryText) }
                     ?.text
@@ -338,4 +361,144 @@ internal object AccompanistLyricsParser {
         if (text.isBlank() || text.hasCjk()) return false
         return primaryText.hasCjk() && text.any { it.isLetter() }
     }
+
+    private fun String.isCreditLine(): Boolean =
+        creditLinePattern.containsMatchIn(trimMeaningful())
+
+    // Broader check that also catches "ArtistName:" style metadata lines
+    // (e.g. "Adam Levine:", "Taylor Swift:") that don't start with known credit keywords
+    private fun String.isCreditOrMetadataLine(): Boolean {
+        val trimmed = trimMeaningful()
+        if (trimmed.isBlank()) return false
+        if (isCreditLine()) return true
+        // Match lines like "Adam Levine:" — a name/label ending with colon,
+        // short enough to be metadata rather than actual lyrics
+        if (metadataLabelColonPattern.containsMatchIn(trimmed)) return true
+        return false
+    }
+
+    private val creditLinePattern = Regex(
+        "^(作词|作曲|编曲|原唱|翻唱|制作|演唱|录音|混音|监制|企划|出品|填词|歌手|歌|曲|词" +
+            "|Lyrics|Music|Arrangement|Compos(?:ed|e|er|rd)?|Vocal|Mix|Produce[rd]?)" +
+            "\\s*(?:by\\s*)?[：:]",
+        RegexOption.IGNORE_CASE
+    )
+
+    // Matches lines like "Adam Levine:" or "Taylor Swift feat. Ed Sheeran:"
+    // — name-like text followed by colon, typically metadata/credit annotations in TTML.
+    // Requires: starts with uppercase letter, contains only label-like content, ends with ":"
+    private val metadataLabelColonPattern = Regex(
+        "^[A-Z][A-Za-z\u00C0-\u024F\u4e00-\u9fff]+" +  // Name part (Latin/CJK)
+            "(?:\\s+[A-Za-z\u00C0-\u024F\u4e00-\u9fff]+)*" +  // Optional more name parts
+            "(?:\\s+(?:feat|ft|featuring|with|\\&|and)\\.?\\s+" +  // Optional collaboration
+            "[A-Z][A-Za-z\u00C0-\u024F\\s]+)?" +  // Collaborator name
+            "\\s*[：:]$"  // Ends with colon
+    )
+
+    // ─── Background/accompaniment text post-processing ──────────────────────
+
+    /**
+     * Detects when x-bg/accompaniment text comes as a concatenated Latin blob
+     * (e.g. "Andthere'salotofcoolchicksoutthere" because TTML spans had no inter-word
+     * whitespace). Splits into proper words with estimated per-word timing so the
+     * background line renders correctly and animates per-word like v1/v2 lyrics.
+     *
+     * Returns a pair of (display text, per-word LyricWord list). If the input already
+     * looks well-spaced, returns it as-is.
+     */
+    private fun List<TimedTextPart>.fixBackgroundSpacingAndTiming(
+        bgStart: Long?,
+        bgEnd: Long?
+    ): Pair<String?, List<LyricWord>> {
+        val rawDisplay = toDisplayText().normalizeBackgroundAsideText()
+            .trimMeaningful().takeIf { it.isNotBlank() } ?: return null to emptyList()
+
+        val rawWords = toBackgroundLyricWords()
+
+        // If the text has reasonable spacing (space-to-letter ratio above threshold),
+        // or if it contains CJK characters (which don't use spaces between words),
+        // return as-is — nothing to fix.
+        if (!rawDisplay.needsLatinWordSplit()) return rawDisplay to rawWords
+
+        // Split concatenated Latin text into words
+        val wordList = Regex("""[A-Za-z0-9']+""").findAll(rawDisplay)
+            .map { it.value }
+            .filter { it.isNotBlank() }
+            .toList()
+
+        if (wordList.size <= 1) {
+            // Can't split into multiple words; return original but at least ensure
+            // we have one LyricWord for rendering.
+            if (rawWords.isEmpty()) {
+                return rawDisplay to listOf(
+                    LyricWord(
+                        text = rawDisplay,
+                        startMs = bgStart ?: 0L,
+                        endMs = bgEnd ?: (bgStart ?: 0L) + 3000L
+                    )
+                )
+            }
+            return rawDisplay to rawWords
+        }
+
+        // Create estimated per-word timing
+        val effectiveStart = bgStart ?: rawWords.minOfOrNull { it.startMs } ?: 0L
+        val effectiveEnd = bgEnd ?: rawWords.maxOfOrNull { it.endMs } ?: (effectiveStart + 3000L)
+        val totalDuration = (effectiveEnd - effectiveStart).coerceAtLeast(wordList.size * 150L)
+
+        // Weight each word by character count (longer words get more time)
+        val weights = wordList.map { estimateWordWeight(it).toDouble() }
+        val totalWeight = weights.sum().coerceAtLeast(1.0)
+
+        var cursor = effectiveStart
+        val estimatedWords = wordList.mapIndexed { idx, word ->
+            val weight = weights[idx]
+            val duration = (totalDuration * weight / totalWeight).toLong().coerceAtLeast(150L)
+            val wStart = cursor
+            val wEnd = cursor + duration
+            cursor = wEnd
+            LyricWord(text = word, startMs = wStart, endMs = wEnd)
+        }
+
+        // Reconstruct display text with proper spacing
+        val fixedDisplay = wordList.joinToString(" ")
+
+        return fixedDisplay to estimatedWords
+    }
+
+    /** Heuristic: does this text look like concatenated Latin words missing spaces? */
+    private fun String.needsLatinWordSplit(): Boolean {
+        if (this.hasCjk()) return false  // CJK doesn't use spaces between chars
+
+        // Count spaces vs letters. Well-spaced English has ~1 space per 5-6 chars.
+        // Concatenated blob has 0 or very few spaces for many letters.
+        val spaceCount = count { it == ' ' }
+        val letterCount = count { it.isLetter() }
+
+        if (letterCount < 8) return false  // Too short to be a "blob"
+
+        // Ratio check: if fewer than 1 space per ~10 letters, likely needs splitting
+        if (spaceCount > 0 && letterCount / spaceCount.toDouble() < 9.0) return false
+
+        // Pattern check: look for lowercase→uppercase transitions without preceding space
+        // (e.g. "coolChicks", "callHome")
+        var i = 1
+        while (i < length) {
+            if (this[i].isUpperCase() && this[i - 1].isLowerCase() && (i == 1 || this[i - 2] != ' ')) {
+                return true  // Found camelCase-like boundary → definitely needs split
+            }
+            i++
+        }
+
+        // Fallback: long runs of lowercase (>12 chars) with no internal spaces
+        val maxLowercaseRun = fold(0) { max, ch -> 
+            if (ch.isLowerCase() || ch == '\'') max + 1 else 0 
+        }
+        if (maxLowercaseRun > 14) return true
+
+        return false
+    }
+
+    private fun estimateWordWeight(text: String): Float =
+        text.filter { it.isLetterOrDigit() }.length.toFloat().coerceAtLeast(1f)
 }

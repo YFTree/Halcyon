@@ -34,6 +34,7 @@ internal data class PlayerScreenSettings(
     val beautifulLyricsBackground: Boolean = true,
     val showSongAnnotation: Boolean = true,
     val coverSwipeEnabled: Boolean = true,
+    val lyricParserEngine: Int = SettingsManager.LYRIC_PARSER_ENGINE_ELLA,
     val playerTitlePosition: Int = SettingsManager.PLAYER_TITLE_POSITION_BELOW_COVER,
     val playerKeepScreenOn: Boolean = false,
     val hiResLogoEnabled: Boolean = false,
@@ -73,6 +74,7 @@ private data class PlayerSettingsGroupB(
     val beautifulLyricsBackground: Boolean,
     val showSongAnnotation: Boolean,
     val coverSwipeEnabled: Boolean,
+    val lyricParserEngine: Int,
     val playerTitlePosition: Int,
     val playerKeepScreenOn: Boolean,
     val hiResLogoEnabled: Boolean,
@@ -91,16 +93,25 @@ private data class PlayerSettingsGroupBExtra(
     val beautifulLyricsBackground: Boolean,
     val showSongAnnotation: Boolean,
     val coverSwipeEnabled: Boolean,
+    val lyricParserEngine: Int,
     val playerTitlePosition: Int,
     val playerKeepScreenOn: Boolean,
     val hiResLogoEnabled: Boolean,
     val hiResLogoUri: String
 )
 
+private data class PlayerSettingsGroupBFlagsPart1(
+    val beautifulLyricsBackground: Boolean,
+    val showSongAnnotation: Boolean,
+    val coverSwipeEnabled: Boolean,
+    val lyricParserEngine: Int
+)
+
 private data class PlayerSettingsGroupBFlags(
     val beautifulLyricsBackground: Boolean,
     val showSongAnnotation: Boolean,
     val coverSwipeEnabled: Boolean,
+    val lyricParserEngine: Int,
     val playerTitlePosition: Int,
     val playerKeepScreenOn: Boolean
 )
@@ -166,14 +177,27 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
         ) { immersive, bgEnabled, bgUri, bgOpacity, bgDim ->
             PlayerSettingsGroupBBase(immersive, bgEnabled, bgUri, bgOpacity, bgDim)
         }
-        val groupBFlags = combine(
+        val groupBFlagsPart1 = combine(
             settingsManager.playerBeautifulLyricsBackground,
             settingsManager.playerShowSongAnnotation,
             settingsManager.playerCoverSwipeEnabled,
+            settingsManager.lyricParserEngine
+        ) { beautifulLyrics, showAnnotation, coverSwipe, parserEngine ->
+            PlayerSettingsGroupBFlagsPart1(beautifulLyrics, showAnnotation, coverSwipe, parserEngine)
+        }
+        val groupBFlags = combine(
+            groupBFlagsPart1,
             settingsManager.playerTitlePosition,
             settingsManager.playerKeepScreenOn
-        ) { beautifulLyrics, showAnnotation, coverSwipe, titlePosition, keepScreenOn ->
-            PlayerSettingsGroupBFlags(beautifulLyrics, showAnnotation, coverSwipe, titlePosition, keepScreenOn)
+        ) { part1, titlePosition, keepScreenOn ->
+            PlayerSettingsGroupBFlags(
+                beautifulLyricsBackground = part1.beautifulLyricsBackground,
+                showSongAnnotation = part1.showSongAnnotation,
+                coverSwipeEnabled = part1.coverSwipeEnabled,
+                lyricParserEngine = part1.lyricParserEngine,
+                playerTitlePosition = titlePosition,
+                playerKeepScreenOn = keepScreenOn
+            )
         }
         val groupBHiRes = combine(
             settingsManager.hiResLogoEnabled,
@@ -186,6 +210,7 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
                 beautifulLyricsBackground = flags.beautifulLyricsBackground,
                 showSongAnnotation = flags.showSongAnnotation,
                 coverSwipeEnabled = flags.coverSwipeEnabled,
+                lyricParserEngine = flags.lyricParserEngine,
                 playerTitlePosition = flags.playerTitlePosition,
                 playerKeepScreenOn = flags.playerKeepScreenOn,
                 hiResLogoEnabled = hiRes.hiResLogoEnabled,
@@ -202,6 +227,7 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
                 beautifulLyricsBackground = extra.beautifulLyricsBackground,
                 showSongAnnotation = extra.showSongAnnotation,
                 coverSwipeEnabled = extra.coverSwipeEnabled,
+                lyricParserEngine = extra.lyricParserEngine,
                 playerTitlePosition = extra.playerTitlePosition,
                 playerKeepScreenOn = extra.playerKeepScreenOn,
                 hiResLogoEnabled = extra.hiResLogoEnabled,
@@ -242,6 +268,7 @@ internal fun rememberPlayerScreenSettings(settingsManager: SettingsManager): Pla
                 beautifulLyricsBackground = b.beautifulLyricsBackground,
                 showSongAnnotation = b.showSongAnnotation,
                 coverSwipeEnabled = b.coverSwipeEnabled,
+                lyricParserEngine = b.lyricParserEngine,
                 playerTitlePosition = b.playerTitlePosition,
                 playerKeepScreenOn = b.playerKeepScreenOn,
                 hiResLogoEnabled = b.hiResLogoEnabled,

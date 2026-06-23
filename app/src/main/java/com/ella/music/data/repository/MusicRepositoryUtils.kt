@@ -137,10 +137,20 @@ internal fun downloadWebDavMetadataHeader(song: Song, config: WebDavConfig, cach
 
 internal fun AudioTagInfo.embeddedLyricsContent(preferTtml: Boolean): String? {
     val names = if (preferTtml) {
-        listOf("TTML LYRICS", "TTML LYRIC", "TTMLLYRICS", "TTMLLYRIC", "TTML",
-            "SYNCEDLYRICS", "LYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS", "USLT", "SYLT", "LYRIC")
+        listOf(
+            "TTML LYRICS", "TTML LYRIC", "TTMLLYRICS", "TTMLLYRIC", "TTML",
+            "SYNCEDLYRICS", "LYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS",
+            "USLT", "SYLT", "LYRIC", "LYR",
+            // iTunes / M4A extended lyric tags
+            "----:com.apple.iTunes:Lyrics", "ITUNESLYRICS"
+        )
     } else {
-        listOf("SYNCEDLYRICS", "LYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS", "USLT", "SYLT", "LYRIC")
+        listOf(
+            "SYNCEDLYRICS", "LYRICS", "UNSYNCEDLYRICS", "UNSYNCED LYRICS",
+            "USLT", "SYLT", "LYRIC", "LYR",
+            // iTunes / M4A extended lyric tags
+            "----:com.apple.iTunes:Lyrics", "ITUNESLYRICS"
+        )
     }
     names.forEach { target ->
         customTags.firstMatchingTagValue(target)?.takeIf { it.looksLikeTtmlLyrics() == preferTtml }?.let { return it }

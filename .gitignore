@@ -21,3 +21,4 @@ local.properties
 /ffmpeg-decoder/src/main/jni/ffmpeg/
 *.jks
 *.keystore
+.workbuddy

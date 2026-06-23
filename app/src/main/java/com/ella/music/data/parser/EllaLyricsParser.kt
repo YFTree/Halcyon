@@ -708,14 +708,55 @@ internal object EllaLyricsParser {
         val cleanedWords = words
             .map { it.copy(text = it.text.removeBackgroundParentheses()) }
             .filter { it.text.isNotBlank() }
+        val bgStart = attr("begin").parseTtmlTime() ?: cleanedWords.minOfOrNull { it.startMs }
+        val bgEnd = attr("end").parseTtmlTime() ?: cleanedWords.maxOfOrNull { it.endMs } ?: fallbackEnd
+        // When x-bg has no inner timed spans but has overall begin/end timing,
+        // create estimated per-word timing so x-bg animates per-word like v1/v2.
+        val effectiveWords = if (cleanedWords.isEmpty() && text.isNotBlank() && bgStart != null && bgEnd != null) {
+            text.estimateTtmlBackgroundWords(bgStart, bgEnd)
+        } else {
+            cleanedWords
+        }
         return TtmlBackground(
             text = text,
-            words = cleanedWords,
+            words = effectiveWords,
             translation = translation,
-            startMs = attr("begin").parseTtmlTime() ?: cleanedWords.minOfOrNull { it.startMs },
-            endMs = attr("end").parseTtmlTime() ?: cleanedWords.maxOfOrNull { it.endMs } ?: fallbackEnd
+            startMs = bgStart,
+            endMs = bgEnd
         )
     }
+
+    private fun String.estimateTtmlBackgroundWords(startMs: Long, endMs: Long): List<LyricWord> {
+        val cleaned = cleanLyricText()
+        if (cleaned.isBlank()) return emptyList()
+        val duration = (endMs - startMs).coerceAtLeast(cleaned.length * 120L)
+        // For CJK text, split per character; for Latin text, split per word
+        val segments = if (cleaned.hasCjk()) {
+            cleaned.chunked(1)
+        } else {
+            Regex("""\S+\s*""").findAll(cleaned).map { it.value }.toList()
+        }
+        if (segments.isEmpty()) return emptyList()
+        val totalWeight = segments.sumOf { estimateWordWeight(it) }.coerceAtLeast(1.0)
+        var cursorMs = startMs
+        return segments.mapNotNull { segment ->
+            val weight = estimateWordWeight(segment)
+            val segDuration = (duration * weight / totalWeight).toLong().coerceAtLeast(120L)
+            val segStart = cursorMs
+            val segEnd = cursorMs + segDuration
+            cursorMs = segEnd
+            val displayText = segment.trim()
+            if (displayText.isNotBlank()) {
+                LyricWord(text = segment, startMs = segStart, endMs = segEnd)
+            } else null
+        }.filter { it.text.isNotBlank() }
+    }
+
+    private fun estimateWordWeight(text: String): Double =
+        text.cleanLyricText().let { cleaned ->
+            if (cleaned.hasCjk()) cleaned.length.toDouble()
+            else cleaned.split(Regex("""\s+""")).filter { it.isNotBlank() }.size.toDouble().coerceAtLeast(1.0)
+        }
 
     private fun String.leadingLrcTimeMatches(): List<MatchResult> {
         val result = mutableListOf<MatchResult>()
@@ -776,7 +817,63 @@ internal object EllaLyricsParser {
                     )
                 )
             }
-        return attachBackgroundLines(merged)
+        val timeMerged = attachBackgroundLines(merged)
+        return mergeNearbyCompanionLines(timeMerged)
+    }
+
+    private fun mergeNearbyCompanionLines(lines: List<LyricLine>): List<LyricLine> {
+        if (lines.size < 2) return lines
+        val result = mutableListOf<LyricLine>()
+        var i = 0
+        while (i < lines.size) {
+            val current = lines[i]
+            if (i + 1 < lines.size) {
+                val next = lines[i + 1]
+                val timeGap = next.timeMs - current.timeMs
+                if (timeGap in 0..500 && next.endMs != null && next.endMs!! >= current.timeMs) {
+                    val currentText = current.text.cleanLyricText()
+                    val nextText = next.text.cleanLyricText()
+                    val nextIsCjk = nextText.hasCjk()
+                    val currentIsCjk = currentText.hasCjk()
+                    val currentIsCredit = currentText.isLyricCreditLine()
+                    val nextIsCredit = nextText.isLyricCreditLine()
+                    // Credit lines only merge with other credit lines (e.g. "Lyrics by:" + "Composed by:")
+                    // Non-credit English lines should pair with CJK translations, not other English lines
+                    if (currentIsCredit && nextIsCredit) {
+                        val mergedTranslation = listOfNotNull(current.translation, nextText)
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                            .joinToString("\n")
+                            .takeIf { it.isNotBlank() }
+                        result.add(current.copy(
+                            translation = current.translation.mergeLyricCompanionText(mergedTranslation),
+                            endMs = current.endMs ?: next.endMs
+                        ))
+                        i += 2
+                        continue
+                    }
+                    // Pair non-CJK (English) with CJK (translation): e.g. "I'm at a payphone" + "我在电话亭里"
+                    // But only if neither is a credit line
+                    if (!currentIsCredit && !nextIsCredit && !currentIsCjk && nextIsCjk
+                        && !currentText.contains(nextText) && !nextText.contains(currentText)) {
+                        val mergedTranslation = listOfNotNull(current.translation, nextText)
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                            .joinToString("\n")
+                            .takeIf { it.isNotBlank() }
+                        result.add(current.copy(
+                            translation = current.translation.mergeLyricCompanionText(mergedTranslation),
+                            endMs = current.endMs ?: next.endMs
+                        ))
+                        i += 2
+                        continue
+                    }
+                }
+            }
+            result.add(current)
+            i++
+        }
+        return result
     }
 
     private fun List<LyricLine>.shouldKeepIndependentDuetLines(): Boolean =
@@ -929,12 +1026,17 @@ internal object EllaLyricsParser {
     private fun String.isTimestampLike(): Boolean = timestampOnlyPattern.matches(trim().replace(',', '.'))
 
     private fun String.preformatTtml(): String =
-        replace(" </span><span", "</span> <span")
+        // Move trailing whitespace (spaces) from inside spans to between spans,
+        // and normalize inter-span whitespace (including XML indentation with newlines)
+        // to a single space. cleanLyricText() removes unwanted CJK-CJK spaces later.
+        replace(Regex("""[ \t]+</span>\s*<span"""), "</span> <span")
+            .replace(Regex("""</span>\s+<span"""), "</span> <span")
             .replace(",</span><span", ",</span> <span")
 
     private fun String.cleanLyricText(): String =
         decodeHtmlCompat()
             .replace(Regex("""[ \t\r\n]+"""), " ")
+            .replace(Regex("""(?<=[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]) (?=[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af])"""), "")
             .trim()
 
     fun isPlaceholderOnlyLine(line: String): Boolean =
@@ -1006,7 +1108,14 @@ internal object EllaLyricsParser {
             .cleanLyricText()
 
     private fun String.withoutFormattingWhitespace(): String =
-        if (isBlank() && any { it == '\n' || it == '\r' || it == '\t' }) "" else this
+        if (isBlank()) {
+            // Preserve at least one space from whitespace-only text nodes that contain
+            // regular space characters — these may represent inter-word gaps between spans.
+            // Pure newlines/tabs (no spaces) are formatting indentation only.
+            if (any { it == ' ' || it == '\u00A0' }) " " else ""
+        } else {
+            this
+        }
 
     private fun String.decodeHtmlCompat(): String =
         runCatching { Html.fromHtml(this, Html.FROM_HTML_MODE_LEGACY).toString() }
