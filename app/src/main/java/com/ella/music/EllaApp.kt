@@ -6,6 +6,7 @@ import com.ella.music.data.AppLogStore
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.webdav.WebDavClient
 import com.ella.music.mcp.McpServerService
+import com.ella.music.ui.LibrarySortUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,12 +26,22 @@ class EllaApp : Application() {
         }
         AppLogStore.info(this, "EllaApp", "Application started")
 
+        val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val settingsManager = SettingsManager.getInstance(this)
+
+        // 预热进程级排序单例：进程重启后单例会回到默认值，导致各列表页 collectAsState(initial=...)
+        // 先用默认值渲染再被 DataStore 异步值覆盖，表现为"排序乱跳/不记忆"（#210/#126）。
+        // #133 的"设置恢复默认"同因——OOM 触发进程重启后单例全回默认。
+        appScope.launch {
+            runCatching { LibrarySortUiState.warmUp(settingsManager) }
+        }
+
         // Auto-start MCP server if previously enabled
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            val settingsManager = SettingsManager.getInstance(this@EllaApp)
+        appScope.launch {
             if (settingsManager.mcpServerEnabled.first()) {
                 McpServerService.start(this@EllaApp)
             }
         }
     }
 }
+

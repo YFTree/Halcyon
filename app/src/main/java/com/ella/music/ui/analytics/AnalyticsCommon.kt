@@ -39,6 +39,7 @@ import com.ella.music.R
 import com.ella.music.data.SettingsManager
 import com.ella.music.data.SongPlaybackStats
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.CoverLoadLimiter
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -318,10 +319,15 @@ internal fun AnalyticsSongCover(
 ) {
     val coverBitmap by produceState<Bitmap?>(initialValue = null, song?.id, song?.dateModified, song?.fileSize) {
         value = withContext(Dispatchers.IO) {
+            // Analytics 页同时渲染 40-50 个封面，不限流会并发解码大量 bitmap 触发 OOM，
+            // 进而被系统杀进程重启（#133）。经 CoverLoadLimiter 排队后最多 2 个并发，其余
+            // 排队等待，内存峰值大幅降低。
             runCatching {
-                song?.let { s ->
-                    if (coverSize > 128) mainViewModel.getAlbumCoverArtBitmap(s)
-                    else mainViewModel.getCoverArtBitmap(s)
+                CoverLoadLimiter.run {
+                    song?.let { s ->
+                        if (coverSize > 128) mainViewModel.getAlbumCoverArtBitmap(s)
+                        else mainViewModel.getCoverArtBitmap(s)
+                    }
                 }
             }.getOrNull()
         }

@@ -40,6 +40,7 @@ import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
 import com.ella.music.data.model.playlistIdentityKey
+import com.ella.music.ui.components.CoverLoadLimiter
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
@@ -152,7 +153,7 @@ internal fun ListeningDayDetailSection(
     val representativeSongKey = remember(representativeSong) { representativeSong?.listeningIdentityKey() }
     val coverBitmap by produceState<Bitmap?>(initialValue = null, representativeSongKey, day.dateKey) {
         value = withContext(Dispatchers.IO) {
-            representativeSong?.let(mainViewModel::getAlbumCoverArtBitmap)
+            CoverLoadLimiter.run { representativeSong?.let(mainViewModel::getAlbumCoverArtBitmap) }
         }
     }
 
@@ -317,8 +318,11 @@ private fun ListeningTimelineRow(
     val songKey = remember(song) { song?.listeningIdentityKey() }
     val coverBitmap by produceState<Bitmap?>(initialValue = null, songKey, entry.entry.playedAt) {
         value = withContext(Dispatchers.IO) {
+            // 听歌历史页逐条加载封面，不限流会并发解码触发 OOM（#133）。
             runCatching {
-                song?.takeIf { canPlaySong }?.let(mainViewModel::getCoverArtBitmap)
+                CoverLoadLimiter.run {
+                    song?.takeIf { canPlaySong }?.let(mainViewModel::getCoverArtBitmap)
+                }
             }.getOrNull()
         }
     }
