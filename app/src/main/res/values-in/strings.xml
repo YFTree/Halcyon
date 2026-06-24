@@ -793,8 +793,6 @@
     <string name="settings_lyric_font_system_default_summary">Render lirik dengan font default aplikasi</string>
     <string name="settings_lyric_font_system_default_applied">Menggunakan font default aplikasi</string>
     <string name="settings_lyric_font_apply_to_page">Terapkan ke halaman lirik</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">Gaya font kustom diterapkan ke halaman lirik</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">Halaman lirik mempertahankan gaya font default</string>
     <string name="settings_lyric_font_italic">Miring</string>
     <string name="settings_lyric_font_italic_summary_enabled">Gunakan gaya miring di halaman lirik</string>
     <string name="settings_lyric_font_italic_summary_disabled">Gunakan gaya tegak normal di halaman lirik</string>

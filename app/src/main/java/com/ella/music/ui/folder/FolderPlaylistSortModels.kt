@@ -22,7 +22,9 @@ internal fun List<FolderPlaylist>.sortedForFolderPlaylists(
     pinnedIds: List<String> = emptyList()
 ): List<FolderPlaylist> {
     val sorted = when (mode) {
-        FolderPlaylistSortMode.Custom -> this
+        // "Custom" defaults to creation-time descending (newest first) per issue #237③. Until the
+        // user manually reorders, this is the natural default. CustomDesc is the reverse of that.
+        FolderPlaylistSortMode.Custom -> sortedWith(compareByDescending<FolderPlaylist> { it.createdAt }.thenBy { it.name.musicSortKey() })
         FolderPlaylistSortMode.DateUpdated -> sortedWith(compareByDescending<FolderPlaylist> { it.updatedAt }.thenBy { it.name.musicSortKey() })
         FolderPlaylistSortMode.DateCreatedDesc -> sortedWith(compareByDescending<FolderPlaylist> { it.createdAt }.thenBy { it.name.musicSortKey() })
         FolderPlaylistSortMode.DateCreated -> sortedWith(compareBy<FolderPlaylist> { it.createdAt }.thenBy { it.name.musicSortKey() })
@@ -30,7 +32,7 @@ internal fun List<FolderPlaylist>.sortedForFolderPlaylists(
         FolderPlaylistSortMode.FolderCount -> sortedWith(compareByDescending<FolderPlaylist> { it.folders.size }.thenBy { it.name.musicSortKey() })
         FolderPlaylistSortMode.SongCount -> sortedWith(compareByDescending<FolderPlaylist> { songCountProvider(it) }.thenBy { it.name.musicSortKey() })
         FolderPlaylistSortMode.Duration -> sortedWith(compareByDescending<FolderPlaylist> { durationProvider(it) }.thenBy { it.name.musicSortKey() })
-        FolderPlaylistSortMode.CustomDesc -> asReversed()
+        FolderPlaylistSortMode.CustomDesc -> sortedWith(compareBy<FolderPlaylist> { it.createdAt }.thenBy { it.name.musicSortKey() })
     }
     if (pinnedIds.isEmpty()) return sorted
     val pinnedRank = pinnedIds.withIndex().associate { it.value to it.index }

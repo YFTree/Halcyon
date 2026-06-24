@@ -793,8 +793,6 @@
     <string name="settings_lyric_font_system_default_summary">แสดงเนื้อเพลงด้วยฟอนต์เริ่มต้นของแอป</string>
     <string name="settings_lyric_font_system_default_applied">ใช้ฟอนต์เริ่มต้นของแอป</string>
     <string name="settings_lyric_font_apply_to_page">ใช้กับหน้าเนื้อเพลง</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">ใช้สไตล์ฟอนต์กำหนดเองกับหน้าเนื้อเพลง</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">หน้าเนื้อเพลงใช้สไตล์ฟอนต์เริ่มต้น</string>
     <string name="settings_lyric_font_italic">ตัวเอียง</string>
     <string name="settings_lyric_font_italic_summary_enabled">ใช้สไตล์ตัวเอียงบนหน้าเนื้อเพลง</string>
     <string name="settings_lyric_font_italic_summary_disabled">ใช้สไตล์ตัวตรงปกติบนหน้าเนื้อเพลง</string>

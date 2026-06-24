@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,15 +46,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.ella.music.R
+import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
+import com.ella.music.ui.components.ConfirmDangerDialog
 import com.ella.music.ui.components.DefaultAlbumCover
 import com.ella.music.ui.components.SongMoreActionHost
 import com.ella.music.ui.components.ellaPageBackground
 import com.ella.music.viewmodel.MainViewModel
 import com.ella.music.viewmodel.PlayerViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -87,6 +91,8 @@ fun ListeningCalendarHistoryScreen(
         selectedDateKey?.let(dayAggregates::get)
     }
     var actionSong by remember { mutableStateOf<Song?>(null) }
+    var pendingRemoveEntry by remember { mutableStateOf<PlaybackHistoryEntry?>(null) }
+    val scope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -150,7 +156,8 @@ fun ListeningCalendarHistoryScreen(
                         day = selectedDay,
                         mainViewModel = mainViewModel,
                         playerViewModel = playerViewModel,
-                        onSongMore = { song -> actionSong = song }
+                        onSongMore = { song -> actionSong = song },
+                        onRemoveHistoryEntry = { entry -> pendingRemoveEntry = entry }
                     )
                 }
                 items(monthSections, key = { it.label }) { month ->
@@ -176,4 +183,18 @@ fun ListeningCalendarHistoryScreen(
         onNavigateToAlbum = onNavigateToAlbum,
         onNavigateToArtist = onNavigateToArtist
     )
+
+    pendingRemoveEntry?.let { entry ->
+        ConfirmDangerDialog(
+            show = true,
+            title = stringResource(R.string.listening_calendar_remove_history_title),
+            message = stringResource(R.string.listening_calendar_remove_history_message),
+            onDismiss = { pendingRemoveEntry = null },
+            onConfirm = {
+                val toRemove = entry
+                pendingRemoveEntry = null
+                scope.launch { mainViewModel.removePlaybackHistoryEntry(toRemove) }
+            }
+        )
+    }
 }

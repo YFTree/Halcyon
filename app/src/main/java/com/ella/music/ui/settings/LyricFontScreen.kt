@@ -62,6 +62,8 @@ fun LyricFontScreen(
     val lyricFontWeight by settingsManager.lyricFontWeight.collectAsState(initial = 800)
     val lyricFontItalic by settingsManager.lyricFontItalic.collectAsState(initial = false)
     val lyricShareUseLyricFont by settingsManager.lyricShareUseLyricFont.collectAsState(initial = false)
+    val lyricFontApplyToPage by settingsManager.lyricFontApplyToPage.collectAsState(initial = true)
+    val lyricFontApplyToDesktop by settingsManager.lyricFontApplyToDesktop.collectAsState(initial = true)
     var fonts by remember { mutableStateOf<List<FontChoice>>(emptyList()) }
     var systemFonts by remember { mutableStateOf<List<FontChoice>>(emptyList()) }
     var showSystemFontPicker by remember { mutableStateOf(false) }
@@ -142,6 +144,25 @@ fun LyricFontScreen(
                         checked = lyricShareUseLyricFont,
                         onCheckedChange = { value ->
                             scope.launch { settingsManager.setLyricShareUseLyricFont(value) }
+                        }
+                    )
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_lyric_font_apply_to_page),
+                        summary = stringResource(R.string.settings_lyric_font_apply_to_page_summary),
+                        checked = lyricFontApplyToPage,
+                        onCheckedChange = { value ->
+                            scope.launch { settingsManager.setLyricFontApplyToPage(value) }
+                        }
+                    )
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_lyric_font_apply_to_desktop),
+                        summary = stringResource(R.string.settings_lyric_font_apply_to_desktop_summary),
+                        checked = lyricFontApplyToDesktop,
+                        onCheckedChange = { value ->
+                            scope.launch {
+                                settingsManager.setLyricFontApplyToDesktop(value)
+                                notifyDesktopLyricFontChanged(context, settingsManager)
+                            }
                         }
                     )
                 }

@@ -138,6 +138,17 @@ class PlaybackStatsStore private constructor(context: Context) {
         saveHistory(updated)
     }
 
+    /**
+     * Removes a single playback history entry identified by (songId, playedAt). Lets the user
+     * delete a problematic history record (e.g. a song that no longer exists in the library or
+     * one whose cover art pollutes the artwork cache) without clearing the whole history.
+     */
+    suspend fun removeHistoryEntry(entry: PlaybackHistoryEntry) = withContext(Dispatchers.IO) {
+        val updated = _history.value.filterNot { it.songId == entry.songId && it.playedAt == entry.playedAt }
+        _history.value = updated
+        saveHistory(updated)
+    }
+
     private suspend fun addDailyListenTime(timestampMs: Long, listenedMs: Long) = withContext(Dispatchers.IO) {
         val key = timestampMs.toDateKey()
         val updated = _dailyListenMs.value.toMutableMap()

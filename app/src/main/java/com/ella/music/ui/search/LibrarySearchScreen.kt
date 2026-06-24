@@ -469,9 +469,13 @@ fun LibrarySearchScreen(
                 onSearch = { commitSearch() },
                 placeholder = stringResource(R.string.library_search_page_placeholder),
                 modifier = Modifier.weight(1f),
-                // Only force-focus from deep links (focus=true). For normal entries pass null so
-                // EllaSearchBar falls back to the user's "auto show keyboard" setting.
-                autoFocus = autoFocusSearch.takeIf { it }
+                // DeepLink 带 keyword 时强制不弹输入法；DeepLink 无 keyword 时强制弹；
+                // 普通入口（无 focus 标记且无 keyword）回退用户的"自动弹出输入法"设置。
+                autoFocus = when {
+                    autoFocusSearch -> true
+                    !initialQuery.isNullOrBlank() -> false
+                    else -> null
+                }
             )
         }
 

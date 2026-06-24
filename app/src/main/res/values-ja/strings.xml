@@ -793,8 +793,6 @@
     <string name="settings_lyric_font_system_default_summary">アプリのデフォルトフォントで歌詞を描画</string>
     <string name="settings_lyric_font_system_default_applied">アプリのデフォルトフォントを使用中</string>
     <string name="settings_lyric_font_apply_to_page">歌詞ページに適用</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">カスタムフォントのスタイルを歌詞ページに適用しました</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">歌詞ページではデフォルトのフォントスタイルを使用します</string>
     <string name="settings_lyric_font_italic">イタリック</string>
     <string name="settings_lyric_font_italic_summary_enabled">歌詞ページでイタリックスタイルを使用</string>
     <string name="settings_lyric_font_italic_summary_disabled">歌詞ページで通常の字形を使用</string>

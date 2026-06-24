@@ -11,7 +11,7 @@ internal data class LazyOnlineQueue(
 internal fun Song.lyricIdentityKey(): String {
     return when {
         onlineSource.isNotBlank() || onlineId.isNotBlank() -> "online:$onlineSource:$onlineId:$path"
-        path.isNotBlank() -> "path:$path"
+        path.isNotBlank() -> "path:$path:$id:$dateModified"
         else -> "id:$id"
     }
 }

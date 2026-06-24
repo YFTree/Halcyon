@@ -84,7 +84,7 @@ fun PlaylistDetailScreen(
     val openPlayerOnPlay by mainViewModel.settingsManager.openPlayerOnPlay.collectAsState(initial = false)
     val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val isFiveStarPlaylist = playlistId == FIVE_STAR_PLAYLIST_ID
-    val storedPlaylist = playlists.firstOrNull { it.id == playlistId }
+    val storedPlaylist = playlists.firstOrNull { it.id == playlistId || it.name == playlistId }
     val fiveStarSongs by produceState(initialValue = emptyList(), isFiveStarPlaylist, librarySongs, ratingRevision) {
         value = if (isFiveStarPlaylist) mainViewModel.getFiveStarSongs() else emptyList()
     }

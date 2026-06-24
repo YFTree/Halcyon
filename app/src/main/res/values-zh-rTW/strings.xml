@@ -793,8 +793,6 @@
     <string name="settings_lyric_font_system_default_summary">使用應用預設字體渲染歌詞</string>
     <string name="settings_lyric_font_system_default_applied">已使用應用預設字體</string>
     <string name="settings_lyric_font_apply_to_page">應用到歌詞頁</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">已將自訂字體效果應用到歌詞頁</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">歌詞頁繼續使用預設字體樣式</string>
     <string name="settings_lyric_font_italic">斜體</string>
     <string name="settings_lyric_font_italic_summary_enabled">歌詞頁使用斜體樣式</string>
     <string name="settings_lyric_font_italic_summary_disabled">歌詞頁使用正常字形</string>

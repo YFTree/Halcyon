@@ -74,6 +74,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val playbackStats: StateFlow<List<SongPlaybackStats>> = playbackStatsStore.stats
     val playbackHistory: StateFlow<List<PlaybackHistoryEntry>> = playbackStatsStore.history
     val dailyListenMs: StateFlow<Map<String, Long>> = playbackStatsStore.dailyListenMs
+
+    suspend fun removePlaybackHistoryEntry(entry: PlaybackHistoryEntry) {
+        playbackStatsStore.removeHistoryEntry(entry)
+    }
     val playlists: StateFlow<List<UserPlaylist>> = playlistStore.playlists
     private val _libraryCacheLoaded = MutableStateFlow(false)
     val libraryCacheLoaded: StateFlow<Boolean> = _libraryCacheLoaded.asStateFlow()

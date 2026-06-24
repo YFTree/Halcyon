@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.LazyColumn
@@ -171,6 +172,8 @@ fun MetadataCategoryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectionMode by remember { mutableStateOf(false) }
     var selectedNames by remember { mutableStateOf(setOf<String>()) }
+    var rangeAnchorName by remember { mutableStateOf<String?>(null) }
+    var rangeTargetName by remember { mutableStateOf<String?>(null) }
     var categoryMenuItem by remember { mutableStateOf<MetadataCategoryItem?>(null) }
     var folderToBlock by remember { mutableStateOf<String?>(null) }
     var playlistPickerSongs by remember { mutableStateOf<List<Song>?>(null) }
@@ -194,16 +197,40 @@ fun MetadataCategoryScreen(
         gridColumns.coerceIn(1, 4)
     }
     val pageBackground = ellaPageBackground()
-    val gridState = rememberLazyGridState()
+    val gridState = rememberSaveable(saver = LazyGridState.Saver) { LazyGridState() }
     val scope = rememberCoroutineScope()
     val currentSelectionKeys = remember(displayedItems) { displayedItems.map { it.name } }
+    val currentSelectionIndexByName = remember(currentSelectionKeys) {
+        buildMap {
+            currentSelectionKeys.forEachIndexed { index, name -> put(name, index) }
+        }
+    }
     fun clearSelection() {
-        selectionMode = false
         selectedNames = emptySet()
+        rangeAnchorName = null
+        rangeTargetName = null
+        selectionMode = false
+    }
+    fun updateRangeAnchorsForManualSelection(name: String, selectedNow: Boolean) {
+        if (selectedNow) {
+            when {
+                rangeAnchorName == null -> rangeAnchorName = name
+                rangeAnchorName == name -> Unit
+                else -> rangeTargetName = name
+            }
+        } else {
+            if (rangeTargetName == name) rangeTargetName = null
+            if (rangeAnchorName == name) {
+                rangeAnchorName = rangeTargetName ?: selectedNames.firstOrNull { it != name }
+                rangeTargetName = null
+            }
+        }
     }
     fun toggleSelection(name: String) {
-        val next = if (name in selectedNames) selectedNames - name else selectedNames + name
+        val selecting = name !in selectedNames
+        val next = if (selecting) selectedNames + name else selectedNames - name
         selectedNames = next
+        updateRangeAnchorsForManualSelection(name, selecting)
         if (next.isEmpty()) selectionMode = false
     }
     fun selectedActionSongs(): List<Song> =
@@ -215,15 +242,39 @@ fun MetadataCategoryScreen(
     fun toggleSelectAllVisibleItems() {
         if (currentSelectionKeys.isEmpty()) return
         val visible = currentSelectionKeys.toSet()
-        selectedNames = if (visible.all { it in selectedNames }) {
-            selectedNames - visible
+        if (visible.all { it in selectedNames }) {
+            selectedNames = selectedNames - visible
+            rangeAnchorName = null
+            rangeTargetName = null
         } else {
-            selectedNames + visible
+            selectedNames = selectedNames + visible
         }
         selectionMode = selectedNames.isNotEmpty()
     }
     val selectedVisibleCount = remember(selectedNames, currentSelectionKeys) {
         currentSelectionKeys.count { it in selectedNames }
+    }
+    val rangeSelectionAvailable = remember(currentSelectionIndexByName, selectedNames, rangeAnchorName, rangeTargetName) {
+        val anchor = rangeAnchorName
+        val target = rangeTargetName
+        anchor != null &&
+            target != null &&
+            anchor != target &&
+            anchor in selectedNames &&
+            target in selectedNames &&
+            anchor in currentSelectionIndexByName &&
+            target in currentSelectionIndexByName
+    }
+    fun applyRangeSelection() {
+        val anchor = rangeAnchorName ?: return
+        val target = rangeTargetName ?: return
+        val anchorIndex = currentSelectionIndexByName[anchor] ?: return
+        val targetIndex = currentSelectionIndexByName[target] ?: return
+        if (anchorIndex == targetIndex) return
+        val bounds = if (anchorIndex < targetIndex) anchorIndex..targetIndex else targetIndex..anchorIndex
+        selectedNames = selectedNames + bounds.map { currentSelectionKeys[it] }
+        rangeAnchorName = target
+        rangeTargetName = null
     }
     BackHandler(enabled = selectionMode || sortExpanded || searchExpanded || folderToBlock != null) {
         when {
@@ -528,9 +579,9 @@ fun MetadataCategoryScreen(
                 }
                 FloatingSelectionControls(
                     visible = selectionMode && currentSelectionKeys.isNotEmpty(),
-                    rangeEnabled = false,
+                    rangeEnabled = rangeSelectionAvailable,
                     allSelected = currentSelectionKeys.isNotEmpty() && selectedVisibleCount == currentSelectionKeys.size,
-                    onRangeSelect = {},
+                    onRangeSelect = ::applyRangeSelection,
                     onSelectAll = ::toggleSelectAllVisibleItems,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)

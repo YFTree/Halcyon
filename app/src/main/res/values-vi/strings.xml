@@ -793,8 +793,6 @@
     <string name="settings_lyric_font_system_default_summary">Hiển thị lời bài hát với phông chữ ứng dụng mặc định</string>
     <string name="settings_lyric_font_system_default_applied">Sử dụng phông chữ ứng dụng mặc định</string>
     <string name="settings_lyric_font_apply_to_page">Áp dụng cho trang lời bài hát</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">Kiểu phông chữ tùy chỉnh được áp dụng cho trang lời bài hát</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">Trang lời bài hát giữ nguyên kiểu chữ mặc định</string>
     <string name="settings_lyric_font_italic">Nghiêng</string>
     <string name="settings_lyric_font_italic_summary_enabled">Sử dụng kiểu in nghiêng trên trang lời bài hát</string>
     <string name="settings_lyric_font_italic_summary_disabled">Sử dụng kiểu đứng bình thường trên trang lời bài hát</string>

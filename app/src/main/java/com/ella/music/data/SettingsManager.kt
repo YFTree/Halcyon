@@ -215,6 +215,7 @@ class SettingsManager(private val context: Context) {
         val KEY_LYRIC_SECONDARY_FONT_SCALE = intPreferencesKey("lyric_secondary_font_scale")
         val KEY_LYRIC_FONT_ITALIC = booleanPreferencesKey("lyric_font_italic")
         val KEY_LYRIC_FONT_APPLY_TO_PAGE = booleanPreferencesKey("lyric_font_apply_to_page")
+        val KEY_LYRIC_FONT_APPLY_TO_DESKTOP = booleanPreferencesKey("lyric_font_apply_to_desktop")
         val KEY_LYRIC_PERSPECTIVE_EFFECT = booleanPreferencesKey("lyric_perspective_effect")
         val KEY_LYRIC_PERSPECTIVE_Y_ANGLE = intPreferencesKey("lyric_perspective_y_angle")
         val KEY_SCAN_INCLUDE_FOLDERS = stringPreferencesKey("scan_include_folders")
@@ -780,6 +781,7 @@ class SettingsManager(private val context: Context) {
     val lyricSecondaryFontScale: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_SECONDARY_FONT_SCALE] ?: 100 }
     val lyricFontItalic: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_ITALIC] ?: false }
     val lyricFontApplyToPage: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_APPLY_TO_PAGE] ?: true }
+    val lyricFontApplyToDesktop: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_FONT_APPLY_TO_DESKTOP] ?: true }
     val lyricShareUseLyricFont: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_SHARE_USE_LYRIC_FONT] ?: false }
     val lyricPerspectiveEffect: Flow<Boolean> = context.dataStore.data.map { it[KEY_LYRIC_PERSPECTIVE_EFFECT] ?: false }
     val lyricPerspectiveYAngle: Flow<Int> = context.dataStore.data.map { it[KEY_LYRIC_PERSPECTIVE_Y_ANGLE] ?: 25 }
@@ -1623,6 +1625,10 @@ class SettingsManager(private val context: Context) {
         context.dataStore.edit { it[KEY_LYRIC_FONT_APPLY_TO_PAGE] = enabled }
     }
 
+    suspend fun setLyricFontApplyToDesktop(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_LYRIC_FONT_APPLY_TO_DESKTOP] = enabled }
+    }
+
     suspend fun setPlayerTapSeekEnabled(enabled: Boolean) {
         context.dataStore.edit { it[KEY_PLAYER_TAP_SEEK_ENABLED] = enabled }
     }
@@ -1938,6 +1944,7 @@ class SettingsManager(private val context: Context) {
             setBoolean(KEY_LYRIC_PAGE_KEEP_SCREEN_ON)
             setBoolean(KEY_LYRIC_FONT_ITALIC)
             setBoolean(KEY_LYRIC_FONT_APPLY_TO_PAGE)
+            setBoolean(KEY_LYRIC_FONT_APPLY_TO_DESKTOP)
             setBoolean(KEY_LYRIC_PERSPECTIVE_EFFECT)
             setBoolean(KEY_MINI_PLAYER_LYRIC_TRANSLATION)
             setBoolean(KEY_MINI_PLAYER_COVER_ROTATION)

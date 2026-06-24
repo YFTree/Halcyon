@@ -64,6 +64,10 @@ private fun Uri.toHalcyonRoute(): String? {
             ?.takeIf { it.isNotBlank() }
             ?.let { Screen.PlaylistDetail.createRoute(it) }
             ?: Screen.Playlists.createRoute()
+        "folder_playlists" -> path.firstOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { Screen.FolderPlaylistDetail.createRoute(it) }
+            ?: Screen.FolderPlaylists.route
         "category" -> {
             val type = path.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return null
             val name = path.drop(1).joinToString("/").takeIf { it.isNotBlank() }

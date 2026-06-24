@@ -103,6 +103,13 @@ fun FolderPlaylistsScreen(
     // and reopening the editor, avoiding accidental mis-taps.
     var editorDraftName by remember(editorTarget?.id) { mutableStateOf(editorTarget?.name.orEmpty()) }
     var editorDraftFolders by remember(editorTarget?.id) { mutableStateOf(editorTarget?.folders.orEmpty().toSet()) }
+    // Folders that should stay pinned to the top for the duration of this editor session. Unlike
+    // editorDraftFolders, this set only grows (new selections are added) and never shrinks when a
+    // folder is unchecked — so a folder that was selected when the sheet opened remains pinned even
+    // after the user accidentally unchecks it, until the editor target changes.
+    var editorPinnedFolders by remember(editorTarget?.id) {
+        mutableStateOf(editorTarget?.folders.orEmpty().toSet())
+    }
     var pendingDelete by remember { mutableStateOf<FolderPlaylist?>(null) }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -349,6 +356,8 @@ fun FolderPlaylistsScreen(
         onDraftNameChange = { editorDraftName = it },
         selectedFolders = editorDraftFolders,
         onSelectedFoldersChange = { editorDraftFolders = it },
+        pinnedFolders = editorPinnedFolders,
+        onPinnedFoldersChange = { editorPinnedFolders = it },
         onDismiss = { showEditor = false },
         onSave = { target, name, folders ->
             scope.launch {
@@ -400,7 +409,9 @@ fun FolderPlaylistDetailScreen(
     val showPlayNextInLists by mainViewModel.settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val currentSong by playerViewModel.currentSong.collectAsState()
     val favoriteSongKeys by playerViewModel.favoriteSongKeys.collectAsState()
-    val playlist = remember(playlists, playlistId) { playlists.firstOrNull { it.id == playlistId } }
+    val playlist = remember(playlists, playlistId) {
+        playlists.firstOrNull { it.id == playlistId || it.name == playlistId }
+    }
     val playlistSongs = remember(playlist, songs) {
         playlist?.let { songs.songsForFolderPlaylist(it.folders) }.orEmpty()
     }
@@ -761,6 +772,8 @@ private fun FolderPlaylistEditorSheet(
     onDraftNameChange: (String) -> Unit,
     selectedFolders: Set<String>,
     onSelectedFoldersChange: (Set<String>) -> Unit,
+    pinnedFolders: Set<String>,
+    onPinnedFoldersChange: (Set<String>) -> Unit,
     onDismiss: () -> Unit,
     onSave: (FolderPlaylist?, String, List<String>) -> Unit
 ) {
@@ -776,17 +789,17 @@ private fun FolderPlaylistEditorSheet(
         }
     }
 
-    // Pin selected folders to the top regardless of whether we're creating a new playlist or
-    // editing an existing one. This makes the selected folders easy to find and avoids
-    // accidental mis-taps when scrolling through a long folder list.
-    val sortedFilteredFolders = remember(filteredFolders, editorSort, selectedFolders) {
+    // Pin folders to the top using the session-persistent pinnedFolders set, which only grows as
+    // the user selects new folders and never shrinks on uncheck. This keeps a previously-selected
+    // folder pinned even after an accidental mis-tap, until the editor target changes.
+    val sortedFilteredFolders = remember(filteredFolders, editorSort, pinnedFolders) {
         val base = when (editorSort) {
             EditorFolderSort.Name -> filteredFolders.sortedBy { it.substringAfterLast('/').lowercase() }
             EditorFolderSort.ModifiedTime -> filteredFolders.sortedByDescending { it }
             EditorFolderSort.SongCount -> filteredFolders
         }
         base.sortedWith(
-            compareByDescending<String> { it in selectedFolders }
+            compareByDescending<String> { it in pinnedFolders }
                 .thenBy { base.indexOf(it) }
         )
     }
@@ -855,9 +868,14 @@ private fun FolderPlaylistEditorSheet(
                         summary = folder,
                         checked = folder in selectedFolders,
                         onCheckedChange = { checked ->
-                            onSelectedFoldersChange(
-                                if (checked) selectedFolders + folder else selectedFolders - folder
-                            )
+                            if (checked) {
+                                onSelectedFoldersChange(selectedFolders + folder)
+                                onPinnedFoldersChange(pinnedFolders + folder)
+                            } else {
+                                onSelectedFoldersChange(selectedFolders - folder)
+                                // Intentionally do NOT remove from pinnedFolders so the folder
+                                // stays pinned for the rest of this editor session.
+                            }
                         }
                     )
                 }

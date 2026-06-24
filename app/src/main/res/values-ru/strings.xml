@@ -791,8 +791,6 @@
     <string name="settings_lyric_font_system_default_summary">Отрисовывайте тексты песен с помощью шрифта приложения по умолчанию.</string>
     <string name="settings_lyric_font_system_default_applied">Использование шрифта приложения по умолчанию</string>
     <string name="settings_lyric_font_apply_to_page">Применить к странице с текстом песни</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">К странице с текстом текста применяется собственный стиль шрифта.</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">На странице с текстами песен сохраняется стиль шрифта по умолчанию.</string>
     <string name="settings_lyric_font_italic">Курсив</string>
     <string name="settings_lyric_font_italic_summary_enabled">Используйте курсив на странице с текстом песни.</string>
     <string name="settings_lyric_font_italic_summary_disabled">Используйте обычный вертикальный стиль на странице с текстом песни.</string>

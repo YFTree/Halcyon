@@ -633,7 +633,13 @@ class DesktopLyricService : Service() {
         translationScale = settingsManager.desktopLyricTranslationScale.first().coerceIn(80, 220) / 100f,
         opacityPercent = settingsManager.desktopLyricOpacity.first().coerceIn(35, 100),
         lyricTextColor = settingsManager.desktopLyricTextColor.first(),
-        lyricFontPath = settingsManager.lyricFontPath.first(),
+        // When "apply font to desktop lyric" is off, pass an empty path so the lyric view falls
+        // back to the system default typeface instead of the custom lyric font.
+        lyricFontPath = if (settingsManager.lyricFontApplyToDesktop.first()) {
+            settingsManager.lyricFontPath.first()
+        } else {
+            ""
+        },
         lyricFontWeight = settingsManager.lyricFontWeight.first().coerceIn(100, 900),
         lyricFontItalic = settingsManager.lyricFontItalic.first(),
         savedX = settingsManager.desktopLyricX.first(),

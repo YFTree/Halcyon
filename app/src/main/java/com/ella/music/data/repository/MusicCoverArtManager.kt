@@ -66,6 +66,11 @@ internal class MusicCoverArtManager(
                 if (error is OutOfMemoryError) {
                     coverArtCache.evictAll()
                     coverBitmapCache.evictAll()
+                    // Clear persisted failure states too: an OOM is a transient condition, and
+                    // leaving stale Missing/Error markers would make getCoverArt short-circuit to
+                    // null for these keys forever (line above: `Missing/Error -> return null`),
+                    // which is a likely cause of "all covers disappear after a bad song loads".
+                    coverDataStates.clear()
                 }
                 Log.w("MusicRepo", "Failed to extract cover art for ${song.path}", error)
                 if (shouldPersistFailureState) coverDataStates[cacheKey] = CoverDataState.Error(error.message)
@@ -112,7 +117,11 @@ internal class MusicCoverArtManager(
                 BitmapFactory.decodeByteArray(data, 0, data.size, options)
                     ?.also { coverBitmapCache.put(cacheKey, it) }
             }.getOrElse { error ->
-                if (error is OutOfMemoryError) { coverArtCache.evictAll(); coverBitmapCache.evictAll() }
+                if (error is OutOfMemoryError) {
+                    coverArtCache.evictAll()
+                    coverBitmapCache.evictAll()
+                    coverDataStates.clear()
+                }
                 Log.w("MusicRepo", "Failed to decode cover bitmap for ${song.path}", error)
                 null
             }

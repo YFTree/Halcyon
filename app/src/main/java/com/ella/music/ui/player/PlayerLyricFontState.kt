@@ -31,6 +31,7 @@ internal fun rememberPlayerLyricFontState(
     val lyricFontScaleValue by settingsManager.lyricFontScale.collectAsState(initial = 100)
     val lyricSecondaryFontScaleValue by settingsManager.lyricSecondaryFontScale.collectAsState(initial = 100)
     val lyricShareUseLyricFont by settingsManager.lyricShareUseLyricFont.collectAsState(initial = false)
+    val lyricFontApplyToPage by settingsManager.lyricFontApplyToPage.collectAsState(initial = true)
     val bundledDefaultLyricFontPath = remember(context) { ensureBundledMiSansSemiboldPath(context) }
     val preferBundledLyricFontByDefault = remember { !isXiaomiFamilyPlayerDevice() }
     val defaultLyricFontPath = remember(preferBundledLyricFontByDefault, bundledDefaultLyricFontPath) {
@@ -78,7 +79,10 @@ internal fun rememberPlayerLyricFontState(
     }
 
     return PlayerLyricFontState(
-        fontFamily = lyricFontFamily,
+        // fontFamily drives the PlayerSongMetaText group (song title + artist + annotation) on
+        // the player/lyrics pages. When the "apply font to page" toggle is off, return null so
+        // those texts fall back to the global app font, leaving the lyric body font untouched.
+        fontFamily = if (lyricFontApplyToPage) lyricFontFamily else null,
         fontPath = effectiveLyricFontPath,
         fontWeight = lyricFontWeight,
         fontScale = lyricFontScale,

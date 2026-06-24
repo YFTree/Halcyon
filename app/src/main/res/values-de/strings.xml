@@ -793,8 +793,6 @@
     <string name="settings_lyric_font_system_default_summary">Liedtexte mit der Standard-App-Schrift darstellen</string>
     <string name="settings_lyric_font_system_default_applied">Standard-App-Schrift wird verwendet</string>
     <string name="settings_lyric_font_apply_to_page">Auf Liedtextseite anwenden</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">Benutzerdefinierter Schriftstil wird auf der Liedtextseite angewendet</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">Die Liedtextseite behält den Standardschriftstil</string>
     <string name="settings_lyric_font_italic">Kursiv</string>
     <string name="settings_lyric_font_italic_summary_enabled">Kursiven Stil auf der Liedtextseite verwenden</string>
     <string name="settings_lyric_font_italic_summary_disabled">Normalen aufrechten Stil auf der Liedtextseite verwenden</string>

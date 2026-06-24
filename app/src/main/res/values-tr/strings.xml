@@ -791,8 +791,6 @@
     <string name="settings_lyric_font_system_default_summary">Şarkı sözlerini varsayılan uygulama yazı tipiyle oluştur</string>
     <string name="settings_lyric_font_system_default_applied">Varsayılan uygulama yazı tipini kullanma</string>
     <string name="settings_lyric_font_apply_to_page">Şarkı sözü sayfasına uygula</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">Şarkı sözü sayfasına özel yazı tipi stili uygulanır</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">Şarkı sözü sayfası varsayılan yazı tipi stilini korur</string>
     <string name="settings_lyric_font_italic">italik</string>
     <string name="settings_lyric_font_italic_summary_enabled">Şarkı sözü sayfasında italik stil kullanın</string>
     <string name="settings_lyric_font_italic_summary_disabled">Şarkı sözü sayfasında normal dikey stili kullanın</string>

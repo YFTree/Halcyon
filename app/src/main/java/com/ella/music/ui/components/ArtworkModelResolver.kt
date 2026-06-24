@@ -132,7 +132,10 @@ private val embeddedArtworkExtensions = setOf(
 )
 
 private object ArtworkModelMemoryCache {
-    private val cache = LruCache<String, Any>(96)
+    // Larger cache so that browsing a long playback-history list (which loads many covers via
+    // produceState) does not evict the artwork models resolved for the main library grid, which
+    // would make every library cell briefly fall back to DefaultAlbumCover on return.
+    private val cache = LruCache<String, Any>(256)
 
     @Synchronized
     fun get(key: String): Any? = cache.get(key)

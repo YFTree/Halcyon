@@ -870,9 +870,10 @@
     <string name="settings_lyric_font_list">Font list</string>
     <string name="settings_lyric_font_system_default_summary">Render lyrics with the default app font</string>
     <string name="settings_lyric_font_system_default_applied">Using the default app font</string>
-    <string name="settings_lyric_font_apply_to_page">Apply to lyric page</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">Custom font styling is applied to the lyric page</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">The lyric page keeps the default font styling</string>
+    <string name="settings_lyric_font_apply_to_page">Apply to player/lyric page</string>
+    <string name="settings_lyric_font_apply_to_page_summary">Song title, artist and annotation on the player and lyric pages follow the custom font; off uses the global font</string>
+    <string name="settings_lyric_font_apply_to_desktop">Apply to desktop lyric</string>
+    <string name="settings_lyric_font_apply_to_desktop_summary">Desktop lyric follows the custom font; off uses the system default font</string>
     <string name="settings_lyric_font_italic">Italic</string>
     <string name="settings_lyric_font_italic_summary_enabled">Use italic styling on the lyric page</string>
     <string name="settings_lyric_font_italic_summary_disabled">Use the normal upright style on the lyric page</string>
@@ -901,7 +902,7 @@
     <string name="settings_openai_model">OpenAI model</string>
     <string name="settings_openai_model_summary">For example %1$s; change it to any model available to your account</string>
     <string name="settings_lyric_share_card">Lyric share card</string>
-    <string name="settings_lyric_share_use_lyric_font">Use lyric font</string>
+    <string name="settings_lyric_share_use_lyric_font">Apply font to lyric card</string>
     <string name="settings_lyric_share_use_lyric_font_summary">Preview and shared cards follow the lyric page custom font and weight</string>
     <string name="settings_lyric_share_custom_info">Custom info</string>
     <string name="settings_lyric_share_custom_info_summary">Leave blank to show Halcyon; fill a name to show by @name</string>

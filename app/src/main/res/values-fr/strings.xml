@@ -793,8 +793,6 @@
     <string name="settings_lyric_font_system_default_summary">Afficher les paroles avec la police par défaut de l’application</string>
     <string name="settings_lyric_font_system_default_applied">Police par défaut de l’application utilisée</string>
     <string name="settings_lyric_font_apply_to_page">Appliquer à la page des paroles</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">Le style de police personnalisé est appliqué à la page des paroles</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">La page des paroles conserve le style de police par défaut</string>
     <string name="settings_lyric_font_italic">Italique</string>
     <string name="settings_lyric_font_italic_summary_enabled">Utiliser le style italique sur la page des paroles</string>
     <string name="settings_lyric_font_italic_summary_disabled">Utiliser le style droit normal sur la page des paroles</string>

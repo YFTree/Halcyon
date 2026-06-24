@@ -430,6 +430,8 @@
     <string name="listening_calendar_empty_day">今日无播放记录</string>
     <string name="listening_calendar_records_total">%1$d 条播放记录</string>
     <string name="listening_calendar_unique_songs">%1$d 首不同歌曲</string>
+    <string name="listening_calendar_remove_history_title">移除听歌记录</string>
+    <string name="listening_calendar_remove_history_message">确定移除这条听歌记录吗？移除后该记录将不再显示，便于排除错误歌曲记录导致的问题。</string>
     <string name="album_search_placeholder">搜索专辑或艺术家</string>
     <string name="album_empty">未找到专辑</string>
     <string name="album_list_summary">%1$d 张专辑 · %2$s</string>
@@ -939,9 +941,6 @@
     <string name="settings_lyric_font_list">字体列表</string>
     <string name="settings_lyric_font_system_default_summary">使用应用默认字体渲染歌词</string>
     <string name="settings_lyric_font_system_default_applied">已使用应用默认字体</string>
-    <string name="settings_lyric_font_apply_to_page">应用到歌词页</string>
-    <string name="settings_lyric_font_apply_to_page_summary_enabled">已将自定义字体效果应用到歌词页</string>
-    <string name="settings_lyric_font_apply_to_page_summary_disabled">歌词页继续使用默认字体样式</string>
     <string name="settings_lyric_font_italic">斜体</string>
     <string name="settings_lyric_font_italic_summary_enabled">歌词页使用斜体样式</string>
     <string name="settings_lyric_font_italic_summary_disabled">歌词页使用正常字形</string>
@@ -970,8 +969,12 @@
     <string name="settings_openai_model">OpenAI 模型</string>
     <string name="settings_openai_model_summary">例如 %1$s；可按账号可用模型自行修改</string>
     <string name="settings_lyric_share_card">歌词卡片分享</string>
-    <string name="settings_lyric_share_use_lyric_font">使用歌词字体</string>
+    <string name="settings_lyric_share_use_lyric_font">字体应用到歌词卡片</string>
     <string name="settings_lyric_share_use_lyric_font_summary">开启后分享卡片和预览会跟随歌词页的自定义字体与粗细</string>
+    <string name="settings_lyric_font_apply_to_page">字体应用到播放页/歌词页</string>
+    <string name="settings_lyric_font_apply_to_page_summary">开启后播放页与歌词页的歌曲名称、艺术家名称、注释跟随自定义字体；关闭则使用全局字体</string>
+    <string name="settings_lyric_font_apply_to_desktop">字体应用到桌面歌词</string>
+    <string name="settings_lyric_font_apply_to_desktop_summary">开启后桌面歌词跟随自定义字体；关闭则使用系统默认字体</string>
     <string name="settings_lyric_share_custom_info">自定义信息</string>
     <string name="settings_lyric_share_custom_info_summary">留空显示 Halcyon；填写名称后显示为 by @名称</string>
     <string name="settings_tag_scraping">音乐标签刮削</string>

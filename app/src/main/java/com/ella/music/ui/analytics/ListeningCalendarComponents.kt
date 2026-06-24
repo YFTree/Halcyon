@@ -2,8 +2,10 @@ package com.ella.music.ui.analytics
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ella.music.R
+import com.ella.music.data.PlaybackHistoryEntry
 import com.ella.music.data.audioQualitySummary
 import com.ella.music.data.model.AudioInfo
 import com.ella.music.data.model.Song
@@ -129,7 +132,8 @@ internal fun ListeningDayDetailSection(
     day: ListeningDayAggregate?,
     mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
-    onSongMore: (Song) -> Unit
+    onSongMore: (Song) -> Unit,
+    onRemoveHistoryEntry: (PlaybackHistoryEntry) -> Unit
 ) {
     if (day == null || day.entries.isEmpty()) {
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -231,7 +235,8 @@ internal fun ListeningDayDetailSection(
                     isLast = index == day.entries.lastIndex,
                     mainViewModel = mainViewModel,
                     playerViewModel = playerViewModel,
-                    onSongMore = onSongMore
+                    onSongMore = onSongMore,
+                    onRemoveHistoryEntry = onRemoveHistoryEntry
                 )
             }
         }
@@ -297,13 +302,15 @@ private fun ListeningActionIconButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ListeningTimelineRow(
     entry: ListeningTimelineEntry,
     isLast: Boolean,
     mainViewModel: MainViewModel,
     playerViewModel: PlayerViewModel,
-    onSongMore: (Song) -> Unit
+    onSongMore: (Song) -> Unit,
+    onRemoveHistoryEntry: (PlaybackHistoryEntry) -> Unit
 ) {
     val song = entry.song
     val canPlaySong = remember(song) { song?.isPlayableCalendarSong() == true }
@@ -359,10 +366,14 @@ private fun ListeningTimelineRow(
             )
 
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    song?.takeIf { canPlaySong }?.let { playerViewModel.playSong(it) }
-                }
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = {
+                            song?.takeIf { canPlaySong }?.let { playerViewModel.playSong(it) }
+                        },
+                        onLongClick = { onRemoveHistoryEntry(entry.entry) }
+                    )
             ) {
                 Row(
                     modifier = Modifier
