@@ -252,6 +252,70 @@ class MusicRepository(private val context: Context) {
         return MusicScanSummary(total = _songs.value.size)
     }
 
+    /**
+     * Refreshes (re-scans) the songs within the given [folders] and **merges** the results into
+     * the current library, rather than replacing the entire library. This is used by the
+     * "文件夹歌单" (folder playlist) refresh action: only songs under the playlist's folders are
+     * re-scanned for metadata/cover updates, and any newly-discovered songs in those folders are
+     * added. Songs elsewhere in the library are left untouched.
+     *
+     * @return a summary of the refresh (added/updated counts).
+     */
+    suspend fun refreshFolders(
+        folders: List<String>,
+        minDurationMs: Long = 0,
+        deepMetadata: Boolean = true
+    ): MusicScanSummary = withContext(Dispatchers.IO) {
+        val normalizedFolders = folders.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        if (normalizedFolders.isEmpty()) return@withContext MusicScanSummary(total = _songs.value.size)
+
+        val existingSongs = _songs.value
+        val existingByPath = existingSongs.associateBy { it.path }
+        val existingPaths = existingByPath.keys
+
+        // Scan only the specified folders.
+        val scannedSongs = scanner.scanAllSongs(
+            minDurationMs = minDurationMs,
+            includeFolders = normalizedFolders,
+            excludeFolders = emptyList(),
+            deepMetadata = deepMetadata
+        ) { count -> scanProgressState.update(count) }
+
+        val scannedByPath = scannedSongs.associateBy { it.path }
+        var updatedCount = 0
+        var addedCount = 0
+
+        // Build the merged library: keep all existing songs, but replace/update those whose path
+        // falls within the scanned folders, and add any brand-new songs found.
+        val merged = existingSongs.mapTo(ArrayList(existingSongs.size)) { existing ->
+            val scanned = scannedByPath[existing.path]
+            if (scanned != null) {
+                if (scanned != existing) updatedCount++
+                scanned
+            } else {
+                existing
+            }
+        }
+        // Add songs that are in the scanned folders but not already in the library.
+        val newPathSongs = scannedSongs.filter { it.path !in existingPaths }
+        if (newPathSongs.isNotEmpty()) {
+            merged.addAll(newPathSongs)
+            addedCount = newPathSongs.size
+        }
+
+        val clearedRatingSnapshots = snapshotManager.clearMissingFileSnapshots(merged.map { it.path }.toSet())
+        _songs.value = merged
+        _albums.value = merged.toAlbums()
+        saveLibraryCache(merged, _albums.value)
+        AppLogStore.info(
+            context,
+            "MusicScanner",
+            "Folder refresh finished: folders=${normalizedFolders.size} scanned=${scannedSongs.size} added=$addedCount updated=$updatedCount total=${merged.size}",
+            AppLogType.LIBRARY
+        )
+        MusicScanSummary(total = merged.size, added = addedCount, updated = updatedCount)
+    }
+
     private suspend fun synchronizeLibrary(
         minDurationMs: Long,
         includeFolders: List<String>,

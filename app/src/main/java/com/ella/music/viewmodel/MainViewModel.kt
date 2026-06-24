@@ -119,6 +119,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Refreshes (re-scans) the songs within the given [folders] and **merges** the results into
+     * the current library. Unlike [scanMusicForFolders], this does NOT replace the entire library —
+     * it only re-scans the specified folders for metadata/cover updates and adds any newly-found
+     * songs in those folders, leaving all other library entries untouched.
+     *
+     * Use this for the "文件夹歌单" (folder playlist) refresh action.
+     */
+    fun refreshFolderPlaylistFolders(folders: List<String>) {
+        if (scanJob?.isActive == true || isScanning.value) return
+        val normalizedFolders = folders.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        if (normalizedFolders.isEmpty()) return
+        scanJob = viewModelScope.launch {
+            repository.startScanning()
+            val summary = try {
+                val minDuration = settingsManager.minDurationSec.first() * 1000L
+                repository.refreshFolders(
+                    folders = normalizedFolders,
+                    minDurationMs = minDuration,
+                    deepMetadata = true
+                )
+            } finally {
+                repository.finishScanning()
+            }
+            repository.emitScanSummary(summary)
+            preloadLibrarySearchSnapshot()
+            withContext(Dispatchers.IO) {
+                prewarmLibraryAnalysisCache(getApplication(), songs.value, this@MainViewModel)
+            }
+        }
+    }
+
     fun scanMusicIfAutoEnabled() {
         if (autoScanRequested) return
         autoScanRequested = true

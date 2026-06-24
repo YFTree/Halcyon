@@ -708,17 +708,25 @@ internal object EllaLyricsParser {
         val cleanedWords = words
             .map { it.copy(text = it.text.removeBackgroundParentheses()) }
             .filter { it.text.isNotBlank() }
+        // If the collected text has no spaces but we have multiple words, the spans were
+        // likely adjacent without inter-span whitespace. Rebuild the display text by
+        // joining the individual word texts with spaces so it renders correctly.
+        val displayText = if (cleanedWords.size > 1 && text.isNotBlank() && !text.hasCjk() && !text.contains(' ')) {
+            cleanedWords.joinToString(" ") { it.text.cleanLyricText() }.cleanLyricText()
+        } else {
+            text
+        }
         val bgStart = attr("begin").parseTtmlTime() ?: cleanedWords.minOfOrNull { it.startMs }
         val bgEnd = attr("end").parseTtmlTime() ?: cleanedWords.maxOfOrNull { it.endMs } ?: fallbackEnd
         // When x-bg has no inner timed spans but has overall begin/end timing,
         // create estimated per-word timing so x-bg animates per-word like v1/v2.
-        val effectiveWords = if (cleanedWords.isEmpty() && text.isNotBlank() && bgStart != null && bgEnd != null) {
-            text.estimateTtmlBackgroundWords(bgStart, bgEnd)
+        val effectiveWords = if (cleanedWords.isEmpty() && displayText.isNotBlank() && bgStart != null && bgEnd != null) {
+            displayText.estimateTtmlBackgroundWords(bgStart, bgEnd)
         } else {
             cleanedWords
         }
         return TtmlBackground(
-            text = text,
+            text = displayText,
             words = effectiveWords,
             translation = translation,
             startMs = bgStart,
@@ -1131,6 +1139,12 @@ internal object EllaLyricsParser {
         if (isEmpty() || lineText.isBlank()) return this
         val normalized = lineText.cleanLyricText()
         if (normalized.hasCjk()) return withSpacing(normalized)
+        // If the line text has no spaces but we have multiple words, the text was likely
+        // concatenated from TTML spans without inter-span whitespace (e.g. x-bg spans that
+        // are directly adjacent). Don't try token matching — it would collapse all words
+        // into a single blob. Return the individual words directly; they already have
+        // proper per-word text and timing.
+        if (!normalized.contains(' ') && size > 1) return this
         val tokens = Regex("""\S+\s*""").findAll(normalized).map { it.value }.toList()
         if (tokens.isEmpty()) return withSpacing(normalized)
         val result = mutableListOf<LyricWord>()

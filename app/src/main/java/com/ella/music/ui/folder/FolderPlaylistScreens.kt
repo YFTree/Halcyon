@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -96,6 +97,12 @@ fun FolderPlaylistsScreen(
     val availableFolders = remember(songs) { songs.availableFolderPlaylistFolders() }
     var editorTarget by remember { mutableStateOf<FolderPlaylist?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    // Hoist the editor's draft state so it persists across dialog open/close within the same
+    // session. Reset only when the editor target changes (i.e. user opens "new" or a different
+    // playlist). This keeps previously-selected folders pinned to the top even after closing
+    // and reopening the editor, avoiding accidental mis-taps.
+    var editorDraftName by remember(editorTarget?.id) { mutableStateOf(editorTarget?.name.orEmpty()) }
+    var editorDraftFolders by remember(editorTarget?.id) { mutableStateOf(editorTarget?.folders.orEmpty().toSet()) }
     var pendingDelete by remember { mutableStateOf<FolderPlaylist?>(null) }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -131,6 +138,18 @@ fun FolderPlaylistsScreen(
                         folder.contains(query, ignoreCase = true) ||
                             folder.substringAfterLast('/').contains(query, ignoreCase = true)
                     }
+            }
+        }
+    }
+
+    BackHandler(enabled = searchExpanded || moreMenuTarget != null || pendingDelete != null || showEditor) {
+        when {
+            showEditor -> showEditor = false
+            pendingDelete != null -> pendingDelete = null
+            moreMenuTarget != null -> moreMenuTarget = null
+            searchExpanded -> {
+                searchExpanded = false
+                searchQuery = ""
             }
         }
     }
@@ -257,7 +276,7 @@ fun FolderPlaylistsScreen(
                         onClick = { onOpenPlaylist(playlist.id) },
                         onSync = {
                             scope.launch {
-                                mainViewModel.scanMusicForFolders(playlist.folders)
+                                mainViewModel.refreshFolderPlaylistFolders(playlist.folders)
                                 Toast.makeText(context, R.string.folder_playlist_more_refresh, Toast.LENGTH_SHORT).show()
                             }
                         },
@@ -292,7 +311,7 @@ fun FolderPlaylistsScreen(
                 EllaMiuixMenuItem(
                     text = stringResource(R.string.folder_playlist_more_refresh),
                     onClick = {
-                        scope.launch { mainViewModel.scanMusicForFolders(playlist.folders) }
+                        scope.launch { mainViewModel.refreshFolderPlaylistFolders(playlist.folders) }
                         moreMenuTarget = null
                     }
                 )
@@ -326,6 +345,10 @@ fun FolderPlaylistsScreen(
         show = showEditor,
         target = editorTarget,
         availableFolders = availableFolders,
+        draftName = editorDraftName,
+        onDraftNameChange = { editorDraftName = it },
+        selectedFolders = editorDraftFolders,
+        onSelectedFoldersChange = { editorDraftFolders = it },
         onDismiss = { showEditor = false },
         onSave = { target, name, folders ->
             scope.launch {
@@ -734,14 +757,16 @@ private fun FolderPlaylistEditorSheet(
     show: Boolean,
     target: FolderPlaylist?,
     availableFolders: List<String>,
+    draftName: String,
+    onDraftNameChange: (String) -> Unit,
+    selectedFolders: Set<String>,
+    onSelectedFoldersChange: (Set<String>) -> Unit,
     onDismiss: () -> Unit,
     onSave: (FolderPlaylist?, String, List<String>) -> Unit
 ) {
     if (!show) return
-    var draftName by remember(target?.id, show) { mutableStateOf(target?.name.orEmpty()) }
-    var selectedFolders by remember(target?.id, show) { mutableStateOf(target?.folders.orEmpty().toSet()) }
-    var searchQuery by remember(show) { mutableStateOf("") }
-    var editorSort by remember(show) { mutableStateOf(EditorFolderSort.Name) }
+    var searchQuery by remember { mutableStateOf("") }
+    var editorSort by remember { mutableStateOf(EditorFolderSort.Name) }
 
     val filteredFolders = remember(availableFolders, searchQuery) {
         if (searchQuery.isBlank()) availableFolders
@@ -751,20 +776,19 @@ private fun FolderPlaylistEditorSheet(
         }
     }
 
-    val sortedFilteredFolders = remember(filteredFolders, editorSort, selectedFolders, target?.id) {
+    // Pin selected folders to the top regardless of whether we're creating a new playlist or
+    // editing an existing one. This makes the selected folders easy to find and avoids
+    // accidental mis-taps when scrolling through a long folder list.
+    val sortedFilteredFolders = remember(filteredFolders, editorSort, selectedFolders) {
         val base = when (editorSort) {
             EditorFolderSort.Name -> filteredFolders.sortedBy { it.substringAfterLast('/').lowercase() }
             EditorFolderSort.ModifiedTime -> filteredFolders.sortedByDescending { it }
             EditorFolderSort.SongCount -> filteredFolders
         }
-        if (target == null) {
-            base
-        } else {
-            base.sortedWith(
-                compareByDescending<String> { it in selectedFolders }
-                    .thenBy { base.indexOf(it) }
-            )
-        }
+        base.sortedWith(
+            compareByDescending<String> { it in selectedFolders }
+                .thenBy { base.indexOf(it) }
+        )
     }
 
     EllaMiuixBottomSheet(
@@ -784,7 +808,7 @@ private fun FolderPlaylistEditorSheet(
         ) {
             EllaMiuixTextField(
                 value = draftName,
-                onValueChange = { draftName = it },
+                onValueChange = onDraftNameChange,
                 label = stringResource(R.string.playlist_name_label),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -831,7 +855,9 @@ private fun FolderPlaylistEditorSheet(
                         summary = folder,
                         checked = folder in selectedFolders,
                         onCheckedChange = { checked ->
-                            selectedFolders = if (checked) selectedFolders + folder else selectedFolders - folder
+                            onSelectedFoldersChange(
+                                if (checked) selectedFolders + folder else selectedFolders - folder
+                            )
                         }
                     )
                 }

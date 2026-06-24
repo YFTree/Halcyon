@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -372,7 +374,6 @@ internal fun CoverPlayerPage(
                             .fillMaxWidth()
                             .weight(1f)
                             .background(playerContentSurfaceBrush(pagePalette, flowEffectMode))
-                            .windowInsetsPadding(WindowInsets.navigationBars)
                             .padding(horizontal = 28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -478,7 +479,7 @@ internal fun CoverPlayerPage(
                             onMoveQueueSong = onMoveQueueSong,
                             onAddQueueToPlaylist = onAddQueueToPlaylist,
                             onClearQueue = onClearQueue,
-                            modifier = Modifier.height(76.dp)
+                            modifier = Modifier.requiredHeight(76.dp)
                         )
                         if (!compactWindow) {
                             AudioVisualizer(
@@ -493,13 +494,15 @@ internal fun CoverPlayerPage(
                                     .height(30.dp)
                             )
                         }
+                        Spacer(
+                            modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
+                        )
                     }
                 } else {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .windowInsetsPadding(WindowInsets.statusBars)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
                             .padding(horizontal = 28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -655,9 +658,12 @@ internal fun CoverPlayerPage(
                             onMoveQueueSong = onMoveQueueSong,
                             onAddQueueToPlaylist = onAddQueueToPlaylist,
                             onClearQueue = onClearQueue,
-                            modifier = Modifier.height(92.dp)
+                            modifier = Modifier.requiredHeight(92.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(
+                            modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
+                        )
                     }
                 }
             }

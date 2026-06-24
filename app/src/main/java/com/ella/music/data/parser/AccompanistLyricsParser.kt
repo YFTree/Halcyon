@@ -420,50 +420,30 @@ internal object AccompanistLyricsParser {
         // return as-is — nothing to fix.
         if (!rawDisplay.needsLatinWordSplit()) return rawDisplay to rawWords
 
-        // Split concatenated Latin text into words
-        val wordList = Regex("""[A-Za-z0-9']+""").findAll(rawDisplay)
-            .map { it.value }
-            .filter { it.isNotBlank() }
-            .toList()
-
-        if (wordList.size <= 1) {
-            // Can't split into multiple words; return original but at least ensure
-            // we have one LyricWord for rendering.
-            if (rawWords.isEmpty()) {
-                return rawDisplay to listOf(
-                    LyricWord(
-                        text = rawDisplay,
-                        startMs = bgStart ?: 0L,
-                        endMs = bgEnd ?: (bgStart ?: 0L) + 3000L
-                    )
-                )
+        // Strategy 1: If we have multiple words with proper per-word text/timing
+        // (from separate TTML spans), use them directly. The display text was likely
+        // concatenated because spans were adjacent without inter-span whitespace.
+        if (rawWords.size > 1) {
+            val wordTexts = rawWords.map { it.text.trim() }.filter { it.isNotBlank() }
+            if (wordTexts.size > 1) {
+                val fixedDisplay = wordTexts.joinToString(" ")
+                return fixedDisplay to rawWords
             }
-            return rawDisplay to rawWords
         }
 
-        // Create estimated per-word timing
-        val effectiveStart = bgStart ?: rawWords.minOfOrNull { it.startMs } ?: 0L
-        val effectiveEnd = bgEnd ?: rawWords.maxOfOrNull { it.endMs } ?: (effectiveStart + 3000L)
-        val totalDuration = (effectiveEnd - effectiveStart).coerceAtLeast(wordList.size * 150L)
-
-        // Weight each word by character count (longer words get more time)
-        val weights = wordList.map { estimateWordWeight(it).toDouble() }
-        val totalWeight = weights.sum().coerceAtLeast(1.0)
-
-        var cursor = effectiveStart
-        val estimatedWords = wordList.mapIndexed { idx, word ->
-            val weight = weights[idx]
-            val duration = (totalDuration * weight / totalWeight).toLong().coerceAtLeast(150L)
-            val wStart = cursor
-            val wEnd = cursor + duration
-            cursor = wEnd
-            LyricWord(text = word, startMs = wStart, endMs = wEnd)
+        // Strategy 2: Single span/syllable with all text concatenated.
+        // We can't reliably split without a dictionary, so return as-is with
+        // at least one LyricWord for rendering.
+        if (rawWords.isEmpty()) {
+            return rawDisplay to listOf(
+                LyricWord(
+                    text = rawDisplay,
+                    startMs = bgStart ?: 0L,
+                    endMs = bgEnd ?: (bgStart ?: 0L) + 3000L
+                )
+            )
         }
-
-        // Reconstruct display text with proper spacing
-        val fixedDisplay = wordList.joinToString(" ")
-
-        return fixedDisplay to estimatedWords
+        return rawDisplay to rawWords
     }
 
     /** Heuristic: does this text look like concatenated Latin words missing spaces? */

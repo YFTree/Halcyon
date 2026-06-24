@@ -1,6 +1,7 @@
 package com.ella.music.ui.search
 
 import android.content.Context
+import androidx.compose.runtime.saveable.Saver
 import com.ella.music.R
 import com.ella.music.data.decodeNeteaseKey
 import com.ella.music.data.model.Album
@@ -50,6 +51,15 @@ internal val SearchFilter.acceptsSongResults: Boolean
 
 internal val SearchFilter.supportsDuplicateFilter: Boolean
     get() = this in listOf(SearchFilter.All, SearchFilter.Songs)
+
+/**
+ * Saver for [SearchFilter] so it can survive process death and — more importantly — be
+ * retained via `rememberSaveable` across navigation back-stack pops (e.g. opening an
+ * album/playlist detail from search results and pressing back returns to the same tab
+ * instead of resetting to "All").
+ */
+internal val SearchFilterSaver: Saver<SearchFilter, String> =
+    Saver(save = { it.name }, restore = { runCatching { SearchFilter.valueOf(it) }.getOrDefault(SearchFilter.All) })
 
 internal data class ArtistSearchResult(
     val artist: Artist,

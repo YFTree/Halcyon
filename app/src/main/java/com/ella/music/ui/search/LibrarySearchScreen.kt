@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,8 +107,13 @@ fun LibrarySearchScreen(
     val showPlayNextInLists by settingsManager.showPlayNextInLists.collectAsState(initial = false)
     val scanExcludeFolders by settingsManager.scanExcludeFolders.collectAsState(initial = "")
     val blockedFolders = remember(scanExcludeFolders) { scanExcludeFolders.toFolderSettingList() }
-    var query by remember(initialQuery) { mutableStateOf(initialQuery.orEmpty()) }
-    var filter by remember(initialFilterType) { mutableStateOf(SearchFilter.fromRouteType(initialFilterType)) }
+    var query by rememberSaveable(initialQuery) { mutableStateOf(initialQuery.orEmpty()) }
+    // Persist the selected filter across navigation (e.g. opening an album/playlist detail and
+    // coming back) so the user doesn't get bounced back to the "All" tab. Uses a String-backed
+    // saver because SearchFilter is an enum; we store its name and map back on restore.
+    var filter by rememberSaveable(initialFilterType, stateSaver = SearchFilterSaver) {
+        mutableStateOf(SearchFilter.fromRouteType(initialFilterType))
+    }
     var duplicatesOnly by remember { mutableStateOf(false) }
     var actionSong by remember { mutableStateOf<Song?>(null) }
     var actionTarget by remember { mutableStateOf<SearchActionTarget?>(null) }
@@ -463,7 +469,9 @@ fun LibrarySearchScreen(
                 onSearch = { commitSearch() },
                 placeholder = stringResource(R.string.library_search_page_placeholder),
                 modifier = Modifier.weight(1f),
-                autoFocus = autoFocusSearch
+                // Only force-focus from deep links (focus=true). For normal entries pass null so
+                // EllaSearchBar falls back to the user's "auto show keyboard" setting.
+                autoFocus = autoFocusSearch.takeIf { it }
             )
         }
 

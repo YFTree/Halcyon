@@ -426,7 +426,6 @@ fun ArtistScreen(
         selectedIds = selectedIds.filterTo(mutableSetOf()) { it in visibleIds }
         if (rangeAnchorId !in visibleIds) rangeAnchorId = selectedIds.firstOrNull()
         if (rangeTargetId !in visibleIds) rangeTargetId = null
-        if (selectedIds.isEmpty()) selectionMode = false
     }
 
     LaunchedEffect(scrollToTopRequest) {

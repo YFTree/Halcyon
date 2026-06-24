@@ -240,7 +240,6 @@ fun MetadataCategoryScreen(
         if (!selectionMode) return@LaunchedEffect
         val visibleKeys = currentSelectionKeys.toSet()
         selectedNames = selectedNames.filterTo(linkedSetOf()) { it in visibleKeys }
-        if (selectedNames.isEmpty()) selectionMode = false
     }
 
     val overlayColor = wallpaperContentOverlayColor()
@@ -498,8 +497,7 @@ fun MetadataCategoryScreen(
                                 if (selectionMode) {
                                     toggleSelection(item.name)
                                 } else {
-                                    selectionMode = true
-                                    selectedNames = selectedNames + item.name
+                                    categoryMenuItem = item
                                 }
                             }
                         )

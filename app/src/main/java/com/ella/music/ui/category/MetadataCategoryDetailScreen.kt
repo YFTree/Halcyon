@@ -407,7 +407,6 @@ fun MetadataCategoryDetailScreen(
         selectedIds = selectedIds.filterTo(mutableSetOf()) { it in visibleIds }
         if (rangeAnchorId !in visibleIds) rangeAnchorId = selectedIds.firstOrNull()
         if (rangeTargetId !in visibleIds) rangeTargetId = null
-        if (selectedIds.isEmpty()) selectionMode = false
     }
     LaunchedEffect(type, sortIndex) {
         if (type == "folder" && sortIndex == MetadataDetailSongSortMode.AlbumTrack.ordinal) {
@@ -731,9 +730,12 @@ fun MetadataCategoryDetailScreen(
                             selectionMode = selectionMode,
                             selected = selected,
                             onLongClick = {
-                                selectionMode = true
-                                selectedIds = selectedIds + song.id
-                                updateRangeAnchorsForManualSelection(song.id, selectedNow = true)
+                                if (selectionMode) {
+                                    toggleSongSelection(song.id)
+                                    updateRangeAnchorsForManualSelection(song.id, selectedNow = song.id !in selectedIds)
+                                } else {
+                                    actionSong = song
+                                }
                             },
                             onClick = {
                                 if (selectionMode) {
