@@ -37,8 +37,8 @@ It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, 
 
 ### 🎵 Library & Playlists
 
-- Supports local MediaStore scanning and custom folder scanning, with browsing by album, artist, folder, genre, year, composer, and lyricist.
-- Provides a dedicated library search page with song, album, artist, lyric, duplicate-song, and full-tag search, plus search history.
+- Supports local MediaStore scanning and custom folder scanning, with browsing by album, artist, folder, genre, year, composer, and lyricist; long-press the scan button to trigger a deep full-tag rescan.
+- Provides a dedicated library search page with song, album, artist, lyric, duplicate-song, and full-tag search, plus search history, multi-select, and range selection.
 - Supports local playlists, favorites, five-star songs, playlist import / export, desktop shortcuts, and custom drag sorting.
 - Album grouping uses both album name and album artist to avoid merging same-name albums from different artists.
 - Includes library analytics, listening calendar, play-count ranking, listening-duration ranking, format distribution, and quality distribution.
@@ -71,8 +71,8 @@ It focuses on local music and lyrics, with a MIUI / HyperOS-inspired interface, 
 
 ### 🎚 Audio Effects, Decoding, Tags & Quality
 
-- Includes an in-app equalizer with multi-band EQ mapped to the device output, bass boost, and virtualizer.
-- Uses lyrico-audiotag as the primary local metadata path, supporting artwork, basic tags, and embedded lyrics for common audio formats.
+- Includes an in-app software 10-band parametric equalizer that does not depend on the system Equalizer, with bass boost and virtualizer shown based on device capability.
+- Uses lyrico-audiotag as the primary local metadata path, supporting artwork, basic tags, embedded lyrics, and multi-value tags for common audio formats.
 - The built-in tag editor supports editing basic tags, lyrics, and embedded artwork.
 - Provides system, FFmpeg, and automatic decoding modes for better ALAC / AAC / M4A compatibility.
 - Supports ReplayGain, shuffle queue restoration, quality labels, and 24-bit / 96 kHz recognition.
